@@ -1,0 +1,1415 @@
+/////////// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// =========================
+/// ENUMS
+/// =========================
+
+enum UserRole {
+  SUPER_ADMIN
+  ANTENNA_ADMIN
+  MEMBER
+}
+
+enum UserStatus {
+  EMAIL_UNVERIFIED // membre/admin créé mais email non vérifié (si activation par email)
+  PENDING_APPROVAL // email vérifié / créé, en attente validation admin
+  ACTIVE
+  REJECTED
+  SUSPENDED
+  DELETED // soft-delete logique
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+}
+
+enum LanguageCode {
+  FR
+  EN
+}
+
+enum CurrencyCode {
+  EUR
+  USD
+  GNF
+  XOF
+  GBP
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  MOBILE_MONEY
+  CARD
+  OTHER
+}
+
+enum ContributionStatus {
+  DRAFT
+  SUBMITTED // dépôt déclaré par membre
+  PENDING_VALIDATION // en attente validation admin antenne
+  VALIDATED
+  REJECTED
+  CANCELLED
+}
+
+enum ValidationChannel {
+  PHYSICAL_CASH
+  BANK_STATEMENT
+  MOBILE_MONEY_RECEIPT
+  TRANSFER_PROOF
+  OTHER
+}
+
+enum ProjectStatus {
+  PROPOSED
+  UNDER_REVIEW
+  MEMBER_APPROVAL_PENDING
+  APPROVED
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+  ARCHIVED
+}
+
+enum ProposalStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  CONVERTED_TO_PROJECT
+}
+
+enum VoteChoice {
+  YES
+  NO
+  ABSTAIN
+}
+
+enum VoteSessionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  CANCELLED
+  PUBLISHED
+}
+
+enum NotificationType {
+  ACCOUNT_EMAIL_VERIFICATION
+  ACCOUNT_APPROVED
+  ACCOUNT_REJECTED
+  ACCOUNT_SUSPENDED
+
+  CONTRIBUTION_SUBMITTED
+  CONTRIBUTION_VALIDATED
+  CONTRIBUTION_REJECTED
+  CONTRIBUTION_CANCELLED
+
+  PROJECT_PROPOSAL_SUBMITTED
+  PROJECT_PROPOSAL_APPROVED
+  PROJECT_PROPOSAL_REJECTED
+
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_STATUS_CHANGED
+  PROJECT_VOTE_OPEN
+  PROJECT_VOTE_CLOSED
+
+  NEWS_PUBLISHED
+  DOCUMENT_PUBLISHED
+
+  REMINDER_CONTRIBUTION_DELAY
+  SYSTEM_ALERT
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  SMS
+  PUSH
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  READ
+}
+
+enum FileCategory {
+  PROFILE_PHOTO
+  CONTRIBUTION_PROOF
+  PROJECT_IMAGE
+  PROJECT_DOCUMENT
+  NEWS_IMAGE
+  ASSOCIATION_DOCUMENT
+  ANTENNA_DOCUMENT
+  OTHER
+}
+
+enum FileVisibility {
+  PRIVATE
+  ANTENNA_ONLY
+  ASSOCIATION_WIDE
+  PUBLIC
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PostScope {
+  GLOBAL
+  ANTENNA
+}
+
+enum DocumentScope {
+  GLOBAL
+  ANTENNA
+  PROJECT
+  PRIVATE
+}
+
+enum MembershipApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+enum LedgerEntryType {
+  CONTRIBUTION_IN
+  DONATION_IN
+  MANUAL_ADJUSTMENT_IN
+  PROJECT_EXPENSE_OUT
+  OPERATING_EXPENSE_OUT
+  MANUAL_ADJUSTMENT_OUT
+}
+
+enum ProjectionPeriodType {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  SOFT_DELETE
+  RESTORE
+
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  PASSWORD_RESET_REQUEST
+  PASSWORD_RESET_SUCCESS
+
+  VERIFY_EMAIL
+  APPROVE_ACCOUNT
+  REJECT_ACCOUNT
+  SUSPEND_ACCOUNT
+  REACTIVATE_ACCOUNT
+
+  SUBMIT_CONTRIBUTION
+  VALIDATE_CONTRIBUTION
+  REJECT_CONTRIBUTION
+  CANCEL_CONTRIBUTION
+
+  CREATE_PROJECT
+  UPDATE_PROJECT
+  CHANGE_PROJECT_STATUS
+  CREATE_PROJECT_PROPOSAL
+  REVIEW_PROJECT_PROPOSAL
+  CREATE_VOTE_SESSION
+  CAST_VOTE
+
+  PUBLISH_NEWS
+  PUBLISH_DOCUMENT
+
+  CREATE_ANTENNA
+  UPDATE_ANTENNA
+  SUSPEND_ANTENNA
+  CREATE_ADMIN_ACCOUNT
+  ASSIGN_ADMIN_TO_ANTENNA
+  REMOVE_ADMIN_FROM_ANTENNA
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  CRON
+}
+
+enum TokenType {
+  EMAIL_VERIFICATION
+  PASSWORD_RESET
+  INVITATION
+}
+
+enum ReminderKind {
+  CONTRIBUTION_DELAY_3_MONTHS
+  CONTRIBUTION_DELAY_CUSTOM
+  GENERAL_ANNOUNCEMENT
+}
+
+/// =========================
+/// CORE STRUCTURE
+/// =========================
+
+model Association {
+  id                 String       @id @default(cuid())
+  code               String       @unique
+  name               String
+  description        String?
+  legalName          String?
+  registrationNumber String?
+  country            String?
+  city               String?
+  addressLine1       String?
+  addressLine2       String?
+  postalCode         String?
+  phone              String?
+  email              String?
+  websiteUrl         String?
+  logoFileId         String?
+  defaultCurrency    CurrencyCode @default(EUR)
+  isActive           Boolean      @default(true)
+
+  // paramètres globaux
+  contributionDelayThresholdMonths Int     @default(3) // retardataire > N mois
+  allowProjectVoting               Boolean @default(true)
+  requireEmailVerification         Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  logoFile FileAsset? @relation("AssociationLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
+
+  antennas               Antenna[]
+  users                  User[]
+  newsPosts              NewsPost[]
+  documents              Document[]
+  projects               Project[]
+  projectProposals       ProjectProposal[]
+  ledgerEntries          LedgerEntry[]
+  projections            FinancialProjection[]
+  notifications          Notification[]
+  settings               AssociationSetting[]
+  auditLogs              AuditLog[]
+  Membership             Membership[]
+  AntennaAdminAssignment AntennaAdminAssignment[]
+  AdminInvitation        AdminInvitation[]
+  AuthToken              AuthToken[]
+  Session                Session[]
+  Contribution           Contribution[]
+  BalanceSnapshot        BalanceSnapshot[]
+  VoteSession            VoteSession[]
+  FileAsset              FileAsset[]
+  ReminderRunLog         ReminderRunLog[]
+
+  @@index([isActive])
+  @@map("associations")
+}
+
+model Antenna {
+  id            String  @id @default(cuid())
+  associationId String
+  code          String
+  name          String
+  country       String?
+  city          String?
+  region        String?
+  addressLine1  String?
+  addressLine2  String?
+  postalCode    String?
+  phone         String?
+  email         String?
+  isActive      Boolean @default(true)
+  notes         String?
+
+  // Paramètres spécifiques antenne (peuvent override les réglages globaux)
+  delayThresholdMonthsOverride Int?
+  defaultCurrency              CurrencyCode?
+
+  // Gouvernance : créée uniquement par SUPER_ADMIN (règle backend)
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  suspendedAt     DateTime?
+  suspendedReason String?
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  createdByUser User?       @relation("AntennaCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  members             Membership[]
+  adminAssignments    AntennaAdminAssignment[]
+  contributions       Contribution[]
+  projects            Project[]
+  projectProposals    ProjectProposal[]
+  newsPosts           NewsPost[]
+  documents           Document[]
+  ledgerEntries       LedgerEntry[]
+  settings            AntennaSetting[]
+  notifications       Notification[]
+  reminders           ReminderRunLog[]
+  auditLogs           AuditLog[]
+  AdminInvitation     AdminInvitation[]
+  BalanceSnapshot     BalanceSnapshot[]
+  VoteSession         VoteSession[]
+  FinancialProjection FinancialProjection[]
+
+  @@unique([associationId, code])
+  @@unique([associationId, name])
+  @@index([associationId, isActive])
+  @@map("antennas")
+}
+
+/// =========================
+/// USERS / AUTH / MEMBERSHIP
+/// =========================
+
+model User {
+  id              String     @id @default(cuid())
+  associationId   String
+  email           String     @unique
+  emailVerifiedAt DateTime?
+  passwordHash    String
+  role            UserRole   @default(MEMBER)
+  status          UserStatus @default(EMAIL_UNVERIFIED)
+
+  firstName          String
+  lastName           String
+  fullNameNormalized String? // utile recherche/tri
+  phone              String?
+  birthDate          DateTime?
+  gender             Gender?
+  country            String?
+  city               String?
+  addressLine1       String?
+  addressLine2       String?
+  postalCode         String?
+  profilePhotoFileId String?
+
+  preferredLanguage LanguageCode @default(FR)
+  timezone          String?      @default("Europe/Paris")
+  isPhoneVerified   Boolean      @default(false)
+
+  // Gouvernance / traçabilité
+  createdByUserId   String? // SUPER_ADMIN pour admins / auto pour membres = null ou self workflow
+  approvedByUserId  String? // admin antenne ou super admin
+  approvedAt        DateTime?
+  rejectedByUserId  String?
+  rejectedAt        DateTime?
+  rejectionReason   String?
+  suspendedByUserId String?
+  suspendedAt       DateTime?
+  suspensionReason  String?
+  lastLoginAt       DateTime?
+
+  // Soft-delete
+  deletedAt       DateTime?
+  deletedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  association  Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  profilePhoto FileAsset?  @relation("UserProfilePhoto", fields: [profilePhotoFileId], references: [id], onDelete: SetNull)
+
+  // self relations (audit de gouvernance)
+  createdByUser User?  @relation("UserCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdUsers  User[] @relation("UserCreatedByUser")
+
+  approvedByUser User?  @relation("UserApprovedByUser", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  approvedUsers  User[] @relation("UserApprovedByUser")
+
+  rejectedByUser User?  @relation("UserRejectedByUser", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  rejectedUsers  User[] @relation("UserRejectedByUser")
+
+  suspendedByUser User?  @relation("UserSuspendedByUser", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
+  suspendedUsers  User[] @relation("UserSuspendedByUser")
+
+  deletedByUser User?  @relation("UserDeletedByUser", fields: [deletedByUserId], references: [id], onDelete: SetNull)
+  deletedUsers  User[] @relation("UserDeletedByUser")
+
+  // liens fonctionnels
+  memberships      Membership[]
+  adminAssignments AntennaAdminAssignment[]
+
+  // inverse relations manquantes (validation Prisma)
+  membershipsApproved Membership[] @relation("MembershipApprovedByUser")
+  membershipsRejected Membership[] @relation("MembershipRejectedByUser")
+
+  associationSettingsUpdated AssociationSetting[] @relation("AssociationSettingUpdatedByUser")
+  antennaSettingsUpdated     AntennaSetting[]     @relation("AntennaSettingUpdatedByUser")
+
+  antennaAdminAssignmentsGiven   AntennaAdminAssignment[] @relation("AntennaAdminAssignedByUser")
+  antennaAdminAssignmentsRevoked AntennaAdminAssignment[] @relation("AntennaAdminRevokedByUser")
+
+  adminInvitationsCreated AdminInvitation[] @relation("AdminInvitationCreatedByUser")
+  reminderRunsTriggered   ReminderRunLog[]  @relation("ReminderTriggeredByUser")
+
+  projectProposalsReviewed ProjectProposal[]        @relation("ProjectProposalReviewedBy")
+  projectProposalComments  ProjectProposalComment[] @relation("ProjectProposalCommentAuthor")
+  projectsCreated          Project[]                @relation("ProjectCreatedByUser")
+
+  contributions          Contribution[] @relation("ContributionMember")
+  contributionsValidated Contribution[] @relation("ContributionValidatedBy")
+  contributionsRejected  Contribution[] @relation("ContributionRejectedBy")
+  contributionsCancelled Contribution[] @relation("ContributionCancelledBy")
+
+  projectProposals       ProjectProposal[] @relation("ProjectProposalAuthor")
+  projectsManaged        Project[]         @relation("ProjectManager")
+  projectUpdatesAuthored ProjectUpdate[]   @relation("ProjectUpdateAuthor")
+  voteSessionsCreated    VoteSession[]     @relation("VoteSessionCreatedBy")
+  votes                  ProjectVote[]     @relation("ProjectVoteVoter")
+
+  newsPostsCreated   NewsPost[] @relation("NewsPostCreatedBy")
+  newsPostsPublished NewsPost[] @relation("NewsPostPublishedBy")
+
+  documentsUploaded Document[]  @relation("DocumentUploadedBy")
+  filesUploaded     FileAsset[] @relation("FileUploadedBy")
+
+  notifications        NotificationRecipient[]
+  notificationsCreated Notification[]          @relation("NotificationCreatedBy")
+  notificationsTarget  Notification[]          @relation("NotificationUserTarget")
+
+  ledgerEntriesCreated LedgerEntry[]         @relation("LedgerEntryCreatedBy")
+  projectionsCreated   FinancialProjection[] @relation("ProjectionCreatedBy")
+
+  authTokens           AuthToken[]
+  sessions             Session[]
+  refreshTokenSessions RefreshTokenSession[] // <-- Ajouté ici
+  passwordResetTokens  PasswordResetToken[] // <-- Ajouté ici
+  notificationPrefs    UserNotificationPreference?
+  securitySettings     UserSecuritySetting?
+
+  auditLogsActor  AuditLog[] @relation("AuditActorUser")
+  auditLogsTarget AuditLog[] @relation("AuditTargetUser")
+
+  createdAntennas Antenna[] @relation("AntennaCreatedByUser")
+
+  @@index([associationId, role, status])
+  @@index([associationId, lastName, firstName])
+  @@index([createdByUserId])
+  @@index([approvedByUserId])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// Rattachement d’un user à une antenne (un membre / admin peut avoir historique de rattachement)
+/// Pour un membre classique : 1 membership actif vers 1 antenne.
+/// Pour flexibilité future : historique de changement d’antenne.
+model Membership {
+  id            String                   @id @default(cuid())
+  associationId String
+  userId        String
+  antennaId     String
+  status        MembershipApprovalStatus @default(PENDING)
+
+  joinedAt  DateTime?
+  leftAt    DateTime?
+  isPrimary Boolean   @default(true)
+
+  // workflow validation membre (par admin de l’antenne ou super admin)
+  approvedByUserId String?
+  approvedAt       DateTime?
+  rejectedByUserId String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  antenna     Antenna     @relation(fields: [antennaId], references: [id], onDelete: Cascade)
+
+  approvedByUser User? @relation("MembershipApprovedByUser", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  rejectedByUser User? @relation("MembershipRejectedByUser", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, antennaId, isPrimary]) // évite doublon principal exact
+  @@index([associationId, antennaId, status])
+  @@index([userId, status])
+  @@map("memberships")
+}
+
+/// Affectation des admins aux antennes
+/// Règle métier : créée par SUPER_ADMIN uniquement (backend)
+model AntennaAdminAssignment {
+  id                       String  @id @default(cuid())
+  associationId            String
+  antennaId                String
+  adminUserId              String
+  isPrimaryManager         Boolean @default(true)
+  canValidateMembers       Boolean @default(true)
+  canValidateContributions Boolean @default(true)
+  canManageProjects        Boolean @default(true)
+  canManageContent         Boolean @default(true)
+  isActive                 Boolean @default(true)
+
+  assignedByUserId String // normalement SUPER_ADMIN
+  assignedAt       DateTime  @default(now())
+  revokedByUserId  String?
+  revokedAt        DateTime?
+  revokeReason     String?
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna     @relation(fields: [antennaId], references: [id], onDelete: Cascade)
+  adminUser   User        @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  assignedByUser User  @relation("AntennaAdminAssignedByUser", fields: [assignedByUserId], references: [id], onDelete: Restrict)
+  revokedByUser  User? @relation("AntennaAdminRevokedByUser", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([antennaId, adminUserId])
+  @@index([associationId, antennaId, isActive])
+  @@index([adminUserId, isActive])
+  @@map("antenna_admin_assignments")
+}
+
+/// Invitation admin créée par SUPER_ADMIN (optionnel mais pro)
+/// Permet créer l’admin via lien d’activation plutôt que mot de passe en clair.
+model AdminInvitation {
+  id            String    @id @default(cuid())
+  associationId String
+  antennaId     String?
+  email         String
+  firstName     String?
+  lastName      String?
+  role          UserRole  @default(ANTENNA_ADMIN)
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  revokedAt     DateTime?
+  revokedReason String?
+
+  createdByUserId String // SUPER_ADMIN
+  createdAt       DateTime @default(now())
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  createdByUser User        @relation("AdminInvitationCreatedByUser", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([associationId, email, role])
+  @@index([associationId, antennaId, expiresAt])
+  @@map("admin_invitations")
+}
+
+/// =========================
+/// AUTH / SECURITY
+/// =========================
+
+model AuthToken {
+  id                 String    @id @default(cuid())
+  associationId      String
+  userId             String?
+  email              String?
+  type               TokenType
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  consumedAt         DateTime?
+  createdByIp        String?
+  createdByUserAgent String?
+  createdAt          DateTime  @default(now())
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([associationId, type, expiresAt])
+  @@index([userId, type])
+  @@map("auth_tokens")
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  associationId    String
+  userId           String
+  sessionTokenHash String    @unique
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  lastSeenAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([associationId, expiresAt])
+  @@map("sessions")
+}
+
+model RefreshTokenSession {
+  id            String    @id @default(cuid())
+  associationId String
+  userId        String
+  tokenHash     String    @unique
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  revokedAt     DateTime?
+  replacedById  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([associationId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id            String    @id @default(cuid())
+  associationId String
+  userId        String
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([associationId])
+  @@index([expiresAt])
+}
+
+model UserSecuritySetting {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  twoFactorEnabled   Boolean   @default(false)
+  twoFactorSecretEnc String?
+  backupCodesHash    Json? // tableau de hashes
+  passwordChangedAt  DateTime?
+  forcePasswordReset Boolean   @default(false)
+  lastFailedLoginAt  DateTime?
+  failedLoginCount   Int       @default(0)
+  lockedUntil        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_security_settings")
+}
+
+/// =========================
+/// CONTRIBUTIONS / TRÉSORERIE
+/// =========================
+
+model Contribution {
+  id            String @id @default(cuid())
+  associationId String
+  antennaId     String
+  memberUserId  String
+
+  // Dépôt déclaré
+  amount           Decimal       @db.Decimal(14, 2)
+  currency         CurrencyCode  @default(EUR)
+  paymentMethod    PaymentMethod
+  submittedAt      DateTime      @default(now())
+  contributionDate DateTime? // date réelle du versement déclarée
+  monthReference   Int? // pour stats mensuelles (1..12)
+  yearReference    Int? // ex: 2026
+
+  status          ContributionStatus @default(PENDING_VALIDATION)
+  memberComment   String?
+  adminComment    String?
+  rejectionReason String?
+
+  // Preuves
+  proofFileId       String?
+  externalReference String? // référence virement / mobile money / reçu papier
+  validationChannel ValidationChannel?
+
+  // Validation admin (antenne)
+  validatedByUserId String?
+  validatedAt       DateTime?
+  rejectedByUserId  String?
+  rejectedAt        DateTime?
+  cancelledByUserId String?
+  cancelledAt       DateTime?
+
+  // Optionnel: lien écriture comptable (entrée)
+  ledgerEntryId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna     @relation(fields: [antennaId], references: [id], onDelete: Cascade)
+  member      User        @relation("ContributionMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+
+  validatedByUser User? @relation("ContributionValidatedBy", fields: [validatedByUserId], references: [id], onDelete: SetNull)
+  rejectedByUser  User? @relation("ContributionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  cancelledByUser User? @relation("ContributionCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+
+  proofFile   FileAsset?   @relation("ContributionProofFile", fields: [proofFileId], references: [id], onDelete: SetNull)
+  ledgerEntry LedgerEntry? @relation("ContributionLedgerEntry", fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+
+  @@index([associationId, status, submittedAt])
+  @@index([antennaId, status, submittedAt])
+  @@index([memberUserId, submittedAt])
+  @@index([yearReference, monthReference])
+  @@map("contributions")
+}
+
+/// Journal financier (entrées/sorties) pour un solde robuste et traçable.
+/// Le solde global / par antenne est calculé via SUM(entries) signé.
+model LedgerEntry {
+  id            String          @id @default(cuid())
+  associationId String
+  antennaId     String?
+  type          LedgerEntryType
+
+  // Convention : montant positif + direction contrôlée par "type"
+  amount   Decimal      @db.Decimal(14, 2)
+  currency CurrencyCode @default(EUR)
+
+  title         String
+  description   String?
+  effectiveDate DateTime @default(now())
+
+  // Liens métiers (optionnels)
+  contributionId String? @unique
+  projectId      String?
+  documentId     String?
+  referenceCode  String?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  createdByUser User?       @relation("LedgerEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  contribution Contribution? @relation("ContributionLedgerEntry")
+  project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  document     Document?     @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([associationId, effectiveDate])
+  @@index([antennaId, effectiveDate])
+  @@index([type, effectiveDate])
+  @@map("ledger_entries")
+}
+
+/// Snapshots de solde (cache/reporting) - optionnels mais utiles pour dashboard rapide
+model BalanceSnapshot {
+  id            String       @id @default(cuid())
+  associationId String
+  antennaId     String?
+  currency      CurrencyCode @default(EUR)
+  balanceAmount Decimal      @db.Decimal(14, 2)
+  asOf          DateTime
+  generatedBy   String? // "CRON" / user id / system
+  createdAt     DateTime     @default(now())
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+
+  @@index([associationId, asOf])
+  @@index([antennaId, asOf])
+  @@map("balance_snapshots")
+}
+
+/// =========================
+/// PROJECTS / PROPOSALS / VOTES
+/// =========================
+
+model ProjectProposal {
+  id            String  @id @default(cuid())
+  associationId String
+  antennaId     String?
+  authorUserId  String
+
+  title           String
+  summary         String?
+  description     String
+  estimatedBudget Decimal?      @db.Decimal(14, 2)
+  currency        CurrencyCode? @default(EUR)
+  targetStartDate DateTime?
+  targetEndDate   DateTime?
+  locationText    String?
+
+  status           ProposalStatus @default(SUBMITTED)
+  reviewComment    String?
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+
+  // Si approuvé -> projet créé
+  // La référence et le champ scalaire se font désormais côté 'Project' uniquement
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  author      User        @relation("ProjectProposalAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  reviewedByUser   User?    @relation("ProjectProposalReviewedBy", fields: [reviewedByUserId], references: [id], onDelete: SetNull)
+  convertedProject Project? @relation("ProposalConvertedProject")
+
+  attachments  ProjectProposalAttachment[]
+  voteSessions VoteSession[]
+  comments     ProjectProposalComment[]
+
+  @@index([associationId, status, createdAt])
+  @@index([antennaId, status, createdAt])
+  @@index([authorUserId, createdAt])
+  @@map("project_proposals")
+}
+
+model ProjectProposalAttachment {
+  id         String   @id @default(cuid())
+  proposalId String
+  fileId     String
+  caption    String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  proposal ProjectProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  file     FileAsset       @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, fileId])
+  @@index([proposalId, sortOrder])
+  @@map("project_proposal_attachments")
+}
+
+model ProjectProposalComment {
+  id           String   @id @default(cuid())
+  proposalId   String
+  authorUserId String
+  body         String
+  isInternal   Boolean  @default(false) // visible admin only
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  proposal ProjectProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  author   User            @relation("ProjectProposalCommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  @@index([proposalId, createdAt])
+  @@map("project_proposal_comments")
+}
+
+model Project {
+  id            String  @id @default(cuid())
+  associationId String
+  antennaId     String?
+
+  title       String
+  slug        String?
+  summary     String?
+  description String
+  status      ProjectStatus @default(APPROVED)
+
+  budgetAmount Decimal?      @db.Decimal(14, 2)
+  currency     CurrencyCode? @default(EUR)
+  amountRaised Decimal?      @db.Decimal(14, 2) // optionnel cache
+  amountSpent  Decimal?      @db.Decimal(14, 2) // optionnel cache
+
+  startDate    DateTime?
+  endDate      DateTime?
+  targetDate   DateTime?
+  locationText String?
+
+  isPublicToMembers Boolean @default(true)
+  coverImageFileId  String?
+
+  managerUserId    String? // admin responsable projet
+  sourceProposalId String? @unique
+
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  archivedAt      DateTime?
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  managerUser   User?       @relation("ProjectManager", fields: [managerUserId], references: [id], onDelete: SetNull)
+  createdByUser User?       @relation("ProjectCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  coverImageFile FileAsset?       @relation("ProjectCoverImage", fields: [coverImageFileId], references: [id], onDelete: SetNull)
+  sourceProposal ProjectProposal? @relation("ProposalConvertedProject", fields: [sourceProposalId], references: [id], onDelete: SetNull)
+
+  attachments   ProjectAttachment[]
+  updates       ProjectUpdate[]
+  voteSessions  VoteSession[]
+  ledgerEntries LedgerEntry[]
+  documents     Document[]          @relation("ProjectDocuments")
+
+  @@unique([associationId, slug])
+  @@index([associationId, status, createdAt])
+  @@index([antennaId, status, createdAt])
+  @@map("projects")
+}
+
+model ProjectAttachment {
+  id        String   @id @default(cuid())
+  projectId String
+  fileId    String
+  caption   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  project Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  file    FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, fileId])
+  @@index([projectId, sortOrder])
+  @@map("project_attachments")
+}
+
+model ProjectUpdate {
+  id              String    @id @default(cuid())
+  projectId       String
+  authorUserId    String
+  title           String?
+  body            String
+  progressPercent Int? // 0..100 (valider côté backend)
+  published       Boolean   @default(true)
+  publishedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author  User    @relation("ProjectUpdateAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
+
+  attachments ProjectUpdateAttachment[]
+
+  @@index([projectId, published, createdAt])
+  @@map("project_updates")
+}
+
+model ProjectUpdateAttachment {
+  id              String   @id @default(cuid())
+  projectUpdateId String
+  fileId          String
+  caption         String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  projectUpdate ProjectUpdate @relation(fields: [projectUpdateId], references: [id], onDelete: Cascade)
+  file          FileAsset     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([projectUpdateId, fileId])
+  @@index([projectUpdateId, sortOrder])
+  @@map("project_update_attachments")
+}
+
+/// Vote / approbation par membres (optionnel mais fortement recommandé)
+model VoteSession {
+  id            String  @id @default(cuid())
+  associationId String
+  antennaId     String?
+  projectId     String?
+  proposalId    String?
+
+  title       String
+  description String?
+  status      VoteSessionStatus @default(DRAFT)
+
+  startsAt        DateTime?
+  endsAt          DateTime?
+  quorumPercent   Decimal?  @db.Decimal(5, 2) // ex 50.00
+  approvalPercent Decimal?  @db.Decimal(5, 2) // ex 66.67
+  allowAbstain    Boolean   @default(true)
+
+  createdByUserId String
+  publishedAt     DateTime?
+  closedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  association Association      @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna?         @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  project     Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proposal    ProjectProposal? @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  createdByUser User          @relation("VoteSessionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  votes         ProjectVote[]
+
+  @@index([associationId, status, startsAt, endsAt])
+  @@index([projectId, status])
+  @@index([proposalId, status])
+  @@map("vote_sessions")
+}
+
+model ProjectVote {
+  id            String     @id @default(cuid())
+  voteSessionId String
+  voterUserId   String
+  choice        VoteChoice
+  comment       String?
+  castAt        DateTime   @default(now())
+
+  voteSession VoteSession @relation(fields: [voteSessionId], references: [id], onDelete: Cascade)
+  voter       User        @relation("ProjectVoteVoter", fields: [voterUserId], references: [id], onDelete: Restrict)
+
+  @@unique([voteSessionId, voterUserId]) // 1 vote par membre/session
+  @@index([voteSessionId, choice])
+  @@map("project_votes")
+}
+
+/// =========================
+/// CONTENT / DOCUMENTS / MEDIAS
+/// =========================
+
+model NewsPost {
+  id            String  @id @default(cuid())
+  associationId String
+  antennaId     String?
+
+  scope  PostScope  @default(GLOBAL)
+  status PostStatus @default(DRAFT)
+
+  title    String
+  slug     String?
+  excerpt  String?
+  content  String // markdown/html/texte selon ton choix
+  isPinned Boolean @default(false)
+
+  coverImageFileId  String?
+  createdByUserId   String
+  publishedByUserId String?
+  publishedAt       DateTime?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+
+  createdByUser   User  @relation("NewsPostCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  publishedByUser User? @relation("NewsPostPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
+
+  coverImageFile FileAsset?           @relation("NewsPostCoverImage", fields: [coverImageFileId], references: [id], onDelete: SetNull)
+  attachments    NewsPostAttachment[]
+
+  @@unique([associationId, slug])
+  @@index([associationId, scope, status, publishedAt])
+  @@index([antennaId, status, publishedAt])
+  @@map("news_posts")
+}
+
+model NewsPostAttachment {
+  id         String   @id @default(cuid())
+  newsPostId String
+  fileId     String
+  caption    String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  newsPost NewsPost  @relation(fields: [newsPostId], references: [id], onDelete: Cascade)
+  file     FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([newsPostId, fileId])
+  @@index([newsPostId, sortOrder])
+  @@map("news_post_attachments")
+}
+
+model Document {
+  id            String  @id @default(cuid())
+  associationId String
+  antennaId     String?
+  projectId     String?
+
+  title          String
+  description    String?
+  categoryLabel  String?
+  scope          DocumentScope @default(GLOBAL)
+  isDownloadable Boolean       @default(true)
+  isPinned       Boolean       @default(false)
+
+  fileId           String
+  uploadedByUserId String
+  publishedAt      DateTime?
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  project     Project?    @relation("ProjectDocuments", fields: [projectId], references: [id], onDelete: SetNull)
+
+  file           FileAsset @relation("DocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  uploadedByUser User      @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+
+  ledgerEntries LedgerEntry[]
+
+  @@index([associationId, scope, publishedAt])
+  @@index([antennaId, publishedAt])
+  @@index([projectId, publishedAt])
+  @@map("documents")
+}
+
+model FileAsset {
+  id               String  @id @default(cuid())
+  associationId    String
+  uploadedByUserId String?
+
+  storageProvider  String // ex: "s3", "cloudinary", "local"
+  storageKey       String  @unique
+  originalFilename String
+  mimeType         String
+  sizeBytes        BigInt
+  checksumSha256   String?
+
+  category   FileCategory   @default(OTHER)
+  visibility FileVisibility @default(PRIVATE)
+
+  width           Int?
+  height          Int?
+  durationSeconds Int? // audio/vidéo si besoin
+
+  url      String? // si URL publique/signée persistée
+  metadata Json?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  association    Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  uploadedByUser User?       @relation("FileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+
+  // Relations "pointées"
+  associationLogoFor   Association[]  @relation("AssociationLogo")
+  userProfilePhotoFor  User[]         @relation("UserProfilePhoto")
+  contributionProofFor Contribution[] @relation("ContributionProofFile")
+  projectCoverFor      Project[]      @relation("ProjectCoverImage")
+  newsCoverFor         NewsPost[]     @relation("NewsPostCoverImage")
+  documentFileFor      Document[]     @relation("DocumentFile")
+
+  proposalAttachments      ProjectProposalAttachment[]
+  projectAttachments       ProjectAttachment[]
+  projectUpdateAttachments ProjectUpdateAttachment[]
+  newsAttachments          NewsPostAttachment[]
+
+  @@index([associationId, category, createdAt])
+  @@index([uploadedByUserId, createdAt])
+  @@map("file_assets")
+}
+
+/// =========================
+/// NOTIFICATIONS / REMINDERS
+/// =========================
+
+model Notification {
+  id              String           @id @default(cuid())
+  associationId   String
+  antennaId       String?
+  userId          String? // cible directe optionnelle
+  type            NotificationType
+  title           String
+  message         String
+  payload         Json? // données contextuelles (ids, liens, etc.)
+  createdByUserId String?
+  createdAt       DateTime         @default(now())
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  user          User?       @relation("NotificationUserTarget", fields: [userId], references: [id], onDelete: SetNull)
+  createdByUser User?       @relation("NotificationCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  recipients NotificationRecipient[]
+
+  @@index([associationId, type, createdAt])
+  @@index([antennaId, createdAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+/// delivery / lecture par destinataire et par canal
+model NotificationRecipient {
+  id             String                     @id @default(cuid())
+  notificationId String
+  userId         String
+  channel        NotificationChannel        @default(IN_APP)
+  deliveryStatus NotificationDeliveryStatus @default(PENDING)
+  sentAt         DateTime?
+  failedAt       DateTime?
+  failureReason  String?
+  readAt         DateTime?
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId, channel])
+  @@index([userId, channel, deliveryStatus, readAt])
+  @@map("notification_recipients")
+}
+
+model UserNotificationPreference {
+  id           String  @id @default(cuid())
+  userId       String  @unique
+  inAppEnabled Boolean @default(true)
+  emailEnabled Boolean @default(true)
+  smsEnabled   Boolean @default(false)
+  pushEnabled  Boolean @default(false)
+
+  accountEvents      Boolean @default(true)
+  contributionEvents Boolean @default(true)
+  projectEvents      Boolean @default(true)
+  newsEvents         Boolean @default(true)
+  reminderEvents     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
+}
+
+/// Logs de campagnes / relances (ex: retardataires > 3 mois)
+model ReminderRunLog {
+  id                String       @id @default(cuid())
+  associationId     String
+  antennaId         String?
+  kind              ReminderKind
+  thresholdMonths   Int?
+  recipientsCount   Int          @default(0)
+  successCount      Int          @default(0)
+  failedCount       Int          @default(0)
+  details           Json?
+  triggeredByUserId String? // null si cron
+  triggeredAt       DateTime     @default(now())
+
+  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna         Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  triggeredByUser User?       @relation("ReminderTriggeredByUser", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+
+  @@index([associationId, kind, triggeredAt])
+  @@index([antennaId, kind, triggeredAt])
+  @@map("reminder_run_logs")
+}
+
+/// =========================
+/// SETTINGS / REPORTING / PROJECTIONS
+/// =========================
+
+model AssociationSetting {
+  id              String   @id @default(cuid())
+  associationId   String
+  key             String
+  value           Json
+  description     String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  updatedByUser User?       @relation("AssociationSettingUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([associationId, key])
+  @@map("association_settings")
+}
+
+model AntennaSetting {
+  id              String   @id @default(cuid())
+  antennaId       String
+  key             String
+  value           Json
+  description     String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  antenna       Antenna @relation(fields: [antennaId], references: [id], onDelete: Cascade)
+  updatedByUser User?   @relation("AntennaSettingUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([antennaId, key])
+  @@map("antenna_settings")
+}
+
+/// Projections financières (admin/super admin)
+model FinancialProjection {
+  id            String  @id @default(cuid())
+  associationId String
+  antennaId     String?
+  title         String
+  description   String?
+
+  periodType ProjectionPeriodType
+  startDate  DateTime
+  endDate    DateTime
+
+  projectedIncome  Decimal @db.Decimal(14, 2)
+  projectedExpense Decimal @db.Decimal(14, 2)
+  projectedNet     Decimal @db.Decimal(14, 2)
+
+  assumptions Json? // hypothèses de calcul
+  version     Int   @default(1)
+
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  createdByUser User        @relation("ProjectionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([associationId, periodType, startDate, endDate])
+  @@index([antennaId, periodType, startDate, endDate])
+  @@map("financial_projections")
+}
+
+/// =========================
+/// AUDIT / OBSERVABILITY
+/// =========================
+
+model AuditLog {
+  id            String  @id @default(cuid())
+  associationId String
+  antennaId     String?
+
+  actorType   AuditActorType @default(USER)
+  actorUserId String?
+  action      AuditAction
+
+  targetModel  String // ex: "User", "Contribution", "Project"
+  targetId     String?
+  targetUserId String?
+
+  summary   String?
+  metadata  Json? // avant/après, payload, ids...
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+
+  actorUser  User? @relation("AuditActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
+  targetUser User? @relation("AuditTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([associationId, createdAt])
+  @@index([antennaId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetModel, targetId])
+  @@map("audit_logs")
+}
