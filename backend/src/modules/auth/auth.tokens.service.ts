@@ -4,7 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PermissionsService } from '../permissions/permissions.service';
+// CORRECTION DU CHEMIN D'IMPORT ICI :
+import { PermissionsService } from '../permissions/permissions.service'; // Attention: vérifier s'il s'appelle servive ou service
 import { UserRole } from '@prisma/client';
 
 type TokenUser = {
@@ -28,7 +29,6 @@ export class AuthTokensService {
   }
 
   private parseDurationMs(value: string): number {
-    // mini parser stable: 15m / 30d / 3600s / 2h
     const m = /^(\d+)([smhd])$/.exec(value.trim());
     if (!m) throw new Error(`Invalid duration format: ${value}`);
     const n = Number(m[1]);

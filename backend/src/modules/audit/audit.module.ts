@@ -1,10 +1,9 @@
 //src/modules/audit/audit.module.ts
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AuditService } from './audit.service';
 
-@Global()
 @Module({
   providers: [AuditService],
-  exports: [AuditService],
+  exports: [AuditService], // <-- Cette ligne est primordiale !
 })
 export class AuditModule {}

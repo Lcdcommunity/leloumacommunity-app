@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '@nestjs/config';
 import { LocalStorageProvider } from './storage/local-storage.provider';
 import { S3StorageProvider } from './storage/s3-storage.provider';
+import { FileCategory, FileVisibility, AuditAction } from '@prisma/client';
 
 @Injectable()
 export class UploadsService {
@@ -30,6 +31,8 @@ export class UploadsService {
     description?: string;
     isPublic?: boolean;
   }) {
+    const driver = this.config.get<string>('storage.driver') || 'local';
+    
     const stored = await this.provider.upload({
       buffer: params.file.buffer,
       fileName: params.file.originalname,
@@ -41,21 +44,21 @@ export class UploadsService {
       data: {
         associationId: params.actor.associationId,
         uploadedByUserId: params.actor.id,
-        fileName: params.file.originalname,
+        storageProvider: driver, // <-- C'est ce champ qui manquait !
+        originalFilename: params.file.originalname,
         storageKey: stored.storageKey,
         url: stored.url,
         mimeType: stored.mimeType ?? params.file.mimetype,
-        sizeBytes: stored.sizeBytes ?? params.file.size,
-        category: params.category ?? 'DOCUMENT',
-        isPublic: params.isPublic ?? false,
-        description: params.description,
+        sizeBytes: stored.sizeBytes ?? BigInt(params.file.size),
+        category: (params.category as FileCategory) ?? FileCategory.OTHER,
+        visibility: params.isPublic ? FileVisibility.PUBLIC : FileVisibility.PRIVATE,
       },
     });
 
     await this.audit.log({
       associationId: params.actor.associationId,
       actorUserId: params.actor.id,
-      action: 'UPLOAD_FILE',
+      action: AuditAction.CREATE,
       targetModel: 'FileAsset',
       targetId: created.id,
       summary: 'Upload fichier + création FileAsset',

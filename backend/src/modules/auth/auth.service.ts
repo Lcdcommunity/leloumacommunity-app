@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
-import * as bcrypt from 'bcrypt';
+import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthTokensService } from './auth.tokens.service';
 import { AuthMailerService } from './auth.mailer.service';
@@ -28,7 +28,6 @@ export class AuthService {
     return createHash('sha256').update(input).digest('hex');
   }
 
-  // À appeler depuis ton login existant après validation password/email/status/etc.
   async issueTokensForUser(
     user: { id: string; associationId: string; role: any; email: string },
     meta?: { userAgent?: string; ipAddress?: string },
@@ -60,7 +59,6 @@ export class AuthService {
       return { revokedSessions: 1, mode: 'single' as const };
     }
 
-    // fallback safe: revoke all if no token provided
     const count = await this.tokens.revokeAllUserSessions(currentUserId);
     return { revokedSessions: count, mode: 'all-fallback' as const };
   }
@@ -70,22 +68,18 @@ export class AuthService {
       where: { email: dto.email.toLowerCase().trim() },
     });
 
-    // Réponse neutre (anti-enumération)
     const generic = {
       success: true,
-      message:
-        'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
+      message: 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
     };
 
-    if (!user) return generic;
-    if (user.status === 'REJECTED') return generic;
+    if (!user || user.status === 'REJECTED') return generic;
 
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.sha256(rawToken);
     const ttlMinutes = Number(this.config.get('auth.passwordResetTokenTtlMinutes') ?? 30);
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
-    // Invalidation des anciens non utilisés (option stable)
     await this.prisma.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null },
       data: { usedAt: new Date() },
@@ -129,10 +123,7 @@ export class AuthService {
     await this.prisma.$transaction(async (tx) => {
       await tx.user.update({
         where: { id: record.userId },
-        data: {
-          passwordHash,
-          // optionnel: forcer "ACTIVE" si déjà vérifié et approuvé
-        },
+        data: { passwordHash },
       });
 
       await tx.passwordResetToken.update({
@@ -140,7 +131,6 @@ export class AuthService {
         data: { usedAt: new Date() },
       });
 
-      // sécurité: invalider toutes les sessions refresh
       await tx.refreshTokenSession.updateMany({
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: new Date() },

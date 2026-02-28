@@ -99,7 +99,8 @@ export class ContributionsService {
       return { message: 'Déjà validée', contribution };
     }
 
-    if ([ContributionStatus.CANCELLED, ContributionStatus.REJECTED].includes(contribution.status)) {
+    // <-- CORRECTION TypeScript ICI : suppression du .includes() -->
+    if (contribution.status === ContributionStatus.CANCELLED || contribution.status === ContributionStatus.REJECTED) {
       throw new BadRequestException('Cotisation non validable dans cet état');
     }
 

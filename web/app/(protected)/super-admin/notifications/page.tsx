@@ -1,0 +1,48 @@
+//web/app/(protected)/super-admin/notifications/page.tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { AppShell } from '../../../../components/layout/AppShell';
+import { Card } from '../../../../components/ui/Card';
+import { Table } from '../../../../components/ui/Table';
+import { Badge } from '../../../../components/ui/Badge';
+import { api } from '../../../../lib/api-client';
+import type { NotificationItem } from '../../../../types/notification';
+import { formatDate } from '../../../../lib/format';
+
+export default function SuperAdminNotificationsPage() {
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await api.listNotifications();
+        setItems(res.items);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erreur');
+      }
+    })();
+  }, []);
+
+  return (
+    <AppShell title="Notifications">
+      <Card title="Centre de notifications">
+        {error ? <p className="error-text">{error}</p> : null}
+        <Table columns={['Message', 'Statut', 'Date']}>
+          {items.map((n) => (
+            <tr key={n.id}>
+              <td>{n.message}</td>
+              <td>
+                <Badge tone={n.isRead ? 'neutral' : 'info'}>
+                  {n.isRead ? 'Lue' : 'Non lue'}
+                </Badge>
+              </td>
+              <td>{formatDate(n.createdAt)}</td>
+            </tr>
+          ))}
+        </Table>
+      </Card>
+    </AppShell>
+  );
+}
