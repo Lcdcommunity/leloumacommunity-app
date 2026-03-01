@@ -14,9 +14,9 @@ export function PendingAccountsTable({
   loadingId,
 }: {
   items: UserSummary[];
-  onApprove: (userId: string) => Promise<void>;
-  onReject: (userId: string) => Promise<void>;
-  loadingId?: string | null;
+  onApprove: (id: string) => Promise<void>;
+  onReject: (id: string) => Promise<void>;
+  loadingId: string | null;
 }) {
   return (
     <Table columns={['Nom', 'Email', 'Statut', 'Date', 'Actions']}>
@@ -28,15 +28,15 @@ export function PendingAccountsTable({
           <td>{formatDate(u.createdAt)}</td>
           <td>
             <div className="row-actions">
-              <Button
-                onClick={() => void onApprove(u.id)}
+              <Button 
+                onClick={() => void onApprove(u.id)} 
                 disabled={loadingId === u.id}
               >
                 Valider
               </Button>
-              <Button
-                variant="danger"
-                onClick={() => void onReject(u.id)}
+              <Button 
+                variant="danger" 
+                onClick={() => void onReject(u.id)} 
                 disabled={loadingId === u.id}
               >
                 Rejeter

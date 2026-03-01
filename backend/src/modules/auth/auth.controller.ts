@@ -1,6 +1,7 @@
 //src/modules/auth/auth.controller.ts
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Get, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -13,6 +14,22 @@ import { Request } from 'express';
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  // 👇 NOUVELLE ROUTE GET ME 👇
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  async getMe(@CurrentUser() user: AuthUser) {
+    return this.authService.getMe(user.id);
+  }
+
+  // 👇 ROUTES EXISTANTES 👇
+  @Post('login')
+  async login(@Body() dto: LoginDto, @Req() req: Request) {
+    return this.authService.login(dto, {
+      userAgent: req.headers['user-agent'],
+      ipAddress: req.ip,
+    });
+  }
 
   @Post('refresh')
   async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {

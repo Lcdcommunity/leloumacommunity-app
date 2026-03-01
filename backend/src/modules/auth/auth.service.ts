@@ -14,6 +14,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -28,11 +29,65 @@ export class AuthService {
     return createHash('sha256').update(input).digest('hex');
   }
 
-  async issueTokensForUser(
-    user: { id: string; associationId: string; role: any; email: string },
-    meta?: { userAgent?: string; ipAddress?: string },
-  ) {
-    return this.tokens.issueLoginTokens(user, meta);
+  // 👇 FONCTION GET ME CORRIGÉE 👇
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        associationId: true,
+        // antennaId a été retiré ici car il est géré par la table de relation
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Utilisateur introuvable');
+    }
+
+    return user;
+  }
+
+  // 👇 FONCTION DE LOGIN EXISTANTE 👇
+  async login(dto: LoginDto, meta?: { userAgent?: string; ipAddress?: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase().trim() },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Identifiants invalides');
+    }
+
+    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Identifiants invalides');
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Votre compte n\'est pas actif ou en attente de validation.');
+    }
+
+    const tokens = await this.tokens.issueLoginTokens(
+      { id: user.id, associationId: user.associationId, role: user.role, email: user.email },
+      meta
+    );
+
+    // On renvoie les tokens ET les infos de l'utilisateur pour le frontend
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      }
+    };
   }
 
   async refresh(dto: RefreshTokenDto, meta?: { userAgent?: string; ipAddress?: string }) {

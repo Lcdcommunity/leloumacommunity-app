@@ -18,9 +18,10 @@ export default function SuperAdminNotificationsPage() {
     void (async () => {
       try {
         const res = await api.listNotifications();
-        setItems(res.items);
+        // Correction : S'assurer que items est toujours un tableau même si l'API renvoie null/undefined
+        setItems(res?.items || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erreur');
+        setError(err instanceof Error ? err.message : 'Erreur lors du chargement des notifications');
       }
     })();
   }, []);
@@ -28,19 +29,30 @@ export default function SuperAdminNotificationsPage() {
   return (
     <AppShell title="Notifications">
       <Card title="Centre de notifications">
-        {error ? <p className="error-text">{error}</p> : null}
+        {error ? <p className="text-red-500 mb-4">{error}</p> : null}
+        
         <Table columns={['Message', 'Statut', 'Date']}>
-          {items.map((n) => (
-            <tr key={n.id}>
-              <td>{n.message}</td>
-              <td>
-                <Badge tone={n.isRead ? 'neutral' : 'info'}>
-                  {n.isRead ? 'Lue' : 'Non lue'}
-                </Badge>
+          {items.length > 0 ? (
+            items.map((n) => (
+              <tr key={n.id} className="border-b last:border-0">
+                <td className="py-3 px-4">{n.message}</td>
+                <td className="py-3 px-4">
+                  <Badge tone={n.isRead ? 'neutral' : 'info'}>
+                    {n.isRead ? 'Lue' : 'Non lue'}
+                  </Badge>
+                </td>
+                <td className="py-3 px-4 text-sm text-gray-500">
+                  {formatDate(n.createdAt)}
+                </td>
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={3} className="text-center py-8 text-gray-500">
+                Aucune notification trouvée.
               </td>
-              <td>{formatDate(n.createdAt)}</td>
             </tr>
-          ))}
+          )}
         </Table>
       </Card>
     </AppShell>

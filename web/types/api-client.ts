@@ -9,11 +9,10 @@ import type { NotificationItem } from '../types/notification';
 import type { UserSummary } from '../types/user';
 import type { ApiListResponse } from '../types/api';
 
-// ... garde les imports / api existants
+// 👇 VOICI LA LIGNE QUI MANQUAIT 👇
+import { http } from '../lib/http';
 
 export const api = {
-  // ... méthodes existantes Phase 1 + Phase 2
-
   // -------------------------------
   // AUTH / ENRÔLEMENT MEMBRE (Phase 3)
   // -------------------------------
@@ -29,7 +28,7 @@ export const api = {
     addressLine1?: string;
     addressLine2?: string;
   }) =>
-    http<{ message: string } , typeof body>('/auth/member-signup', {
+    http<{ message: string }, typeof body>('/auth/member-signup', {
       method: 'POST',
       body,
     }),

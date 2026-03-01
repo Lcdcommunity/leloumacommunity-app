@@ -37,6 +37,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/audit', label: 'Audit' },
   { href: '/admin/settings', label: 'Paramètres' },
 ];
+
 const memberItems: NavItem[] = [
   { href: '/member', label: 'Dashboard' },
   { href: '/member/contributions/new', label: 'Faire un dépôt' },
@@ -49,9 +50,6 @@ const memberItems: NavItem[] = [
   { href: '/member/notifications', label: 'Notifications' },
   { href: '/member/profile', label: 'Mon profil' },
   { href: '/member/settings', label: 'Paramètres' },
-];
-const memberItems: NavItem[] = [
-  { href: '/member', label: 'Dashboard' },
 ];
 
 export function Sidebar() {

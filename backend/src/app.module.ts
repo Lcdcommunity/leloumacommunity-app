@@ -35,6 +35,9 @@ import { MemberModule } from './modules/member/member.module';
 import { AuthMemberController } from './modules/auth/auth-member.controller';
 import { AuthMemberService } from './modules/auth/auth-member.service';
 
+// 👇 AJOUT DU MODULE SUPER ADMIN 👇
+import { SuperAdminModule } from './modules/super-admin/super-admin.module';
+
 @Module({
   imports: [
     // Configuration globale
@@ -69,6 +72,9 @@ import { AuthMemberService } from './modules/auth/auth-member.service';
     PublicModule,
     DashboardModule,
     MemberModule,
+
+    // 👇 AJOUT DU MODULE SUPER ADMIN ICI 👇
+    SuperAdminModule,
   ],
   controllers: [
     AuthMemberController,

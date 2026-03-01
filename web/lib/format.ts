@@ -1,20 +1,11 @@
-//web/lib/format.ts
-export function formatCurrency(amount: number, currency = 'EUR'): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 2,
-  }).format(amount);
+export function formatCurrency(amount: number | null | undefined, currency = 'EUR') {
+  if (amount === null || amount === undefined) return '-';
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency }).format(amount);
 }
-
-export function formatDate(date?: string | null): string {
-  if (!date) return '—';
-  return new Intl.DateTimeFormat('fr-FR', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(date));
+export function formatDate(date: string | Date | null | undefined) {
+  if (!date) return '-';
+  return new Date(date).toLocaleDateString('fr-FR');
 }
-
-export function fullName(input: { firstName?: string | null; lastName?: string | null }): string {
-  return [input.firstName, input.lastName].filter(Boolean).join(' ').trim() || '—';
+export function fullName(user: { firstName: string; lastName: string }) {
+  return `${user.firstName} ${user.lastName}`.trim();
 }

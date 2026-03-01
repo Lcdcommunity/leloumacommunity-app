@@ -1,4 +1,4 @@
-//web/components/ui/Badge.tsx
-export function Badge({ children, tone = 'neutral' }: { children: React.ReactNode; tone?: 'neutral' | 'success' | 'warning' | 'danger' | 'info'; }) {
-  return <span className={`badge badge-${tone}`}>{children}</span>;
+import React from 'react';
+export function Badge({ children, tone }: { children: React.ReactNode; tone?: 'success' | 'warning' | 'danger' | 'info' | 'neutral' }) {
+  return <span className={`badge badge-${tone || 'neutral'}`}>{children}</span>;
 }

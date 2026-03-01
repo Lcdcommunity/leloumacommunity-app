@@ -1,17 +1,22 @@
-//backend/src/modules/notifications/dto/notifications-query.dto.ts
-import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { Transform } from 'class-transformer';
+// backend/src/modules/notifications/dto/notifications-query.dto.ts
+import { IsOptional, IsNumber, Min, IsEnum } from 'class-validator';
+import { Type } from 'class-transformer';
+import { NotificationType } from '@prisma/client';
 
 export class NotificationsQueryDto {
   @IsOptional()
-  @Transform(({ value }) => String(value))
-  @IsString()
-  @MaxLength(50)
-  type?: string;
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  page?: number = 1;
 
   @IsOptional()
-  @Transform(({ value }) => String(value))
-  @IsString()
-  @MaxLength(10)
-  status?: string; // si tu as DeliveryStatus, sinon ignore
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  pageSize?: number = 20;
+
+  @IsOptional()
+  @IsEnum(NotificationType)
+  type?: NotificationType;
 }

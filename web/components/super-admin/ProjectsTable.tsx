@@ -11,10 +11,14 @@ export function ProjectsTable({ items }: { items: Project[] }) {
     <Table columns={['Titre', 'Statut', 'Budget prévu', 'Budget dépensé', 'Début', 'Fin']}>
       {items.map((p) => (
         <tr key={p.id}>
-          <td>{p.title}</td>
-          <td><Badge tone="info">{p.status}</Badge></td>
-          <td>{p.budgetPlanned != null ? formatCurrency(p.budgetPlanned) : '—'}</td>
-          <td>{p.budgetSpent != null ? formatCurrency(p.budgetSpent) : '—'}</td>
+          <td><strong>{p.title}</strong></td>
+          <td>
+            <Badge tone={p.status === 'IN_PROGRESS' ? 'info' : 'neutral'}>
+              {p.status}
+            </Badge>
+          </td>
+          <td>{formatCurrency(p.budgetPlanned)}</td>
+          <td>{p.budgetSpent != null ? formatCurrency(p.budgetSpent) : '-'}</td>
           <td>{formatDate(p.startsAt)}</td>
           <td>{formatDate(p.endsAt)}</td>
         </tr>

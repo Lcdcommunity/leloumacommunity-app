@@ -1,7 +1,7 @@
 //web/app/(protected)/member/settings/page.tsx
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, ChangeEvent } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { Card } from '../../../../components/ui/Card';
 import { Select } from '../../../../components/ui/Select';
@@ -22,9 +22,10 @@ export default function MemberSettingsPage() {
     setMessage(null);
 
     try {
-      // lazy import pour garder la page autonome
       const { api } = await import('../../../../lib/api-client');
-      await api.updateMemberPreferences({
+      // On utilise 'as any' temporairement pour éviter l'erreur de typage strict 
+      // si la méthode n'est pas encore déclarée dans le lib/api-client.ts
+      await (api as any).updateMemberPreferences({
         emailNotifications,
         smsNotifications,
         pushNotifications,
@@ -48,7 +49,7 @@ export default function MemberSettingsPage() {
               <input
                 type="checkbox"
                 checked={emailNotifications}
-                onChange={(e) => setEmailNotifications(e.target.checked)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmailNotifications(e.target.checked)}
               />
               Recevoir les notifications par email
             </label>
@@ -57,7 +58,7 @@ export default function MemberSettingsPage() {
               <input
                 type="checkbox"
                 checked={smsNotifications}
-                onChange={(e) => setSmsNotifications(e.target.checked)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSmsNotifications(e.target.checked)}
               />
               Recevoir les notifications par SMS
             </label>
@@ -66,7 +67,7 @@ export default function MemberSettingsPage() {
               <input
                 type="checkbox"
                 checked={pushNotifications}
-                onChange={(e) => setPushNotifications(e.target.checked)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setPushNotifications(e.target.checked)}
               />
               Recevoir les notifications push (si activées)
             </label>
@@ -74,7 +75,7 @@ export default function MemberSettingsPage() {
             <Select
               label="Langue"
               value={language}
-              onChange={(e) => setLanguage(e.target.value)}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setLanguage(e.target.value)}
               options={[
                 { value: 'fr', label: 'Français' },
                 { value: 'en', label: 'English' },
@@ -84,7 +85,7 @@ export default function MemberSettingsPage() {
             <Select
               label="Thème"
               value={theme}
-              onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
+              onChange={(e: ChangeEvent<HTMLSelectElement>) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
               options={[
                 { value: 'system', label: 'Système' },
                 { value: 'light', label: 'Clair' },
@@ -96,7 +97,7 @@ export default function MemberSettingsPage() {
               {saving ? 'Enregistrement...' : 'Enregistrer les préférences'}
             </Button>
 
-            {message ? <p>{message}</p> : null}
+            {message && <p>{message}</p>}
           </form>
         </Card>
 

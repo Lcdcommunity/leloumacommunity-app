@@ -24,11 +24,15 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Gère le rafraîchissement automatique du token JWT
+ */
 async function refreshTokenRequest(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
 
-  const res = await fetch(`${env.apiBaseUrl}/auth/refresh`, {
+  // Utilisation de env.apiUrl pour pointer vers le backend [3001]
+  const res = await fetch(`${env.apiUrl}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken }),
@@ -49,6 +53,9 @@ async function refreshTokenRequest(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Fonction HTTP universelle pour communiquer avec le backend NestJS
+ */
 export async function http<TResponse, TBody = unknown>(
   path: string,
   options?: RequestOptions<TBody>,
@@ -75,19 +82,23 @@ export async function http<TResponse, TBody = unknown>(
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  const res = await fetch(`${env.apiBaseUrl}${path}`, {
+  // Construction de l'URL finale sans le bug "undefined"
+  const res = await fetch(`${env.apiUrl}${path}`, {
     method,
     headers,
     body,
   });
 
+  // Gestion automatique de l'expiration du token (401)
   if (res.status === 401 && useAuth && retryOn401) {
     const refreshed = await refreshTokenRequest();
     if (refreshed) {
+      // On rejoue la requête initiale avec le nouveau token
       return http<TResponse, TBody>(path, { ...options, retryOn401: false });
     }
   }
 
+  // Gestion des erreurs d'API
   if (!res.ok) {
     const payload = (await parseJsonSafe(res)) as ApiErrorPayload | string | null;
     const message =
@@ -95,10 +106,12 @@ export async function http<TResponse, TBody = unknown>(
         ? payload
         : Array.isArray(payload?.message)
         ? payload?.message.join(', ')
-        : payload?.message || `HTTP ${res.status}`;
+        : payload?.message || `Erreur HTTP ${res.status}`;
     throw new Error(message);
   }
 
+  // Cas particulier du 204 No Content
   if (res.status === 204) return undefined as TResponse;
+
   return (await res.json()) as TResponse;
 }

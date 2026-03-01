@@ -16,8 +16,12 @@ export default function NewAntennaPage() {
         <AntennaForm
           submitLabel="Créer l’antenne"
           onSubmit={async (values) => {
-            await api.createAntenna(values);
-            router.replace('/super-admin/antennas');
+            try {
+              await api.createAntenna(values);
+              router.replace('/super-admin/antennas');
+            } catch (error) {
+              console.error("Erreur lors de la création de l'antenne:", error);
+            }
           }}
         />
       </Card>
