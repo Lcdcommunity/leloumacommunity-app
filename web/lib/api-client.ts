@@ -108,11 +108,12 @@ export const api = {
       }`,
     ),
 
+  // CORRECTION : Alignement avec les routes du SuperAdminController
   approveMemberAccount: (userId: string) =>
-    http(`/member-approvals/${userId}/approve`, { method: 'PATCH' }),
+    http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),
 
   rejectMemberAccount: (userId: string, reason?: string) =>
-    http(`/member-approvals/${userId}/reject`, {
+    http(`/super-admin/users/${userId}/reject`, {
       method: 'PATCH',
       body: { reason },
     }),

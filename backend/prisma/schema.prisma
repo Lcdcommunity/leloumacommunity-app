@@ -1,4 +1,4 @@
-/////////// prisma/schema.prisma
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -496,8 +496,8 @@ model User {
 
   authTokens           AuthToken[]
   sessions             Session[]
-  refreshTokenSessions RefreshTokenSession[] // <-- Ajouté ici
-  passwordResetTokens  PasswordResetToken[] // <-- Ajouté ici
+  refreshTokenSessions RefreshTokenSession[]
+  passwordResetTokens  PasswordResetToken[]
   notificationPrefs    UserNotificationPreference?
   securitySettings     UserSecuritySetting?
 
@@ -675,6 +675,7 @@ model RefreshTokenSession {
   @@index([userId])
   @@index([associationId])
   @@index([expiresAt])
+  @@map("refresh_token_sessions")
 }
 
 model PasswordResetToken {
@@ -691,6 +692,7 @@ model PasswordResetToken {
   @@index([userId])
   @@index([associationId])
   @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model UserSecuritySetting {

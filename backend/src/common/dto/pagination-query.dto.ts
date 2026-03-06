@@ -1,3 +1,4 @@
+//backend/src/common/dto/pagination-query.dto.ts
 import { IsOptional, IsNumber, Min, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -17,4 +18,9 @@ export class PaginationQueryDto {
   @IsOptional()
   @IsString()
   q?: string;
+
+  // 👇 AJOUT CHIRURGICAL ICI 👇
+  @IsOptional()
+  @IsString()
+  status?: string;
 }

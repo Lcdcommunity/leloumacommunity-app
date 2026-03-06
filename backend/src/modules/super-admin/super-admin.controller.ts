@@ -15,10 +15,29 @@ export class SuperAdminController {
   constructor(private readonly service: SuperAdminService) {}
 
   @Get('members')
-  listMembers(@Query() query: PaginationQueryDto, @Query('status') status?: string) {
-    return this.service.listUsersByRole(UserRole.MEMBER, query.page, query.pageSize, query.q, status);
+  listMembers(@Query() query: PaginationQueryDto) {
+    return this.service.listUsersByRole(
+      UserRole.MEMBER, 
+      query.page, 
+      query.pageSize, 
+      query.q, 
+      query.status
+    );
   }
 
+  // 👇 LA PORTE POUR /api/super-admin/admins AJOUTÉE ICI 👇
+  @Get('admins')
+  listAdmins(@Query() query: PaginationQueryDto) {
+    return this.service.listUsersByRole(
+      UserRole.ANTENNA_ADMIN, 
+      query.page, 
+      query.pageSize, 
+      query.q, 
+      query.status
+    );
+  }
+
+  // --- GESTION DES APPROBATIONS ---
   @Patch('users/:id/approve')
   approveMember(@Param('id') id: string, @CurrentUser() admin: AuthUser) {
     return this.service.approveUser(id, admin.id);
@@ -29,6 +48,7 @@ export class SuperAdminController {
     return this.service.rejectUser(id, admin.id, reason);
   }
 
+  // --- LISTES GLOBALES ---
   @Get('antennas')
   listAntennas(@Query() query: PaginationQueryDto) {
     return this.service.listAntennas(query.page, query.pageSize, query.q);
@@ -42,5 +62,10 @@ export class SuperAdminController {
   @Get('documents')
   listDocuments(@Query() query: PaginationQueryDto) {
     return this.service.listDocuments(query.page, query.pageSize, query.q);
+  }
+
+  @Get('contributions')
+  listContributions(@Query() query: PaginationQueryDto) {
+    return this.service.listAllContributions(query.page, query.pageSize, query.status);
   }
 }

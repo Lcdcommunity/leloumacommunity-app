@@ -27,13 +27,13 @@ export const memberMapper = {
       id: c.id,
       amount: Number(c.amount),
       currency: c.currency ?? 'EUR',
-      method: c.method ?? null,
-      reference: c.reference ?? null,
+      method: c.paymentMethod ?? null, // Alignement Prisma
+      reference: c.externalReference ?? null, // Alignement Prisma
       status: c.status,
-      depositedAt: c.depositedAt?.toISOString?.() ?? c.depositedAt ?? null,
+      depositedAt: c.contributionDate?.toISOString?.() ?? c.contributionDate ?? null, // Alignement Prisma
       createdAt: c.createdAt?.toISOString?.() ?? c.createdAt,
       validatedAt: c.validatedAt?.toISOString?.() ?? c.validatedAt ?? null,
-      note: c.note ?? null,
+      note: c.memberComment ?? null, // Alignement Prisma
     };
   },
 
@@ -75,36 +75,15 @@ export const memberMapper = {
       description: d.description ?? null,
       createdAt: d.createdAt?.toISOString?.() ?? d.createdAt,
       updatedAt: d.updatedAt?.toISOString?.() ?? d.updatedAt,
-      fileAsset: d.fileAsset
-        ? {
-            id: d.fileAsset.id,
-            fileName: d.fileAsset.fileName ?? null,
-            url: d.fileAsset.url ?? null,
-          }
-        : null,
+      fileAsset: d.file ? { id: d.file.id, fileName: d.file.fileName ?? null, url: d.file.url ?? null } : null,
     };
   },
 
   contentPost(c: any) {
-    return {
-      id: c.id,
-      title: c.title,
-      body: c.body ?? null,
-      status: c.status,
-      createdAt: c.createdAt?.toISOString?.() ?? c.createdAt,
-      updatedAt: c.updatedAt?.toISOString?.() ?? c.updatedAt,
-    };
+    return { id: c.id, title: c.title, body: c.body ?? null, status: c.status, createdAt: c.createdAt?.toISOString?.() ?? c.createdAt, updatedAt: c.updatedAt?.toISOString?.() ?? c.updatedAt };
   },
 
   notification(n: any) {
-    return {
-      id: n.id,
-      message: n.message,
-      isRead: Boolean(n.isRead),
-      createdAt: n.createdAt?.toISOString?.() ?? n.createdAt,
-      updatedAt: n.updatedAt?.toISOString?.() ?? n.updatedAt,
-      type: n.type ?? null,
-      metadata: n.metadata ?? null,
-    };
+    return { id: n.id, message: n.message, isRead: Boolean(n.isRead), createdAt: n.createdAt?.toISOString?.() ?? n.createdAt, updatedAt: n.updatedAt?.toISOString?.() ?? n.updatedAt, type: n.type ?? null, metadata: n.metadata ?? null };
   },
 };

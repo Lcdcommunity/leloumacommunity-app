@@ -42,7 +42,11 @@ export class SuperAdminService {
       this.prisma.user.findMany({
         where, skip, take: pageSize,
         orderBy: { createdAt: 'desc' },
-        include: { memberships: { include: { antenna: true } } }
+        include: { 
+          memberships: { include: { antenna: true } },
+          // On inclut les antennes gérées pour les admins
+          adminAssignments: { include: { antenna: true } } 
+        }
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -69,7 +73,6 @@ export class SuperAdminService {
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
   }
 
-  // --- ACTIONS SUR LES COMPTES ---
   async approveUser(userId: string, adminId: string) {
     return this.prisma.user.update({
       where: { id: userId },
@@ -98,7 +101,7 @@ export class SuperAdminService {
     const skip = (page - 1) * pageSize;
     const where: Prisma.ContributionWhereInput = status ? { status } : {};
     const [items, total] = await Promise.all([
-      this.prisma.contribution.findMany({ where, skip, take: pageSize, include: { member: true, antenna: true } }),
+      this.prisma.contribution.findMany({ where, skip, take: pageSize, include: { member: true, antenna: true }, orderBy: { createdAt: 'desc' } }),
       this.prisma.contribution.count({ where }),
     ]);
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };

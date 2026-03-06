@@ -35,8 +35,10 @@ import { MemberModule } from './modules/member/member.module';
 import { AuthMemberController } from './modules/auth/auth-member.controller';
 import { AuthMemberService } from './modules/auth/auth-member.service';
 
-// 👇 AJOUT DU MODULE SUPER ADMIN 👇
+// Modules d'administration (Global & Antenne)
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
+import { AssociationsModule } from './modules/associations/associations.module';
+import { AdminModule } from './modules/admin/admin.module'; // 👈 AJOUT CHIRURGICAL
 
 @Module({
   imports: [
@@ -73,8 +75,10 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
     DashboardModule,
     MemberModule,
 
-    // 👇 AJOUT DU MODULE SUPER ADMIN ICI 👇
+    // Modules d'administration
     SuperAdminModule,
+    AssociationsModule,
+    AdminModule, // 👈 AJOUT CHIRURGICAL ICI
   ],
   controllers: [
     AuthMemberController,

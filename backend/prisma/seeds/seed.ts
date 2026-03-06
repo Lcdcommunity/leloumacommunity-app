@@ -50,7 +50,7 @@ async function main() {
     update: {},
     create: {
       associationId: association.id,
-      email: 'admin.paris@association.com',
+      email: 'admin.paris@association.com', 
       passwordHash: hashedPwd,
       firstName: 'Admin', lastName: 'Paris',
       role: UserRole.ANTENNA_ADMIN,

@@ -1,4 +1,4 @@
-//web/app/(protected)/admin/notifications/page.tsx
+// web/app/(protected)/admin/notifications/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -18,7 +18,8 @@ export default function AdminNotificationsPage() {
     void (async () => {
       try {
         const res = await api.listNotifications();
-        setItems(res.items);
+        // 👇 SÉCURITÉ 1 : On garantit qu'on stocke toujours un tableau, même si res.items n'existe pas
+        setItems(res?.items || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur');
       }
@@ -31,7 +32,8 @@ export default function AdminNotificationsPage() {
         {error ? <p className="error-text">{error}</p> : null}
 
         <Table columns={['Message', 'Statut', 'Date']}>
-          {items.map((n) => (
+          {/* 👇 SÉCURITÉ 2 : Le point d'interrogation empêche le crash si la variable n'est pas un tableau */}
+          {items?.map((n) => (
             <tr key={n.id}>
               <td>{n.message}</td>
               <td>
