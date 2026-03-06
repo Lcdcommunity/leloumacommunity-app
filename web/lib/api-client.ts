@@ -1,4 +1,4 @@
-//web/lib/api-client.ts
+// web/lib/api-client.ts
 import { http } from './http';
 import type { ApiListResponse } from '../types/api';
 import type { Antenna } from '../types/antenna';
@@ -108,7 +108,6 @@ export const api = {
       }`,
     ),
 
-  // CORRECTION : Alignement avec les routes du SuperAdminController
   approveMemberAccount: (userId: string) =>
     http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),
 
@@ -281,7 +280,7 @@ export const api = {
       body,
     }),
 
-  // Notifications / Audit (scope user / scope antenna backend-side)
+  // Notifications / Audit
   listNotifications: () => http<ApiListResponse<NotificationItem>>('/notifications?page=1&pageSize=50'),
 
   listAudit: (params?: { page?: number; pageSize?: number; action?: string }) =>
@@ -291,7 +290,66 @@ export const api = {
       }`,
     ),
 
-  // Profile (phase 2 settings)
+  // Profile
   updateMyProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/users/me', { method: 'PATCH', body }),
+
+  // ==========================================
+  // ESPACE MEMBRE
+  // ==========================================
+  
+  dashboardMember: () => 
+    http<{ 
+      user?: UserSummary; 
+      me?: UserSummary; 
+      stats?: {
+        myTotalContributions?: number;
+        activeProjects?: number;
+        myContributionsTotal?: number;
+        myContributionsValidatedTotal?: number;
+        myPendingContributionsCount?: number;
+        associationTotalBalance?: number;
+        lateMonths?: number;
+        myLastContributionAt?: string | null;
+        currency?: string;
+      };
+      recentContributions?: Contribution[];
+      projectsInProgress?: Project[];
+      latestContents?: ContentPost[];
+      lateMembersPreview?: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
+    }>('/member/dashboard'),
+  
+  listMyContributions: (params?: { page?: number; pageSize?: number }) =>
+    http<ApiListResponse<Contribution>>(`/member/contributions?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
+  
+  createContribution: (body: { amount: number; method: string; reference?: string; depositedAt?: string; note?: string; receiptFileAssetId?: string; }) => 
+    http<Contribution, typeof body>('/member/contributions', { method: 'POST', body }),
+  
+  listProjectsForMembers: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
+    http<ApiListResponse<Project>>(`/member/projects?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${params?.status ? `&status=${params.status}` : ''}`),
+  
+  listProjectProposals: (params?: { page?: number; pageSize?: number }) =>
+    http<ApiListResponse<{ id: string; title: string; description: string; status: string; expectedBudget: number | null; createdAt: string; updatedAt: string; }>>(`/member/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
+  
+  createProjectProposal: (body: { title: string; description: string; expectedBudget?: number; }) => 
+    http<{ id: string; title: string; status: string; }, typeof body>('/member/project-proposals', { method: 'POST', body }),
+  
+  listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
+    http<ApiListResponse<DocumentItem>>(`/member/documents?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
+  
+  listContentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
+    http<ApiListResponse<ContentPost>>(`/member/contents?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
+  
+  listLateMembersVisible: (params?: { page?: number; pageSize?: number }) =>
+    http<ApiListResponse<{ id: string; firstName: string; lastName: string; antennaName: string | null; lateMonths: number; }>>(`/member/late-members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
+  
+  listMyNotifications: (params?: { page?: number; pageSize?: number }) => 
+    http<ApiListResponse<NotificationItem>>(`/notifications?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
+  
+  getAssociationBalanceSummary: () => 
+    http<{ associationId: string; associationName: string; totalValidatedContributionsAmount: number; currency: string; lastUpdatedAt: string; }>('/member/association-balance'),
+    
+  // 👇 AJOUTÉ : Méthode pour marquer une notification comme lue
+  markNotificationRead: (id: string) => 
+    http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
 };

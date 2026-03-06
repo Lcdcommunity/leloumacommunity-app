@@ -1,4 +1,4 @@
-//web/app/(protected)/member/notifications/page.tsx
+// web/app/(protected)/member/notifications/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -20,7 +20,8 @@ export default function MemberNotificationsPage() {
     setError(null);
     try {
       const res = await api.listMyNotifications();
-      setItems(res.items);
+      // 👇 Sécurité ajoutée : on garantit la présence d'un tableau
+      setItems(res?.items || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement notifications');
     }
@@ -44,7 +45,8 @@ export default function MemberNotificationsPage() {
         {error ? <p className="error-text">{error}</p> : null}
 
         <Table columns={['Message', 'Statut', 'Date', 'Action']}>
-          {items.map((n) => (
+          {/* 👇 Sécurité ajoutée au moment de la boucle map */}
+          {(items || []).map((n) => (
             <tr key={n.id}>
               <td>{n.message}</td>
               <td>

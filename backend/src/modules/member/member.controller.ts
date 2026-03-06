@@ -1,4 +1,4 @@
-//backend/src/modules/member/member.controller.ts
+// backend/src/modules/member/member.controller.ts
 import {
   Body,
   Controller,
@@ -30,6 +30,12 @@ import { MemberContentsQueryDto } from './dto/member-contents-query.dto';
 @Roles(UserRole.MEMBER)
 export class MemberController {
   constructor(private readonly service: MemberService) {}
+
+  // 👇 NOUVELLE ROUTE : Dashboard Membre
+  @Get('dashboard')
+  getDashboard(@CurrentUser() user: AuthUser) {
+    return this.service.getDashboard(user.id);
+  }
 
   // Profil
   @Patch('profile')

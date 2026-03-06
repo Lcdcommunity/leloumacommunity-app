@@ -1,4 +1,4 @@
-// src/modules/member/member.service.ts
+// backend/src/modules/member/member.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -48,6 +48,29 @@ export class MemberService {
 
     if (!user) throw new NotFoundException('Utilisateur introuvable');
     return { ...user, antennaId: user.memberships[0]?.antennaId || null };
+  }
+
+  // 👇 NOUVELLE FONCTION : Statistiques du Dashboard Membre
+  async getDashboard(userId: string) {
+    const me = await this.getMeOrThrow(userId);
+
+    const [totalMyContributions, activeProjects] = await Promise.all([
+      this.prisma.contribution.aggregate({
+        where: { memberUserId: userId, status: ContributionStatus.VALIDATED },
+        _sum: { amount: true },
+      }),
+      this.prisma.project.count({
+        where: { associationId: me.associationId, status: ProjectStatus.IN_PROGRESS },
+      }),
+    ]);
+
+    return {
+      user: memberMapper.userSummary(me),
+      stats: {
+        myTotalContributions: Number(totalMyContributions._sum.amount ?? 0),
+        activeProjects,
+      },
+    };
   }
 
   private ensureMemberActiveEnough(status: UserStatus): void {
