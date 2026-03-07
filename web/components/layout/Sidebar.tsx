@@ -27,7 +27,8 @@ const adminItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/approvals', label: 'Validations comptes' },
   { href: '/admin/members', label: 'Membres' },
-  { href: '/admin/contributions', label: 'Cotisations' },
+  { href: '/admin/contributions', label: 'Validation cotisations' }, // Modifié pour plus de clarté
+  { href: '/admin/contributions/history', label: 'Historique cotisations' }, // 👇 NOUVEAU LIEN AJOUTÉ
   { href: '/admin/projects', label: 'Projets' },
   { href: '/admin/documents', label: 'Documents & photos' },
   { href: '/admin/contents', label: 'Informations' },
@@ -81,7 +82,8 @@ export function Sidebar() {
       <div className="sidebar-brand">{title}</div>
       <nav className="sidebar-nav">
         {items.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href + '/');
+          // Utilisation de l'égalité stricte pour que seul le menu exact soit en surbrillance
+          const active = pathname === item.href; 
           return (
             <Link key={item.href} href={item.href} className={`sidebar-link ${active ? 'active' : ''}`}>
               {item.label}

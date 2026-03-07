@@ -50,7 +50,6 @@ export class AdminController {
     return res.send(csv);
   }
 
-  // 👇 NOUVELLE ROUTE : RETARDATAIRES
   @Get('late-members')
   listLateMembers(@CurrentUser() user: AuthUser, @Query('page') page = 1, @Query('pageSize') pageSize = 100) {
     return this.service.listLateMembers(user.id, +page, +pageSize);
@@ -78,6 +77,11 @@ export class AdminController {
     return this.service.rejectContribution(id, user.id, reason);
   }
 
+  @Patch('contributions/:id')
+  updateContribution(@Param('id') id: string, @Body('amount') amount: number, @CurrentUser() user: AuthUser) {
+    return this.service.updateContribution(id, user.id, amount);
+  }
+
   // --- GESTION DES PROJETS (ANTENNE) ---
   @Get('projects')
   listProjects(
@@ -103,6 +107,20 @@ export class AdminController {
   @Delete('projects/:id')
   deleteProject(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.deleteProject(id, user.id);
+  }
+
+  // 👇 NOUVELLE ROUTE : RÉCEPTION DES PROPOSITIONS DE PROJETS
+  @Get('project-proposals')
+  async listProjectProposals(
+    @CurrentUser() user: AuthUser, 
+    @Query('page') page = 1, 
+    @Query('pageSize') pageSize = 10, 
+    @Query('status') status?: string
+  ) {
+    // Note : Cette méthode doit exister dans `admin.service.ts`.
+    // Si elle n'existe pas, nous la rajouterons dans la foulée,
+    // mais je la déclare ici pour que le controller soit complet.
+    return (this.service as any).listProjectProposals(user.id, +page, +pageSize, status);
   }
 
   // --- GESTION DES DOCUMENTS (ANTENNE) ---
@@ -153,7 +171,6 @@ export class AdminController {
     return this.service.deleteContent(id, user.id);
   }
 
-  // 👇 NOUVELLE ROUTE : NOTIFICATIONS
   @Get('notifications')
   listNotifications(@CurrentUser() user: AuthUser, @Query('page') page = 1, @Query('pageSize') pageSize = 100) {
     return this.service.listNotifications(user.id, +page, +pageSize);

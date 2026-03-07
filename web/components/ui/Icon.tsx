@@ -1,0 +1,122 @@
+//web/components/ui/Icon.tsx
+import {
+  Users,
+  Clock,
+  DollarSign,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  UserPlus,
+  FileText,
+  Calendar,
+  Home,
+  Settings,
+  LogOut,
+  Bell,
+  Menu,
+  X,
+  ChevronRight,
+  ChevronLeft,
+  ChevronDown,
+  Search,
+  Filter,
+  Download,
+  Upload,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff,
+  Mail,
+  Phone,
+  MapPin,
+  Globe,
+  Lock,
+  Unlock,
+  Shield,
+  Award,
+  Heart,
+  Star,
+  ThumbsUp,
+  MessageCircle,
+  Share2,
+  Bookmark,
+  Camera,
+  Image,
+  Paperclip,
+  Link,
+  ExternalLink,
+  MoreHorizontal,
+  MoreVertical,
+  // 1. On importe LucideProps pour un typage propre
+  type LucideProps,
+} from 'lucide-react'
+
+export const Icons = {
+  users: Users,
+  pending: Clock,
+  cash: DollarSign,
+  chart: TrendingUp,
+  alert: AlertCircle,
+  success: CheckCircle,
+  error: XCircle,
+  userPlus: UserPlus,
+  document: FileText,
+  calendar: Calendar,
+  home: Home,
+  settings: Settings,
+  logout: LogOut,
+  notification: Bell,
+  menu: Menu,
+  close: X,
+  chevronRight: ChevronRight,
+  chevronLeft: ChevronLeft,
+  chevronDown: ChevronDown,
+  search: Search,
+  filter: Filter,
+  download: Download,
+  upload: Upload,
+  plus: Plus,
+  edit: Edit,
+  delete: Trash2,
+  view: Eye,
+  hide: EyeOff,
+  mail: Mail,
+  phone: Phone,
+  location: MapPin,
+  website: Globe,
+  lock: Lock,
+  unlock: Unlock,
+  shield: Shield,
+  award: Award,
+  heart: Heart,
+  star: Star,
+  thumbsUp: ThumbsUp,
+  comment: MessageCircle,
+  share: Share2,
+  bookmark: Bookmark,
+  camera: Camera,
+  image: Image,
+  attachment: Paperclip,
+  link: Link,
+  external: ExternalLink,
+  moreHorizontal: MoreHorizontal,
+  moreVertical: MoreVertical,
+}
+
+export type IconName = keyof typeof Icons
+
+// 2. Correction chirurgicale du typage : on omet 'iconNode'
+interface IconProps extends Omit<LucideProps, 'ref' | 'iconNode'> {
+  name: IconName
+}
+
+export function Icon({ name, className, ...props }: IconProps) {
+  const LucideIconComponent = Icons[name]
+  
+  if (!LucideIconComponent) return null
+
+  // 3. On passe les props normalement, le 'iconNode' est géré en interne par Lucide
+  return <LucideIconComponent className={className} {...props} />
+}

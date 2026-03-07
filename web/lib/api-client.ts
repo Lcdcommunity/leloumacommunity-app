@@ -171,6 +171,9 @@ export const api = {
   rejectContributionAntenna: (id: string, payload?: { reason?: string }) =>
     http(`/admin/contributions/${id}/reject`, { method: 'PATCH', body: payload ?? {} }),
 
+  updateContributionAntenna: (id: string, payload: { amount: number }) =>
+    http(`/admin/contributions/${id}`, { method: 'PATCH', body: payload }),
+
   // Projects (super-admin global)
   listProjects: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
     http<ApiListResponse<Project>>(
@@ -331,7 +334,8 @@ export const api = {
   listProjectProposals: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<{ id: string; title: string; description: string; status: string; expectedBudget: number | null; createdAt: string; updatedAt: string; }>>(`/member/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
   
-  createProjectProposal: (body: { title: string; description: string; expectedBudget?: number; }) => 
+  // 👇 LA CORRECTION EST ICI : Ajout de attachmentFileAssetId
+  createProjectProposal: (body: { title: string; description: string; expectedBudget?: number; attachmentFileAssetId?: string; }) => 
     http<{ id: string; title: string; status: string; }, typeof body>('/member/project-proposals', { method: 'POST', body }),
   
   listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
@@ -349,7 +353,6 @@ export const api = {
   getAssociationBalanceSummary: () => 
     http<{ associationId: string; associationName: string; totalValidatedContributionsAmount: number; currency: string; lastUpdatedAt: string; }>('/member/association-balance'),
     
-  // 👇 AJOUTÉ : Méthode pour marquer une notification comme lue
   markNotificationRead: (id: string) => 
     http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
 };

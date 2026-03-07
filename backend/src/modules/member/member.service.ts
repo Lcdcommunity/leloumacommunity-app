@@ -50,7 +50,6 @@ export class MemberService {
     return { ...user, antennaId: user.memberships[0]?.antennaId || null };
   }
 
-  // 👇 NOUVELLE FONCTION : Statistiques du Dashboard Membre
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
@@ -127,6 +126,10 @@ export class MemberService {
       throw new BadRequestException('Utilisateur non rattaché à une association / antenne.');
     }
 
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const autoReference = `TR-${datePart}-${randomPart}`;
+
     const created = await this.prisma.contribution.create({
       data: {
         associationId: me.associationId,
@@ -135,7 +138,7 @@ export class MemberService {
         amount: new Prisma.Decimal(dto.amount),
         currency: 'EUR',
         paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
-        externalReference: dto.reference ?? null,
+        externalReference: autoReference,
         contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
         memberComment: dto.note ?? null,
         proofFileId: dto.receiptFileAssetId ?? null,
@@ -250,7 +253,7 @@ export class MemberService {
     return { items: items.map(memberMapper.project), total, page, pageSize };
   }
 
-  async createProjectProposal(userId: string, dto: CreateProjectProposalDto) {
+  async createProjectProposal(userId: string, dto: CreateProjectProposalDto & { attachmentFileAssetId?: string }) {
     const me = await this.getMeOrThrow(userId);
     this.ensureMemberActiveEnough(me.status);
 
@@ -263,6 +266,14 @@ export class MemberService {
         description: dto.description.trim(),
         estimatedBudget: dto.expectedBudget ? new Prisma.Decimal(dto.expectedBudget) : null,
         status: ProposalStatus.SUBMITTED,
+        // 👇 Attachement de la pièce jointe (si présente) via la table pivot
+        ...(dto.attachmentFileAssetId ? {
+          attachments: {
+            create: {
+              fileId: dto.attachmentFileAssetId
+            }
+          }
+        } : {})
       },
     });
 
@@ -281,10 +292,24 @@ export class MemberService {
 
     const [total, items] = await Promise.all([
       this.prisma.projectProposal.count({ where }),
-      this.prisma.projectProposal.findMany({ where, orderBy: [{ createdAt: 'desc' }], skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.projectProposal.findMany({ 
+        where, 
+        orderBy: [{ createdAt: 'desc' }], 
+        skip: (page - 1) * pageSize, 
+        take: pageSize,
+      }),
     ]);
 
-    return { items: items.map(memberMapper.projectProposal), total, page, pageSize };
+    // 👇 CORRECTION FRONTEND : On renvoie "estimatedBudget" en s'assurant qu'il est bien mappé
+    return { 
+      items: items.map(p => ({
+        ...memberMapper.projectProposal(p),
+        estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : null // Force l'envoi de l'info
+      })), 
+      total, 
+      page, 
+      pageSize 
+    };
   }
 
   async listDocuments(userId: string, query: MemberDocumentsQueryDto): Promise<PaginatedResponseDto<any>> {

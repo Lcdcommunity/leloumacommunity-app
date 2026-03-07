@@ -292,3 +292,38 @@ textarea.input { min-height: 100px; resize: vertical; }
   .grid-stats { grid-template-columns: 1fr; }
   .page-title { font-size: 18px; }
 }
+/* Styles personnalisés */
+
+.hover-lift {
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.05);
+}
+
+/* Classes utilitaires personnalisées */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Scrollbar personnalisée (optionnel) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

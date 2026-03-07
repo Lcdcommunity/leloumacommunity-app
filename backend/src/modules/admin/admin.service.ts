@@ -1,7 +1,7 @@
 // backend/src/modules/admin/admin.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma } from '@prisma/client';
+import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole } from '@prisma/client';
 import { memberMapper } from '../member/member.mapper';
 
 @Injectable()
@@ -24,7 +24,7 @@ export class AdminService {
   async listPendingApprovals(adminId: string, page: number, pageSize: number) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const skip = (page - 1) * pageSize;
-    const where = { status: UserStatus.PENDING_APPROVAL, memberships: { some: { antennaId } } };
+    const where: any = { status: UserStatus.PENDING_APPROVAL, role: UserRole.MEMBER, memberships: { some: { antennaId } } };
 
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({ 
@@ -48,7 +48,7 @@ export class AdminService {
 
   async approveMember(userId: string, adminId: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
-    const user = await this.prisma.user.findFirst({ where: { id: userId, memberships: { some: { antennaId } } } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId, role: UserRole.MEMBER as any, memberships: { some: { antennaId } } } });
     if (!user) throw new NotFoundException("Membre introuvable.");
     
     return this.prisma.user.update({ 
@@ -59,7 +59,7 @@ export class AdminService {
 
   async rejectMember(userId: string, adminId: string, reason: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
-    const user = await this.prisma.user.findFirst({ where: { id: userId, memberships: { some: { antennaId } } } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId, role: UserRole.MEMBER as any, memberships: { some: { antennaId } } } });
     if (!user) throw new NotFoundException("Membre introuvable.");
     
     return this.prisma.user.update({ 
@@ -71,8 +71,9 @@ export class AdminService {
   async listMembers(adminId: string, page: number, pageSize: number, q?: string, status?: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const skip = (page - 1) * pageSize;
-    const where: Prisma.UserWhereInput = { 
-      memberships: { some: { antennaId } }, 
+    const where: Prisma.UserWhereInput | any = { 
+      memberships: { some: { antennaId } },
+      role: UserRole.MEMBER,
       ...(status ? { status: status as UserStatus } : {}) 
     };
     
@@ -95,7 +96,7 @@ export class AdminService {
   async exportMembers(adminId: string): Promise<string> {
     const antennaId = await this.getAdminAntennaId(adminId);
     const members = await this.prisma.user.findMany({ 
-      where: { memberships: { some: { antennaId } } }, 
+      where: { memberships: { some: { antennaId } }, role: UserRole.MEMBER as any }, 
       orderBy: { lastName: 'asc' } 
     });
     
@@ -104,13 +105,11 @@ export class AdminService {
     return header + rows;
   }
 
-  // 👇 AJOUT DE LA ROUTE MANQUANTE : RETARDATAIRES
   async listLateMembers(adminId: string, page: number, pageSize: number) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const skip = (page - 1) * pageSize;
     
-    // Pour l'instant on simule en renvoyant des membres actifs, la vraie logique se fera plus tard
-    const where = { memberships: { some: { antennaId } }, status: UserStatus.ACTIVE };
+    const where: any = { memberships: { some: { antennaId } }, status: UserStatus.ACTIVE, role: UserRole.MEMBER };
     
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({ where, skip, take: pageSize, orderBy: { lastName: 'asc' } }),
@@ -120,7 +119,7 @@ export class AdminService {
     return { 
       items: items.map(u => ({
         ...memberMapper.userSummary(u),
-        delayMonths: 3, // Simulation pour le front
+        delayMonths: 3,
         lastContributionDate: null 
       })), 
       total, 
@@ -185,6 +184,17 @@ export class AdminService {
     });
   }
 
+  async updateContribution(contributionId: string, adminId: string, amount: number) {
+    const antennaId = await this.getAdminAntennaId(adminId);
+    const contribution = await this.prisma.contribution.findFirst({ where: { id: contributionId, antennaId } });
+    if (!contribution) throw new NotFoundException("Cotisation introuvable.");
+    
+    return this.prisma.contribution.update({ 
+      where: { id: contributionId }, 
+      data: { amount: new Prisma.Decimal(amount) } 
+    });
+  }
+
   // --- GESTION DES PROJETS ---
 
   async listProjects(adminId: string, page: number, pageSize: number, status?: string, q?: string) {
@@ -218,13 +228,31 @@ export class AdminService {
     
     if (!antenna?.associationId) throw new BadRequestException("Antenne non rattachée à une association.");
 
+    let safeStatus = undefined;
+    if (data.status && Object.values(ProjectStatus).includes(data.status)) {
+      safeStatus = data.status as ProjectStatus;
+    }
+
     return this.prisma.project.create({
       data: { 
-        ...data, 
+        title: data.title,
+        description: data.description,
+        ...(safeStatus ? { status: safeStatus } : {}),
+        startDate: data.startsAt ? new Date(data.startsAt) : null,
+        endDate: data.endsAt ? new Date(data.endsAt) : null,
         antennaId, 
         associationId: antenna.associationId, 
-        budgetPlanned: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : null, 
-        budgetSpent: data.budgetSpent ? new Prisma.Decimal(data.budgetSpent) : new Prisma.Decimal(0) 
+        budgetAmount: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : null, 
+        amountSpent: data.budgetSpent ? new Prisma.Decimal(data.budgetSpent) : new Prisma.Decimal(0),
+        
+        // 👇 CONNEXION CORRECTE SELON LE SCHEMA PRISMA
+        ...(data.photoIds && data.photoIds.length > 0 ? {
+          attachments: {
+            create: data.photoIds.map((fileId: string) => ({
+              fileId: fileId
+            }))
+          }
+        } : {})
       }
     });
   }
@@ -234,12 +262,30 @@ export class AdminService {
     const project = await this.prisma.project.findFirst({ where: { id: projectId, antennaId } });
     if (!project) throw new NotFoundException("Projet introuvable.");
     
+    let safeStatus = undefined;
+    if (data.status && Object.values(ProjectStatus).includes(data.status)) {
+      safeStatus = data.status as ProjectStatus;
+    }
+
     return this.prisma.project.update({ 
       where: { id: projectId }, 
       data: { 
-        ...data, 
-        budgetPlanned: data.budgetPlanned !== undefined ? new Prisma.Decimal(data.budgetPlanned) : undefined, 
-        budgetSpent: data.budgetSpent !== undefined ? new Prisma.Decimal(data.budgetSpent) : undefined 
+        ...(data.title !== undefined ? { title: data.title } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(safeStatus ? { status: safeStatus } : {}),
+        ...(data.startsAt !== undefined ? { startDate: data.startsAt ? new Date(data.startsAt) : null } : {}),
+        ...(data.endsAt !== undefined ? { endDate: data.endsAt ? new Date(data.endsAt) : null } : {}),
+        ...(data.budgetPlanned !== undefined ? { budgetAmount: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : null } : {}),
+        ...(data.budgetSpent !== undefined ? { amountSpent: data.budgetSpent ? new Prisma.Decimal(data.budgetSpent) : null } : {}),
+        
+        // 👇 CONNEXION CORRECTE DES NOUVELLES PHOTOS
+        ...(data.photoIds && data.photoIds.length > 0 ? {
+          attachments: {
+            create: data.photoIds.map((fileId: string) => ({
+              fileId: fileId
+            }))
+          }
+        } : {})
       } 
     });
   }
@@ -296,7 +342,6 @@ export class AdminService {
 
     if (!antenna?.associationId) throw new BadRequestException("Antenne non rattachée.");
 
-    // Le "as string" blinde complètement TypeScript contre l'erreur "never"
     return this.prisma.document.create({
       data: {
         title: data.title,
@@ -414,7 +459,7 @@ export class AdminService {
     return this.prisma.newsPost.delete({ where: { id: contentId } });
   }
 
-  // 👇 AJOUT DE LA ROUTE MANQUANTE : NOTIFICATIONS
+  // --- NOTIFICATIONS ---
   async listNotifications(adminId: string, page: number, pageSize: number) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const skip = (page - 1) * pageSize;
@@ -427,7 +472,6 @@ export class AdminService {
     ]);
 
     return { 
-      // On passe un isRead false par défaut en attendant la logique utilisateur final
       items: items.map(n => memberMapper.notification({ ...n, isRead: false })), 
       total, 
       page, 

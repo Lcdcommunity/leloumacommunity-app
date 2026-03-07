@@ -1,19 +1,19 @@
-// web/app/(protected)/admin/contributions/page.tsx
+// web/app/(protected)/admin/contributions/history/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { AppShell } from '../../../../components/layout/AppShell';
-import { Card } from '../../../../components/ui/Card';
-import { Select } from '../../../../components/ui/Select';
-import { Input } from '../../../../components/ui/Input';
-import { Button } from '../../../../components/ui/Button';
-import { api } from '../../../../lib/api-client';
-import type { Contribution } from '../../../../types/contribution';
-import { ContributionValidationTable } from '../../../../components/admin/ContributionValidationTable';
+import { AppShell } from '../../../../../components/layout/AppShell';
+import { Card } from '../../../../../components/ui/Card';
+import { Select } from '../../../../../components/ui/Select';
+import { Input } from '../../../../../components/ui/Input';
+import { Button } from '../../../../../components/ui/Button';
+import { api } from '../../../../../lib/api-client';
+import type { Contribution } from '../../../../../types/contribution';
+import { ContributionValidationTable } from '../../../../../components/admin/ContributionValidationTable';
 
-export default function AdminContributionsPage() {
+export default function AdminContributionsHistoryPage() {
   const [items, setItems] = useState<Contribution[]>([]);
-  const [status, setStatus] = useState('PENDING_VALIDATION'); 
+  const [status, setStatus] = useState(''); 
   const [q, setQ] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +26,7 @@ export default function AdminContributionsPage() {
         status: status || undefined,
         q: q || undefined,
       });
-      setItems(res.items);
+      setItems(res?.items || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');
@@ -83,8 +83,8 @@ export default function AdminContributionsPage() {
   }
 
   return (
-    <AppShell title="Validation des cotisations">
-      <Card title="Cotisations des membres (votre antenne)">
+    <AppShell title="Historique des cotisations">
+      <Card title="Archives de l'antenne">
         <div className="toolbar responsive-toolbar">
           <Input placeholder="Recherche membre / référence..." value={q} onChange={(e) => setQ(e.target.value)} />
           <Select
@@ -93,9 +93,9 @@ export default function AdminContributionsPage() {
             onChange={(e) => setStatus(e.target.value)}
             options={[
               { value: '', label: 'Tous statuts' },
-              { value: 'PENDING_VALIDATION', label: 'En attente' }, 
               { value: 'VALIDATED', label: 'Validée' },
               { value: 'REJECTED', label: 'Rejetée' },
+              { value: 'PENDING_VALIDATION', label: 'En attente' },
             ]}
           />
           <Button onClick={() => void load()}>Filtrer</Button>
@@ -109,6 +109,7 @@ export default function AdminContributionsPage() {
           onValidate={handleValidate}
           onReject={handleReject}
           onEdit={handleEdit}
+          isHistoryView={true} // 👇 ON ACTIVE LE NOUVEAU MODE ICI
         />
       </Card>
     </AppShell>

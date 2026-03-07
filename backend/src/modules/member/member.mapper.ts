@@ -1,4 +1,5 @@
-//backend/src/modules/member/member.mapper.ts
+// backend/src/modules/member/member.mapper.ts
+
 export const memberMapper = {
   userSummary(u: any) {
     return {
@@ -27,13 +28,13 @@ export const memberMapper = {
       id: c.id,
       amount: Number(c.amount),
       currency: c.currency ?? 'EUR',
-      method: c.paymentMethod ?? null, // Alignement Prisma
-      reference: c.externalReference ?? null, // Alignement Prisma
+      method: c.paymentMethod ?? null,
+      reference: c.externalReference ?? null,
       status: c.status,
-      depositedAt: c.contributionDate?.toISOString?.() ?? c.contributionDate ?? null, // Alignement Prisma
+      depositedAt: c.contributionDate?.toISOString?.() ?? c.contributionDate ?? null,
       createdAt: c.createdAt?.toISOString?.() ?? c.createdAt,
       validatedAt: c.validatedAt?.toISOString?.() ?? c.validatedAt ?? null,
-      note: c.memberComment ?? null, // Alignement Prisma
+      note: c.memberComment ?? null,
     };
   },
 
@@ -43,10 +44,11 @@ export const memberMapper = {
       title: p.title,
       description: p.description ?? null,
       status: p.status,
-      budgetPlanned: p.budgetPlanned != null ? Number(p.budgetPlanned) : null,
-      budgetSpent: p.budgetSpent != null ? Number(p.budgetSpent) : null,
-      startsAt: p.startsAt?.toISOString?.() ?? p.startsAt ?? null,
-      endsAt: p.endsAt?.toISOString?.() ?? p.endsAt ?? null,
+      // 👇 CORRECTION : On lit les bonnes propriétés Prisma (budgetAmount, amountSpent, startDate, endDate)
+      budgetPlanned: p.budgetAmount != null ? Number(p.budgetAmount) : null,
+      budgetSpent: p.amountSpent != null ? Number(p.amountSpent) : null,
+      startsAt: p.startDate?.toISOString?.() ?? p.startDate ?? null,
+      endsAt: p.endDate?.toISOString?.() ?? p.endDate ?? null,
       createdAt: p.createdAt?.toISOString?.() ?? p.createdAt,
       updatedAt: p.updatedAt?.toISOString?.() ?? p.updatedAt,
     };
@@ -80,10 +82,25 @@ export const memberMapper = {
   },
 
   contentPost(c: any) {
-    return { id: c.id, title: c.title, body: c.body ?? null, status: c.status, createdAt: c.createdAt?.toISOString?.() ?? c.createdAt, updatedAt: c.updatedAt?.toISOString?.() ?? c.updatedAt };
+    return { 
+      id: c.id, 
+      title: c.title, 
+      body: c.body ?? null, 
+      status: c.status, 
+      createdAt: c.createdAt?.toISOString?.() ?? c.createdAt, 
+      updatedAt: c.updatedAt?.toISOString?.() ?? c.updatedAt 
+    };
   },
 
   notification(n: any) {
-    return { id: n.id, message: n.message, isRead: Boolean(n.isRead), createdAt: n.createdAt?.toISOString?.() ?? n.createdAt, updatedAt: n.updatedAt?.toISOString?.() ?? n.updatedAt, type: n.type ?? null, metadata: n.metadata ?? null };
+    return { 
+      id: n.id, 
+      message: n.message, 
+      isRead: Boolean(n.isRead), 
+      createdAt: n.createdAt?.toISOString?.() ?? n.createdAt, 
+      updatedAt: n.updatedAt?.toISOString?.() ?? n.updatedAt, 
+      type: n.type ?? null, 
+      metadata: n.metadata ?? null 
+    };
   },
 };
