@@ -1,6 +1,6 @@
-//backend/prisma/seeds/seed.ts
+// backend/prisma/seeds/seed.ts
 import { PrismaClient, UserRole, UserStatus, MembershipApprovalStatus } from '@prisma/client';
-import * as bcrypt from 'bcryptjs'; // <-- Correction ici
+import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -28,15 +28,16 @@ async function main() {
     },
   });
 
-  const hashedPwd = await bcrypt.hash('Admin2026!', 10); //
+  // Nouveau mot de passe global
+  const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
   // 1. Super Admin
   const superAdmin = await prisma.user.upsert({
-    where: { email: 'superadmin@association.com' },
+    where: { email: 'thiernodoniko@gmail.com' },
     update: {},
     create: {
       associationId: association.id,
-      email: 'superadmin@association.com',
+      email: 'thiernodoniko@gmail.com',
       passwordHash: hashedPwd,
       firstName: 'Super', lastName: 'Admin',
       role: UserRole.SUPER_ADMIN,
@@ -46,11 +47,11 @@ async function main() {
 
   // 2. Admin Antenne
   const antennaAdmin = await prisma.user.upsert({
-    where: { email: 'admin.paris@association.com' },
+    where: { email: 'jallowdoniko@gmail.com' },
     update: {},
     create: {
       associationId: association.id,
-      email: 'admin.paris@association.com', 
+      email: 'jallowdoniko@gmail.com', 
       passwordHash: hashedPwd,
       firstName: 'Admin', lastName: 'Paris',
       role: UserRole.ANTENNA_ADMIN,
@@ -72,11 +73,11 @@ async function main() {
 
   // 3. Membre Standard
   const member = await prisma.user.upsert({
-    where: { email: 'membre@association.com' },
+    where: { email: 'donikojallow@gmail.com' },
     update: {},
     create: {
       associationId: association.id,
-      email: 'membre@association.com',
+      email: 'donikojallow@gmail.com',
       passwordHash: hashedPwd,
       firstName: 'Jean', lastName: 'Dupont',
       role: UserRole.MEMBER,

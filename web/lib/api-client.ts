@@ -355,4 +355,25 @@ export const api = {
     
   markNotificationRead: (id: string) => 
     http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+
+  // ==========================================
+  // INSCRIPTION PUBLIQUE
+  // ==========================================
+
+  listPublicAntennasForSignup: () =>
+    http<Array<{ id: string; code: string; name: string; city?: string; country?: string; }>>('/public/antennas'),
+
+  memberSignup: (body: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    password?: string;
+    antennaId: string;
+    city?: string;
+    country?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+  }) =>
+    http<{ id: string; message: string; }, typeof body>('/public/signup', { method: 'POST', body }),
 };
