@@ -1,14 +1,14 @@
-//web/app/reset-password/page.tsx
+// web/app/reset-password/page.tsx
 'use client';
 
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { http } from '../../lib/http';
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const params = useSearchParams();
   const router = useRouter();
   const token = useMemo(() => params.get('token') || '', [params]);
@@ -52,29 +52,37 @@ export default function ResetPasswordPage() {
   }
 
   return (
+    <form onSubmit={onSubmit} className="stack-md">
+      <Input
+        label="Nouveau mot de passe"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        required
+      />
+      <Input
+        label="Confirmer le mot de passe"
+        type="password"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        required
+      />
+      <Button type="submit" fullWidth disabled={loading}>
+        {loading ? 'Validation...' : 'Valider'}
+      </Button>
+      {message ? <p className="mt-4 text-center text-sm font-medium">{message}</p> : null}
+    </form>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
     <div className="auth-page">
       <div className="auth-card-wrap">
         <Card title="Réinitialiser le mot de passe">
-          <form onSubmit={onSubmit} className="stack-md">
-            <Input
-              label="Nouveau mot de passe"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <Input
-              label="Confirmer le mot de passe"
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-            />
-            <Button type="submit" fullWidth disabled={loading}>
-              {loading ? 'Validation...' : 'Valider'}
-            </Button>
-            {message ? <p>{message}</p> : null}
-          </form>
+          <Suspense fallback={<p className="text-center">Chargement en cours...</p>}>
+            <ResetPasswordContent />
+          </Suspense>
         </Card>
       </div>
     </div>

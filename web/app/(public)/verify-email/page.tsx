@@ -1,14 +1,14 @@
 // web/app/(public)/verify-email/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../../lib/api-client';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const params = useSearchParams();
   const token = useMemo(() => params.get('token') || '', [params]);
 
@@ -46,29 +46,43 @@ export default function VerifyEmailPage() {
   }, [verify]);
 
   return (
+    <Card title="Vérification de l’email">
+      <p className="mb-4">{message}</p>
+
+      {!loading && (
+        <div className="flex gap-4 mt-6">
+          <Link href="/login">
+            <Button>Aller à la connexion</Button>
+          </Link>
+          <Link href="/signup">
+            <Button variant="secondary">Retour inscription</Button>
+          </Link>
+        </div>
+      )}
+
+      {success === true && (
+        <p className="mt-4 text-green-600 font-medium">Étape 1/2 terminée : email vérifié.</p>
+      )}
+      {success === false && (
+        <p className="mt-4 text-red-600 font-medium">Vérification échouée ou lien expiré.</p>
+      )}
+    </Card>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
     <main className="auth-page">
       <div className="auth-card-wrap">
-        <Card title="Vérification de l’email">
-          <p className="mb-4">{message}</p>
-
-          {!loading && (
-            <div className="flex gap-4 mt-6">
-              <Link href="/login">
-                <Button>Aller à la connexion</Button>
-              </Link>
-              <Link href="/signup">
-                <Button variant="secondary">Retour inscription</Button>
-              </Link>
-            </div>
-          )}
-
-          {success === true && (
-            <p className="mt-4 text-green-600 font-medium">Étape 1/2 terminée : email vérifié.</p>
-          )}
-          {success === false && (
-            <p className="mt-4 text-red-600 font-medium">Vérification échouée ou lien expiré.</p>
-          )}
-        </Card>
+        <Suspense 
+          fallback={
+            <Card title="Vérification de l'email">
+              <p>Chargement en cours...</p>
+            </Card>
+          }
+        >
+          <VerifyEmailContent />
+        </Suspense>
       </div>
     </main>
   );
