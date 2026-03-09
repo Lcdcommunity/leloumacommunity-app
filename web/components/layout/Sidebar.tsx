@@ -13,7 +13,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin', label: 'Dashboard' },
   { href: '/super-admin/antennas', label: 'Antennes' },
   { href: '/super-admin/admins', label: 'Admins antenne' },
-  { href: '/super-admin/members', label: 'Membres' },
+  { href: '/super-admin/member', label: 'Membres' },
   { href: '/super-admin/approvals', label: 'Validations comptes' },
   { href: '/super-admin/contributions', label: 'Cotisations' },
   { href: '/super-admin/projects', label: 'Projets' },
@@ -26,7 +26,7 @@ const superAdminItems: NavItem[] = [
 const adminItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/approvals', label: 'Validations comptes' },
-  { href: '/admin/members', label: 'Membres' },
+  { href: '/admin/member', label: 'Membres' },
   { href: '/admin/contributions', label: 'Validation cotisations' }, // Modifié pour plus de clarté
   { href: '/admin/contributions/history', label: 'Historique cotisations' }, // 👇 NOUVEAU LIEN AJOUTÉ
   { href: '/admin/projects', label: 'Projets' },
