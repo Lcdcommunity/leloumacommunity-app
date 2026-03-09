@@ -1,4 +1,4 @@
-//web/components/layout/Sidebar.tsx
+// web/components/layout/Sidebar.tsx
 'use client';
 
 import Link from 'next/link';
@@ -13,7 +13,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin', label: 'Dashboard' },
   { href: '/super-admin/antennas', label: 'Antennes' },
   { href: '/super-admin/admins', label: 'Admins antenne' },
-  { href: '/super-admin/member', label: 'Membres' },
+  { href: '/super-admin/members', label: 'Membres' },
   { href: '/super-admin/approvals', label: 'Validations comptes' },
   { href: '/super-admin/contributions', label: 'Cotisations' },
   { href: '/super-admin/projects', label: 'Projets' },
@@ -26,9 +26,9 @@ const superAdminItems: NavItem[] = [
 const adminItems: NavItem[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/approvals', label: 'Validations comptes' },
-  { href: '/admin/member', label: 'Membres' },
-  { href: '/admin/contributions', label: 'Validation cotisations' }, // Modifié pour plus de clarté
-  { href: '/admin/contributions/history', label: 'Historique cotisations' }, // 👇 NOUVEAU LIEN AJOUTÉ
+  { href: '/admin/members', label: 'Membres' },
+  { href: '/admin/contributions', label: 'Validation cotisations' },
+  { href: '/admin/contributions/history', label: 'Historique cotisations' },
   { href: '/admin/projects', label: 'Projets' },
   { href: '/admin/documents', label: 'Documents & photos' },
   { href: '/admin/contents', label: 'Informations' },
@@ -57,15 +57,26 @@ export function Sidebar() {
   const pathname = usePathname();
   const [role, setRole] = useState<UserRole | null>(null);
 
+  // Sécurisation du useEffect pour éviter les fuites de mémoire
   useEffect(() => {
+    let isMounted = true;
+
     void (async () => {
       try {
         const me = await api.me();
-        setRole(me.role);
+        if (isMounted) {
+          setRole(me.role);
+        }
       } catch {
-        setRole(null);
+        if (isMounted) {
+          setRole(null);
+        }
       }
     })();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const items = useMemo(() => {
