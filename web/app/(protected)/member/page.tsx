@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { MemberStatusBanner } from '../../../components/member/MemberStatusBanner';
+import { VirtualCardWidget } from '../../../components/member/VirtualCardWidget';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, formatDate } from '../../../lib/format';
 import type { UserSummary } from '../../../types/user';
@@ -12,6 +13,22 @@ import type { Project } from '../../../types/project';
 import type { ContentPost } from '../../../types/content';
 
 type MemberDashboardResponse = {
+  virtualCard?: {
+    cardNumber: string;
+    isLocked: boolean;
+    expiresAt: string | null;
+    qrToken: string;
+    antennaName: string;
+    user: {
+      firstName: string;
+      lastName: string;
+      birthDate?: string | null;
+      placeOfBirth?: string | null;
+      country?: string | null;
+      city?: string | null;
+      profilePhotoUrl?: string; 
+    };
+  } | null;
   stats?: {
     myTotalContributions?: number;
     activeProjects?: number;
@@ -73,7 +90,16 @@ export default function MemberHomePage() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await api.dashboardMember();
+        const res = await api.dashboardMember() as MemberDashboardResponse;
+        
+        // 👇 CORRECTION : On utilise un cast typé proprement sans utiliser "any"
+        if (res.virtualCard && res.virtualCard.user) {
+          const userRef = res.virtualCard.user as { profilePhotoUrl?: string | null };
+          if (userRef.profilePhotoUrl === null) {
+            res.virtualCard.user.profilePhotoUrl = undefined;
+          }
+        }
+        
         setData(res);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur chargement dashboard');
@@ -413,6 +439,11 @@ export default function MemberHomePage() {
 
           {/* ── Status banner ── */}
           {me && <MemberStatusBanner me={me} />}
+
+          {/* 👇 LA CARTE 3D CONNECTÉE A LA BASE DE DONNÉES */}
+          <div className="mb-8 w-full max-w-md mx-auto">
+            <VirtualCardWidget card={data.virtualCard || null} />
+          </div>
 
           {/* ── Stats ── */}
           <div className="mb-stats">

@@ -53,7 +53,7 @@ export class MemberService {
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
-    const [totalMyContributions, activeProjects] = await Promise.all([
+    const [totalMyContributions, activeProjects, virtualCard] = await Promise.all([
       this.prisma.contribution.aggregate({
         where: { memberUserId: userId, status: ContributionStatus.VALIDATED },
         _sum: { amount: true },
@@ -61,7 +61,35 @@ export class MemberService {
       this.prisma.project.count({
         where: { associationId: me.associationId, status: ProjectStatus.IN_PROGRESS },
       }),
+      this.prisma.virtualCard.findUnique({
+        where: { userId },
+        include: {
+          user: {
+            include: { memberships: { include: { antenna: true } }, profilePhoto: true }
+          }
+        }
+      })
     ]);
+
+    let cardData = null;
+    if (virtualCard) {
+      cardData = {
+        cardNumber: virtualCard.cardNumber,
+        isLocked: virtualCard.isLocked,
+        expiresAt: virtualCard.expiresAt ? virtualCard.expiresAt.toISOString() : null,
+        qrToken: virtualCard.qrToken,
+        antennaName: virtualCard.user.memberships[0]?.antenna?.name || 'Inconnue',
+        user: {
+          firstName: virtualCard.user.firstName,
+          lastName: virtualCard.user.lastName,
+          birthDate: virtualCard.user.birthDate ? virtualCard.user.birthDate.toISOString() : null,
+          placeOfBirth: virtualCard.user.placeOfBirth,
+          country: virtualCard.user.country,
+          city: virtualCard.user.city,
+          profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
+        }
+      };
+    }
 
     return {
       user: memberMapper.userSummary(me),
@@ -69,6 +97,7 @@ export class MemberService {
         myTotalContributions: Number(totalMyContributions._sum.amount ?? 0),
         activeProjects,
       },
+      virtualCard: cardData
     };
   }
 

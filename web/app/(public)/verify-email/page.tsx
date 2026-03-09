@@ -1,7 +1,7 @@
-//web/app/(public)/verify-email/page.tsx
+// web/app/(public)/verify-email/page.tsx
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '../../../lib/api-client';
@@ -16,51 +16,58 @@ export default function VerifyEmailPage() {
   const [success, setSuccess] = useState<boolean | null>(null);
   const [message, setMessage] = useState('Vérification de votre email en cours...');
 
-  useEffect(() => {
-    void (async () => {
-      if (!token) {
-        setSuccess(false);
-        setMessage('Token de vérification manquant.');
-        setLoading(false);
-        return;
-      }
+  // Utilisation de useCallback pour stabiliser la fonction et éviter l'erreur de dépendance
+  const verify = useCallback(async () => {
+    if (!token) {
+      setSuccess(false);
+      setMessage('Token de vérification manquant.');
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const res = await api.verifyEmailToken({ token });
-        setSuccess(res.emailVerified);
-        setMessage(
-          res.emailVerified
-            ? 'Email vérifié avec succès. Votre compte attend maintenant la validation de l’administrateur de votre antenne.'
-            : 'La vérification n’a pas pu être finalisée.',
-        );
-      } catch (err) {
-        setSuccess(false);
-        setMessage(err instanceof Error ? err.message : 'Erreur de vérification email.');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    try {
+      const res = await api.verifyEmailToken({ token });
+      setSuccess(res.emailVerified);
+      setMessage(
+        res.emailVerified
+          ? 'Email vérifié avec succès. Votre compte attend maintenant la validation de l’administrateur de votre antenne.'
+          : 'La vérification n’a pas pu être finalisée.'
+      );
+    } catch (err) {
+      setSuccess(false);
+      setMessage(err instanceof Error ? err.message : 'Erreur de vérification email.');
+    } finally {
+      setLoading(false);
+    }
   }, [token]);
+
+  useEffect(() => {
+    void verify();
+  }, [verify]);
 
   return (
     <main className="auth-page">
       <div className="auth-card-wrap">
         <Card title="Vérification de l’email">
-          <p>{message}</p>
+          <p className="mb-4">{message}</p>
 
-          {!loading ? (
-            <div className="row-actions">
-              <Link href="/login"><Button>Aller à la connexion</Button></Link>
-              <Link href="/signup"><Button variant="secondary">Retour inscription</Button></Link>
+          {!loading && (
+            <div className="flex gap-4 mt-6">
+              <Link href="/login">
+                <Button>Aller à la connexion</Button>
+              </Link>
+              <Link href="/signup">
+                <Button variant="secondary">Retour inscription</Button>
+              </Link>
             </div>
-          ) : null}
+          )}
 
-          {success === true ? (
-            <p className="success-text">Étape 1/2 terminée : email vérifié.</p>
-          ) : null}
-          {success === false ? (
-            <p className="error-text">Vérification échouée ou lien expiré.</p>
-          ) : null}
+          {success === true && (
+            <p className="mt-4 text-green-600 font-medium">Étape 1/2 terminée : email vérifié.</p>
+          )}
+          {success === false && (
+            <p className="mt-4 text-red-600 font-medium">Vérification échouée ou lien expiré.</p>
+          )}
         </Card>
       </div>
     </main>

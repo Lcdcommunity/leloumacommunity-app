@@ -11,6 +11,7 @@ interface ContributionValues {
   depositedAt: string;
   method: string;
   note: string;
+  purpose: string; // 👈 NOUVEAU : Ajout du motif
 }
 
 interface Props {
@@ -24,6 +25,7 @@ export function ContributionCreateForm({ onSubmit, isSubmitting }: Props) {
     depositedAt: new Date().toISOString().split('T')[0],
     method: 'CASH',
     note: '',
+    purpose: 'REGULAR_QUOTA', // 👈 NOUVEAU : Valeur par défaut
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,6 +38,21 @@ export function ContributionCreateForm({ onSubmit, isSubmitting }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* 👇 NOUVEAU : Sélecteur du motif du versement */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-gray-700">Motif du versement</label>
+        <select
+          className="border border-gray-300 rounded-md p-2 text-sm focus:ring-brand-blue focus:border-brand-blue outline-none"
+          value={values.purpose}
+          onChange={(e) => setValues({ ...values, purpose: e.target.value })}
+          required
+        >
+          <option value="REGULAR_QUOTA">Cotisation (Mensuelle, Trimestrielle...)</option>
+          <option value="MEMBERSHIP_CARD">Règlement Carte Membre Annuelle</option>
+          <option value="DONATION">Don libre</option>
+        </select>
+      </div>
+
       <Input
         label="Montant"
         type="number"
@@ -43,7 +60,7 @@ export function ContributionCreateForm({ onSubmit, isSubmitting }: Props) {
         value={values.amount}
         onChange={(e) => setValues({ ...values, amount: e.target.value })}
       />
-      
+
       <Input
         label="Date du versement"
         type="date"
@@ -51,11 +68,11 @@ export function ContributionCreateForm({ onSubmit, isSubmitting }: Props) {
         value={values.depositedAt}
         onChange={(e) => setValues({ ...values, depositedAt: e.target.value })}
       />
-      
+
       <div className="flex flex-col gap-1">
         <label className="text-sm font-medium text-gray-700">Mode de paiement</label>
         <select
-          className="border border-gray-300 rounded-md p-2 text-sm focus:ring-brand-blue focus:border-brand-blue"
+          className="border border-gray-300 rounded-md p-2 text-sm focus:ring-brand-blue focus:border-brand-blue outline-none"
           value={values.method}
           onChange={(e) => setValues({ ...values, method: e.target.value })}
         >
@@ -71,7 +88,7 @@ export function ContributionCreateForm({ onSubmit, isSubmitting }: Props) {
         onChange={(e) => setValues({ ...values, note: e.target.value })}
         placeholder="Ex: Cotisation du mois de Mars"
       />
-      
+
       <Button type="submit" disabled={isSubmitting} className="w-full">
         {isSubmitting ? 'Envoi en cours...' : 'Déclarer la cotisation'}
       </Button>

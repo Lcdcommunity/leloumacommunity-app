@@ -1,4 +1,4 @@
-//web/app/(protected)/member/documents/page.tsx
+// web/app/(protected)/member/documents/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -16,7 +16,8 @@ export default function MemberDocumentsPage() {
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  // 1. Fonction dédiée uniquement au bouton "Rechercher"
+  const handleSearch = async () => {
     setError(null);
     try {
       const res = await api.listDocumentsForMembers({ page: 1, pageSize: 100, q: q || undefined });
@@ -24,16 +25,40 @@ export default function MemberDocumentsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement documents');
     }
-  }
+  };
 
-  useEffect(() => { void load(); }, []);
+  // 2. Logique de chargement initial encapsulée proprement dans le useEffect
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialData() {
+      try {
+        const res = await api.listDocumentsForMembers({ page: 1, pageSize: 100 });
+        if (isMounted) {
+          setItems(res.items);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erreur chargement documents');
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    // Cleanup pour éviter les fuites de mémoire si le composant est démonté
+    return () => {
+      isMounted = false;
+    };
+  }, []); // Plus aucune erreur de dépendance ici !
 
   return (
     <AppShell title="Documents & photos">
       <Card title="Documents téléchargeables">
         <div className="toolbar">
           <Input placeholder="Recherche..." value={q} onChange={(e) => setQ(e.target.value)} />
-          <Button onClick={() => void load()}>Rechercher</Button>
+          <Button onClick={() => void handleSearch()}>Rechercher</Button>
         </div>
 
         {error ? <p className="error-text">{error}</p> : null}
@@ -45,7 +70,7 @@ export default function MemberDocumentsPage() {
               <td>{d.description || '—'}</td>
               <td>
                 {d.fileAsset?.url ? (
-                  <a href={d.fileAsset.url} target="_blank" rel="noreferrer">
+                  <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline">
                     {d.fileAsset.fileName || 'Télécharger'}
                   </a>
                 ) : '—'}

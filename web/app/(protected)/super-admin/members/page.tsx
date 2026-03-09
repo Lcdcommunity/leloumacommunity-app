@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/members/page.tsx
+// web/app/(protected)/super-admin/members/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -19,7 +19,8 @@ export default function SuperAdminMembersPage() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  // 1. Fonction dédiée uniquement au bouton "Filtrer"
+  const handleSearch = async () => {
     setError(null);
     try {
       const res = await api.listMembers({
@@ -32,16 +33,52 @@ export default function SuperAdminMembersPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');
     }
-  }
+  };
 
-  useEffect(() => { void load(); }, []);
+  // 2. Logique de chargement initial propre dans le useEffect
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialData() {
+      try {
+        const res = await api.listMembers({
+          page: 1,
+          pageSize: 100,
+        });
+        if (isMounted) {
+          setItems(res.items);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erreur');
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <AppShell title="Membres (vue globale)">
       <Card title="Tous les membres">
-        <div className="toolbar responsive-toolbar">
-          <Input placeholder="Recherche..." value={q} onChange={(e) => setQ(e.target.value)} />
+        
+        {/* Ajout des classes flex pour un alignement parfait */}
+        <div className="toolbar responsive-toolbar flex items-end gap-2 mb-4">
+          <Input 
+            label="Recherche"
+            placeholder="Nom, email..." 
+            value={q} 
+            onChange={(e) => setQ(e.target.value)} 
+          />
+          
+          {/* 👇 CORRECTION : Ajout du label obligatoire ici */}
           <Select
+            label="Filtrer par statut"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             options={[
@@ -53,36 +90,38 @@ export default function SuperAdminMembersPage() {
               { value: 'REJECTED', label: 'Rejeté' },
             ]}
           />
-          <Button onClick={() => void load()}>Filtrer</Button>
+          <Button onClick={() => void handleSearch()}>Filtrer</Button>
         </div>
 
-        {error ? <p className="error-text">{error}</p> : null}
+        {error ? <p className="error-text text-red-600 mb-4">{error}</p> : null}
 
-        <Table columns={['Nom', 'Email', 'Rôle', 'Statut', 'Créé le']}>
-          {items.map((u) => (
-            <tr key={u.id}>
-              <td>{fullName(u)}</td>
-              <td>{u.email}</td>
-              <td>{u.role}</td>
-              <td>
-                <Badge
-                  tone={
-                    u.status === 'ACTIVE'
-                      ? 'success'
-                      : u.status === 'PENDING_APPROVAL'
-                      ? 'warning'
-                      : u.status === 'SUSPENDED' || u.status === 'REJECTED'
-                      ? 'danger'
-                      : 'neutral'
-                  }
-                >
-                  {u.status}
-                </Badge>
-              </td>
-              <td>{formatDate(u.createdAt)}</td>
-            </tr>
-          ))}
-        </Table>
+        <div className="mt-4">
+          <Table columns={['Nom', 'Email', 'Rôle', 'Statut', 'Créé le']}>
+            {items.map((u) => (
+              <tr key={u.id}>
+                <td className="font-medium text-gray-800">{fullName(u)}</td>
+                <td>{u.email}</td>
+                <td><Badge tone="info">{u.role}</Badge></td>
+                <td>
+                  <Badge
+                    tone={
+                      u.status === 'ACTIVE'
+                        ? 'success'
+                        : u.status === 'PENDING_APPROVAL'
+                        ? 'warning'
+                        : u.status === 'SUSPENDED' || u.status === 'REJECTED'
+                        ? 'danger'
+                        : 'neutral'
+                    }
+                  >
+                    {u.status}
+                  </Badge>
+                </td>
+                <td className="text-gray-500 text-sm">{formatDate(u.createdAt)}</td>
+              </tr>
+            ))}
+          </Table>
+        </div>
       </Card>
     </AppShell>
   );

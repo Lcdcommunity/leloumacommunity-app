@@ -12,9 +12,28 @@ import type { Association } from '../types/association';
 import type { ContentPost } from '../types/content';
 import type { AntennaDashboardStats, ProjectionResult } from '../types/stats';
 
+// Définition propre du type VirtualCardData pour éviter l'utilisation de 'any'
+export type VirtualCardData = {
+  cardNumber: string;
+  isLocked: boolean;
+  expiresAt: string | null;
+  qrToken: string;
+  antennaName: string;
+  user: {
+    firstName: string;
+    lastName: string;
+    birthDate?: string | null;
+    placeOfBirth?: string | null;
+    country?: string | null;
+    city?: string | null;
+    profilePhotoUrl?: string | null;
+  };
+};
+
 export const api = {
   // Dashboard / profile
   me: () => http<UserSummary & { permissions?: string[] }>('/auth/me'),
+
   dashboardSuperAdmin: () =>
     http<{
       stats: {
@@ -43,6 +62,7 @@ export const api = {
 
   // Association / settings
   getAssociation: () => http<Association>('/associations/current'),
+  
   updateAssociation: (body: Partial<Association>) =>
     http<Association, Partial<Association>>('/associations/current', {
       method: 'PATCH',
@@ -293,18 +313,31 @@ export const api = {
       }`,
     ),
 
-  // Profile
+  // Profile & Preferences
   updateMyProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/users/me', { method: 'PATCH', body }),
+
+  updateMemberPreferences: (body: { 
+    emailNotifications?: boolean; 
+    smsNotifications?: boolean; 
+    pushNotifications?: boolean; 
+    language?: string; 
+    theme?: string; 
+  }) => http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body }),
+
+  // 👇 AJOUTÉ : Vérification d'email
+  verifyEmailToken: (body: { token: string }) => 
+    http<{ emailVerified: boolean }, typeof body>('/public/verify-email', { method: 'POST', body }),
 
   // ==========================================
   // ESPACE MEMBRE
   // ==========================================
-  
+
   dashboardMember: () => 
     http<{ 
       user?: UserSummary; 
       me?: UserSummary; 
+      virtualCard?: VirtualCardData | null; 
       stats?: {
         myTotalContributions?: number;
         activeProjects?: number;
@@ -321,43 +354,42 @@ export const api = {
       latestContents?: ContentPost[];
       lateMembersPreview?: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
     }>('/member/dashboard'),
-  
+
   listMyContributions: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<Contribution>>(`/member/contributions?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
-  
-  createContribution: (body: { amount: number; method: string; reference?: string; depositedAt?: string; note?: string; receiptFileAssetId?: string; }) => 
+
+  createContribution: (body: { amount: number; method: string; reference?: string; depositedAt?: string; note?: string; receiptFileAssetId?: string; purpose?: string; }) => 
     http<Contribution, typeof body>('/member/contributions', { method: 'POST', body }),
-  
+
   listProjectsForMembers: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
     http<ApiListResponse<Project>>(`/member/projects?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${params?.status ? `&status=${params.status}` : ''}`),
-  
+
   listProjectProposals: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<{ id: string; title: string; description: string; status: string; expectedBudget: number | null; createdAt: string; updatedAt: string; }>>(`/member/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
-  
-  // 👇 LA CORRECTION EST ICI : Ajout de attachmentFileAssetId
+
   createProjectProposal: (body: { title: string; description: string; expectedBudget?: number; attachmentFileAssetId?: string; }) => 
     http<{ id: string; title: string; status: string; }, typeof body>('/member/project-proposals', { method: 'POST', body }),
-  
+
   listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
     http<ApiListResponse<DocumentItem>>(`/member/documents?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
-  
+
   listContentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
     http<ApiListResponse<ContentPost>>(`/member/contents?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`),
-  
+
   listLateMembersVisible: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<{ id: string; firstName: string; lastName: string; antennaName: string | null; lateMonths: number; }>>(`/member/late-members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
-  
+
   listMyNotifications: (params?: { page?: number; pageSize?: number }) => 
     http<ApiListResponse<NotificationItem>>(`/notifications?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
-  
+
   getAssociationBalanceSummary: () => 
     http<{ associationId: string; associationName: string; totalValidatedContributionsAmount: number; currency: string; lastUpdatedAt: string; }>('/member/association-balance'),
-    
+
   markNotificationRead: (id: string) => 
     http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
 
   // ==========================================
-  // INSCRIPTION PUBLIQUE
+  // INSCRIPTION PUBLIQUE ET VERIFICATION CARTE
   // ==========================================
 
   listPublicAntennasForSignup: () =>
@@ -376,4 +408,13 @@ export const api = {
     addressLine2?: string;
   }) =>
     http<{ id: string; message: string; }, typeof body>('/public/signup', { method: 'POST', body }),
+
+  verifyPublicCard: (token: string) =>
+    http<{
+      cardNumber: string;
+      isLocked: boolean;
+      expiresAt: string | null;
+      antennaName: string;
+      user: { firstName: string; lastName: string; profilePhotoUrl?: string | null };
+    }>(`/public/cards/${token}`),
 };

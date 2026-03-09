@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/documents/page.tsx
+// web/app/(protected)/super-admin/documents/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -17,17 +17,41 @@ export default function SuperAdminDocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  async function load() {
+  // 1. Fonction dédiée pour le bouton "Rechercher" ET pour rafraîchir après un upload
+  const handleSearch = async () => {
     setError(null);
     try {
       const res = await api.listDocuments({ q: q || undefined, page: 1, pageSize: 100 });
       setItems(res.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur');
+      setError(err instanceof Error ? err.message : 'Erreur chargement documents');
     }
-  }
+  };
 
-  useEffect(() => { void load(); }, []);
+  // 2. Logique de chargement initial encapsulée dans le useEffect
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialData() {
+      try {
+        const res = await api.listDocuments({ page: 1, pageSize: 100 });
+        if (isMounted) {
+          setItems(res.items);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erreur chargement documents');
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   async function onUploadFile(file: File | null) {
     if (!file) return;
@@ -39,7 +63,8 @@ export default function SuperAdminDocumentsPage() {
         folder: 'association-docs',
         description: 'Upload super admin',
       });
-      await load();
+      // On utilise handleSearch pour rafraîchir la liste après un upload
+      await handleSearch();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur upload');
     } finally {
@@ -50,34 +75,42 @@ export default function SuperAdminDocumentsPage() {
   return (
     <AppShell title="Documents / médias">
       <Card title="Documents téléchargeables">
-        <div className="toolbar responsive-toolbar">
-          <Input placeholder="Recherche..." value={q} onChange={(e) => setQ(e.target.value)} />
-          <Button onClick={() => void load()}>Rechercher</Button>
-          <label className="file-upload-btn">
+        
+        <div className="toolbar responsive-toolbar flex items-end gap-2 mb-4">
+          <Input 
+            label="Recherche"
+            placeholder="Mots-clés..." 
+            value={q} 
+            onChange={(e) => setQ(e.target.value)} 
+          />
+          <Button onClick={() => void handleSearch()}>Rechercher</Button>
+          
+          <label className="file-upload-btn cursor-pointer ml-auto bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-800 font-medium py-2 px-4 rounded transition-colors">
             <input
               type="file"
               hidden
+              disabled={uploading}
               onChange={(e) => void onUploadFile(e.target.files?.[0] ?? null)}
             />
-            {uploading ? 'Upload...' : 'Uploader un fichier'}
+            {uploading ? 'Upload en cours...' : 'Uploader un fichier'}
           </label>
         </div>
 
-        {error ? <p className="error-text">{error}</p> : null}
+        {error ? <p className="error-text text-red-600 mb-4">{error}</p> : null}
 
         <Table columns={['Titre', 'Description', 'Fichier', 'Créé le']}>
           {items.map((d) => (
             <tr key={d.id}>
-              <td>{d.title}</td>
+              <td className="font-medium text-gray-800">{d.title}</td>
               <td>{d.description || '—'}</td>
               <td>
                 {d.fileAsset?.url ? (
-                  <a href={d.fileAsset.url} target="_blank" rel="noreferrer">
+                  <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="text-brand-blue hover:underline font-medium">
                     {d.fileAsset.fileName || 'Télécharger'}
                   </a>
                 ) : '—'}
               </td>
-              <td>{formatDate(d.createdAt)}</td>
+              <td className="text-gray-500 text-sm">{formatDate(d.createdAt)}</td>
             </tr>
           ))}
         </Table>

@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/contributions/page.tsx
+// web/app/(protected)/super-admin/contributions/page.tsx
 'use client';
 
 import { useEffect, useState, ChangeEvent } from 'react';
@@ -16,7 +16,8 @@ export default function SuperAdminContributionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function load() {
+  // 1. Fonction dédiée au bouton "Filtrer"
+  async function handleSearch() {
     setError(null);
     setLoading(true);
     try {
@@ -33,14 +34,43 @@ export default function SuperAdminContributionsPage() {
     }
   }
 
+  // 2. Logique de chargement initial dans le useEffect
   useEffect(() => { 
-    void load(); 
-  }, []);
+    let isMounted = true;
+
+    async function loadInitialData() {
+      setLoading(true);
+      try {
+        const res = await api.listContributions({ 
+          page: 1, 
+          pageSize: 100 
+        });
+        if (isMounted) {
+          setItems(res.items);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erreur lors du chargement des cotisations');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // <-- Plus d'avertissement de dépendance !
 
   return (
     <AppShell title="Cotisations globales">
       <Card title="Suivi des cotisations de toutes les antennes">
-        <div className="toolbar responsive-toolbar">
+        <div className="toolbar responsive-toolbar flex items-end gap-2">
           {/* Le label est obligatoire ici pour corriger l'erreur ts(2741) */}
           <Select
             label="Filtrer par statut"
@@ -54,14 +84,16 @@ export default function SuperAdminContributionsPage() {
               { value: 'CANCELLED', label: 'Annulées' },
             ]}
           />
-          <Button onClick={() => void load()} disabled={loading}>
+          <Button onClick={() => void handleSearch()} disabled={loading}>
             {loading ? 'Chargement...' : 'Filtrer'}
           </Button>
         </div>
 
-        {error ? <p className="error-text">{error}</p> : null}
+        {error ? <p className="error-text mt-4">{error}</p> : null}
         
-        <ContributionsTable items={items} />
+        <div className="mt-4">
+          <ContributionsTable items={items} />
+        </div>
       </Card>
     </AppShell>
   );

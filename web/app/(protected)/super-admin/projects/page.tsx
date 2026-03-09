@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/projects/page.tsx
+// web/app/(protected)/super-admin/projects/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -17,7 +17,8 @@ export default function SuperAdminProjectsPage() {
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  // 1. Fonction dédiée uniquement au bouton "Filtrer"
+  const handleSearch = async () => {
     setError(null);
     try {
       const res = await api.listProjects({ page: 1, pageSize: 100, status: status || undefined, q: q || undefined });
@@ -25,16 +26,49 @@ export default function SuperAdminProjectsPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');
     }
-  }
+  };
 
-  useEffect(() => { void load(); }, []);
+  // 2. Logique de chargement initial propre dans le useEffect
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialData() {
+      try {
+        const res = await api.listProjects({ page: 1, pageSize: 100 });
+        if (isMounted) {
+          setItems(res.items);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erreur');
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <AppShell title="Projets (pilotage global)">
       <Card title="Projets passés, en cours et futurs">
-        <div className="toolbar responsive-toolbar">
-          <Input placeholder="Recherche par titre..." value={q} onChange={(e) => setQ(e.target.value)} />
+        
+        {/* Ajout des classes flex pour un alignement parfait */}
+        <div className="toolbar responsive-toolbar flex items-end gap-2 mb-4">
+          <Input 
+            label="Recherche"
+            placeholder="Recherche par titre..." 
+            value={q} 
+            onChange={(e) => setQ(e.target.value)} 
+          />
+          
+          {/* 👇 CORRECTION : Ajout du label obligatoire ici */}
           <Select
+            label="Filtrer par statut"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
             options={[
@@ -48,11 +82,14 @@ export default function SuperAdminProjectsPage() {
               { value: 'CANCELLED', label: 'Annulé' },
             ]}
           />
-          <Button onClick={() => void load()}>Filtrer</Button>
+          <Button onClick={() => void handleSearch()}>Filtrer</Button>
         </div>
 
-        {error ? <p className="error-text">{error}</p> : null}
-        <ProjectsTable items={items} />
+        {error ? <p className="error-text text-red-600 mb-4">{error}</p> : null}
+        
+        <div className="mt-4">
+          <ProjectsTable items={items} />
+        </div>
       </Card>
     </AppShell>
   );

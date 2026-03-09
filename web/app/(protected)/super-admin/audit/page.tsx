@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/audit/page.tsx
+// web/app/(protected)/super-admin/audit/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -16,23 +16,49 @@ export default function SuperAdminAuditPage() {
   const [action, setAction] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  // 1. Fonction dédiée uniquement au bouton "Filtrer"
+  const handleSearch = async () => {
+    setError(null);
     try {
       const res = await api.listAudit({ action: action || undefined, page: 1, pageSize: 100 });
       setItems(res.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur');
     }
-  }
+  };
 
-  useEffect(() => { void load(); }, []);
+  // 2. Logique de chargement initial encapsulée proprement
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialData() {
+      try {
+        const res = await api.listAudit({ page: 1, pageSize: 100 });
+        if (isMounted) {
+          setItems(res.items);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erreur');
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    // Cleanup
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <AppShell title="Journal d’audit">
       <Card title="Historique des actions">
         <div className="toolbar">
           <Input placeholder="Action (ex: UPLOAD_FILE)" value={action} onChange={(e) => setAction(e.target.value)} />
-          <Button onClick={() => void load()}>Filtrer</Button>
+          <Button onClick={() => void handleSearch()}>Filtrer</Button>
         </div>
 
         {error ? <p className="error-text">{error}</p> : null}

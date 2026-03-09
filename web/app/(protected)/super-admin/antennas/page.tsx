@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/antennas/page.tsx
+// web/app/(protected)/super-admin/antennas/page.tsx
 'use client';
 
 import Link from 'next/link';
@@ -20,7 +20,8 @@ export default function SuperAdminAntennasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  async function load() {
+  // 1. Fonction dédiée au bouton "Rechercher"
+  const handleSearch = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -31,9 +32,37 @@ export default function SuperAdminAntennasPage() {
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  useEffect(() => { void load(); }, []);
+  // 2. Logique de chargement initial dans le useEffect
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadInitialData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.listAntennas({ q: '', page: 1, pageSize: 50 });
+        if (isMounted) {
+          setItems(res.items);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : 'Erreur');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitialData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <AppShell title="Antennes">
@@ -41,24 +70,27 @@ export default function SuperAdminAntennasPage() {
         title="Gestion des antennes"
         actions={<Link href="/super-admin/antennas/new"><Button>Nouvelle antenne</Button></Link>}
       >
-        <div className="toolbar">
+        <div className="toolbar flex items-end gap-2 mb-4">
           <Input
-            placeholder="Recherche (nom, code...)"
+            label="Recherche"
+            placeholder="Nom, code..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
-          <Button onClick={() => void load()}>Rechercher</Button>
+          <Button onClick={() => void handleSearch()} disabled={loading}>
+            Rechercher
+          </Button>
         </div>
 
         {loading ? <Loader /> : null}
-        {error ? <p className="error-text">{error}</p> : null}
+        {error ? <p className="error-text text-red-600 mb-4">{error}</p> : null}
 
         {!loading && !error ? (
           <Table columns={['Code', 'Nom', 'Ville', 'Pays', 'Statut', 'Créé le']}>
             {items.map((a) => (
               <tr key={a.id}>
-                <td>{a.code}</td>
-                <td>{a.name}</td>
+                <td className="font-mono font-medium">{a.code}</td>
+                <td className="font-semibold text-gray-800">{a.name}</td>
                 <td>{a.city || '—'}</td>
                 <td>{a.country || '—'}</td>
                 <td>
@@ -66,7 +98,7 @@ export default function SuperAdminAntennasPage() {
                     {a.isActive ? 'ACTIVE' : 'INACTIVE'}
                   </Badge>
                 </td>
-                <td>{formatDate(a.createdAt)}</td>
+                <td className="text-gray-500 text-sm">{formatDate(a.createdAt)}</td>
               </tr>
             ))}
           </Table>

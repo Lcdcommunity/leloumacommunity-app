@@ -1,4 +1,4 @@
-//web/app/(protected)/member/settings/page.tsx
+// web/app/(protected)/member/settings/page.tsx
 'use client';
 
 import { FormEvent, useState, ChangeEvent } from 'react';
@@ -6,6 +6,7 @@ import { AppShell } from '../../../../components/layout/AppShell';
 import { Card } from '../../../../components/ui/Card';
 import { Select } from '../../../../components/ui/Select';
 import { Button } from '../../../../components/ui/Button';
+import { api } from '../../../../lib/api-client'; // 👈 Import statique propre
 
 export default function MemberSettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
@@ -22,17 +23,15 @@ export default function MemberSettingsPage() {
     setMessage(null);
 
     try {
-      const { api } = await import('../../../../lib/api-client');
-      // On utilise 'as any' temporairement pour éviter l'erreur de typage strict 
-      // si la méthode n'est pas encore déclarée dans le lib/api-client.ts
-      await (api as any).updateMemberPreferences({
+      // 👇 Plus de "as any", on appelle directement la méthode correctement typée
+      await api.updateMemberPreferences({
         emailNotifications,
         smsNotifications,
         pushNotifications,
         language,
         theme,
       });
-      setMessage('Préférences enregistrées.');
+      setMessage('Préférences enregistrées avec succès.');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Erreur enregistrement préférences');
     } finally {
@@ -97,7 +96,11 @@ export default function MemberSettingsPage() {
               {saving ? 'Enregistrement...' : 'Enregistrer les préférences'}
             </Button>
 
-            {message && <p>{message}</p>}
+            {message && (
+              <p className={`mt-2 text-sm font-medium ${message.includes('Erreur') ? 'text-red-600' : 'text-green-600'}`}>
+                {message}
+              </p>
+            )}
           </form>
         </Card>
 
