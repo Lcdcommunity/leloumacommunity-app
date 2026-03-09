@@ -1,6 +1,7 @@
-//backend/src/modules/public/public.controller.ts
-import { Controller, Get } from '@nestjs/common';
+// backend/src/modules/public/public.controller.ts
+import { Controller, Get, Post, Body } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { PublicService, SignupDto } from './public.service';
 
 interface PublicAntennaResponse {
   id: string;
@@ -12,11 +13,13 @@ interface PublicAntennaResponse {
 
 @Controller('public')
 export class PublicController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly publicService: PublicService, // 👈 On injecte le nouveau service
+  ) {}
 
   @Get('antennas')
   async listAntennas(): Promise<PublicAntennaResponse[]> {
-    // Adapte le modèle Prisma si besoin: antenna / branch / center / etc.
     const items = await this.prisma.antenna.findMany({
       where: {
         isActive: true,
@@ -32,5 +35,12 @@ export class PublicController {
     });
 
     return items;
+  }
+
+  // 👇 LA ROUTE POST D'INSCRIPTION 👇
+  @Post('signup')
+  async signup(@Body() dto: SignupDto) {
+    // On passe simplement les données au service qui fait tout le travail
+    return this.publicService.signup(dto);
   }
 }
