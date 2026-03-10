@@ -1,5 +1,5 @@
 //src/modules/contributions/dto/create-contribution.dto.ts
-import { CurrencyCode, PaymentMethod } from '@prisma/client';
+import { CurrencyCode, PaymentMethod, ContributionPurpose } from '@prisma/client';
 import { IsDateString, IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateContributionDto {
@@ -15,6 +15,11 @@ export class CreateContributionDto {
 
   @IsEnum(PaymentMethod)
   paymentMethod!: PaymentMethod;
+
+  // 👇 AJOUT CHIRURGICAL ICI AUSSI 👇
+  @IsOptional()
+  @IsEnum(ContributionPurpose)
+  purpose?: ContributionPurpose;
 
   @IsOptional()
   @IsDateString()

@@ -5,10 +5,12 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  IsEnum,
   MaxLength,
   Min,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ContributionPurpose } from '@prisma/client';
 
 export class CreateMemberContributionDto {
   @Transform(({ value }) => Number(value))
@@ -25,6 +27,11 @@ export class CreateMemberContributionDto {
   @IsString()
   @MaxLength(50)
   method?: string;
+
+  // 👇 AJOUT CHIRURGICAL : Le backend accepte enfin la propriété purpose du frontend
+  @IsOptional()
+  @IsEnum(ContributionPurpose)
+  purpose?: ContributionPurpose;
 
   @IsOptional()
   @IsString()

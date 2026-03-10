@@ -1,10 +1,9 @@
 // web/components/member/VirtualCardWidget.tsx
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import QRCode from 'react-qr-code';
 import Image from 'next/image';
-import { Button } from '../ui/Button';
 
 export interface VirtualCardData {
   cardNumber: string;
@@ -24,117 +23,453 @@ export interface VirtualCardData {
 }
 
 export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [flipped, setFlipped] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
-  // Si la carte n'existe pas ou est verrouillée
-  if (!card || card.isLocked) {
+  // ── Logique de Drag & Drop (limitée à la barre supérieure) ──
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const dragStartOffset = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Le drag ne commence QUE si on attrape la poignée (classe vcw-drag-handle)
+    const target = e.target as HTMLElement;
+    if (!target.closest('.vcw-drag-handle')) return;
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    dragStartPos.current = { x: e.clientX, y: e.clientY };
+    dragStartOffset.current = { ...offset };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartPos.current.x;
+    const dy = e.clientY - dragStartPos.current.y;
+    setOffset({
+      x: dragStartOffset.current.x + dx,
+      y: dragStartOffset.current.y + dy,
+    });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (isDragging) {
+      setIsDragging(false);
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  // ── Données de la carte ──
+  const isExpired = card?.expiresAt ? new Date(card.expiresAt) < new Date() : false;
+  const isLocked = !card || card.isLocked || isExpired;
+
+  const verificationUrl =
+    card && !isLocked
+      ? `${typeof window !== 'undefined' ? window.location.origin : ''}/verify-card/${card.qrToken}`
+      : '';
+
+  const expiryFormatted = card?.expiresAt
+    ? new Date(card.expiresAt).toLocaleDateString('fr-FR', { month: '2-digit', year: '2-digit' })
+    : 'N/A';
+
+  const cardNum = card?.cardNumber
+    ? card.cardNumber.match(/.{1,4}/g)?.join(' ') ?? card.cardNumber
+    : '•••• •••• •••• ••••';
+
+  // ── Rendu quand la carte est masquée ──
+  if (isMinimized) {
     return (
-      <div className="relative w-full max-w-md aspect-[1.58/1] rounded-2xl bg-gradient-to-br from-gray-200 to-gray-300 border border-gray-300 shadow-inner flex flex-col items-center justify-center p-6 text-center overflow-hidden">
-        <div className="absolute inset-0 bg-white/40 backdrop-blur-md z-10 flex flex-col items-center justify-center p-6">
-          <svg className="w-12 h-12 text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8V7a4 4 0 00-8 0v4h8z"></path>
+      <>
+        <style>{`
+          .vcw-fab {
+            position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+            background: linear-gradient(135deg, #00C6FF 0%, #0072FF 100%);
+            color: #FFFFFF; border: 1px solid rgba(255,255,255,0.4);
+            padding: 0.8rem 1.2rem; border-radius: 99px;
+            font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700;
+            display: flex; align-items: center; gap: 0.5rem; cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0, 114, 255, 0.4);
+            animation: vcw-popin 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transition: transform 0.2s, box-shadow 0.2s;
+          }
+          .vcw-fab:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0, 114, 255, 0.5); }
+          @keyframes vcw-popin { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
+        `}</style>
+        <button className="vcw-fab" onClick={() => setIsMinimized(false)}>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
           </svg>
-          <h3 className="font-bold text-gray-800 text-lg">Carte verrouillée</h3>
-          <p className="text-sm text-gray-600 mt-1 mb-4">
-            {card?.expiresAt 
-              ? "Votre carte a expiré. Veuillez la renouveler." 
-              : "Payez votre adhésion annuelle pour débloquer votre carte."}
-          </p>
-          <Button onClick={() => window.location.href = '/member/contributions'}>
-            Régler ma carte
-          </Button>
-        </div>
-        {/* Fausse carte floutée en arrière-plan */}
-        <div className="opacity-30 blur-sm w-full h-full flex flex-col">
-           <div className="h-12 bg-brand-blue w-full"></div>
-           <div className="flex-1 bg-white"></div>
-        </div>
-      </div>
+          Afficher ma carte
+        </button>
+      </>
     );
   }
 
-  // URL publique pour la vérification par scan
-  const verificationUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/verify-card/${card.qrToken}`;
-
   return (
-    <div className="perspective-1000 w-full max-w-md group cursor-pointer mx-auto" onClick={() => setIsFlipped(!isFlipped)}>
-      <div className={`relative w-full aspect-[1.58/1] transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+        /* Wrapper principal */
+        .vcw-draggable-container {
+          position: relative; 
+          width: 100%; max-width: 400px; margin: 0 auto;
+          font-family: 'DM Sans', sans-serif;
+          touch-action: none;
+          will-change: transform;
+        }
+
+        /* ── BARRE DE CONTRÔLE (Drag & Hide) ── */
+        .vcw-controls {
+          display: flex; justify-content: space-between; align-items: center;
+          padding: 0 0.5rem 0.5rem 0.5rem;
+        }
+        .vcw-drag-handle {
+          display: flex; align-items: center; gap: 0.4rem;
+          font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+          color: #94A3B8; cursor: grab; padding: 0.4rem; border-radius: 8px;
+          transition: background 0.2s, color 0.2s;
+        }
+        .vcw-drag-handle:hover { background: rgba(15,23,42,0.05); color: #475569; }
+        .vcw-drag-handle:active { cursor: grabbing; background: rgba(15,23,42,0.08); }
         
-        {/* === FACE AVANT === */}
-        <div className="absolute inset-0 w-full h-full backface-hidden bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-xl border border-gray-200 overflow-hidden flex flex-col">
-          {/* Header */}
-          <div className="h-16 bg-brand-blue flex items-center px-4 justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center overflow-hidden">
-                <Image src="/assets/images/logolcd.jpg" alt="Logo" width={40} height={40} className="object-cover" />
-              </div>
-              <div className="text-white">
-                <h2 className="text-sm font-bold leading-tight">Lélouma Communauté</h2>
-                <p className="text-[10px] opacity-80 leading-tight">Antenne : {card.antennaName}</p>
-              </div>
-            </div>
-            <div className="text-white/90 text-xs font-bold tracking-widest">MEMBRE</div>
-          </div>
+        .vcw-minimize-btn {
+          background: rgba(15, 23, 42, 0.05); border: 1px solid rgba(15, 23, 42, 0.1);
+          width: 28px; height: 28px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; color: #475569; transition: all 0.2s;
+        }
+        .vcw-minimize-btn:hover { background: rgba(15, 23, 42, 0.1); color: #0F172A; }
 
-          {/* Corps de la carte */}
-          <div className="flex-1 p-4 flex gap-4">
-            <div className="w-24 h-32 bg-gray-100 rounded-lg border border-gray-200 flex-shrink-0 overflow-hidden shadow-sm">
-              {card.user.profilePhotoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={card.user.profilePhotoUrl} alt="Profil" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-300">
-                  <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+        /* ── LA CARTE ── */
+        .vcw-scene {
+          width: 100%; aspect-ratio: 1.586; perspective: 1200px;
+          cursor: pointer; /* Indique que la carte entière est cliquable */
+        }
+
+        .vcw-inner {
+          width: 100%; height: 100%; position: relative;
+          transform-style: preserve-3d;
+          transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+          border-radius: 20px;
+          box-shadow: 0 24px 48px rgba(0, 114, 255, 0.25);
+        }
+        .vcw-inner.flipped { transform: rotateY(180deg); }
+        .vcw-draggable-container:active .vcw-inner { box-shadow: 0 30px 60px rgba(0, 114, 255, 0.35); }
+
+        .vcw-face {
+          position: absolute; inset: 0; border-radius: 20px;
+          overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+        }
+
+        /* ══ FRONT - ONDES MÉTALLIQUES BLEUES ══════════════════════════════════════════ */
+        .vcw-front {
+          /* La base bleue nuit */
+          background-color: #030B1E;
+          /* Les vagues bleues électriques et cyan */
+          background-image: 
+            radial-gradient(ellipse at 100% 0%, #00E1FF 0%, transparent 50%),
+            radial-gradient(ellipse at 0% 100%, #0044FF 0%, transparent 60%),
+            radial-gradient(ellipse at 50% 50%, #001144 0%, transparent 80%),
+            conic-gradient(from 180deg at 40% 60%, rgba(0,225,255,0.1) 0deg, rgba(0,68,255,0.4) 120deg, rgba(0,225,255,0.1) 240deg, transparent 360deg);
+          display: flex; flex-direction: column;
+          padding: clamp(1rem, 4.5%, 1.4rem);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset, 0 1px 2px rgba(255, 255, 255, 0.4) inset;
+        }
+
+        /* Effet "Holographique / Honeycomb" très léger */
+        .vcw-front::before {
+          content: ''; position: absolute; inset: 0; border-radius: 20px;
+          background-image: 
+            linear-gradient(30deg, rgba(255,255,255,0.03) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.03) 87.5%, rgba(255,255,255,0.03)),
+            linear-gradient(150deg, rgba(255,255,255,0.03) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.03) 87.5%, rgba(255,255,255,0.03)),
+            linear-gradient(30deg, rgba(255,255,255,0.03) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.03) 87.5%, rgba(255,255,255,0.03)),
+            linear-gradient(150deg, rgba(255,255,255,0.03) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.03) 87.5%, rgba(255,255,255,0.03)),
+            linear-gradient(60deg, rgba(255,255,255,0.03) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.03) 75%, rgba(255,255,255,0.03)),
+            linear-gradient(60deg, rgba(255,255,255,0.03) 25%, transparent 25.5%, transparent 75%, rgba(255,255,255,0.03) 75%, rgba(255,255,255,0.03));
+          background-size: 20px 35px;
+          background-position: 0 0, 0 0, 10px 18px, 10px 18px, 0 0, 10px 18px;
+          pointer-events: none; mix-blend-mode: overlay; opacity: 0.3;
+        }
+
+        /* Faisceau lumineux oblique (Shine) */
+        .vcw-front::after {
+          content: ''; position: absolute;
+          top: -150%; left: -50%; width: 100%; height: 300%;
+          background: linear-gradient(
+            to right, 
+            transparent 0%, 
+            rgba(255,255,255,0.05) 45%, 
+            rgba(255,255,255,0.3) 50%, 
+            rgba(255,255,255,0.05) 55%, 
+            transparent 100%
+          );
+          transform: rotate(35deg); pointer-events: none;
+        }
+
+        .vcw-top {
+          display: flex; justify-content: space-between; align-items: flex-start;
+          position: relative; z-index: 1; margin-bottom: auto;
+        }
+
+        .vcw-logo-row { display: flex; align-items: center; gap: 10px; }
+        .vcw-logo-ring {
+          width: 36px; height: 36px; border-radius: 50%;
+          border: 2px solid rgba(255,255,255,0.8);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 15px rgba(0,225,255,0.5);
+          overflow: hidden; background: #fff;
+          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .vcw-org {
+          font-size: clamp(0.65rem, 2vw, 0.75rem);
+          font-weight: 700; color: #FFFFFF; text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+          letter-spacing: 0.15em; text-transform: uppercase;
+          line-height: 1.2; max-width: 120px;
+        }
+
+        /* Pillule statut "Néon" */
+        .vcw-status {
+          display: inline-flex; align-items: center; gap: 6px;
+          padding: 0.3rem 0.8rem; border-radius: 99px;
+          font-size: 0.6rem; font-weight: 800;
+          letter-spacing: 0.12em; text-transform: uppercase;
+          backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        .vcw-status.valid {
+          background: rgba(0, 225, 255, 0.15);
+          border: 1px solid rgba(0, 225, 255, 0.5);
+          color: #E0FFFF;
+          box-shadow: 0 0 15px rgba(0, 225, 255, 0.3) inset;
+        }
+        .vcw-status.invalid {
+          background: rgba(239, 68, 68, 0.2);
+          border: 1px solid rgba(239, 68, 68, 0.5);
+          color: #FECACA;
+        }
+        .vcw-status-dot {
+          width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+          background: currentColor;
+          animation: vcwblink 2s ease-in-out infinite;
+        }
+        @keyframes vcwblink { 0%,100%{opacity:1; box-shadow: 0 0 8px currentColor;} 50%{opacity:0.3; box-shadow: none;} }
+
+        /* Centre */
+        .vcw-mid {
+          display: flex; align-items: center;
+          gap: clamp(0.85rem, 3.5%, 1.25rem);
+          position: relative; z-index: 1;
+          padding: clamp(0.7rem, 3%, 1.2rem) 0; margin: auto 0;
+        }
+
+        .vcw-qr-box {
+          width: clamp(92px, 26%, 115px); height: clamp(92px, 26%, 115px);
+          background: rgba(255,255,255,0.95); border-radius: 12px;
+          display: flex; align-items: center; justify-content: center; padding: 6px; flex-shrink: 0;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 0 2px rgba(255,255,255,0.3) inset;
+        }
+
+        .vcw-info { flex: 1; min-width: 0; }
+        .vcw-name {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: clamp(1.2rem, 4vw, 1.5rem);
+          font-weight: 600; color: #FFFFFF;
+          letter-spacing: 0.02em; line-height: 1.1; margin-bottom: 0.3rem;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+        }
+        .vcw-antenna {
+          font-size: clamp(0.58rem, 1.6vw, 0.68rem);
+          color: rgba(255,255,255,0.8); font-weight: 600;
+          letter-spacing: 0.08em; margin-bottom: 0.6rem;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          text-transform: uppercase; text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        .vcw-detail-row { display: flex; flex-direction: column; gap: 0.3rem; }
+        .vcw-detail { display: flex; flex-direction: column; }
+        .vcw-detail-label {
+          font-size: 0.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em;
+          color: rgba(255,255,255,0.5); margin-bottom: 2px;
+        }
+        .vcw-detail-val {
+          font-size: clamp(0.6rem, 1.6vw, 0.75rem);
+          color: #FFFFFF; font-weight: 600;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+          text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+
+        /* Bas */
+        .vcw-bottom {
+          display: flex; justify-content: space-between; align-items: flex-end; position: relative; z-index: 1;
+        }
+        .vcw-card-num {
+          font-family: 'DM Mono', monospace;
+          font-size: clamp(0.65rem, 1.8vw, 0.8rem); font-weight: 500; letter-spacing: 0.2em;
+          color: #FFFFFF; text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+        .vcw-exp-block { text-align: right; }
+        .vcw-exp-label {
+          font-size: 0.5rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em;
+          color: rgba(255,255,255,0.5); display: block; margin-bottom: 2px;
+        }
+        .vcw-exp-val {
+          font-family: 'DM Mono', monospace; font-size: clamp(0.65rem, 1.8vw, 0.75rem);
+          color: #FFFFFF; font-weight: 600; letter-spacing: 0.08em; text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+        }
+
+        /* ══ BACK - ONDES SIMILAIRES ════════════════════════════════════════════ */
+        .vcw-back {
+          transform: rotateY(180deg);
+          background-color: #030B1E;
+          background-image: 
+            radial-gradient(ellipse at 0% 0%, #0044FF 0%, transparent 60%),
+            radial-gradient(ellipse at 100% 100%, #00E1FF 0%, transparent 70%);
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          gap: clamp(0.8rem, 2.5%, 1rem); padding: clamp(1rem, 4.5%, 1.4rem);
+          box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
+        }
+        .vcw-back::before {
+          content: ''; position: absolute; inset: 0; border-radius: 20px;
+          background-image: 
+            linear-gradient(30deg, rgba(255,255,255,0.02) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.02) 87.5%, rgba(255,255,255,0.02));
+          background-size: 20px 35px; pointer-events: none; mix-blend-mode: overlay;
+        }
+        .vcw-back-title {
+          font-size: clamp(0.65rem, 2vw, 0.75rem); font-weight: 800; letter-spacing: 0.15em;
+          text-transform: uppercase; color: #FFFFFF; text-align: center; position: relative; z-index: 1;
+        }
+        .vcw-qr-card {
+          background: rgba(255,255,255,0.95); border-radius: 12px; padding: clamp(10px, 3%, 14px);
+          box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 0 15px rgba(0,225,255,0.3);
+          display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;
+        }
+        .vcw-back-footer {
+          font-size: clamp(0.55rem, 1.5vw, 0.65rem); font-weight: 500;
+          color: rgba(255,255,255,0.7); text-align: center; line-height: 1.6; max-width: 280px; position: relative; z-index: 1;
+        }
+
+        /* ══ HINT ════════════════════════════════════════════ */
+        .vcw-hint {
+          display: flex; align-items: center; justify-content: center;
+          gap: 6px; margin-top: 0.8rem;
+          font-size: 0.72rem; color: #94A3B8; font-weight: 500; letter-spacing: 0.03em;
+          animation: vcwfade 0.5s 0.3s both;
+        }
+        @keyframes vcwfade { from{opacity:0;transform:translateY(4px);} to{opacity:1;transform:translateY(0);} }
+
+        @media (max-width: 420px) {
+          .vcw-draggable-container { max-width: 100%; }
+          .vcw-qr-box { width: 85px; height: 85px; }
+        }
+      `}</style>
+
+      {/* Le conteneur principal gère le drag & drop */}
+      <div 
+        className="vcw-draggable-container"
+        style={{ 
+          transform: `translate3d(${offset.x}px, ${offset.y}px, 0)`,
+          zIndex: isDragging ? 100 : 10
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        
+        {/* Panneau de contrôle : La poignée permet de glisser, le bouton permet de masquer */}
+        <div className="vcw-controls">
+          <div className="vcw-drag-handle">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 9h8M8 15h8" />
+            </svg>
+            Déplacer la carte
+          </div>
+          <button 
+            className="vcw-minimize-btn" 
+            onClick={() => setIsMinimized(true)}
+            title="Masquer la carte"
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 12H5" />
+            </svg>
+          </button>
+        </div>
+
+        {/* ── LA CARTE (Cliquable sur toute sa surface pour se retourner) ── */}
+        <div className="vcw-scene" onClick={() => setFlipped(f => !f)} role="button" aria-label="Retourner la carte">
+          <div className={`vcw-inner${flipped ? ' flipped' : ''}`}>
+
+            {/* ── FRONT ── */}
+            <div className="vcw-face vcw-front">
+              <div className="vcw-top">
+                <div className="vcw-logo-row">
+                  <div className="vcw-logo-ring">
+                    <Image src="/assets/images/logolcd.jpg" alt="Logo" width={36} height={36} style={{ objectFit: 'cover', borderRadius: '50%' }} />
+                  </div>
+                  <span className="vcw-org">Lélouma<br/>Communauté</span>
                 </div>
-              )}
+                <span className={`vcw-status ${!isExpired ? 'valid' : 'invalid'}`}>
+                  <span className="vcw-status-dot" />
+                  {!isExpired ? 'Actif' : 'Expiré'}
+                </span>
+              </div>
+
+              <div className="vcw-mid">
+                <div className="vcw-qr-box">
+                  <QRCode value={verificationUrl} size={100} level="H" style={{ width: '100%', height: '100%' }} />
+                </div>
+                <div className="vcw-info">
+                  <div className="vcw-name">{card!.user.lastName} {card!.user.firstName}</div>
+                  <div className="vcw-antenna">Antenne · {card!.antennaName}</div>
+                  <div className="vcw-detail-row">
+                    {card!.user.birthDate && (
+                      <div className="vcw-detail">
+                        <span className="vcw-detail-label">Né(e) le</span>
+                        <span className="vcw-detail-val">{new Date(card!.user.birthDate).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                    )}
+                    {(card!.user.city || card!.user.country) && (
+                      <div className="vcw-detail">
+                        <span className="vcw-detail-label">Résidence</span>
+                        <span className="vcw-detail-val">{[card!.user.city, card!.user.country].filter(Boolean).join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="vcw-bottom">
+                <span className="vcw-card-num">{cardNum}</span>
+                <div className="vcw-exp-block">
+                  <span className="vcw-exp-label">Expire</span>
+                  <span className="vcw-exp-val">{expiryFormatted}</span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-col justify-center text-sm text-gray-800 flex-1">
-              <div className="mb-2">
-                <span className="text-[10px] text-brand-blue font-bold uppercase tracking-wider">Nom & Prénom</span> <br/>
-                <span className="font-bold text-base uppercase">{card.user.lastName} {card.user.firstName}</span>
+            {/* ── BACK ── */}
+            <div className="vcw-face vcw-back">
+              <span className="vcw-back-title">Scannez pour vérifier</span>
+              <div className="vcw-qr-card">
+                <QRCode value={verificationUrl} size={140} level="H" />
               </div>
-              <div className="mb-2 flex gap-4">
-                 <div>
-                   <span className="text-[10px] text-gray-500 uppercase tracking-wider">Né(e) le</span><br/>
-                   <span className="font-medium">{card.user.birthDate ? new Date(card.user.birthDate).toLocaleDateString('fr-FR') : 'N/A'}</span>
-                 </div>
-                 <div>
-                   <span className="text-[10px] text-gray-500 uppercase tracking-wider">À</span><br/>
-                   <span className="font-medium">{card.user.placeOfBirth || 'N/A'}</span>
-                 </div>
-              </div>
-              <div>
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Résidence</span><br/>
-                <span className="font-medium leading-tight">{card.user.city || ''}{card.user.city && card.user.country ? ', ' : ''}{card.user.country || 'N/A'}</span>
-              </div>
+              <p className="vcw-back-footer">
+                Carte strictement personnelle et incessible.<br/>
+                En cas de perte, contactez l&apos;administrateur de votre antenne.
+              </p>
             </div>
-          </div>
 
-          {/* Footer */}
-          <div className="h-8 bg-gray-100 border-t border-gray-200 px-4 flex items-center justify-between text-[10px] text-gray-600 font-medium">
-            <span>ID: <span className="font-bold text-gray-800">{card.cardNumber}</span></span>
-            <span>Expire le: <span className="font-bold text-red-600">{card.expiresAt ? new Date(card.expiresAt).toLocaleDateString('fr-FR') : 'N/A'}</span></span>
           </div>
         </div>
 
-        {/* === FACE ARRIÈRE (QR CODE) === */}
-        <div className="absolute inset-0 w-full h-full backface-hidden rotate-y-180 bg-brand-blue rounded-2xl shadow-xl border border-gray-200 p-6 flex flex-col items-center justify-center text-white">
-          <p className="text-sm font-medium mb-4 text-center text-blue-50">Scannez pour vérifier la validité</p>
-          <div className="bg-white p-3 rounded-xl shadow-lg">
-            <QRCode value={verificationUrl} size={130} level="H" />
-          </div>
-          <p className="text-[10px] mt-6 opacity-70 text-center px-4">
-            Cette carte est strictement personnelle et incessible. En cas de perte, veuillez contacter votre antenne.
-          </p>
+        <div className="vcw-hint">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          {flipped ? "Cliquez sur la carte pour voir l'avant" : "Cliquez sur la carte pour voir le QR code"}
         </div>
-
       </div>
-      
-      <p className="text-center text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-        Cliquez sur la carte pour la retourner
-      </p>
-    </div>
+    </>
   );
 }

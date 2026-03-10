@@ -560,6 +560,9 @@ export default function MemberSignupPage() {
           text-align: center;
           font-size: 0.8rem;
           color: var(--mist);
+          display: flex;
+          flex-direction: column;
+          gap: 0.6rem;
         }
         .sp-footer a {
           color: var(--blue);
@@ -568,6 +571,14 @@ export default function MemberSignupPage() {
           transition: color 0.2s;
         }
         .sp-footer a:hover { color: var(--blue-light); }
+        .sp-footer-sublink {
+          font-size: 0.75rem;
+          font-weight: 400 !important;
+          color: var(--mist) !important;
+        }
+        .sp-footer-sublink:hover {
+          color: var(--blue) !important;
+        }
 
         /* Step panels */
         .sp-panel {
@@ -850,10 +861,11 @@ export default function MemberSignupPage() {
             </form>
           )}
 
-          {/* Footer */}
+          {/* Footer modifié avec le lien Mot de passe oublié */}
           {!success && (
             <div className="sp-footer">
-              Déjà membre ? <Link href="/login">Se connecter</Link>
+              <div>Déjà membre ? <Link href="/login">Se connecter</Link></div>
+              <Link href="/forgot-password" className="sp-footer-sublink">Mot de passe oublié ?</Link>
             </div>
           )}
 

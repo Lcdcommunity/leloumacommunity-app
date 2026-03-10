@@ -1,7 +1,9 @@
 // backend/src/modules/public/public.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthMailerService } from '../auth/auth.mailer.service';
 import * as bcrypt from 'bcryptjs';
+import { randomBytes, createHash } from 'crypto';
 
 export interface SignupDto {
   firstName: string;
@@ -18,7 +20,10 @@ export interface SignupDto {
 
 @Injectable()
 export class PublicService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authMailer: AuthMailerService, // 👈 Injection du service mail
+  ) {}
 
   async signup(dto: SignupDto) {
     const emailLower = dto.email.toLowerCase().trim();
@@ -60,12 +65,10 @@ export class PublicService {
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2,
         role: 'MEMBER',
-        status: 'PENDING_APPROVAL', 
+        // Statut défini sur EMAIL_UNVERIFIED comme prévu dans le schema.prisma
+        status: 'EMAIL_UNVERIFIED', 
         associationId: antenna.associationId, 
         
-        // 👇 CORRECTION CHIRURGICALE ICI 👇
-        // Remplacement de "userAntennas" par "memberships" pour respecter le schema
-        // Ajout de "associationId" requis par le modèle Membership
         memberships: {
           create: {
             antennaId: antenna.id,
@@ -73,6 +76,32 @@ export class PublicService {
           },
         },
       },
+    });
+
+    // 5. Générer un token sécurisé pour la vérification
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Le lien expire dans 24 heures
+
+    // 6. Sauvegarder le token dans la table AuthToken
+    await this.prisma.authToken.create({
+      data: {
+        associationId: antenna.associationId,
+        userId: user.id,
+        email: user.email,
+        type: 'EMAIL_VERIFICATION',
+        tokenHash,
+        expiresAt,
+      },
+    });
+
+    // 7. Construire le lien et envoyer l'email de vérification
+    const frontUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const verifyUrl = `${frontUrl.replace(/\/$/, '')}/verify-email?token=${rawToken}`;
+
+    await this.authMailer.sendVerificationEmail({
+      to: user.email,
+      verifyUrl,
     });
 
     return {

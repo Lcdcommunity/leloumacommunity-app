@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, ContributionStatus, ProjectStatus, ProposalStatus, PostStatus, UserStatus, PaymentMethod } from '@prisma/client';
+import { Prisma, ContributionStatus, ProjectStatus, ProposalStatus, PostStatus, UserStatus, PaymentMethod, ContributionPurpose } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { memberMapper } from './member.mapper';
 import { MemberProfileUpdateDto } from './dto/member-profile-update.dto';
@@ -172,6 +172,8 @@ export class MemberService {
         memberComment: dto.note ?? null,
         proofFileId: dto.receiptFileAssetId ?? null,
         status: ContributionStatus.PENDING_VALIDATION,
+        // 👇 AJOUT CHIRURGICAL : On enregistre le purpose en base
+        purpose: dto.purpose || ContributionPurpose.REGULAR_QUOTA,
       },
     });
 
@@ -295,7 +297,6 @@ export class MemberService {
         description: dto.description.trim(),
         estimatedBudget: dto.expectedBudget ? new Prisma.Decimal(dto.expectedBudget) : null,
         status: ProposalStatus.SUBMITTED,
-        // 👇 Attachement de la pièce jointe (si présente) via la table pivot
         ...(dto.attachmentFileAssetId ? {
           attachments: {
             create: {
@@ -329,11 +330,10 @@ export class MemberService {
       }),
     ]);
 
-    // 👇 CORRECTION FRONTEND : On renvoie "estimatedBudget" en s'assurant qu'il est bien mappé
     return { 
       items: items.map(p => ({
         ...memberMapper.projectProposal(p),
-        estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : null // Force l'envoi de l'info
+        estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : null 
       })), 
       total, 
       page, 
