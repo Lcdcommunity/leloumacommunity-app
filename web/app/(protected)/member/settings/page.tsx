@@ -3,115 +3,414 @@
 
 import { FormEvent, useState, ChangeEvent } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
-import { Card } from '../../../../components/ui/Card';
-import { Select } from '../../../../components/ui/Select';
-import { Button } from '../../../../components/ui/Button';
-import { api } from '../../../../lib/api-client'; // 👈 Import statique propre
+import { api } from '../../../../lib/api-client';
+
+type Theme = 'light' | 'dark' | 'system';
+
+const STEPS = [
+  {
+    icon: (
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+      </svg>
+    ),
+    title: 'Validation e-mail',
+    desc: 'Obligatoire apr\u00e8s l\u2019enr\u00f4lement pour activer le compte.',
+    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE',
+  },
+  {
+    icon: (
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+      </svg>
+    ),
+    title: 'Validation admin antenne',
+    desc: 'Obligatoire avant activation compl\u00e8te de l\u2019espace membre.',
+    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+  },
+  {
+    icon: (
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+    ),
+    title: 'Cotisations',
+    desc: 'Validation manuelle par l\u2019admin apr\u00e8s confirmation de r\u00e9ception r\u00e9elle.',
+    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0',
+  },
+  {
+    icon: (
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+    ),
+    title: 'Propositions de projets',
+    desc: 'Soumises puis trait\u00e9es par les responsables d\u2019antenne.',
+    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A',
+  },
+];
 
 export default function MemberSettingsPage() {
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [smsNotifications, setSmsNotifications] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(false);
   const [language, setLanguage] = useState('fr');
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+  const [theme, setTheme] = useState<Theme>('system');
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
-
     try {
-      // 👇 Plus de "as any", on appelle directement la méthode correctement typée
-      await api.updateMemberPreferences({
-        emailNotifications,
-        smsNotifications,
-        pushNotifications,
-        language,
-        theme,
-      });
-      setMessage('Préférences enregistrées avec succès.');
+      await api.updateMemberPreferences({ emailNotifications, smsNotifications, pushNotifications, language, theme });
+      setMessage({ text: 'Pr\u00e9f\u00e9rences enregistr\u00e9es avec succ\u00e8s.', ok: true });
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Erreur enregistrement préférences');
+      setMessage({ text: err instanceof Error ? err.message : 'Erreur enregistrement pr\u00e9f\u00e9rences', ok: false });
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <AppShell title="Paramètres membre">
-      <div className="grid grid-2">
-        <Card title="Préférences de notifications">
-          <form onSubmit={handleSubmit} className="stack-md">
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={emailNotifications}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setEmailNotifications(e.target.checked)}
-              />
-              Recevoir les notifications par email
-            </label>
+    <AppShell title="Param\u00e8tres">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={smsNotifications}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setSmsNotifications(e.target.checked)}
-              />
-              Recevoir les notifications par SMS
-            </label>
+        .ms-wrap {
+          font-family: 'DM Sans', sans-serif;
+          padding: clamp(1.25rem, 3vw, 2rem);
+          max-width: 1000px; margin: 0 auto;
+        }
 
-            <label className="checkbox-row">
-              <input
-                type="checkbox"
-                checked={pushNotifications}
-                onChange={(e: ChangeEvent<HTMLInputElement>) => setPushNotifications(e.target.checked)}
-              />
-              Recevoir les notifications push (si activées)
-            </label>
+        /* Header */
+        .ms-header {
+          margin-bottom: 1.75rem;
+          opacity: 0; transform: translateY(10px);
+          animation: msin 0.5s 0.04s cubic-bezier(.22,1,.36,1) forwards;
+        }
+        .ms-eyebrow { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
+        .ms-eyebrow-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; animation: mspulse 2s ease-in-out infinite; }
+        @keyframes mspulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+        .ms-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 500; color: #111827; letter-spacing: -0.02em; line-height: 1.15; }
+        .ms-title span { background: linear-gradient(135deg,#1D4ED8,#3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-            <Select
-              label="Langue"
-              value={language}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setLanguage(e.target.value)}
-              options={[
-                { value: 'fr', label: 'Français' },
-                { value: 'en', label: 'English' },
-              ]}
-            />
+        /* Layout */
+        .ms-layout {
+          display: grid; grid-template-columns: 1fr 380px; gap: 1.25rem; align-items: start;
+        }
+        @media (max-width: 860px) { .ms-layout { grid-template-columns: 1fr; } }
 
-            <Select
-              label="Thème"
-              value={theme}
-              onChange={(e: ChangeEvent<HTMLSelectElement>) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
-              options={[
-                { value: 'system', label: 'Système' },
-                { value: 'light', label: 'Clair' },
-                { value: 'dark', label: 'Sombre' },
-              ]}
-            />
+        /* Panel */
+        .ms-panel {
+          background: rgba(253,253,255,0.92);
+          backdrop-filter: blur(12px);
+          border-radius: 20px;
+          border: 1px solid rgba(37,99,235,0.09);
+          box-shadow: 0 2px 12px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.85) inset;
+          overflow: hidden;
+        }
+        .ms-panel-left {
+          opacity: 0; transform: translateY(10px);
+          animation: msin 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards;
+        }
+        .ms-panel-right {
+          opacity: 0; transform: translateY(10px);
+          animation: msin 0.5s 0.17s cubic-bezier(.22,1,.36,1) forwards;
+        }
 
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Enregistrement...' : 'Enregistrer les préférences'}
-            </Button>
+        .ms-panel-head {
+          padding: 1rem 1.3rem; border-bottom: 1px solid rgba(37,99,235,0.07);
+          display: flex; align-items: center; gap: 0.55rem;
+        }
+        .ms-panel-ico { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .ms-panel-title { font-size: 0.73rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #374151; }
 
-            {message && (
-              <p className={`mt-2 text-sm font-medium ${message.includes('Erreur') ? 'text-red-600' : 'text-green-600'}`}>
-                {message}
-              </p>
-            )}
-          </form>
-        </Card>
+        /* Section inside panel */
+        .ms-section { padding: 1.2rem 1.3rem; border-bottom: 1px solid rgba(37,99,235,0.06); }
+        .ms-section:last-child { border-bottom: none; }
+        .ms-section-label {
+          font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em;
+          text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.85rem;
+        }
 
-        <Card title="Rappel de statut de compte">
-          <div className="stack-sm">
-            <p><strong>Validation d’email :</strong> obligatoire après enrôlement.</p>
-            <p><strong>Validation admin d’antenne :</strong> obligatoire avant activation complète.</p>
-            <p><strong>Cotisations :</strong> validation manuelle par l’admin après confirmation de réception réelle.</p>
-            <p><strong>Propositions de projets :</strong> soumises puis traitées par les responsables.</p>
+        /* Toggle switch row */
+        .ms-toggle-row {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 0.7rem 0.85rem; border-radius: 12px;
+          border: 1px solid rgba(37,99,235,0.09);
+          background: rgba(249,250,251,0.6);
+          margin-bottom: 0.55rem; gap: 0.75rem;
+          transition: background 0.2s, border-color 0.2s;
+          cursor: pointer;
+        }
+        .ms-toggle-row:last-child { margin-bottom: 0; }
+        .ms-toggle-row:hover { background: #EFF6FF; border-color: rgba(37,99,235,0.18); }
+        .ms-toggle-row.active { background: #EFF6FF; border-color: rgba(37,99,235,0.22); }
+
+        .ms-toggle-info { display: flex; align-items: center; gap: 0.65rem; flex: 1; min-width: 0; pointer-events: none; }
+        .ms-toggle-ico { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .ms-toggle-text {}
+        .ms-toggle-name { font-size: 0.83rem; font-weight: 600; color: #111827; }
+        .ms-toggle-desc { font-size: 0.68rem; color: #9CA3AF; margin-top: 1px; }
+
+        /* Custom toggle pill */
+        .ms-switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+        .ms-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .ms-switch-track {
+          position: absolute; inset: 0; border-radius: 99px;
+          background: #E2E8F0; transition: background 0.2s;
+          cursor: pointer;
+        }
+        .ms-switch input:checked + .ms-switch-track { background: #2563EB; }
+        .ms-switch-thumb {
+          position: absolute; top: 3px; left: 3px;
+          width: 18px; height: 18px; border-radius: 50%;
+          background: white; transition: transform 0.2s cubic-bezier(.22,1,.36,1);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.15); pointer-events: none;
+        }
+        .ms-switch input:checked ~ .ms-switch-thumb { transform: translateX(18px); }
+
+        /* Select field */
+        .ms-field { display: flex; flex-direction: column; gap: 0.38rem; margin-bottom: 0.7rem; }
+        .ms-field:last-child { margin-bottom: 0; }
+        .ms-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #2563EB; }
+        .ms-select-wrap { position: relative; }
+        .ms-select {
+          width: 100%; height: 44px;
+          padding: 0 2.2rem 0 1rem;
+          border-radius: 11px; border: 1px solid rgba(37,99,235,0.15);
+          background: rgba(255,255,255,0.85);
+          font-family: 'DM Sans', sans-serif; font-size: 0.85rem; color: #111827;
+          outline: none; -webkit-appearance: none; appearance: none; cursor: pointer;
+          transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .ms-select:focus { border-color: rgba(37,99,235,0.5); box-shadow: 0 0 0 3px rgba(37,99,235,0.09); background: white; }
+        .ms-select-chevron { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
+
+        /* Theme pills */
+        .ms-theme-row { display: flex; gap: 0.5rem; }
+        .ms-theme-pill {
+          flex: 1; height: 38px; border-radius: 10px;
+          border: 1.5px solid rgba(37,99,235,0.13);
+          background: rgba(255,255,255,0.8); cursor: pointer;
+          font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 600; color: #374151;
+          display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+          transition: all 0.2s;
+        }
+        .ms-theme-pill:hover { border-color: rgba(37,99,235,0.35); background: #EFF6FF; color: #1D4ED8; }
+        .ms-theme-pill.active { border-color: #2563EB; background: #EFF6FF; color: #1D4ED8; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+        /* Submit footer */
+        .ms-footer {
+          padding: 1.1rem 1.3rem; border-top: 1px solid rgba(37,99,235,0.07);
+          display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap;
+        }
+        .ms-submit {
+          height: 46px; padding: 0 1.5rem;
+          background: linear-gradient(135deg,#1D4ED8,#2563EB,#3B82F6);
+          background-size: 200%; background-position: 0%;
+          border: none; border-radius: 12px; color: white;
+          font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700;
+          letter-spacing: 0.05em; cursor: pointer;
+          display: flex; align-items: center; gap: 0.45rem;
+          box-shadow: 0 4px 16px rgba(37,99,235,0.28);
+          transition: background-position 0.4s, transform 0.15s, box-shadow 0.3s;
+          white-space: nowrap;
+        }
+        .ms-submit:hover:not(:disabled) { background-position: 100%; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(37,99,235,0.38); }
+        .ms-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+        .ms-spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: msspin 0.7s linear infinite; }
+        @keyframes msspin { to { transform: rotate(360deg); } }
+
+        .ms-toast { display: flex; align-items: center; gap: 0.45rem; padding: 0.6rem 0.9rem; border-radius: 10px; font-size: 0.77rem; font-weight: 600; border: 1px solid; animation: msin 0.3s cubic-bezier(.22,1,.36,1); }
+        .ms-toast.ok  { background: #ECFDF5; color: #065F46; border-color: #A7F3D0; }
+        .ms-toast.err { background: #FEF2F2; color: #B91C1C; border-color: #FECACA; }
+
+        /* Status steps */
+        .ms-steps { display: flex; flex-direction: column; }
+        .ms-step {
+          display: flex; gap: 0.75rem; padding: 0.9rem 1.3rem;
+          border-bottom: 1px solid rgba(37,99,235,0.05);
+          transition: background 0.15s;
+        }
+        .ms-step:last-child { border-bottom: none; }
+        .ms-step:hover { background: rgba(37,99,235,0.02); }
+        .ms-step-ico { width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; border: 1px solid; }
+        .ms-step-title { font-size: 0.82rem; font-weight: 700; color: #111827; margin-bottom: 2px; }
+        .ms-step-desc { font-size: 0.72rem; color: #6B7280; line-height: 1.55; }
+
+        @keyframes msin { to { opacity: 1; transform: translateY(0); } }
+      `}</style>
+
+      <div className="ms-wrap">
+
+        {/* Header */}
+        <div className="ms-header">
+          <div className="ms-eyebrow"><div className="ms-eyebrow-dot" />Espace membre</div>
+          <h1 className="ms-title">Param&egrave;tres <span>&amp; pr&eacute;f&eacute;rences</span></h1>
+        </div>
+
+        <div className="ms-layout">
+
+          {/* LEFT — Preferences form */}
+          <div className="ms-panel-left">
+            <form onSubmit={handleSubmit}>
+              <div className="ms-panel">
+
+                {/* Notifications */}
+                <div className="ms-panel-head">
+                  <div className="ms-panel-ico" style={{ background: '#EFF6FF', color: '#2563EB' }}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                  </div>
+                  <span className="ms-panel-title">Notifications</span>
+                </div>
+
+                <div className="ms-section">
+                  <div className="ms-section-label">Canaux de notification</div>
+
+                  {[
+                    {
+                      key: 'email', checked: emailNotifications, onChange: (v: boolean) => setEmailNotifications(v),
+                      name: 'Notifications e-mail', desc: 'Recevez les alertes directement dans votre bo\u00eete mail',
+                      color: '#2563EB', bg: '#EFF6FF',
+                      icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>,
+                    },
+                    {
+                      key: 'sms', checked: smsNotifications, onChange: (v: boolean) => setSmsNotifications(v),
+                      name: 'Notifications SMS', desc: 'Recevez un SMS pour les alertes importantes',
+                      color: '#059669', bg: '#ECFDF5',
+                      icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>,
+                    },
+                    {
+                      key: 'push', checked: pushNotifications, onChange: (v: boolean) => setPushNotifications(v),
+                      name: 'Notifications push', desc: 'Notifications navigateur si activ\u00e9es sur votre appareil',
+                      color: '#7C3AED', bg: '#F5F3FF',
+                      icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>,
+                    },
+                  ].map(row => (
+                    <label key={row.key} className={`ms-toggle-row${row.checked ? ' active' : ''}`}>
+                      <div className="ms-toggle-info">
+                        <div className="ms-toggle-ico" style={{ background: row.bg, color: row.color }}>{row.icon}</div>
+                        <div className="ms-toggle-text">
+                          <div className="ms-toggle-name">{row.name}</div>
+                          <div className="ms-toggle-desc">{row.desc}</div>
+                        </div>
+                      </div>
+                      <div className="ms-switch">
+                        <input
+                          type="checkbox"
+                          checked={row.checked}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => row.onChange(e.target.checked)}
+                        />
+                        <div className="ms-switch-track" />
+                        <div className="ms-switch-thumb" />
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Language */}
+                <div className="ms-section">
+                  <div className="ms-section-label">Langue &amp; affichage</div>
+                  <div className="ms-field">
+                    <label className="ms-label">Langue de l&apos;interface</label>
+                    <div className="ms-select-wrap">
+                      <select
+                        className="ms-select"
+                        value={language}
+                        onChange={(e: ChangeEvent<HTMLSelectElement>) => setLanguage(e.target.value)}
+                      >
+                        <option value="fr">Fran&ccedil;ais</option>
+                        <option value="en">English</option>
+                      </select>
+                      <span className="ms-select-chevron">
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="ms-field">
+                    <label className="ms-label">Th&egrave;me</label>
+                    <div className="ms-theme-row">
+                      {([
+                        { value: 'light', label: 'Clair', icon: <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path strokeLinecap="round" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> },
+                        { value: 'dark',  label: 'Sombre', icon: <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg> },
+                        { value: 'system',label: 'Syst\u00e8me', icon: <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> },
+                      ] as const).map(t => (
+                        <button
+                          key={t.value} type="button"
+                          className={`ms-theme-pill${theme === t.value ? ' active' : ''}`}
+                          onClick={() => setTheme(t.value)}
+                        >
+                          {t.icon}{t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="ms-footer">
+                  <button type="submit" className="ms-submit" disabled={saving}>
+                    {saving ? (
+                      <><div className="ms-spinner" />Enregistrement&#8230;</>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        Enregistrer les pr&eacute;f&eacute;rences
+                      </>
+                    )}
+                  </button>
+                  {message && (
+                    <div className={`ms-toast${message.ok ? ' ok' : ' err'}`}>
+                      {message.ok
+                        ? <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        : <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                      }
+                      {message.text}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </form>
           </div>
-        </Card>
+
+          {/* RIGHT — Status steps */}
+          <div className="ms-panel-right">
+            <div className="ms-panel">
+              <div className="ms-panel-head">
+                <div className="ms-panel-ico" style={{ background: '#FFFBEB', color: '#D97706' }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                </div>
+                <span className="ms-panel-title">Rappel &mdash; Statut de compte</span>
+              </div>
+              <div className="ms-steps">
+                {STEPS.map((s, i) => (
+                  <div key={i} className="ms-step">
+                    <div className="ms-step-ico" style={{ background: s.bg, color: s.color, borderColor: s.border }}>
+                      {s.icon}
+                    </div>
+                    <div>
+                      <div className="ms-step-title">{s.title}</div>
+                      <div className="ms-step-desc">{s.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
     </AppShell>
   );
