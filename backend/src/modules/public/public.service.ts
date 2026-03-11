@@ -1,9 +1,11 @@
 // backend/src/modules/public/public.service.ts
+// backend/src/modules/public/public.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthMailerService } from '../auth/auth.mailer.service';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
+import { UserStatus } from '@prisma/client'; // 👈 Ajout de UserStatus
 
 export interface SignupDto {
   firstName: string;
@@ -16,13 +18,16 @@ export interface SignupDto {
   country?: string;
   addressLine1?: string;
   addressLine2?: string;
+  // 👇 AJOUT CHIRURGICAL : Nouveaux champs d'origine et de naissance
+  originSubPrefecture?: string; 
+  placeOfBirth?: string;
 }
 
 @Injectable()
 export class PublicService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly authMailer: AuthMailerService, // 👈 Injection du service mail
+    private readonly authMailer: AuthMailerService,
   ) {}
 
   async signup(dto: SignupDto) {
@@ -64,11 +69,15 @@ export class PublicService {
         country: dto.country,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2,
+        
+        // 👇 AJOUT CHIRURGICAL : Enregistrement en base
+        originSubPrefecture: dto.originSubPrefecture,
+        placeOfBirth: dto.placeOfBirth,
+        
         role: 'MEMBER',
-        // Statut défini sur EMAIL_UNVERIFIED comme prévu dans le schema.prisma
         status: 'EMAIL_UNVERIFIED', 
         associationId: antenna.associationId, 
-        
+
         memberships: {
           create: {
             antennaId: antenna.id,
@@ -108,5 +117,45 @@ export class PublicService {
       id: user.id,
       message: 'Inscription réussie. Vérifiez votre email.',
     };
+  }
+
+  // 👇 AJOUT CHIRURGICAL : Méthode pour valider le token
+  async verifyEmailToken(rawToken: string) {
+    if (!rawToken) {
+      throw new BadRequestException('Token manquant.');
+    }
+
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+
+    const authToken = await this.prisma.authToken.findFirst({
+      where: {
+        tokenHash,
+        type: 'EMAIL_VERIFICATION',
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+    });
+
+    if (!authToken || !authToken.userId) {
+      throw new BadRequestException('Le lien de vérification est invalide ou a expiré.');
+    }
+
+    // On invalide le token et on passe le membre en attente de validation admin
+    await this.prisma.$transaction([
+      this.prisma.authToken.update({
+        where: { id: authToken.id },
+        data: { consumedAt: new Date() },
+      }),
+      this.prisma.user.update({
+        where: { id: authToken.userId },
+        data: {
+          emailVerifiedAt: new Date(),
+          status: UserStatus.PENDING_APPROVAL,
+        },
+      })
+    ]);
+
+    // On renvoie un objet avec `emailVerified: true` comme attendu par le Frontend
+    return { emailVerified: true };
   }
 }

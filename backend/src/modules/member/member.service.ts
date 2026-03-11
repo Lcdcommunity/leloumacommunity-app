@@ -83,7 +83,11 @@ export class MemberService {
           firstName: virtualCard.user.firstName,
           lastName: virtualCard.user.lastName,
           birthDate: virtualCard.user.birthDate ? virtualCard.user.birthDate.toISOString() : null,
+          
+          // 👇 AJOUT CHIRURGICAL : Récupération des données pour la carte
           placeOfBirth: virtualCard.user.placeOfBirth,
+          originVillage: virtualCard.user.originSubPrefecture, // Mappé sur originSubPrefecture
+          
           country: virtualCard.user.country,
           city: virtualCard.user.city,
           profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
@@ -172,7 +176,6 @@ export class MemberService {
         memberComment: dto.note ?? null,
         proofFileId: dto.receiptFileAssetId ?? null,
         status: ContributionStatus.PENDING_VALIDATION,
-        // 👇 AJOUT CHIRURGICAL : On enregistre le purpose en base
         purpose: dto.purpose || ContributionPurpose.REGULAR_QUOTA,
       },
     });

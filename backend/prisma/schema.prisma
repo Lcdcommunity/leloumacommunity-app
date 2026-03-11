@@ -408,9 +408,10 @@ model User {
   birthDate          DateTime?
   gender             Gender?
   
-  // NOUVEAU : Infos supplémentaires pour la carte membre
-  placeOfBirth       String?
-  countryOfBirth     String?
+  // Infos supplémentaires pour la carte membre
+  placeOfBirth        String?
+  originSubPrefecture String? // NOUVEAU: Sous-préfecture d'origine (ex: Lafou)
+  countryOfBirth      String?
 
   country            String?
   city               String?
@@ -421,7 +422,7 @@ model User {
 
   preferredLanguage LanguageCode @default(FR)
   timezone          String?      @default("Europe/Paris")
-  isPhoneVerified   Boolean      @default(false)
+  isPhoneVerified    Boolean      @default(false)
 
   // Gouvernance / traçabilité
   createdByUserId   String? // SUPER_ADMIN pour admins / auto pour membres = null ou self workflow
@@ -445,7 +446,7 @@ model User {
   association  Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   profilePhoto FileAsset?  @relation("UserProfilePhoto", fields: [profilePhotoFileId], references: [id], onDelete: SetNull)
 
-  // NOUVEAU : Relation vers la carte virtuelle
+  // Relation vers la carte virtuelle
   virtualCard  VirtualCard?
 
   // self relations (audit de gouvernance)
@@ -501,7 +502,6 @@ model User {
 
   documentsUploaded Document[]  @relation("DocumentUploadedBy")
   filesUploaded     FileAsset[] @relation("FileUploadedBy")
-
   notifications        NotificationRecipient[]
   notificationsCreated Notification[]          @relation("NotificationCreatedBy")
   notificationsTarget  Notification[]          @relation("NotificationUserTarget")
@@ -1028,7 +1028,7 @@ model ProjectUpdateAttachment {
   createdAt       DateTime @default(now())
 
   projectUpdate ProjectUpdate @relation(fields: [projectUpdateId], references: [id], onDelete: Cascade)
-  file          FileAsset     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  file          FileAsset     @relation(fields: [fileId], references: [id], onDelete: Cascade)  
 
   @@unique([projectUpdateId, fileId])
   @@index([projectUpdateId, sortOrder])

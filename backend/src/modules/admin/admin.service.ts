@@ -129,6 +129,48 @@ export class AdminService {
     };
   }
 
+  // 👇 AJOUT CHIRURGICAL : GESTION DES STATUTS DES MEMBRES 👇
+  async suspendUser(userId: string, adminId: string) {
+    const antennaId = await this.getAdminAntennaId(adminId);
+    const user = await this.prisma.user.findFirst({ 
+      where: { id: userId, role: UserRole.MEMBER as any, memberships: { some: { antennaId } } } 
+    });
+    if (!user) throw new NotFoundException("Membre introuvable.");
+
+    return this.prisma.user.update({ 
+      where: { id: userId }, 
+      data: { status: UserStatus.SUSPENDED, suspendedByUserId: adminId, suspendedAt: new Date() } 
+    });
+  }
+
+  async activateUser(userId: string, adminId: string) {
+    const antennaId = await this.getAdminAntennaId(adminId);
+    const user = await this.prisma.user.findFirst({ 
+      where: { id: userId, role: UserRole.MEMBER as any, memberships: { some: { antennaId } } } 
+    });
+    if (!user) throw new NotFoundException("Membre introuvable.");
+
+    return this.prisma.user.update({ 
+      where: { id: userId }, 
+      data: { status: UserStatus.ACTIVE, suspendedByUserId: null, suspendedAt: null } 
+    });
+  }
+
+  async deleteUser(userId: string, adminId: string) {
+    const antennaId = await this.getAdminAntennaId(adminId);
+    const user = await this.prisma.user.findFirst({ 
+      where: { id: userId, role: UserRole.MEMBER as any, memberships: { some: { antennaId } } } 
+    });
+    if (!user) throw new NotFoundException("Membre introuvable.");
+
+    // Soft-delete logique
+    return this.prisma.user.update({ 
+      where: { id: userId }, 
+      data: { status: UserStatus.DELETED, deletedByUserId: adminId, deletedAt: new Date() } 
+    });
+  }
+  // 👆 FIN DE L'AJOUT 👇
+
   // --- GESTION DES COTISATIONS ---
 
   async listContributions(adminId: string, page: number, pageSize: number, status?: string, q?: string) {
@@ -162,7 +204,6 @@ export class AdminService {
     };
   }
 
-  // 👇 MISE A JOUR LOGIQUE DE VALIDATION (CARTE MEMBRE)
   async validateContribution(contributionId: string, adminId: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -258,7 +299,6 @@ export class AdminService {
     };
   }
 
-  // 👇 NOUVEAU : Récupération des propositions de projets (demandé tout à l'heure)
   async listProjectProposals(adminId: string, page: number, pageSize: number, status?: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const skip = (page - 1) * pageSize;

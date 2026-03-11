@@ -1,4 +1,5 @@
 // backend/src/modules/public/public.controller.ts
+// backend/src/modules/public/public.controller.ts
 import { Controller, Get, Post, Body } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PublicService, SignupDto } from './public.service';
@@ -15,7 +16,7 @@ interface PublicAntennaResponse {
 export class PublicController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly publicService: PublicService, // 👈 On injecte le nouveau service
+    private readonly publicService: PublicService,
   ) {}
 
   @Get('antennas')
@@ -37,10 +38,14 @@ export class PublicController {
     return items;
   }
 
-  // 👇 LA ROUTE POST D'INSCRIPTION 👇
   @Post('signup')
   async signup(@Body() dto: SignupDto) {
-    // On passe simplement les données au service qui fait tout le travail
     return this.publicService.signup(dto);
+  }
+
+  // 👇 AJOUT CHIRURGICAL : Route appelée par api.verifyEmailToken() depuis le frontend
+  @Post('verify-email-token')
+  async verifyEmailToken(@Body() body: { token: string }) {
+    return this.publicService.verifyEmailToken(body.token);
   }
 }

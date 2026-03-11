@@ -55,6 +55,23 @@ export class AdminController {
     return this.service.listLateMembers(user.id, +page, +pageSize);
   }
 
+  // 👇 AJOUT CHIRURGICAL : GESTION DU STATUT DES MEMBRES 👇
+  @Patch('members/:id/suspend')
+  suspendMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.suspendUser(id, user.id);
+  }
+
+  @Patch('members/:id/activate')
+  activateMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.activateUser(id, user.id);
+  }
+
+  @Delete('members/:id')
+  deleteMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.deleteUser(id, user.id);
+  }
+  // 👆 FIN DE L'AJOUT 👇
+
   // --- GESTION DES COTISATIONS ---
   @Get('contributions')
   listContributions(
@@ -109,7 +126,6 @@ export class AdminController {
     return this.service.deleteProject(id, user.id);
   }
 
-  // 👇 NOUVELLE ROUTE : RÉCEPTION DES PROPOSITIONS DE PROJETS
   @Get('project-proposals')
   async listProjectProposals(
     @CurrentUser() user: AuthUser, 
@@ -117,9 +133,6 @@ export class AdminController {
     @Query('pageSize') pageSize = 10, 
     @Query('status') status?: string
   ) {
-    // Note : Cette méthode doit exister dans `admin.service.ts`.
-    // Si elle n'existe pas, nous la rajouterons dans la foulée,
-    // mais je la déclare ici pour que le controller soit complet.
     return (this.service as any).listProjectProposals(user.id, +page, +pageSize, status);
   }
 

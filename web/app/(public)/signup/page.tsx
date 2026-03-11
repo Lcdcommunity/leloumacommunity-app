@@ -29,6 +29,9 @@ export default function MemberSignupPage() {
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
+  // NOUVEAU CHAMP : Commune d'origine
+  const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
 
@@ -64,6 +67,8 @@ export default function MemberSignupPage() {
     if (s === 1) {
       if (!email.trim()) return "L'email est requis.";
       if (!/\S+@\S+\.\S+/.test(email)) return "Format d'email invalide.";
+      // On rend l'origine obligatoire selon votre demande précédente
+      if (!originSubPrefecture.trim()) return "La commune d'origine est requise.";
     }
     if (s === 2) {
       if (!password) return 'Le mot de passe est requis.';
@@ -93,13 +98,18 @@ export default function MemberSignupPage() {
     setSubmitting(true);
     try {
       await api.memberSignup({
-        firstName, lastName, email,
+        firstName, 
+        lastName, 
+        email,
         phone: phone || undefined,
-        password, antennaId,
+        password, 
+        antennaId,
         city: city || undefined,
         country: country || undefined,
         addressLine1: addressLine1 || undefined,
         addressLine2: addressLine2 || undefined,
+        // ENVOI DU NOUVEAU CHAMP
+        originSubPrefecture: originSubPrefecture.trim(),
       });
       setSuccess(true);
     } catch (err) {
@@ -197,7 +207,7 @@ export default function MemberSignupPage() {
           -webkit-backdrop-filter: blur(24px);
           border: 1px solid rgba(37,99,235,0.13);
           border-radius: 28px;
-          padding: clamp(1.75rem, 5vw, 2.75rem);
+          padding: clamp(1.5rem, 5vw, 2.75rem); /* Ajusté pour mobile */
           box-shadow:
             0 0 0 1px rgba(255,255,255,0.85) inset,
             0 24px 64px rgba(37,99,235,0.10),
@@ -239,7 +249,7 @@ export default function MemberSignupPage() {
 
         .sp-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(1.7rem, 4.5vw, 2.1rem);
+          font-size: clamp(1.6rem, 4.5vw, 2.1rem); /* Légèrement réduit pour mobile */
           font-weight: 500;
           color: var(--text);
           letter-spacing: -0.02em;
@@ -264,7 +274,7 @@ export default function MemberSignupPage() {
           align-items: center;
           justify-content: center;
           gap: 0;
-          margin-bottom: 2rem;
+          margin-bottom: 1.5rem; /* Réduit pour mobile */
         }
         .sp-step-item {
           display: flex;
@@ -277,8 +287,9 @@ export default function MemberSignupPage() {
         .sp-step-item:not(:last-child)::after {
           content: '';
           position: absolute;
-          top: 15px; left: calc(50% + 16px);
-          width: calc(100% - 32px); height: 1px;
+          top: 13px; /* Centré avec le cercle réduit */
+          left: calc(50% + 14px);
+          width: calc(100% - 28px); height: 1px;
           background: rgba(37,99,235,0.15);
           transition: background 0.4s;
         }
@@ -286,12 +297,12 @@ export default function MemberSignupPage() {
           background: var(--blue-light);
         }
         .sp-step-circle {
-          width: 30px; height: 30px;
+          width: 26px; height: 26px; /* Réduit pour mobile */
           border-radius: 50%;
           border: 2px solid rgba(37,99,235,0.2);
           background: white;
           display: flex; align-items: center; justify-content: center;
-          font-size: 0.72rem;
+          font-size: 0.65rem;
           font-weight: 700;
           color: var(--mist);
           transition: all 0.3s cubic-bezier(.22,1,.36,1);
@@ -309,7 +320,7 @@ export default function MemberSignupPage() {
           color: var(--blue);
         }
         .sp-step-label {
-          font-size: 0.65rem;
+          font-size: 0.6rem; /* Réduit pour mobile */
           font-weight: 600;
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -326,7 +337,7 @@ export default function MemberSignupPage() {
           letter-spacing: 0.1em;
           text-transform: uppercase;
           color: var(--blue);
-          margin-bottom: 1rem;
+          margin-bottom: 0.85rem;
           display: flex;
           align-items: center;
           gap: 0.5rem;
@@ -341,16 +352,16 @@ export default function MemberSignupPage() {
         .sp-grid-2 {
           display: grid;
           grid-template-columns: 1fr 1fr;
-          gap: 0.85rem;
+          gap: 0.75rem; /* Légèrement réduit */
         }
-        .sp-stack { display: flex; flex-direction: column; gap: 0.85rem; }
+        .sp-stack { display: flex; flex-direction: column; gap: 0.75rem; }
 
         /* Field */
-        .sp-field { display: flex; flex-direction: column; gap: 0.38rem; }
+        .sp-field { display: flex; flex-direction: column; gap: 0.3rem; }
         .sp-label {
-          font-size: 0.7rem;
+          font-size: 0.68rem;
           font-weight: 600;
-          letter-spacing: 0.09em;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
           color: var(--blue);
         }
@@ -359,7 +370,7 @@ export default function MemberSignupPage() {
           color: var(--mist);
           text-transform: none;
           letter-spacing: 0;
-          font-size: 0.68rem;
+          font-size: 0.65rem;
           margin-left: 0.3rem;
         }
 
@@ -367,14 +378,14 @@ export default function MemberSignupPage() {
 
         .sp-input, .sp-select {
           width: 100%;
-          height: 48px;
+          height: 44px; /* Réduit pour mobile */
           background: rgba(255,255,255,0.75);
           border: 1px solid rgba(37,99,235,0.15);
-          border-radius: 13px;
-          padding: 0 1rem;
+          border-radius: 10px;
+          padding: 0 0.85rem;
           color: var(--text);
           font-family: 'DM Sans', sans-serif;
-          font-size: 0.88rem;
+          font-size: 0.85rem; /* Lisible mais compact */
           outline: none;
           transition: border-color 0.22s, background 0.22s, box-shadow 0.22s;
           -webkit-appearance: none;
@@ -392,8 +403,8 @@ export default function MemberSignupPage() {
           cursor: pointer;
           background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%232563EB' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
           background-repeat: no-repeat;
-          background-position: right 1rem center;
-          padding-right: 2.5rem;
+          background-position: right 0.85rem center;
+          padding-right: 2rem;
         }
 
         .sp-eye-btn {
@@ -428,7 +439,7 @@ export default function MemberSignupPage() {
           transition: width 0.4s, background 0.4s;
         }
         .sp-pwd-label {
-          font-size: 0.68rem;
+          font-size: 0.65rem;
           font-weight: 600;
           margin-left: 0.4rem;
           transition: color 0.3s;
@@ -440,16 +451,15 @@ export default function MemberSignupPage() {
           background: var(--blue-faint);
           border: 1px solid var(--blue-pale);
           border-radius: 12px;
-          padding: 0.85rem 1rem;
-          font-size: 0.78rem;
+          padding: 0.75rem 0.85rem;
+          font-size: 0.75rem;
           color: #1E40AF;
-          line-height: 1.6;
-          margin-bottom: 1.5rem;
+          line-height: 1.5;
+          margin-bottom: 1.2rem;
           display: flex;
           gap: 0.6rem;
           align-items: flex-start;
         }
-
         /* Error / Success */
         .sp-error {
           display: flex;
@@ -469,12 +479,12 @@ export default function MemberSignupPage() {
           padding: 1rem 0 0.5rem;
         }
         .sp-success-icon {
-          width: 64px; height: 64px;
+          width: 56px; height: 56px;
           background: linear-gradient(135deg, #DCFCE7, #BBF7D0);
           border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          margin: 0 auto 1.25rem;
-          box-shadow: 0 0 0 8px rgba(21,128,61,0.08);
+          margin: 0 auto 1rem;
+          box-shadow: 0 0 0 6px rgba(21,128,61,0.08);
           animation: popin 0.5s cubic-bezier(.22,1,.36,1);
         }
         @keyframes popin {
@@ -483,27 +493,27 @@ export default function MemberSignupPage() {
         }
         .sp-success-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.5rem; font-weight: 500;
-          color: var(--text); margin-bottom: 0.6rem;
+          font-size: 1.4rem; font-weight: 500;
+          color: var(--text); margin-bottom: 0.5rem;
         }
-        .sp-success-text { font-size: 0.83rem; color: var(--mist); line-height: 1.65; }
+        .sp-success-text { font-size: 0.8rem; color: var(--mist); line-height: 1.6; }
 
         /* Nav buttons */
         .sp-nav {
           display: flex;
-          gap: 0.75rem;
+          gap: 0.6rem;
           margin-top: 1.5rem;
         }
         .sp-btn-back {
           flex: 0 0 auto;
-          height: 50px;
-          padding: 0 1.2rem;
+          height: 46px; /* Réduit pour mobile */
+          padding: 0 1rem;
           background: transparent;
           border: 1px solid rgba(37,99,235,0.22);
-          border-radius: 13px;
+          border-radius: 10px;
           color: var(--blue);
           font-family: 'DM Sans', sans-serif;
-          font-size: 0.86rem;
+          font-size: 0.82rem;
           font-weight: 600;
           cursor: pointer;
           display: flex; align-items: center; gap: 0.4rem;
@@ -517,26 +527,26 @@ export default function MemberSignupPage() {
 
         .sp-btn-next, .sp-btn-submit {
           flex: 1;
-          height: 50px;
+          height: 46px; /* Réduit pour mobile */
           background: linear-gradient(135deg, #1D4ED8 0%, var(--blue) 50%, var(--blue-light) 100%);
           background-size: 200% 100%;
           background-position: 0% 0%;
           border: none;
-          border-radius: 13px;
+          border-radius: 10px;
           color: white;
           font-family: 'DM Sans', sans-serif;
-          font-size: 0.88rem;
+          font-size: 0.82rem;
           font-weight: 700;
           letter-spacing: 0.05em;
           text-transform: uppercase;
           cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 0.45rem;
           transition: background-position 0.4s, transform 0.15s, box-shadow 0.3s;
-          box-shadow: 0 4px 18px rgba(37,99,235,0.28);
+          box-shadow: 0 4px 14px rgba(37,99,235,0.28);
         }
         .sp-btn-next:hover:not(:disabled), .sp-btn-submit:hover:not(:disabled) {
           background-position: 100% 0%;
-          box-shadow: 0 8px 26px rgba(37,99,235,0.4);
+          box-shadow: 0 6px 20px rgba(37,99,235,0.4);
           transform: translateY(-1px);
         }
         .sp-btn-next:disabled, .sp-btn-submit:disabled {
@@ -544,7 +554,7 @@ export default function MemberSignupPage() {
         }
 
         .sp-spinner {
-          width: 17px; height: 17px;
+          width: 16px; height: 16px;
           border: 2px solid rgba(255,255,255,0.3);
           border-top-color: white;
           border-radius: 50%;
@@ -555,10 +565,10 @@ export default function MemberSignupPage() {
         /* Footer link */
         .sp-footer {
           margin-top: 1.5rem;
-          padding-top: 1.25rem;
+          padding-top: 1.2rem;
           border-top: 1px solid rgba(37,99,235,0.09);
           text-align: center;
-          font-size: 0.8rem;
+          font-size: 0.78rem;
           color: var(--mist);
           display: flex;
           flex-direction: column;
@@ -572,7 +582,7 @@ export default function MemberSignupPage() {
         }
         .sp-footer a:hover { color: var(--blue-light); }
         .sp-footer-sublink {
-          font-size: 0.75rem;
+          font-size: 0.72rem;
           font-weight: 400 !important;
           color: var(--mist) !important;
         }
@@ -589,10 +599,12 @@ export default function MemberSignupPage() {
           to   { opacity: 1; transform: translateY(0); }
         }
 
+        /* Responsive Fixes pour Mobile */
         @media (max-width: 520px) {
-          .sp-grid-2 { grid-template-columns: 1fr; }
-          .sp-root { padding: 1.25rem 0.85rem 2.5rem; }
-          .sp-card { border-radius: 22px; }
+          .sp-grid-2 { grid-template-columns: 1fr; gap: 0.6rem; }
+          .sp-root { padding: 1rem 0.5rem 2rem; }
+          .sp-card { border-radius: 20px; padding: 1.25rem; }
+          .sp-btn-back { padding: 0 0.8rem; }
         }
       `}</style>
 
@@ -627,7 +639,7 @@ export default function MemberSignupPage() {
                 >
                   <div className="sp-step-circle">
                     {i < step ? (
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
                     ) : (i + 1)}
@@ -642,7 +654,7 @@ export default function MemberSignupPage() {
           {success ? (
             <div className="sp-success sp-panel">
               <div className="sp-success-icon">
-                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#15803D" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#15803D" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
               </div>
@@ -671,7 +683,7 @@ export default function MemberSignupPage() {
               {step === 0 && (
                 <div className="sp-panel sp-stack">
                   <div className="sp-notice">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{flexShrink:0,marginTop:'1px'}}>
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{flexShrink:0,marginTop:'2px'}}>
                       <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
                     </svg>
                     Le compte sera activé après vérification email et validation par l&apos;administrateur de votre antenne.
@@ -709,10 +721,17 @@ export default function MemberSignupPage() {
                 </div>
               )}
 
-              {/* ── STEP 1 : Contact ── */}
+              {/* ── STEP 1 : Contact & Origine ── */}
               {step === 1 && (
                 <div className="sp-panel sp-stack">
-                  <p className="sp-section-title">Coordonnées</p>
+                  <p className="sp-section-title">Identité communautaire</p>
+
+                  <div className="sp-field">
+                    <label className="sp-label">Commune d&apos;origine</label>
+                    <input className="sp-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} placeholder="Ex: Lafou" required />
+                  </div>
+
+                  <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Coordonnées</p>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
@@ -725,7 +744,7 @@ export default function MemberSignupPage() {
                     </div>
                   </div>
 
-                  <p className="sp-section-title" style={{marginTop:'0.5rem'}}>Adresse</p>
+                  <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Lieu de résidence actuelle</p>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
@@ -737,14 +756,17 @@ export default function MemberSignupPage() {
                       <input className="sp-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="France" />
                     </div>
                   </div>
-
-                  <div className="sp-field">
-                    <label className="sp-label">Adresse ligne 1 <span className="sp-optional">(optionnel)</span></label>
-                    <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue de la Paix" />
-                  </div>
-                  <div className="sp-field">
-                    <label className="sp-label">Adresse ligne 2 <span className="sp-optional">(optionnel)</span></label>
-                    <input className="sp-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 3B" />
+                  
+                  {/* On garde les lignes d'adresse pour plus de précision si besoin */}
+                  <div className="sp-grid-2">
+                    <div className="sp-field">
+                      <label className="sp-label">Adresse 1 <span className="sp-optional">(optionnel)</span></label>
+                      <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue de la Paix" />
+                    </div>
+                    <div className="sp-field">
+                      <label className="sp-label">Adresse 2 <span className="sp-optional">(optionnel)</span></label>
+                      <input className="sp-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 3B" />
+                    </div>
                   </div>
                 </div>
               )}
@@ -787,7 +809,6 @@ export default function MemberSignupPage() {
                       </div>
                     )}
                   </div>
-
                   <div className="sp-field">
                     <label className="sp-label">Confirmer le mot de passe</label>
                     <div className="sp-input-wrap">
@@ -808,7 +829,7 @@ export default function MemberSignupPage() {
                     </div>
                     {/* Match indicator */}
                     {passwordConfirm && (
-                      <p style={{fontSize:'0.7rem', marginTop:'0.3rem', color: password === passwordConfirm ? '#15803D' : '#B91C1C', fontWeight:600}}>
+                      <p style={{fontSize:'0.65rem', marginTop:'0.3rem', color: password === passwordConfirm ? '#15803D' : '#B91C1C', fontWeight:600}}>
                         {password === passwordConfirm ? '✓ Les mots de passe correspondent' : '✗ Les mots de passe ne correspondent pas'}
                       </p>
                     )}

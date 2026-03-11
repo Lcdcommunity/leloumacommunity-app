@@ -26,7 +26,8 @@ export default function MemberNewContributionPage() {
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
-      await api.createContribution(values);
+      // 👇 CORRECTION ICI : Utilisation du nom correct de la fonction de l'API
+      await api.createContributionMember(values);
       setSuccess(true);
       setTimeout(() => router.push('/member/contributions/history'), 1800);
     } catch (error) {

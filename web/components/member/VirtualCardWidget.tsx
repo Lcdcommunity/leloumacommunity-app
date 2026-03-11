@@ -55,29 +55,26 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
 
   // ── Logique de Drag & Drop (Déplacement Libre) ──
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  // CORRECTION ICI : Utilisation de useState au lieu de useRef pour isDragging
   const [isDragging, setIsDragging] = useState(false); 
   const dragStart = useRef({ x: 0, y: 0 });
   const initialOffset = useRef({ x: 0, y: 0 });
   const hasMoved = useRef(false);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // Ignore clic droit et boutons de contrôle
     if (e.button !== 0 && e.pointerType === 'mouse') return;
     if ((e.target as HTMLElement).closest('.vcw-minimize-btn')) return;
 
     e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDragging(true); // MAJ de l'état
+    setIsDragging(true);
     hasMoved.current = false;
     dragStart.current = { x: e.clientX, y: e.clientY };
     initialOffset.current = { ...offset };
     
-    // Si tactile, on active aussi le hover pour le reflet
     if (e.pointerType === 'touch') setIsHovering(true);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return; // Lecture de l'état
+    if (!isDragging) return;
 
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
@@ -91,13 +88,12 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
       y: initialOffset.current.y + dy,
     });
 
-    // Effet tilt pendant le drag
     calcTilt(e.clientX, e.clientY);
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (isDragging) {
-      setIsDragging(false); // MAJ de l'état
+      setIsDragging(false);
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     if (e.pointerType === 'touch') {
@@ -106,7 +102,6 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
     }
   };
 
-  // Clic pour retourner (uniquement s'il n'y a pas eu de glissement)
   const handleCardClick = () => {
     if (!hasMoved.current) {
       setFlipped(f => !f);
@@ -153,16 +148,16 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         <style>{`
           .vcw-fab {
             position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-            background: linear-gradient(135deg, #00C6FF 0%, #0072FF 100%);
+            background: linear-gradient(135deg, #34D399 0%, #10B981 100%);
             color: #FFFFFF; border: 1px solid rgba(255,255,255,0.4);
             padding: 0.8rem 1.2rem; border-radius: 99px;
             font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700;
             display: flex; align-items: center; gap: 0.5rem; cursor: pointer;
-            box-shadow: 0 10px 25px rgba(0, 114, 255, 0.4);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
             animation: vcw-popin 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
             transition: transform 0.2s, box-shadow 0.2s;
           }
-          .vcw-fab:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(0, 114, 255, 0.5); }
+          .vcw-fab:hover { transform: translateY(-3px); box-shadow: 0 15px 30px rgba(16, 185, 129, 0.5); }
           @keyframes vcw-popin { from { opacity: 0; transform: scale(0.5); } to { opacity: 1; transform: scale(1); } }
         `}</style>
         <button className="vcw-fab" onClick={() => setIsMinimized(false)}>
@@ -229,14 +224,14 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden;
         }
 
-        /* ══ FRONT - ONDES MÉTALLIQUES BLEUES + SHIMMER ══════════════════════════════════════════ */
+        /* ══ FRONT - ONDES MÉTALLIQUES VERTES + SHIMMER ══════════════════════════════════════════ */
         .vcw-front {
-          background-color: #030B1E;
+          background-color: #021C11;
           background-image: 
-            radial-gradient(ellipse at 100% 0%, #00E1FF 0%, transparent 50%),
-            radial-gradient(ellipse at 0% 100%, #0044FF 0%, transparent 60%),
-            radial-gradient(ellipse at 50% 50%, #001144 0%, transparent 80%),
-            conic-gradient(from 180deg at 40% 60%, rgba(0,225,255,0.1) 0deg, rgba(0,68,255,0.4) 120deg, rgba(0,225,255,0.1) 240deg, transparent 360deg);
+            radial-gradient(ellipse at 100% 0%, #34D399 0%, transparent 50%),
+            radial-gradient(ellipse at 0% 100%, #059669 0%, transparent 60%),
+            radial-gradient(ellipse at 50% 50%, #064E3B 0%, transparent 80%),
+            conic-gradient(from 180deg at 40% 60%, rgba(52,211,153,0.1) 0deg, rgba(5,150,105,0.4) 120deg, rgba(52,211,153,0.1) 240deg, transparent 360deg);
           display: flex; flex-direction: column;
           padding: clamp(1rem, 4.5%, 1.4rem);
           box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset, 0 1px 2px rgba(255, 255, 255, 0.4) inset;
@@ -274,7 +269,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-logo-ring {
           width: 36px; height: 36px; border-radius: 50%;
           border: 2px solid rgba(255,255,255,0.8);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 15px rgba(0,225,255,0.5);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.4), 0 0 15px rgba(52,211,153,0.5);
           overflow: hidden; background: #fff;
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
@@ -294,10 +289,10 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
         .vcw-status.valid {
-          background: rgba(0, 225, 255, 0.15);
-          border: 1px solid rgba(0, 225, 255, 0.5);
-          color: #E0FFFF;
-          box-shadow: 0 0 15px rgba(0, 225, 255, 0.3) inset;
+          background: rgba(52, 211, 153, 0.15);
+          border: 1px solid rgba(52, 211, 153, 0.5);
+          color: #D1FAE5;
+          box-shadow: 0 0 15px rgba(52, 211, 153, 0.3) inset;
         }
         .vcw-status.invalid {
           background: rgba(239, 68, 68, 0.2);
@@ -376,10 +371,10 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         /* ══ BACK - ONDES SIMILAIRES ════════════════════════════════════════════ */
         .vcw-back {
           transform: rotateY(180deg);
-          background-color: #030B1E;
+          background-color: #021C11;
           background-image: 
-            radial-gradient(ellipse at 0% 0%, #0044FF 0%, transparent 60%),
-            radial-gradient(ellipse at 100% 100%, #00E1FF 0%, transparent 70%);
+            radial-gradient(ellipse at 0% 0%, #059669 0%, transparent 60%),
+            radial-gradient(ellipse at 100% 100%, #34D399 0%, transparent 70%);
           display: flex; flex-direction: column; align-items: center; justify-content: center;
           gap: clamp(0.8rem, 2.5%, 1rem); padding: clamp(1rem, 4.5%, 1.4rem);
           box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.2) inset;
@@ -396,7 +391,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         }
         .vcw-qr-card {
           background: rgba(255,255,255,0.95); border-radius: 12px; padding: clamp(10px, 3%, 14px);
-          box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 0 15px rgba(0,225,255,0.3);
+          box-shadow: 0 12px 32px rgba(0,0,0,0.6), 0 0 15px rgba(52,211,153,0.3);
           display: flex; align-items: center; justify-content: center; position: relative; z-index: 1;
           pointer-events: none;
         }
@@ -531,10 +526,9 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
               style={{
                 transform: cardTransform,
                 transition: transitionStyle,
-                // CORRECTION DE L'ERREUR ESLINT ICI (isDragging au lieu de isDragging.current)
                 filter: isHovering || isDragging
-                  ? 'drop-shadow(0 32px 40px rgba(0, 114, 255, 0.4))'
-                  : 'drop-shadow(0 20px 30px rgba(0, 114, 255, 0.2))',
+                  ? 'drop-shadow(0 32px 40px rgba(16, 185, 129, 0.4))'
+                  : 'drop-shadow(0 20px 30px rgba(16, 185, 129, 0.2))',
               }}
             >
               {/* FRONT */}
