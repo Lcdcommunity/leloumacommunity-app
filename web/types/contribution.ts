@@ -1,5 +1,6 @@
 //web/types/contribution.ts
-export type ContributionStatus = 'PENDING' | 'VALIDATED' | 'REJECTED' | 'CANCELLED';
+// On ajoute 'PENDING_VALIDATION' pour correspondre exactement à ce que renvoie le backend/Prisma
+export type ContributionStatus = 'PENDING' | 'PENDING_VALIDATION' | 'VALIDATED' | 'REJECTED' | 'CANCELLED';
 
 export interface Contribution {
   id: string;
@@ -9,6 +10,7 @@ export interface Contribution {
   amount: number;
   currency: string;
   method?: string | null;
+  purpose?: string | null; // Ajouté pour gérer les motifs (ex: MEMBERSHIP_CARD, REGULAR_QUOTA)
   status: ContributionStatus;
   depositedAt?: string | null;
   validatedAt?: string | null;
