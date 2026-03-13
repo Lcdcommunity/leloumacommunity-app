@@ -26,9 +26,9 @@ export default function MemberProjectProposalsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.listProjectProposals({
+      // Utilisation de listMyProjectProposals pour l'espace membre
+      const res = await api.listMyProjectProposals({
         page: 1, pageSize: 100,
-        // @ts-expect-error - status injection
         status: status || undefined,
       });
       setItems((res?.items as unknown as ProjectProposal[]) || []);
