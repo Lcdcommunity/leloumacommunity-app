@@ -52,7 +52,7 @@ export const api = {
     originSubPrefecture?: string;
     placeOfBirth?: string;
   }) =>
-    http<{ id: string; message: string; }, typeof body>('/public/signup', {
+    http<{ id: string; message: string }, typeof body>('/public/signup', {
       method: 'POST',
       body,
     }),
@@ -64,7 +64,7 @@ export const api = {
     }),
 
   listPublicAntennasForSignup: () =>
-    http<Array<{ id: string; code: string; name: string; city?: string; country?: string; }>>('/public/antennas'),
+    http<Array<{ id: string; code: string; name: string; city?: string; country?: string }>>('/public/antennas'),
 
   verifyPublicCard: (token: string) =>
     http<VirtualCardData>(`/public/cards/${token}`),
@@ -151,7 +151,7 @@ export const api = {
   // ASSOCIATION & ANTENNES (SUPER ADMIN)
   // ==========================================
   getAssociation: () => http<Association>('/associations/current'),
-  
+
   updateAssociation: (body: Partial<Association>) =>
     http<Association, Partial<Association>>('/associations/current', { method: 'PATCH', body }),
 
@@ -162,7 +162,7 @@ export const api = {
       }${typeof params?.isActive === 'boolean' ? `&isActive=${String(params.isActive)}` : ''}`
     ),
 
-  createAntenna: (body: { code: string; name: string; city?: string; country?: string; isActive?: boolean; }) => 
+  createAntenna: (body: { code: string; name: string; city?: string; country?: string; isActive?: boolean }) =>
     http<Antenna, typeof body>('/super-admin/antennas', { method: 'POST', body }),
 
   updateAntenna: (id: string, body: Partial<Antenna>) =>
@@ -177,13 +177,13 @@ export const api = {
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
 
-  createAntennaAdmin: (body: { antennaId: string; firstName: string; lastName: string; email: string; phone?: string; sendInvite?: boolean; }) => 
+  createAntennaAdmin: (body: { antennaId: string; firstName: string; lastName: string; email: string; phone?: string; sendInvite?: boolean }) =>
     http<UserSummary, typeof body>('/super-admin/admins', { method: 'POST', body }),
 
   // ==========================================
   // GESTION DES MEMBRES (SUPER ADMIN / ADMIN ANTENNE)
   // ==========================================
-  listMembers: (params?: { page?: number; pageSize?: number; q?: string; status?: string; antennaId?: string; }) =>
+  listMembers: (params?: { page?: number; pageSize?: number; q?: string; status?: string; antennaId?: string }) =>
     http<ApiListResponse<UserSummary>>(
       `/super-admin/members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
@@ -193,9 +193,10 @@ export const api = {
     ),
 
   approveMemberAccount: (userId: string) => http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),
-  rejectMemberAccount: (userId: string, reason?: string) => http(`/super-admin/users/${userId}/reject`, { method: 'PATCH', body: { reason } }),
+  rejectMemberAccount: (userId: string, reason?: string) =>
+    http(`/super-admin/users/${userId}/reject`, { method: 'PATCH', body: { reason } }),
 
-  listAntennaMembers: (params?: { page?: number; pageSize?: number; q?: string; status?: string; }) =>
+  listAntennaMembers: (params?: { page?: number; pageSize?: number; q?: string; status?: string }) =>
     http<ApiListResponse<UserSummary>>(
       `/admin/members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
@@ -208,7 +209,8 @@ export const api = {
     ),
 
   approveMemberAccountAntenna: (userId: string) => http(`/admin/member-approvals/${userId}/approve`, { method: 'PATCH' }),
-  rejectMemberAccountAntenna: (userId: string, reason?: string) => http(`/admin/member-approvals/${userId}/reject`, { method: 'PATCH', body: { reason } }),
+  rejectMemberAccountAntenna: (userId: string, reason?: string) =>
+    http(`/admin/member-approvals/${userId}/reject`, { method: 'PATCH', body: { reason } }),
 
   suspendUser: (id: string) => http(`/admin/members/${id}/suspend`, { method: 'PATCH' }),
   activateUser: (id: string) => http(`/admin/members/${id}/activate`, { method: 'PATCH' }),
@@ -231,7 +233,7 @@ export const api = {
   // ==========================================
   // GESTION DES COTISATIONS
   // ==========================================
-  listContributions: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string; memberId?: string; }) =>
+  listContributions: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string; memberId?: string }) =>
     http<ApiListResponse<Contribution>>(
       `/super-admin/contributions?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${params.status}` : ''
@@ -268,14 +270,14 @@ export const api = {
   }) =>
     http<Contribution, typeof body>('/member/contributions', { method: 'POST', body }),
 
-  listMyContributions: (params?: { page?: number; pageSize?: number; status?: string; }) =>
+  listMyContributions: (params?: { page?: number; pageSize?: number; status?: string }) =>
     http<ApiListResponse<Contribution>>(
       `/member/contributions?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
     ),
 
-  runContributionProjection: (body: { expectedMembersPaying: number; averageContribution: number; currency?: string; periodLabel?: string; }) =>
+  runContributionProjection: (body: { expectedMembersPaying: number; averageContribution: number; currency?: string; periodLabel?: string }) =>
     http<ProjectionResult, typeof body>('/admin/projections/contributions', { method: 'POST', body }),
 
   // ==========================================
@@ -295,7 +297,7 @@ export const api = {
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
 
-  createAntennaProject: (body: { title: string; description?: string; status?: string; budgetPlanned?: number; budgetSpent?: number; startsAt?: string | null; endsAt?: string | null; photoIds?: string[]; }) => 
+  createAntennaProject: (body: { title: string; description?: string; status?: string; budgetPlanned?: number; budgetSpent?: number; startsAt?: string | null; endsAt?: string | null; photoIds?: string[] }) =>
     http<Project, typeof body>('/admin/projects', { method: 'POST', body }),
 
   updateAntennaProject: (id: string, body: Partial<Project> & { photoIds?: string[] }) =>
@@ -311,6 +313,25 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
+
+  listProjectProposals: (params?: { page?: number; pageSize?: number; status?: string }) =>
+    http<ApiListResponse<ProjectProposal>>(
+      `/admin/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }`
+    ),
+
+  approveProjectProposal: (id: string, body?: { reviewComment?: string }) =>
+    http<ProjectProposal, { reviewComment?: string }>(`/admin/project-proposals/${id}/approve`, {
+      method: 'PATCH',
+      body: body ?? {},
+    }),
+
+  rejectProjectProposal: (id: string, body?: { reviewComment?: string }) =>
+    http<ProjectProposal, { reviewComment?: string }>(`/admin/project-proposals/${id}/reject`, {
+      method: 'PATCH',
+      body: body ?? {},
+    }),
 
   createProjectProposalMember: (body: {
     title: string;
@@ -346,7 +367,7 @@ export const api = {
       }`
     ),
 
-  createAntennaDocument: (body: { title: string; description?: string; fileAssetId?: string | null; }) => 
+  createAntennaDocument: (body: { title: string; description?: string; fileAssetId?: string | null }) =>
     http<DocumentItem, typeof body>('/admin/documents', { method: 'POST', body }),
 
   updateAntennaDocument: (id: string, body: Partial<DocumentItem>) =>
@@ -368,7 +389,7 @@ export const api = {
       }${params?.status ? `&status=${encodeURIComponent(params.status)}` : ''}`
     ),
 
-  createAntennaContent: (body: { title: string; body?: string; content?: string; status?: string; coverImageFileId?: string | null; }) => 
+  createAntennaContent: (body: { title: string; body?: string; content?: string; status?: string; coverImageFileId?: string | null }) =>
     http<ContentPost, typeof body>('/admin/contents', { method: 'POST', body }),
 
   updateAntennaContent: (id: string, body: Partial<ContentPost>) =>
@@ -400,13 +421,13 @@ export const api = {
     });
   },
 
-  listNotifications: (params?: { page?: number; pageSize?: number }) => 
+  listNotifications: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<NotificationItem>>(`/notifications?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
 
   listMyNotifications: () =>
     http<ApiListResponse<NotificationItem>>('/member/notifications?page=1&pageSize=100'),
 
-  markNotificationRead: (id: string) => 
+  markNotificationRead: (id: string) =>
     http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
 
   listAudit: (params?: { page?: number; pageSize?: number; action?: string }) =>
