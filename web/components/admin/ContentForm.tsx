@@ -1,4 +1,5 @@
 //web/components/admin/ContentForm.tsx
+//web/components/admin/ContentForm.tsx
 'use client';
 
 import { FormEvent, useState } from 'react';
@@ -52,7 +53,7 @@ export function ContentForm({
         title,
         body,
         status,
-        coverFileAssetId,
+        coverImageFileId: coverFileAssetId, // <-- CORRECTION ICI
       });
       setTitle('');
       setBody('');

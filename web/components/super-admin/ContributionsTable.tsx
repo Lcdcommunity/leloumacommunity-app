@@ -1,10 +1,12 @@
 //web/components/super-admin/ContributionsTable.tsx
+//web/components/super-admin/ContributionsTable.tsx
 'use client';
 
 import type { Contribution, ContributionStatus } from '../../types/contribution';
 
 const statusLabels: Record<ContributionStatus, string> = {
   PENDING: 'En attente',
+  PENDING_VALIDATION: 'En attente de validation', // <-- CORRECTION ICI
   VALIDATED: 'Validée',
   REJECTED: 'Rejetée',
   CANCELLED: 'Annulée',

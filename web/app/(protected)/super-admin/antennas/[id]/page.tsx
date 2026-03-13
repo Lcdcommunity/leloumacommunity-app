@@ -108,7 +108,6 @@ export default function EditAntennaPage() {
             ) : antenna ? (
               <AntennaForm
                 initialValues={{
-                  code: antenna.code,
                   name: antenna.name,
                   city: antenna.city || '',
                   country: antenna.country || '',

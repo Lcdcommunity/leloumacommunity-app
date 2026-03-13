@@ -1,4 +1,5 @@
 // web/components/member/ProjectProposalForm.tsx
+// web/components/member/ProjectProposalForm.tsx
 'use client';
 
 import { FormEvent, useState } from 'react';
@@ -48,7 +49,8 @@ export function ProjectProposalForm({
     setError(null);
 
     try {
-      await api.createProjectProposal({
+      // CORRECTION : Appel à la bonne méthode de l'API (createProjectProposalMember)
+      await api.createProjectProposalMember({
         title,
         description,
         expectedBudget: expectedBudget ? Number(expectedBudget) : undefined,
