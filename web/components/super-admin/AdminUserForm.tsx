@@ -2,8 +2,8 @@
 'use client';
 
 import { type FormEvent, useEffect, useState } from 'react';
-import { api } from '../../lib/api-client';
 import type { Antenna } from '../../types/antenna';
+import { superAdminApi } from '../../lib/super-admin-api';
 
 export type AdminFormValues = {
   antennaId: string;
@@ -11,6 +11,13 @@ export type AdminFormValues = {
   lastName: string;
   email: string;
   phone?: string;
+  associationTitle?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  postalCode?: string;
+  city?: string;
+  country?: string;
+  originSubPrefecture?: string;
   sendInvite: boolean;
 };
 
@@ -29,6 +36,24 @@ interface FieldProps {
   hint?: string;
 }
 
+const ASSOCIATION_TITLES = [
+  'Président',
+  'Vice-président',
+  'Secrétaire général',
+  'Secrétaire adjoint',
+  "Secrétaire à l'information",
+  "Secrétaire à l'organisation",
+  'Trésorier',
+  'Trésorier adjoint',
+  'Responsable jeunesse',
+  'Responsable des femmes',
+  'Coordinateur',
+  'Conseiller',
+  'Chargé de mission',
+  'Commissaire aux comptes',
+  'Autre',
+];
+
 function Field({
   label,
   type = 'text',
@@ -42,21 +67,10 @@ function Field({
 
   return (
     <div style={{ flex: 1, minWidth: '220px' }}>
-      <label
-        style={{
-          display: 'block',
-          fontSize: '.72rem',
-          fontWeight: 900,
-          color: '#374151',
-          letterSpacing: '.07em',
-          textTransform: 'uppercase',
-          marginBottom: '.45rem',
-        }}
-      >
+      <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
         {label}
         {required && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
       </label>
-
       <input
         type={type}
         value={value}
@@ -82,20 +96,7 @@ function Field({
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
       />
-
-      {hint && (
-        <p
-          style={{
-            marginTop: '.35rem',
-            fontSize: '.71rem',
-            fontWeight: 600,
-            color: '#9CA3AF',
-            lineHeight: 1.4,
-          }}
-        >
-          {hint}
-        </p>
-      )}
+      {hint && <p style={{ marginTop: '.35rem', fontSize: '.71rem', fontWeight: 600, color: '#9CA3AF', lineHeight: 1.4 }}>{hint}</p>}
     </div>
   );
 }
@@ -110,6 +111,13 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [associationTitle, setAssociationTitle] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
+  const [country, setCountry] = useState('France');
+  const [originSubPrefecture, setOriginSubPrefecture] = useState('');
   const [sendInvite, setSendInvite] = useState(true);
 
   useEffect(() => {
@@ -120,34 +128,19 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
       setLoadError(null);
 
       try {
-        const res = await api.listAntennas({ pageSize: 100, isActive: true });
+        const res = await superAdminApi.listAntennas({ pageSize: 100, isActive: true });
         if (cancelled) return;
-
         setAntennas(res.items);
         setAntennaId(res.items[0]?.id ?? '');
-        return;
-      } catch (primaryError) {
-        console.warn('Chargement filtré des antennes impossible, fallback sans filtre.', primaryError);
-      }
-
-      try {
-        const res = await api.listAntennas({ pageSize: 100 });
-        if (cancelled) return;
-
-        const activeItems = res.items.filter((item) => item.isActive);
-        setAntennas(activeItems);
-        setAntennaId(activeItems[0]?.id ?? '');
-      } catch (fallbackError) {
-        console.error('Erreur lors du chargement des antennes :', fallbackError);
+      } catch (err) {
+        console.error(err);
         if (!cancelled) {
+          setLoadError("Impossible de charger la liste des antennes.");
           setAntennas([]);
           setAntennaId('');
-          setLoadError("Impossible de charger la liste des antennes.");
         }
       } finally {
-        if (!cancelled) {
-          setLoadingAntennas(false);
-        }
+        if (!cancelled) setLoadingAntennas(false);
       }
     }
 
@@ -172,39 +165,29 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
       lastName,
       email,
       phone: phone || undefined,
+      associationTitle: associationTitle || undefined,
+      addressLine1: addressLine1 || undefined,
+      addressLine2: addressLine2 || undefined,
+      postalCode: postalCode || undefined,
+      city: city || undefined,
+      country: country || undefined,
+      originSubPrefecture: originSubPrefecture || undefined,
       sendInvite,
     });
   };
 
-  const submitDisabled =
-    busy || loadingAntennas || antennas.length === 0 || !!loadError;
-
   return (
-    <form
-      onSubmit={(e) => void handleSubmit(e)}
-      style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
-    >
+    <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       <div>
-        <label
-          style={{
-            display: 'block',
-            fontSize: '.72rem',
-            fontWeight: 900,
-            color: '#374151',
-            letterSpacing: '.07em',
-            textTransform: 'uppercase',
-            marginBottom: '.45rem',
-          }}
-        >
+        <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
           Antenne assign&eacute;e <span style={{ color: '#DC2626' }}>*</span>
         </label>
-
         <div style={{ position: 'relative' }}>
           <select
             value={antennaId}
             onChange={(e) => setAntennaId(e.target.value)}
             required
-            disabled={loadingAntennas || busy || antennas.length === 0}
+            disabled={loadingAntennas || busy}
             style={{
               width: '100%',
               height: 42,
@@ -220,20 +203,14 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
               outline: 'none',
               appearance: 'none',
               cursor: 'pointer',
-              backgroundImage:
-                `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236B7280' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236B7280' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'right .8rem center',
             }}
           >
             <option value="" disabled>
-              {loadingAntennas
-                ? 'Chargement des antennes...'
-                : antennas.length === 0
-                  ? 'Aucune antenne disponible'
-                  : 'S&eacute;lectionnez une antenne'}
+              {loadingAntennas ? 'Chargement des antennes...' : 'Sélectionnez une antenne'}
             </option>
-
             {antennas.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name} ({a.code})
@@ -241,94 +218,72 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
             ))}
           </select>
         </div>
-
-        {loadError && (
-          <p
-            style={{
-              marginTop: '.45rem',
-              fontSize: '.74rem',
-              fontWeight: 700,
-              color: '#B91C1C',
-            }}
-          >
-            {loadError}
-          </p>
-        )}
+        {loadError && <p style={{ marginTop: '.45rem', fontSize: '.74rem', fontWeight: 700, color: '#B91C1C' }}>{loadError}</p>}
       </div>
 
       <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-        <Field
-          label="Pr&eacute;nom"
-          value={firstName}
-          onChange={setFirstName}
-          placeholder="Ex: Jean"
-          required
-        />
-        <Field
-          label="Nom"
-          value={lastName}
-          onChange={setLastName}
-          placeholder="Ex: Dupont"
-          required
-        />
+        <Field label="Pr&eacute;nom" value={firstName} onChange={setFirstName} placeholder="Ex: Jean" required />
+        <Field label="Nom" value={lastName} onChange={setLastName} placeholder="Ex: Dupont" required />
       </div>
 
       <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-        <Field
-          type="email"
-          label="Adresse Email"
-          value={email}
-          onChange={setEmail}
-          placeholder="jean.dupont@email.com"
-          required
-          hint="L'invitation sera envoy&eacute;e &agrave; cette adresse."
-        />
-        <Field
-          type="tel"
-          label="T&eacute;l&eacute;phone"
-          value={phone}
-          onChange={setPhone}
-          placeholder="+33 6 00 00 00 00"
-          hint="Optionnel"
-        />
+        <Field type="email" label="Adresse Email" value={email} onChange={setEmail} placeholder="jean.dupont@email.com" required hint="L'invitation et le mot de passe provisoire seront envoyés à cette adresse." />
+        <Field type="tel" label="T&eacute;l&eacute;phone" value={phone} onChange={setPhone} placeholder="+33 6 00 00 00 00" />
       </div>
 
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          padding: '1rem 1.1rem',
-          background: 'rgba(239,246,255,.4)',
-          border: '1px solid rgba(37,99,235,.15)',
-          borderRadius: '12px',
-          marginTop: '.5rem',
-        }}
-      >
+      <div>
+        <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
+          Fonction dans l&apos;association
+        </label>
+        <select
+          value={associationTitle}
+          onChange={(e) => setAssociationTitle(e.target.value)}
+          style={{
+            width: '100%',
+            height: 42,
+            borderRadius: 11,
+            boxSizing: 'border-box',
+            border: '1.5px solid rgba(37,99,235,.18)',
+            background: 'rgba(255,255,255,.88)',
+            padding: '0 .95rem',
+            fontFamily: "'DM Sans',sans-serif",
+            fontSize: '.86rem',
+            fontWeight: 700,
+            color: '#111827',
+            outline: 'none',
+          }}
+        >
+          <option value="">Sélectionnez une fonction</option>
+          {ASSOCIATION_TITLES.map((title) => (
+            <option key={title} value={title}>
+              {title}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+        <Field label="Adresse complète" value={addressLine1} onChange={setAddressLine1} placeholder="Ex: 12 rue de Paris" />
+        <Field label="Compl&eacute;ment d&apos;adresse" value={addressLine2} onChange={setAddressLine2} placeholder="Bâtiment, étage, quartier..." />
+      </div>
+
+      <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+        <Field label="Code postal" value={postalCode} onChange={setPostalCode} placeholder="75000" />
+        <Field label="Ville" value={city} onChange={setCity} placeholder="Paris" />
+      </div>
+
+      <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+        <Field label="Pays" value={country} onChange={setCountry} placeholder="France" />
+        <Field label="Ville d'origine" value={originSubPrefecture} onChange={setOriginSubPrefecture} placeholder="Ex: Labé, Kindia, Dakar..." />
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.1rem', background: 'rgba(239,246,255,.4)', border: '1px solid rgba(37,99,235,.15)', borderRadius: '12px', marginTop: '.5rem' }}>
         <div>
-          <div
-            style={{
-              fontSize: '.84rem',
-              fontWeight: 800,
-              color: '#111827',
-              marginBottom: '.15rem',
-            }}
-          >
-            Envoyer l&apos;email d&apos;invitation
-          </div>
-          <div
-            style={{
-              fontSize: '.72rem',
-              fontWeight: 600,
-              color: '#6B7280',
-              lineHeight: 1.4,
-            }}
-          >
-            L&apos;utilisateur recevra un lien pour d&eacute;finir son mot de passe.
+          <div style={{ fontSize: '.84rem', fontWeight: 800, color: '#111827', marginBottom: '.15rem' }}>Envoyer l&apos;email d&apos;invitation</div>
+          <div style={{ fontSize: '.72rem', fontWeight: 600, color: '#6B7280', lineHeight: 1.4 }}>
+            L&apos;utilisateur recevra son mot de passe provisoire et devra le modifier à la première connexion.
           </div>
         </div>
-
         <button
           type="button"
           role="switch"
@@ -347,34 +302,14 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
             boxShadow: sendInvite ? '0 2px 8px rgba(37,99,235,.35)' : 'none',
           }}
         >
-          <span
-            style={{
-              position: 'absolute',
-              top: 3,
-              left: sendInvite ? 23 : 3,
-              width: 18,
-              height: 18,
-              borderRadius: '50%',
-              background: 'white',
-              transition: 'left .22s cubic-bezier(.22,1,.36,1)',
-              boxShadow: '0 1px 4px rgba(0,0,0,.18)',
-            }}
-          />
+          <span style={{ position: 'absolute', top: 3, left: sendInvite ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: 'white', transition: 'left .22s cubic-bezier(.22,1,.36,1)', boxShadow: '0 1px 4px rgba(0,0,0,.18)' }} />
         </button>
       </div>
 
-      <div
-        style={{
-          paddingTop: '1rem',
-          borderTop: '1px solid rgba(37,99,235,.1)',
-          marginTop: '.5rem',
-          display: 'flex',
-          justifyContent: 'flex-end',
-        }}
-      >
+      <div style={{ paddingTop: '1rem', borderTop: '1px solid rgba(37,99,235,.1)', marginTop: '.5rem', display: 'flex', justifyContent: 'flex-end' }}>
         <button
           type="submit"
-          disabled={submitDisabled}
+          disabled={busy || loadingAntennas}
           style={{
             height: 44,
             padding: '0 1.5rem',
@@ -382,7 +317,7 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
             background: 'linear-gradient(135deg,#1D4ED8,#2563EB)',
             border: 'none',
             color: 'white',
-            cursor: submitDisabled ? 'not-allowed' : 'pointer',
+            cursor: 'pointer',
             fontFamily: "'DM Sans',sans-serif",
             fontSize: '.86rem',
             fontWeight: 800,
@@ -391,38 +326,18 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
             gap: '.5rem',
             boxShadow: '0 4px 14px rgba(37,99,235,.32)',
             transition: 'all .18s',
-            opacity: submitDisabled ? 0.6 : 1,
+            opacity: (busy || loadingAntennas) ? 0.6 : 1,
           }}
         >
           {busy ? (
             <>
-              <div
-                style={{
-                  width: 14,
-                  height: 14,
-                  border: '2px solid rgba(255,255,255,.3)',
-                  borderTopColor: 'white',
-                  borderRadius: '50%',
-                  animation: 'sadnpulse 1s linear infinite',
-                }}
-              />
+              <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'sadnpulse 1s linear infinite' }} />
               Cr&eacute;ation&#8230;
             </>
           ) : (
             <>
-              <svg
-                width="14"
-                height="14"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
               Cr&eacute;er le compte admin
             </>

@@ -19,7 +19,6 @@ export class PaginationQueryDto {
   @IsString()
   q?: string;
 
-  // 👇 AJOUT CHIRURGICAL ICI 👇
   @IsOptional()
   @IsString()
   status?: string;

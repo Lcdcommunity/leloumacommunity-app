@@ -8,47 +8,235 @@ import type { Contribution, ContributionStatus } from '../../../../../types/cont
 import { formatDate } from '../../../../../lib/format';
 
 type ModalType = 'validate' | 'reject' | 'edit' | null;
-interface ModalState { type: ModalType; contribution: Contribution | null }
+
+interface ModalState {
+  type: ModalType;
+  contribution: Contribution | null;
+}
+
+type StatusMeta = {
+  label: string;
+  color: string;
+  bg: string;
+  border: string;
+};
 
 function memberName(c: Contribution): string {
-  return c.member ? `${c.member.firstName} ${c.member.lastName}`.trim() : c.memberId;
+  if (c.member) {
+    const firstName =
+      'firstName' in c.member && typeof c.member.firstName === 'string'
+        ? c.member.firstName
+        : '';
+    const lastName =
+      'lastName' in c.member && typeof c.member.lastName === 'string'
+        ? c.member.lastName
+        : '';
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    if (fullName) return fullName;
+  }
+
+  if ('memberId' in c && typeof c.memberId === 'string') {
+    return c.memberId;
+  }
+
+  if ('memberUserId' in c && typeof c.memberUserId === 'string') {
+    return c.memberUserId;
+  }
+
+  return c.id;
+}
+
+function getStatusMeta(status: ContributionStatus | string): StatusMeta {
+  const map: Partial<Record<ContributionStatus | string, StatusMeta>> = {
+    DRAFT: {
+      label: 'Brouillon',
+      color: '#6B7280',
+      bg: '#F3F4F6',
+      border: '#E5E7EB',
+    },
+    SUBMITTED: {
+      label: 'Soumise',
+      color: '#2563EB',
+      bg: '#EFF6FF',
+      border: '#BFDBFE',
+    },
+    PENDING_VALIDATION: {
+      label: 'En attente',
+      color: '#D97706',
+      bg: '#FFFBEB',
+      border: '#FDE68A',
+    },
+    PENDING: {
+      label: 'En attente',
+      color: '#D97706',
+      bg: '#FFFBEB',
+      border: '#FDE68A',
+    },
+    VALIDATED: {
+      label: 'Validée',
+      color: '#059669',
+      bg: '#ECFDF5',
+      border: '#A7F3D0',
+    },
+    REJECTED: {
+      label: 'Rejetée',
+      color: '#DC2626',
+      bg: '#FEF2F2',
+      border: '#FECACA',
+    },
+    CANCELLED: {
+      label: 'Annulée',
+      color: '#6B7280',
+      bg: '#F3F4F6',
+      border: '#E5E7EB',
+    },
+  };
+
+  return (
+    map[status] ?? {
+      label: String(status ?? 'Inconnu'),
+      color: '#6B7280',
+      bg: '#F3F4F6',
+      border: '#E5E7EB',
+    }
+  );
 }
 
 function StatusBadge({ status }: { status: ContributionStatus }) {
-  const map: Record<ContributionStatus, { label: string; color: string; bg: string; border: string }> = {
-    VALIDATED: { label: 'Valid\u00e9e',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    REJECTED:  { label: 'Rejet\u00e9e', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-    PENDING:   { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-    CANCELLED: { label: 'Annul\u00e9e', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  };
-  const s = map[status];
+  const s = getStatusMeta(status);
+
   return (
-    <span style={{ display:'inline-flex', alignItems:'center', gap:'0.28rem', fontSize:'0.69rem', fontWeight:800, letterSpacing:'0.03em', color:s.color, background:s.bg, border:`1px solid ${s.border}`, borderRadius:99, padding:'0.22rem 0.6rem', whiteSpace:'nowrap' }}>
-      <span style={{ width:6, height:6, borderRadius:'50%', background:s.color, flexShrink:0 }} />{s.label}
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.28rem',
+        fontSize: '0.69rem',
+        fontWeight: 800,
+        letterSpacing: '0.03em',
+        color: s.color,
+        background: s.bg,
+        border: `1px solid ${s.border}`,
+        borderRadius: 99,
+        padding: '0.22rem 0.6rem',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: '50%',
+          background: s.color,
+          flexShrink: 0,
+        }}
+      />
+      {s.label}
     </span>
   );
 }
 
 function AmountPill({ amount }: { amount: number }) {
   return (
-    <span style={{ display:'inline-block', fontFamily:"'DM Mono',monospace", fontSize:'0.84rem', fontWeight:700, color:'#0F172A', background:'#F0F9FF', border:'1px solid #BAE6FD', borderRadius:8, padding:'0.18rem 0.55rem' }}>
-      {amount.toLocaleString('fr-FR', { minimumFractionDigits:0 })}{' '}<span style={{ fontSize:'0.7rem', color:'#0369A1', fontWeight:600 }}>GNF</span>
+    <span
+      style={{
+        display: 'inline-block',
+        fontFamily: "'DM Mono', monospace",
+        fontSize: '0.84rem',
+        fontWeight: 700,
+        color: '#0F172A',
+        background: '#F0F9FF',
+        border: '1px solid #BAE6FD',
+        borderRadius: 8,
+        padding: '0.18rem 0.55rem',
+      }}
+    >
+      {amount.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}{' '}
+      <span style={{ fontSize: '0.7rem', color: '#0369A1', fontWeight: 600 }}>
+        GNF
+      </span>
     </span>
   );
 }
 
-/* ── Modal (ESLint fix: getInitial via useCallback, pas de setState sync) ── */
-function Modal({ modal, onClose, onConfirm, busy }: { modal: ModalState; onClose: () => void; onConfirm: (v: string) => void; busy: boolean }) {
-  const getInitial = useCallback((m: ModalState) => m.type === 'edit' ? String(m.contribution?.amount ?? '') : '', []);
+function Modal({
+  modal,
+  onClose,
+  onConfirm,
+  busy,
+}: {
+  modal: ModalState;
+  onClose: () => void;
+  onConfirm: (v: string) => void;
+  busy: boolean;
+}) {
+  const getInitial = useCallback(
+    (m: ModalState) => (m.type === 'edit' ? String(m.contribution?.amount ?? '') : ''),
+    [],
+  );
+
   const [value, setValue] = useState(() => getInitial(modal));
-  useEffect(() => { setValue(getInitial(modal)); }, [modal, getInitial]);
+
+  useEffect(() => {
+    setValue(getInitial(modal));
+  }, [modal, getInitial]);
 
   if (!modal.type || !modal.contribution) return null;
 
   const configs = {
-    validate: { title:'Valider la cotisation', icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>, iconBg:'#ECFDF5', label:'Note interne', placeholder:'Note de validation (optionnel)\u2026', cta:'Confirmer la validation', ctaGrad:'linear-gradient(135deg,#059669,#10B981)', ctaShadow:'rgba(5,150,105,0.3)', ib:'rgba(5,150,105,0.25)', ibg:'rgba(236,253,245,0.5)' },
-    reject:   { title:'Rejeter la cotisation',  icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>, iconBg:'#FEF2F2', label:'Motif du rejet', placeholder:'Motif du rejet (obligatoire)\u2026', cta:'Confirmer le rejet', ctaGrad:'linear-gradient(135deg,#B91C1C,#DC2626)', ctaShadow:'rgba(220,38,38,0.3)', ib:'rgba(220,38,38,0.25)', ibg:'rgba(254,242,242,0.5)' },
-    edit:     { title:'Modifier le montant',    icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>, iconBg:'#EFF6FF', label:'Nouveau montant (GNF)', placeholder:'', cta:'Enregistrer', ctaGrad:'linear-gradient(135deg,#1D4ED8,#2563EB)', ctaShadow:'rgba(37,99,235,0.3)', ib:'rgba(37,99,235,0.25)', ibg:'rgba(239,246,255,0.5)' },
+    validate: {
+      title: 'Valider la cotisation',
+      icon: (
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      iconBg: '#ECFDF5',
+      label: 'Note interne',
+      placeholder: 'Note de validation (optionnel)…',
+      cta: 'Confirmer la validation',
+      ctaGrad: 'linear-gradient(135deg,#059669,#10B981)',
+      ctaShadow: 'rgba(5,150,105,0.3)',
+      ib: 'rgba(5,150,105,0.25)',
+      ibg: 'rgba(236,253,245,0.5)',
+    },
+    reject: {
+      title: 'Rejeter la cotisation',
+      icon: (
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      ),
+      iconBg: '#FEF2F2',
+      label: 'Motif du rejet',
+      placeholder: 'Motif du rejet (obligatoire)…',
+      cta: 'Confirmer le rejet',
+      ctaGrad: 'linear-gradient(135deg,#B91C1C,#DC2626)',
+      ctaShadow: 'rgba(220,38,38,0.3)',
+      ib: 'rgba(220,38,38,0.25)',
+      ibg: 'rgba(254,242,242,0.5)',
+    },
+    edit: {
+      title: 'Modifier le montant',
+      icon: (
+        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+          />
+        </svg>
+      ),
+      iconBg: '#EFF6FF',
+      label: 'Nouveau montant (GNF)',
+      placeholder: '',
+      cta: 'Enregistrer',
+      ctaGrad: 'linear-gradient(135deg,#1D4ED8,#2563EB)',
+      ctaShadow: 'rgba(37,99,235,0.3)',
+      ib: 'rgba(37,99,235,0.25)',
+      ibg: 'rgba(239,246,255,0.5)',
+    },
   } as const;
 
   const cfg = configs[modal.type];
@@ -56,28 +244,194 @@ function Modal({ modal, onClose, onConfirm, busy }: { modal: ModalState; onClose
 
   return (
     <>
-      <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', zIndex:100 }} onClick={onClose} />
-      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:101, background:'rgba(255,255,255,0.97)', backdropFilter:'blur(18px)', borderRadius:20, padding:'clamp(1.5rem,4vw,2rem)', width:'min(460px,calc(100vw - 2rem))', border:'1px solid rgba(37,99,235,0.1)', boxShadow:'0 24px 60px rgba(37,99,235,0.14)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.4rem' }}>
-          <div style={{ width:42, height:42, borderRadius:12, background:cfg.iconBg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>{cfg.icon}</div>
-          <h2 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:'1.3rem', fontWeight:600, color:'#111827' }}>{cfg.title}</h2>
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15,23,42,0.45)',
+          backdropFilter: 'blur(4px)',
+          zIndex: 100,
+        }}
+        onClick={onClose}
+      />
+      <div
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%,-50%)',
+          zIndex: 101,
+          background: 'rgba(255,255,255,0.97)',
+          backdropFilter: 'blur(18px)',
+          borderRadius: 20,
+          padding: 'clamp(1.5rem,4vw,2rem)',
+          width: 'min(460px,calc(100vw - 2rem))',
+          border: '1px solid rgba(37,99,235,0.1)',
+          boxShadow: '0 24px 60px rgba(37,99,235,0.14)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
+          <div
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 12,
+              background: cfg.iconBg,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            {cfg.icon}
+          </div>
+          <h2
+            style={{
+              fontFamily: "'Cormorant Garamond',serif",
+              fontSize: '1.3rem',
+              fontWeight: 600,
+              color: '#111827',
+            }}
+          >
+            {cfg.title}
+          </h2>
         </div>
-        <div style={{ background:'#F8FAFC', borderRadius:10, padding:'0.65rem 0.9rem', marginBottom:'1.1rem', border:'1px solid #E2E8F0' }}>
-          <span style={{ fontSize:'0.75rem', fontWeight:700, color:'#6B7280' }}>Membre :</span>
-          <span style={{ fontSize:'0.82rem', fontWeight:700, color:'#111827', marginLeft:'0.4rem' }}>{memberName(modal.contribution)}</span>
-          <span style={{ marginLeft:'0.75rem', fontSize:'0.75rem', fontWeight:700, color:'#6B7280' }}>Montant :</span>
-          <span style={{ marginLeft:'0.4rem' }}><AmountPill amount={modal.contribution.amount} /></span>
+
+        <div
+          style={{
+            background: '#F8FAFC',
+            borderRadius: 10,
+            padding: '0.65rem 0.9rem',
+            marginBottom: '1.1rem',
+            border: '1px solid #E2E8F0',
+          }}
+        >
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280' }}>Membre :</span>
+          <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827', marginLeft: '0.4rem' }}>
+            {memberName(modal.contribution)}
+          </span>
+          <span style={{ marginLeft: '0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#6B7280' }}>
+            Montant :
+          </span>
+          <span style={{ marginLeft: '0.4rem' }}>
+            <AmountPill amount={modal.contribution.amount} />
+          </span>
         </div>
-        <label style={{ fontSize:'0.73rem', fontWeight:700, color:'#374151', display:'block', marginBottom:'0.35rem', letterSpacing:'0.04em', textTransform:'uppercase' }}>{cfg.label}</label>
-        {modal.type === 'edit'
-          ? <input type="number" min="1" value={value} onChange={e => setValue(e.target.value)} style={{ width:'100%', height:44, borderRadius:11, padding:'0 1rem', border:`1px solid ${cfg.ib}`, background:cfg.ibg, fontFamily:"'DM Mono',monospace", fontSize:'0.9rem', fontWeight:600, color:'#0F172A', outline:'none' }} />
-          : <textarea value={value} onChange={e => setValue(e.target.value)} placeholder={cfg.placeholder} rows={3} style={{ width:'100%', borderRadius:11, padding:'0.7rem 1rem', border:`1px solid ${cfg.ib}`, background:cfg.ibg, fontFamily:"'DM Sans',sans-serif", fontSize:'0.84rem', color:'#111827', outline:'none', resize:'vertical' }} />
-        }
-        {modal.type === 'reject' && !value.trim() && <p style={{ fontSize:'0.69rem', color:'#DC2626', fontWeight:600, marginTop:'0.3rem' }}>Le motif est obligatoire pour rejeter.</p>}
-        <div style={{ display:'flex', gap:'0.6rem', marginTop:'1.1rem', justifyContent:'flex-end' }}>
-          <button onClick={onClose} disabled={busy} style={{ height:42, padding:'0 1.1rem', borderRadius:10, border:'1px solid rgba(37,99,235,0.15)', background:'rgba(249,250,251,0.9)', fontFamily:"'DM Sans',sans-serif", fontSize:'0.8rem', fontWeight:600, color:'#374151', cursor:'pointer' }}>Annuler</button>
-          <button onClick={() => onConfirm(value)} disabled={busy || !canConfirm} style={{ height:42, padding:'0 1.25rem', borderRadius:10, border:'none', background:cfg.ctaGrad, fontFamily:"'DM Sans',sans-serif", fontSize:'0.8rem', fontWeight:700, color:'white', cursor:'pointer', boxShadow:`0 4px 12px ${cfg.ctaShadow}`, opacity:(busy||!canConfirm)?0.6:1, display:'flex', alignItems:'center', gap:'0.4rem' }}>
-            {busy && <div style={{ width:13, height:13, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', animation:'achspin 0.7s linear infinite' }} />}
+
+        <label
+          style={{
+            fontSize: '0.73rem',
+            fontWeight: 700,
+            color: '#374151',
+            display: 'block',
+            marginBottom: '0.35rem',
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {cfg.label}
+        </label>
+
+        {modal.type === 'edit' ? (
+          <input
+            type="number"
+            min="1"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            style={{
+              width: '100%',
+              height: 44,
+              borderRadius: 11,
+              padding: '0 1rem',
+              border: `1px solid ${cfg.ib}`,
+              background: cfg.ibg,
+              fontFamily: "'DM Mono',monospace",
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              color: '#0F172A',
+              outline: 'none',
+            }}
+          />
+        ) : (
+          <textarea
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder={cfg.placeholder}
+            rows={3}
+            style={{
+              width: '100%',
+              borderRadius: 11,
+              padding: '0.7rem 1rem',
+              border: `1px solid ${cfg.ib}`,
+              background: cfg.ibg,
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: '0.84rem',
+              color: '#111827',
+              outline: 'none',
+              resize: 'vertical',
+            }}
+          />
+        )}
+
+        {modal.type === 'reject' && !value.trim() && (
+          <p style={{ fontSize: '0.69rem', color: '#DC2626', fontWeight: 600, marginTop: '0.3rem' }}>
+            Le motif est obligatoire pour rejeter.
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.1rem', justifyContent: 'flex-end' }}>
+          <button
+            onClick={onClose}
+            disabled={busy}
+            style={{
+              height: 42,
+              padding: '0 1.1rem',
+              borderRadius: 10,
+              border: '1px solid rgba(37,99,235,0.15)',
+              background: 'rgba(249,250,251,0.9)',
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              color: '#374151',
+              cursor: 'pointer',
+            }}
+          >
+            Annuler
+          </button>
+
+          <button
+            onClick={() => onConfirm(value)}
+            disabled={busy || !canConfirm}
+            style={{
+              height: 42,
+              padding: '0 1.25rem',
+              borderRadius: 10,
+              border: 'none',
+              background: cfg.ctaGrad,
+              fontFamily: "'DM Sans',sans-serif",
+              fontSize: '0.8rem',
+              fontWeight: 700,
+              color: 'white',
+              cursor: 'pointer',
+              boxShadow: `0 4px 12px ${cfg.ctaShadow}`,
+              opacity: busy || !canConfirm ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+            }}
+          >
+            {busy && (
+              <div
+                style={{
+                  width: 13,
+                  height: 13,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: 'white',
+                  borderRadius: '50%',
+                  animation: 'achspin 0.7s linear infinite',
+                }}
+              />
+            )}
             {cfg.cta}
           </button>
         </div>
@@ -86,66 +440,140 @@ function Modal({ modal, onClose, onConfirm, busy }: { modal: ModalState; onClose
   );
 }
 
-/* ── Page ── */
 export default function AdminContributionsHistoryPage() {
-  const [items,   setItems]   = useState<Contribution[]>([]);
-  const [status,  setStatus]  = useState('');
-  const [q,       setQ]       = useState('');
-  const [busyId,  setBusyId]  = useState<string | null>(null);
-  const [error,   setError]   = useState<string | null>(null);
+  const [items, setItems] = useState<Contribution[]>([]);
+  const [status, setStatus] = useState('');
+  const [q, setQ] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState<ModalState>({ type: null, contribution: null });
+  const [modal, setModal] = useState<ModalState>({ type: null, contribution: null });
 
   const load = useCallback(async () => {
-    setLoading(true); setError(null);
+    setLoading(true);
+    setError(null);
+
     try {
-      const res = await api.listAntennaContributions({ page:1, pageSize:100, status: status || undefined, q: q || undefined });
+      const res = await api.listAntennaContributions({
+        page: 1,
+        pageSize: 100,
+        status: status || undefined,
+        q: q || undefined,
+      });
+
       setItems(res?.items ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   }, [status, q]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   async function handleConfirm(value: string) {
     if (!modal.contribution) return;
+
     const id = modal.contribution.id;
     setBusyId(id);
+
     try {
-      if (modal.type === 'validate')     await api.validateContributionAntenna(id, { note: value || undefined });
-      else if (modal.type === 'reject')  await api.rejectContributionAntenna(id, { reason: value });
-      else if (modal.type === 'edit') {
+      if (modal.type === 'validate') {
+        await api.validateContributionAntenna(id, { note: value || undefined });
+      } else if (modal.type === 'reject') {
+        await api.rejectContributionAntenna(id, { reason: value });
+      } else if (modal.type === 'edit') {
         const amount = parseFloat(value.replace(',', '.'));
-        if (!isNaN(amount) && amount > 0) await api.updateContributionAntenna(id, { amount });
+
+        if (!Number.isNaN(amount) && amount > 0) {
+          await api.updateContributionAntenna(id, { amount });
+        }
       }
-      setModal({ type:null, contribution:null });
+
+      setModal({ type: null, contribution: null });
       await load();
-    } finally { setBusyId(null); }
+    } finally {
+      setBusyId(null);
+    }
   }
 
-  const validated = items.filter(i => i.status === 'VALIDATED').length;
-  const pending   = items.filter(i => i.status === 'PENDING').length;
-  const rejected  = items.filter(i => i.status === 'REJECTED').length;
-  const total     = items.reduce((s, i) => s + (i.amount ?? 0), 0);
+  const isPendingStatus = (itemStatus: string) =>
+    itemStatus === 'PENDING' ||
+    itemStatus === 'SUBMITTED' ||
+    itemStatus === 'PENDING_VALIDATION';
 
-  const BtnIcon = ({ d }: { d: string }) => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d={d}/></svg>;
-  const Spinner = () => <div style={{ width:12, height:12, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', animation:'achspin 0.7s linear infinite' }} />;
+  const canReviewStatus = (itemStatus: string) =>
+    itemStatus === 'PENDING' ||
+    itemStatus === 'SUBMITTED' ||
+    itemStatus === 'PENDING_VALIDATION';
+
+  const validated = items.filter((i) => i.status === 'VALIDATED').length;
+  const pending = items.filter((i) => isPendingStatus(i.status)).length;
+  const rejected = items.filter((i) => i.status === 'REJECTED').length;
+  const total = items.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+
+  const BtnIcon = ({ d }: { d: string }) => (
+    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+      <path strokeLinecap="round" strokeLinejoin="round" d={d} />
+    </svg>
+  );
+
+  const Spinner = () => (
+    <div
+      style={{
+        width: 12,
+        height: 12,
+        border: '2px solid rgba(255,255,255,0.3)',
+        borderTopColor: 'white',
+        borderRadius: '50%',
+        animation: 'achspin 0.7s linear infinite',
+      }}
+    />
+  );
 
   const ActionButtons = ({ c, flex }: { c: Contribution; flex?: boolean }) => (
-    <div style={{ display:'flex', gap:'0.35rem', justifyContent: flex ? undefined : 'flex-end', flexWrap:'wrap' }}>
-      {c.status === 'PENDING' && (
+    <div
+      style={{
+        display: 'flex',
+        gap: '0.35rem',
+        justifyContent: flex ? undefined : 'flex-end',
+        flexWrap: 'wrap',
+      }}
+    >
+      {canReviewStatus(c.status) && (
         <>
-          <button className="ach-btn ach-btn-green" style={ flex ? { flex:1, justifyContent:'center' } : undefined } disabled={busyId===c.id} onClick={() => setModal({ type:'validate', contribution:c })}>
-            {busyId===c.id ? <Spinner /> : <BtnIcon d="M5 13l4 4L19 7" />}Valider
+          <button
+            className="ach-btn ach-btn-green"
+            style={flex ? { flex: 1, justifyContent: 'center' } : undefined}
+            disabled={busyId === c.id}
+            onClick={() => setModal({ type: 'validate', contribution: c })}
+          >
+            {busyId === c.id ? <Spinner /> : <BtnIcon d="M5 13l4 4L19 7" />}
+            Valider
           </button>
-          <button className="ach-btn ach-btn-red" style={ flex ? { flex:1, justifyContent:'center' } : undefined } disabled={busyId===c.id} onClick={() => setModal({ type:'reject', contribution:c })}>
-            <BtnIcon d="M6 18L18 6M6 6l12 12" />Rejeter
+
+          <button
+            className="ach-btn ach-btn-red"
+            style={flex ? { flex: 1, justifyContent: 'center' } : undefined}
+            disabled={busyId === c.id}
+            onClick={() => setModal({ type: 'reject', contribution: c })}
+          >
+            <BtnIcon d="M6 18L18 6M6 6l12 12" />
+            Rejeter
           </button>
         </>
       )}
-      <button className="ach-btn ach-btn-blue" style={ flex ? { flex:1, justifyContent:'center' } : undefined } disabled={busyId===c.id} onClick={() => setModal({ type:'edit', contribution:c })}>
-        <BtnIcon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />Modifier
+
+      <button
+        className="ach-btn ach-btn-blue"
+        style={flex ? { flex: 1, justifyContent: 'center' } : undefined}
+        disabled={busyId === c.id}
+        onClick={() => setModal({ type: 'edit', contribution: c })}
+      >
+        <BtnIcon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        Modifier
       </button>
     </div>
   );
@@ -215,77 +643,175 @@ export default function AdminContributionsHistoryPage() {
       <div className="ach-wrap">
         <div className="ach-header">
           <div>
-            <div className="ach-eyebrow"><div className="ach-dot" />Archives antenne</div>
-            <h1 className="ach-title">Historique des <span>cotisations</span></h1>
+            <div className="ach-eyebrow">
+              <div className="ach-dot" />
+              Archives antenne
+            </div>
+            <h1 className="ach-title">
+              Historique des <span>cotisations</span>
+            </h1>
           </div>
         </div>
 
         <div className="ach-stats">
           {([
-            { label:'Total re\u00e7u', value:`${total.toLocaleString('fr-FR')} GNF`, color:'#2563EB' },
-            { label:'Valid\u00e9es',  value:validated, color:'#059669' },
-            { label:'En attente',     value:pending,   color:'#D97706' },
-            { label:'Rejet\u00e9es', value:rejected,  color:'#DC2626' },
-          ] as const).map(s => (
-            <div key={s.label} className="ach-stat" style={{ borderTopColor:s.color }}>
-              <div className="ach-stat-val" style={{ color:s.color }}>{s.value}</div>
+            {
+              label: 'Total reçu',
+              value: `${total.toLocaleString('fr-FR')} GNF`,
+              color: '#2563EB',
+            },
+            { label: 'Validées', value: validated, color: '#059669' },
+            { label: 'En attente', value: pending, color: '#D97706' },
+            { label: 'Rejetées', value: rejected, color: '#DC2626' },
+          ] as const).map((s) => (
+            <div key={s.label} className="ach-stat" style={{ borderTopColor: s.color }}>
+              <div className="ach-stat-val" style={{ color: s.color }}>
+                {s.value}
+              </div>
               <div className="ach-stat-lbl">{s.label}</div>
             </div>
           ))}
         </div>
 
-        {error && <div className="ach-err"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink:0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>{error}</div>}
+        {error && (
+          <div className="ach-err">
+            <svg
+              width="14"
+              height="14"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ flexShrink: 0 }}
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+            </svg>
+            {error}
+          </div>
+        )}
 
         <div className="ach-toolbar">
           <div className="ach-sw">
-            <span className="ach-si"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/></svg></span>
-            <input className="ach-search" type="text" placeholder="Recherche membre / r\u00e9f\u00e9rence\u2026" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void load()} />
+            <span className="ach-si">
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <circle cx="11" cy="11" r="8" />
+                <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+              </svg>
+            </span>
+            <input
+              className="ach-search"
+              type="text"
+              placeholder="Recherche membre / référence…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void load()}
+            />
           </div>
-          <select className="ach-select" value={status} onChange={e => setStatus(e.target.value)}>
+
+          <select className="ach-select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Tous statuts</option>
-            <option value="VALIDATED">Valid\u00e9e</option>
-            <option value="REJECTED">Rejet\u00e9e</option>
-            <option value="PENDING">En attente</option>
-            <option value="CANCELLED">Annul\u00e9e</option>
+            <option value="DRAFT">Brouillon</option>
+            <option value="SUBMITTED">Soumise</option>
+            <option value="PENDING_VALIDATION">En attente</option>
+            <option value="VALIDATED">Validée</option>
+            <option value="REJECTED">Rejetée</option>
+            <option value="CANCELLED">Annulée</option>
           </select>
+
           <button className="ach-fbtn" onClick={() => void load()}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/></svg>Filtrer
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+              <circle cx="11" cy="11" r="8" />
+              <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </svg>
+            Filtrer
           </button>
         </div>
 
         <div className="ach-panel">
           {loading ? (
-            <div className="ach-loader"><div className="ach-ring" />Chargement&#8230;</div>
+            <div className="ach-loader">
+              <div className="ach-ring" />
+              Chargement&#8230;
+            </div>
           ) : items.length === 0 ? (
             <div className="ach-empty">
-              <div className="ach-empty-ico"><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.5"><path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg></div>
-              <p>Aucune cotisation trouv\u00e9e</p>
+              <div className="ach-empty-ico">
+                <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.5">
+                  <path
+                    strokeLinecap="round"
+                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                  />
+                </svg>
+              </div>
+              <p>Aucune cotisation trouvée</p>
             </div>
           ) : (
             <>
               <div className="ach-tw">
                 <table className="ach-table">
-                  <thead><tr><th>Membre</th><th>Montant</th><th>Statut</th><th>Note</th><th>Date</th><th style={{ textAlign:'right' }}>Actions</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>Membre</th>
+                      <th>Montant</th>
+                      <th>Statut</th>
+                      <th>Note</th>
+                      <th>Date</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {items.map((c, i) => (
-                      <tr key={c.id} style={{ animationDelay:`${i * 0.03}s` }}>
-                        <td><div className="ach-name">{memberName(c)}</div><div className="ach-ref">{c.id.slice(0,8)}</div></td>
-                        <td><AmountPill amount={c.amount} /></td>
-                        <td><StatusBadge status={c.status} /></td>
-                        <td><span className="ach-note">{c.note ?? <span style={{ color:'#D1D5DB' }}>—</span>}</span></td>
-                        <td><span className="ach-date">{formatDate(c.createdAt)}</span></td>
-                        <td><ActionButtons c={c} /></td>
+                      <tr key={c.id} style={{ animationDelay: `${i * 0.03}s` }}>
+                        <td>
+                          <div className="ach-name">{memberName(c)}</div>
+                          <div className="ach-ref">{c.id.slice(0, 8)}</div>
+                        </td>
+                        <td>
+                          <AmountPill amount={c.amount} />
+                        </td>
+                        <td>
+                          <StatusBadge status={c.status} />
+                        </td>
+                        <td>
+                          <span className="ach-note">
+                            {c.note ?? <span style={{ color: '#D1D5DB' }}>—</span>}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="ach-date">{formatDate(c.createdAt)}</span>
+                        </td>
+                        <td>
+                          <ActionButtons c={c} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
               <div className="ach-mob">
                 {items.map((c, i) => (
-                  <div key={c.id} className="ach-mc" style={{ animationDelay:`${i * 0.03}s` }}>
-                    <div className="ach-mc-row"><div><div className="ach-name">{memberName(c)}</div><div className="ach-ref">{c.id.slice(0,8)}</div></div><StatusBadge status={c.status} /></div>
-                    <div className="ach-mc-meta"><AmountPill amount={c.amount} /><span>{formatDate(c.createdAt)}</span></div>
-                    {c.note && <p className="ach-note" style={{ marginBottom:'.6rem' }}>{c.note}</p>}
+                  <div key={c.id} className="ach-mc" style={{ animationDelay: `${i * 0.03}s` }}>
+                    <div className="ach-mc-row">
+                      <div>
+                        <div className="ach-name">{memberName(c)}</div>
+                        <div className="ach-ref">{c.id.slice(0, 8)}</div>
+                      </div>
+                      <StatusBadge status={c.status} />
+                    </div>
+
+                    <div className="ach-mc-meta">
+                      <AmountPill amount={c.amount} />
+                      <span>{formatDate(c.createdAt)}</span>
+                    </div>
+
+                    {c.note && (
+                      <p className="ach-note" style={{ marginBottom: '.6rem' }}>
+                        {c.note}
+                      </p>
+                    )}
+
                     <ActionButtons c={c} flex />
                   </div>
                 ))}
@@ -295,7 +821,12 @@ export default function AdminContributionsHistoryPage() {
         </div>
       </div>
 
-      <Modal modal={modal} onClose={() => setModal({ type:null, contribution:null })} onConfirm={v => void handleConfirm(v)} busy={busyId !== null} />
+      <Modal
+        modal={modal}
+        onClose={() => setModal({ type: null, contribution: null })}
+        onConfirm={(v) => void handleConfirm(v)}
+        busy={busyId !== null}
+      />
     </AppShell>
   );
 }

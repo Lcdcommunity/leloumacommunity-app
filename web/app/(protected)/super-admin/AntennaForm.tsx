@@ -1,0 +1,1 @@
+export { AntennaForm, type AntennaFormValues } from '../../../components/super-admin/AntennaForm';

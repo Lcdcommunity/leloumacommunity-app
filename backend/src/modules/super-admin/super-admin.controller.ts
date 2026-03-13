@@ -1,5 +1,15 @@
 //backend/src/modules/super-admin/super-admin.controller.ts
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { SuperAdminService } from './super-admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -8,6 +18,8 @@ import { UserRole } from '@prisma/client';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { ListAntennasQueryDto } from './dto/list-antennas-query.dto';
+import { CreateAntennaDto } from './dto/create-antenna.dto';
+import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -37,6 +49,26 @@ export class SuperAdminController {
     );
   }
 
+  @Post('admins')
+  createAdmin(@Body() body: CreateAntennaAdminDto, @CurrentUser() actor: AuthUser) {
+    return this.service.createAntennaAdmin(body, actor.id);
+  }
+
+  @Patch('admins/:id/suspend')
+  suspendAdmin(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.suspendAntennaAdmin(id, actor.id);
+  }
+
+  @Patch('admins/:id/activate')
+  activateAdmin(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.activateAntennaAdmin(id, actor.id);
+  }
+
+  @Delete('admins/:id')
+  deleteAdmin(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.deleteAntennaAdmin(id, actor.id);
+  }
+
   @Patch('users/:id/approve')
   approveMember(@Param('id') id: string, @CurrentUser() admin: AuthUser) {
     return this.service.approveUser(id, admin.id);
@@ -55,6 +87,21 @@ export class SuperAdminController {
       query.q,
       query.isActive,
     );
+  }
+
+  @Post('antennas')
+  createAntenna(@Body() body: CreateAntennaDto, @CurrentUser() actor: AuthUser) {
+    return this.service.createAntenna(body, actor.id);
+  }
+
+  @Patch('antennas/:id')
+  updateAntenna(@Param('id') id: string, @Body() body: Partial<CreateAntennaDto>) {
+    return this.service.updateAntenna(id, body);
+  }
+
+  @Delete('antennas/:id')
+  deleteAntenna(@Param('id') id: string) {
+    return this.service.deleteAntenna(id);
   }
 
   @Get('projects')

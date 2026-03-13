@@ -4,9 +4,9 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
-import { api } from '../../../../lib/api-client';
 import type { UserSummary } from '../../../../types/user';
 import { formatDate, fullName } from '../../../../lib/format';
+import { superAdminApi } from '../../../../lib/super-admin-api';
 
 function AvatarIcon({ firstName, lastName }: { firstName: string; lastName: string }) {
   const initials = `${firstName.charAt(0) || ''}${lastName.charAt(0) || ''}`.toUpperCase();
@@ -40,18 +40,59 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function DeleteModal({
+  user,
+  onConfirm,
+  onCancel,
+  busy,
+}: {
+  user: UserSummary;
+  onConfirm: () => void;
+  onCancel: () => void;
+  busy: boolean;
+}) {
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }} onClick={onCancel} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 101, background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)', width: 'min(440px,calc(100vw - 2rem))', border: '1px solid rgba(220,38,38,.15)', boxShadow: '0 24px 60px rgba(220,38,38,.12)' }}>
+        <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2">
+            <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </div>
+        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.3rem', fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: '.4rem' }}>
+          Supprimer cet administrateur&nbsp;?
+        </h2>
+        <p style={{ fontSize: '.82rem', color: '#6B7280', textAlign: 'center', marginBottom: '1.5rem', fontWeight: 600, lineHeight: 1.55 }}>
+          Le compte de <strong style={{ color: '#111827' }}>{fullName(user)}</strong> sera supprim&eacute; logiquement. Cette action est r&eacute;versible uniquement par intervention technique.
+        </p>
+        <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center' }}>
+          <button onClick={onCancel} disabled={busy} style={{ height: 40, padding: '0 1.2rem', borderRadius: 10, border: '1px solid rgba(220,38,38,.18)', background: 'rgba(249,250,251,.95)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>
+            Annuler
+          </button>
+          <button onClick={onConfirm} disabled={busy} style={{ height: 40, padding: '0 1.3rem', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#991B1B,#DC2626)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 800, color: 'white', cursor: 'pointer', boxShadow: '0 4px 14px rgba(220,38,38,.35)', opacity: busy ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+            {busy && <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'sadspin .7s linear infinite' }} />}
+            Supprimer
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function SuperAdminAdminsPage() {
   const [items, setItems] = useState<UserSummary[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserSummary | null>(null);
 
   const load = useCallback(async (qVal?: string) => {
     setLoading(true);
     setError(null);
-
     try {
-      const res = await api.listAntennaAdmins({ page: 1, pageSize: 100, q: qVal ?? q });
+      const res = await superAdminApi.listAntennaAdmins({ page: 1, pageSize: 100, q: qVal ?? q });
       setItems(res.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement des administrateurs');
@@ -63,6 +104,37 @@ export default function SuperAdminAdminsPage() {
   useEffect(() => {
     void load('');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleToggleStatus(user: UserSummary) {
+    setBusyId(user.id);
+    setError(null);
+    try {
+      if (user.status === 'ACTIVE') {
+        await superAdminApi.suspendAntennaAdmin(user.id);
+      } else {
+        await superAdminApi.activateAntennaAdmin(user.id);
+      }
+      await load(q);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du changement de statut');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDelete(user: UserSummary) {
+    setBusyId(user.id);
+    setDeleteTarget(null);
+    setError(null);
+    try {
+      await superAdminApi.deleteAntennaAdmin(user.id);
+      await load(q);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur suppression');
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   const total = items.length;
   const activeCount = items.filter((u) => u.status === 'ACTIVE').length;
@@ -79,23 +151,19 @@ export default function SuperAdminAdminsPage() {
         @keyframes sadpulse{0%,100%{opacity:1}50%{opacity:.3}}
         .sad-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.5rem,3vw,2rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .sad-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-
         .sad-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:sadin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
         @media(max-width:540px){.sad-stats{grid-template-columns:1fr 1fr}}
         .sad-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.8rem 1rem}
         .sad-stat-val{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:700;line-height:1;margin-bottom:.2rem}
         .sad-stat-lbl{font-size:.65rem;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.07em}
-
         .sad-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:sadin .5s .13s cubic-bezier(.22,1,.36,1) forwards}
         .sad-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
         .sad-panel-titlerow{display:flex;align-items:center;gap:.55rem}
         .sad-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
         .sad-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
         .sad-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
-
         .sad-new-btn{height:38px;padding:0 1.1rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:800;display:flex;align-items:center;gap:.4rem;box-shadow:0 4px 14px rgba(220,38,38,.32);transition:all .18s;text-decoration:none;white-space:nowrap}
         .sad-new-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(220,38,38,.42)}
-
         .sad-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.9rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07)}
         .sad-sw{position:relative;flex:1;min-width:200px}
         .sad-si{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
@@ -105,23 +173,27 @@ export default function SuperAdminAdminsPage() {
         .sad-search-btn{height:40px;padding:0 1.1rem;border-radius:11px;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:800;display:flex;align-items:center;gap:.4rem;box-shadow:0 3px 10px rgba(37,99,235,.3);transition:all .18s;white-space:nowrap}
         .sad-search-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(37,99,235,.4)}
         .sad-search-btn:disabled{opacity:.6;cursor:not-allowed}
-
-        .sad-note{display:flex;align-items:flex-start;gap:.65rem;padding:.9rem 1.2rem;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;color:#1D4ED8;font-size:.8rem;font-weight:700;margin:1rem}
-
         .sad-tw{overflow-x:auto}
-        .sad-table{width:100%;border-collapse:collapse;min-width:750px}
+        .sad-table{width:100%;border-collapse:collapse;min-width:820px}
         .sad-table thead tr{border-bottom:2px solid rgba(220,38,38,.1)}
         .sad-table th{padding:.8rem 1.2rem;font-size:.65rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase;color:#374151;background:rgba(254,242,242,.35);text-align:left;white-space:nowrap}
         .sad-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:sadin .4s cubic-bezier(.22,1,.36,1) both}
         .sad-table tbody tr:last-child{border-bottom:none}
         .sad-table tbody tr:hover{background:rgba(220,38,38,.025)}
         .sad-table td{padding:.9rem 1.2rem;font-size:.82rem;color:#111827;vertical-align:middle}
-
         .sad-name{font-weight:800;font-size:.88rem;color:#0F172A}
         .sad-email{font-size:.72rem;color:#6B7280;font-weight:500;margin-top:2px}
         .sad-role{font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:.15rem .45rem}
         .sad-date{font-size:.75rem;font-weight:700;color:#6B7280}
-
+        .sad-actions{display:flex;gap:.4rem;justify-content:flex-end;align-items:center}
+        .sad-btn-act{height:30px;padding:0 .65rem;border-radius:7px;border:1.5px solid;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.25rem;transition:all .15s;white-space:nowrap}
+        .sad-btn-suspend{color:#D97706;background:rgba(255,251,235,.6);border-color:rgba(217,119,6,.2)}
+        .sad-btn-suspend:hover:not(:disabled){background:#FEF3C7;border-color:rgba(217,119,6,.4);transform:translateY(-1px)}
+        .sad-btn-enable{color:#059669;background:rgba(236,253,245,.6);border-color:rgba(5,150,105,.2)}
+        .sad-btn-enable:hover:not(:disabled){background:#D1FAE5;border-color:rgba(5,150,105,.4);transform:translateY(-1px)}
+        .sad-btn-del{color:#DC2626;background:rgba(254,242,242,.6);border-color:rgba(220,38,38,.2)}
+        .sad-btn-del:hover:not(:disabled){background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
+        .sad-btn-act:disabled{opacity:.45;cursor:not-allowed}
         .sad-mob{display:none;flex-direction:column}
         @media(max-width:760px){.sad-tw{display:none}.sad-mob{display:flex}}
         .sad-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sadin .4s cubic-bezier(.22,1,.36,1) both}
@@ -129,13 +201,12 @@ export default function SuperAdminAdminsPage() {
         .sad-mc-top{display:flex;align-items:flex-start;gap:.65rem;margin-bottom:.6rem}
         .sad-mc-info{flex:1;min-width:0}
         .sad-mc-row2{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem}
-
+        .sad-mc-actions{display:flex;gap:.4rem}
         .sad-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .sad-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:sadspin .8s linear infinite}
         .sad-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
         .sad-empty{display:flex;flex-direction:column;align-items:center;padding:3rem 1rem;gap:.7rem;color:#9CA3AF}
         .sad-empty p{font-size:.84rem;font-weight:700}
-
         @keyframes sadin{to{opacity:1;transform:translateY(0)}}
         @keyframes sadspin{to{transform:rotate(360deg)}}
       `}</style>
@@ -187,17 +258,15 @@ export default function SuperAdminAdminsPage() {
                   <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
                 </svg>
               </span>
-
               <input
                 className="sad-search"
                 type="text"
-                placeholder="Recherche par nom, email&#8230;"
+                placeholder="Recherche par nom, email…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && void load(q)}
               />
             </div>
-
             <button className="sad-search-btn" disabled={loading} onClick={() => void load(q)}>
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <circle cx="11" cy="11" r="8" />
@@ -205,14 +274,6 @@ export default function SuperAdminAdminsPage() {
               </svg>
               Rechercher
             </button>
-          </div>
-
-          <div className="sad-note">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0, marginTop: 1 }}>
-              <circle cx="12" cy="12" r="10" />
-              <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-            </svg>
-            Les actions suspendre, activer et supprimer ne sont pas encore branchées sur des routes super-admin dédiées pour les administrateurs d&apos;antenne.
           </div>
 
           {error && (
@@ -241,9 +302,10 @@ export default function SuperAdminAdminsPage() {
                   <thead>
                     <tr>
                       <th>Administrateur</th>
-                      <th>R&ocirc;le / Antenne</th>
+                      <th>R&ocirc;le</th>
                       <th>Statut</th>
                       <th>Cr&eacute;&eacute; le</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -263,6 +325,24 @@ export default function SuperAdminAdminsPage() {
                         </td>
                         <td><StatusBadge status={u.status} /></td>
                         <td><span className="sad-date">{formatDate(u.createdAt)}</span></td>
+                        <td>
+                          <div className="sad-actions">
+                            {u.status === 'ACTIVE' ? (
+                              <button className="sad-btn-act sad-btn-suspend" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)}>
+                                {busyId === u.id ? <div style={{ width: 11, height: 11, border: '2px solid rgba(217,119,6,.3)', borderTopColor: '#D97706', borderRadius: '50%', animation: 'sadspin .7s linear infinite' }} /> : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                                Suspendre
+                              </button>
+                            ) : (
+                              <button className="sad-btn-act sad-btn-enable" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)}>
+                                {busyId === u.id ? <div style={{ width: 11, height: 11, border: '2px solid rgba(5,150,105,.3)', borderTopColor: '#059669', borderRadius: '50%', animation: 'sadspin .7s linear infinite' }} /> : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                                Activer
+                              </button>
+                            )}
+                            <button className="sad-btn-act sad-btn-del" disabled={busyId === u.id} onClick={() => setDeleteTarget(u)}>
+                              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -284,6 +364,20 @@ export default function SuperAdminAdminsPage() {
                       <span className="sad-role">ADMIN ANTENNE</span>
                       <span className="sad-date">{formatDate(u.createdAt)}</span>
                     </div>
+                    <div style={{ display: 'flex', gap: '.4rem' }}>
+                      {u.status === 'ACTIVE' ? (
+                        <button className="sad-btn-act sad-btn-suspend" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)} style={{ flex: 1, justifyContent: 'center' }}>
+                          Suspendre
+                        </button>
+                      ) : (
+                        <button className="sad-btn-act sad-btn-enable" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)} style={{ flex: 1, justifyContent: 'center' }}>
+                          Activer
+                        </button>
+                      )}
+                      <button className="sad-btn-act sad-btn-del" disabled={busyId === u.id} onClick={() => setDeleteTarget(u)} style={{ padding: '0 1rem' }}>
+                        Supprimer
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -291,6 +385,15 @@ export default function SuperAdminAdminsPage() {
           ) : null}
         </div>
       </div>
+
+      {deleteTarget && (
+        <DeleteModal
+          user={deleteTarget}
+          busy={busyId !== null}
+          onConfirm={() => void handleDelete(deleteTarget)}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </AppShell>
   );
 }
