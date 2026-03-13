@@ -1,21 +1,22 @@
 // web/lib/api-client.ts
-import { http } from './http';
-import type { ApiListResponse } from '../types/api';
-import type { Antenna } from '../types/antenna';
-import type { UserSummary } from '../types/user';
+import type { MemberDashboardStats } from '../types/member';
+import type { ProjectProposal } from '../types/project-proposal';
+import type { ContentPost } from '../types/content';
 import type { Contribution } from '../types/contribution';
 import type { Project } from '../types/project';
 import type { DocumentItem } from '../types/document';
 import type { NotificationItem } from '../types/notification';
+import type { UserSummary } from '../types/user';
+import type { ApiListResponse } from '../types/api';
+import type { Antenna } from '../types/antenna';
 import type { AuditItem } from '../types/audit';
 import type { Association } from '../types/association';
-import type { ContentPost } from '../types/content';
 import type { AntennaDashboardStats, ProjectionResult } from '../types/stats';
-import type { ProjectProposal } from '../types/project-proposal';
-import type { MemberDashboardStats } from '../types/member';
+
+import { http } from './http';
 
 // Définition propre du type VirtualCardData
-export type VirtualCardData = {
+export interface VirtualCardData {
   cardNumber: string;
   isLocked: boolean;
   expiresAt: string | null;
@@ -31,7 +32,7 @@ export type VirtualCardData = {
     city?: string | null;
     profilePhotoUrl?: string | null;
   };
-};
+}
 
 export const api = {
   // ==========================================
@@ -42,7 +43,7 @@ export const api = {
     lastName: string;
     email: string;
     phone?: string;
-    password?: string; // Modifié pour être optionnel selon votre DTO backend
+    password?: string;
     antennaId: string;
     city?: string;
     country?: string;
@@ -51,28 +52,22 @@ export const api = {
     originSubPrefecture?: string;
     placeOfBirth?: string;
   }) =>
-    http<{ id: string; message: string; }, typeof body>('/public/signup', { 
-      method: 'POST', 
-      body 
+    http<{ id: string; message: string; }, typeof body>('/public/signup', {
+      method: 'POST',
+      body,
     }),
 
-  verifyEmailToken: (body: { token: string }) => 
-    http<{ emailVerified: boolean }, typeof body>('/public/verify-email-token', { 
-      method: 'POST', 
-      body 
+  verifyEmailToken: (body: { token: string }) =>
+    http<{ emailVerified: boolean }, typeof body>('/public/verify-email-token', {
+      method: 'POST',
+      body,
     }),
 
   listPublicAntennasForSignup: () =>
     http<Array<{ id: string; code: string; name: string; city?: string; country?: string; }>>('/public/antennas'),
 
   verifyPublicCard: (token: string) =>
-    http<{
-      cardNumber: string;
-      isLocked: boolean;
-      expiresAt: string | null;
-      antennaName: string;
-      user: { firstName: string; lastName: string; profilePhotoUrl?: string | null };
-    }>(`/public/cards/${token}`),
+    http<VirtualCardData>(`/public/cards/${token}`),
 
   // ==========================================
   // ME / PROFIL GÉNÉRAL
@@ -81,6 +76,18 @@ export const api = {
 
   updateMyProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/users/me', { method: 'PATCH', body }),
+
+  updateMemberProfile: (body: Partial<UserSummary>) =>
+    http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
+
+  updateMemberPreferences: (body: {
+    emailNotifications?: boolean;
+    smsNotifications?: boolean;
+    pushNotifications?: boolean;
+    language?: string;
+    theme?: 'light' | 'dark' | 'system' | string;
+  }) =>
+    http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body }),
 
   // ==========================================
   // DASHBOARDS & RÉSUMÉS
@@ -161,6 +168,8 @@ export const api = {
   updateAntenna: (id: string, body: Partial<Antenna>) =>
     http<Antenna, Partial<Antenna>>(`/super-admin/antennas/${id}`, { method: 'PATCH', body }),
 
+  deleteAntenna: (id: string) => http(`/super-admin/antennas/${id}`, { method: 'DELETE' }),
+
   listAntennaAdmins: (params?: { page?: number; pageSize?: number; antennaId?: string; q?: string }) =>
     http<ApiListResponse<UserSummary>>(
       `/super-admin/admins?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
@@ -201,7 +210,6 @@ export const api = {
   approveMemberAccountAntenna: (userId: string) => http(`/admin/member-approvals/${userId}/approve`, { method: 'PATCH' }),
   rejectMemberAccountAntenna: (userId: string, reason?: string) => http(`/admin/member-approvals/${userId}/reject`, { method: 'PATCH', body: { reason } }),
 
-  // Lifecycle (Suspend / Activate / Delete) via Admin Antenne
   suspendUser: (id: string) => http(`/admin/members/${id}/suspend`, { method: 'PATCH' }),
   activateUser: (id: string) => http(`/admin/members/${id}/activate`, { method: 'PATCH' }),
   deleteUser: (id: string) => http(`/admin/members/${id}`, { method: 'DELETE' }),
@@ -219,18 +227,6 @@ export const api = {
       antennaName?: string | null;
       lateMonths?: number;
     }>>(`/member/late-members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
-
-  updateMemberProfile: (body: Partial<UserSummary>) =>
-    http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
-
-  updateMemberPreferences: (body: {
-    emailNotifications?: boolean;
-    smsNotifications?: boolean;
-    pushNotifications?: boolean;
-    language?: string;
-    theme?: 'light' | 'dark' | 'system' | string;
-  }) =>
-    http<{ ok: true }, typeof body>('/member/preferences', { method: 'PATCH', body }),
 
   // ==========================================
   // GESTION DES COTISATIONS
@@ -267,6 +263,7 @@ export const api = {
     reference?: string;
     depositedAt?: string;
     note?: string;
+    purpose?: string;
     receiptFileAssetId?: string | null;
   }) =>
     http<Contribution, typeof body>('/member/contributions', { method: 'POST', body }),
@@ -306,6 +303,8 @@ export const api = {
 
   deleteAntennaProject: (id: string) => http(`/admin/projects/${id}`, { method: 'DELETE' }),
 
+  deleteProject: (id: string) => http(`/super-admin/projects/${id}`, { method: 'DELETE' }),
+
   listProjectsForMembers: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
     http<ApiListResponse<Project>>(
       `/member/projects?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
@@ -337,6 +336,8 @@ export const api = {
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
       }`
     ),
+
+  deleteDocument: (id: string) => http(`/super-admin/documents/${id}`, { method: 'DELETE' }),
 
   listAntennaDocuments: (params?: { page?: number; pageSize?: number; q?: string }) =>
     http<ApiListResponse<DocumentItem>>(
