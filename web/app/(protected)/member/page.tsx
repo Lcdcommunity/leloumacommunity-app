@@ -1,4 +1,4 @@
-// web/app/(protected)/member/page.tsx
+//////// web/app/(protected)/member/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -297,6 +297,14 @@ export default function MemberHomePage() {
           gap: 1rem;
         }
 
+        /* SUR MOBILE : Forcer 3 colonnes pour les stats */
+        @media (max-width: 768px) {
+          .mb-stats {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem; /* Réduire l'espacement pour que ça rentre */
+          }
+        }
+
         .mb-stat {
           background: rgba(253,253,255,0.9);
           backdrop-filter: blur(12px);
@@ -309,6 +317,18 @@ export default function MemberHomePage() {
           animation: mbin 0.5s cubic-bezier(.22,1,.36,1) forwards;
           transition: transform 0.2s, box-shadow 0.2s;
         }
+
+        /* Ajustements internes pour les stats sur mobile */
+        @media (max-width: 768px) {
+          .mb-stat {
+            padding: 0.8rem;
+            border-radius: 12px;
+          }
+          .mb-stat-accent {
+            border-radius: 12px 12px 0 0;
+          }
+        }
+
         .mb-stat:hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 22px rgba(37,99,235,0.08), 0 0 0 1px rgba(255,255,255,0.9) inset;
@@ -321,24 +341,66 @@ export default function MemberHomePage() {
           display: flex; justify-content: space-between; align-items: flex-start;
           margin-bottom: 0.8rem;
         }
+        
+        @media (max-width: 768px) {
+          .mb-stat-top {
+             flex-direction: column-reverse; /* Icône au dessus du texte sur mobile si besoin, ou on garde tel quel selon la place */
+             gap: 0.4rem;
+             margin-bottom: 0.5rem;
+          }
+        }
+
         .mb-stat-label {
-          font-size: 0.68rem; font-weight: 800; /* Gras doux renforcé */
+          font-size: 0.68rem; font-weight: 800;
           letter-spacing: 0.08em; text-transform: uppercase;
           color: #4B5563; max-width: 110px; line-height: 1.4;
         }
+
+        @media (max-width: 768px) {
+          .mb-stat-label {
+            font-size: 0.55rem;
+          }
+        }
+
         .mb-stat-icon {
           width: 36px; height: 36px; border-radius: 10px;
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
+
+        @media (max-width: 768px) {
+           .mb-stat-icon {
+             width: 24px; height: 24px; border-radius: 6px;
+           }
+           .mb-stat-icon svg {
+             width: 14px; height: 14px;
+           }
+        }
+
         .mb-stat-value {
           font-family: 'Cormorant Garamond', serif;
           font-size: 1.85rem; font-weight: 700;
           color: #111827; letter-spacing: -0.03em;
           line-height: 1; margin-bottom: 0.4rem;
         }
+
+        @media (max-width: 768px) {
+           .mb-stat-value {
+             font-size: 1.2rem;
+             word-break: break-word; /* Evite que le texte ne dépasse de la carte */
+           }
+        }
+
         .mb-stat-sub {
           font-size: 0.72rem; color: #6B7280; font-weight: 600;
         }
+
+        @media (max-width: 768px) {
+           .mb-stat-sub {
+             font-size: 0.55rem;
+             line-height: 1.2;
+           }
+        }
+
 
         /* ── Bottom grid ── */
         .mb-grid2 {
@@ -400,7 +462,7 @@ export default function MemberHomePage() {
         .mb-table tbody tr:hover { background: rgba(37,99,235,0.03); }
         .mb-table td {
           padding: 0.85rem 1.4rem;
-          font-size: 0.82rem; color: #1F2937; font-weight: 500; /* Gras doux */
+          font-size: 0.82rem; color: #1F2937; font-weight: 500;
           vertical-align: middle;
         }
         .mb-table td.mono {

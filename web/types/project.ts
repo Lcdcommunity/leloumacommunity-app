@@ -1,4 +1,5 @@
 //web/types/project.ts
+// web/types/project.ts
 export type ProjectStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'SUSPENDED' | 'CANCELLED';
 
 export interface Project {
@@ -14,4 +15,5 @@ export interface Project {
   endsAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  attachments?: Array<{ id: string; url: string }>; 
 }

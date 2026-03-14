@@ -1,4 +1,5 @@
 // backend/src/modules/admin/admin.service.ts
+// backend/src/modules/admin/admin.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus } from '@prisma/client';
@@ -129,7 +130,6 @@ export class AdminService {
     };
   }
 
-  // 👇 AJOUT CHIRURGICAL : GESTION DES STATUTS DES MEMBRES 👇
   async suspendUser(userId: string, adminId: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const user = await this.prisma.user.findFirst({ 
@@ -163,13 +163,11 @@ export class AdminService {
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
 
-    // Soft-delete logique
     return this.prisma.user.update({ 
       where: { id: userId }, 
       data: { status: UserStatus.DELETED, deletedByUserId: adminId, deletedAt: new Date() } 
     });
   }
-  // 👆 FIN DE L'AJOUT 👇
 
   // --- GESTION DES COTISATIONS ---
 
@@ -210,26 +208,22 @@ export class AdminService {
       where: { id: contributionId, antennaId },
       include: { member: true } 
     });
-    
+
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
 
-    // 1. Valider la cotisation
     const updated = await this.prisma.contribution.update({ 
       where: { id: contributionId }, 
       data: { status: ContributionStatus.VALIDATED, validatedAt: new Date(), validatedByUserId: adminId } 
     });
 
-    // 2. LOGIQUE CARTE MEMBRE : Si le motif est la carte membre
     if (contribution.purpose === 'MEMBERSHIP_CARD') {
       const now = new Date();
       const nextYear = new Date();
       nextYear.setFullYear(now.getFullYear() + 1);
 
-      // Générer un numéro de carte unique (ex: LCD-2026-XXXX)
       const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
       const cardNumber = `LCD-${now.getFullYear()}-${randomSuffix}`;
 
-      // Upsert (Créer ou Mettre à jour et déverrouiller) la carte du membre
       await this.prisma.virtualCard.upsert({
         where: { userId: contribution.memberUserId },
         create: {
@@ -286,12 +280,31 @@ export class AdminService {
     }
 
     const [items, total] = await Promise.all([
-      this.prisma.project.findMany({ where, skip, take: pageSize, orderBy: { createdAt: 'desc' } }),
+      this.prisma.project.findMany({ 
+        where, 
+        skip, 
+        take: pageSize, 
+        orderBy: { createdAt: 'desc' },
+        include: {
+          attachments: {
+            include: { file: true }
+          }
+        }
+      }),
       this.prisma.project.count({ where }),
     ]);
 
     return { 
-      items: items.map(p => memberMapper.project(p)), 
+      items: items.map(p => {
+        const mappedProject = memberMapper.project(p);
+        return {
+          ...mappedProject,
+          attachments: p.attachments?.map(a => ({
+            id: a.file.id,
+            url: a.file.url
+          })) || []
+        };
+      }), 
       total, 
       page, 
       pageSize, 
@@ -302,7 +315,7 @@ export class AdminService {
   async listProjectProposals(adminId: string, page: number, pageSize: number, status?: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const skip = (page - 1) * pageSize;
-    
+
     const where: Prisma.ProjectProposalWhereInput = { 
       antennaId, 
       ...(status ? { status: status as ProposalStatus } : {}) 
@@ -396,8 +409,8 @@ export class AdminService {
         } : {})
       } 
     });
-  }
-
+  }  
+  
   async deleteProject(projectId: string, adminId: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const project = await this.prisma.project.findFirst({ where: { id: projectId, antennaId } });

@@ -1,4 +1,5 @@
 //src/main.ts
+//src/main.ts
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -6,6 +7,15 @@ import { json, urlencoded } from 'express';
 import * as path from 'path';
 import * as express from 'express';
 import { AppModule } from './app.module';
+
+// ─── Fix global BigInt serialization ────────────────────────────────────────
+// Prisma retourne des BigInt pour certains champs numériques.
+// JSON.stringify ne les supporte pas nativement → "Do not know how to serialize a BigInt".
+// On ajoute toJSON() sur le prototype une seule fois au bootstrap.
+(BigInt.prototype as unknown as Record<string, unknown>)['toJSON'] = function () {
+  return this.toString();
+};
+// ────────────────────────────────────────────────────────────────────────────
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: true });
@@ -30,7 +40,7 @@ async function bootstrap() {
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Association Community API')
-      .setDescription('API de gestion d’association communautaire')
+      .setDescription('API de gestion d\u2019association communautaire')
       .setVersion('1.0.0')
       .addBearerAuth()
       .build();
@@ -48,6 +58,6 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT || 3000);
   await app.listen(port);
-  console.log(`🚀 Serveur lancé sur : http://localhost:${port}/api`);
+  console.log(`\u{1F680} Serveur lanc\u00e9 sur : http://localhost:${port}/api`);
 }
 bootstrap();
