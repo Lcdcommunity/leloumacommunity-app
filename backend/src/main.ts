@@ -29,16 +29,23 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
+  // --- CONFIGURATION DYNAMIQUE DES CORS ---
+  // On récupère CORS_ORIGINS ou FRONTEND_URL configurés sur Render
+  const originsFromEnv = process.env.CORS_ORIGINS || process.env.FRONTEND_URL;
+  
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...(originsFromEnv ? originsFromEnv.split(',') : []),
+  ].map(origin => origin.trim()).filter(Boolean);
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://127.0.0.1:3000',
-      process.env.FRONTEND_URL || '',
-    ].filter(Boolean),
+    origin: allowedOrigins,
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
   });
+  // ----------------------------------------
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -78,6 +85,7 @@ async function bootstrap() {
 
   await app.listen(port);
   console.log(`🚀 Serveur lancé sur : http://localhost:${port}/api`);
+  console.log(`✅ CORS autorisés pour :`, allowedOrigins);
 }
 
 void bootstrap();
