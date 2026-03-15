@@ -1,4 +1,4 @@
-//src/app.module.ts
+//////// backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -38,7 +38,10 @@ import { AuthMemberService } from './modules/auth/auth-member.service';
 // Modules d'administration (Global & Antenne)
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { AssociationsModule } from './modules/associations/associations.module';
-import { AdminModule } from './modules/admin/admin.module'; // 👈 AJOUT CHIRURGICAL
+import { AdminModule } from './modules/admin/admin.module';
+
+// 👇 AJOUT CHIRURGICAL : Import du module Users
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
@@ -78,7 +81,10 @@ import { AdminModule } from './modules/admin/admin.module'; // 👈 AJOUT CHIRUR
     // Modules d'administration
     SuperAdminModule,
     AssociationsModule,
-    AdminModule, // 👈 AJOUT CHIRURGICAL ICI
+    AdminModule,
+    
+    // 👇 AJOUT CHIRURGICAL : Déclaration du module Users
+    UsersModule, 
   ],
   controllers: [
     AuthMemberController,

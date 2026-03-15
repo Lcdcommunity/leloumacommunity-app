@@ -1,4 +1,4 @@
-// web/lib/api-client.ts
+//////// web/lib/api-client.ts
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
@@ -15,7 +15,7 @@ import type { AntennaDashboardStats, ProjectionResult } from '../types/stats';
 
 import { http } from './http';
 
-// Définition propre du type VirtualCardData
+// Définition propre du type VirtualCardData pour l'API
 export interface VirtualCardData {
   cardNumber: string;
   isLocked: boolean;
@@ -28,10 +28,45 @@ export interface VirtualCardData {
     birthDate?: string | null;
     placeOfBirth?: string | null;
     originSubPrefecture?: string | null;
+    originVillage?: string | null;
     country?: string | null;
     city?: string | null;
     profilePhotoUrl?: string | null;
   };
+}
+
+// 👇 NOUVELLE INTERFACE : Le profil au complet pour rassurer TypeScript
+export interface FullUserProfile extends UserSummary {
+  phone?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
+  country?: string | null;
+  birthDate?: string | null;
+  placeOfBirth?: string | null;
+  countryOfBirth?: string | null;
+  profilePhotoUrl?: string | null;
+  originVillage?: string | null;
+  originSubPrefecture?: string | null;
+  cardNumber?: string | null;
+  isCardLocked?: boolean;
+  cardExpiresAt?: string | null;
+  qrToken?: string | null;
+  antennaName?: string | null;
+  virtualCard?: {
+    id: string;
+    cardNumber: string;
+    isLocked: boolean;
+    expiresAt: string | null;
+    qrToken: string;
+  } | null;
+  antenna?: {
+    id: string;
+    name: string;
+    code: string;
+    membershipStatus: string;
+  } | null;
 }
 
 export const api = {
@@ -74,11 +109,24 @@ export const api = {
   // ==========================================
   me: () => http<UserSummary & { permissions?: string[] }>('/auth/me'),
 
+  // 👇 PLUS DE "any" ICI !
+  getMyProfile: () => http<FullUserProfile>('/users/me'),
+
+  // 👇 Typage mis à jour pour la mise à jour
   updateMyProfile: (body: Partial<UserSummary>) =>
-    http<UserSummary, Partial<UserSummary>>('/users/me', { method: 'PATCH', body }),
+    http<FullUserProfile, Partial<UserSummary>>('/users/me', { method: 'PATCH', body }),
 
   updateMemberProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
+
+  uploadProfilePhoto: async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return http<{ message?: string; profilePhotoUrl?: string | null; user?: FullUserProfile }>('/users/me/profile-photo', {
+      method: 'POST',
+      body: form,
+    });
+  },
 
   updateMemberPreferences: (body: {
     emailNotifications?: boolean;

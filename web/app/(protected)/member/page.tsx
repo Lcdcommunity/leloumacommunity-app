@@ -1,4 +1,5 @@
 //////// web/app/(protected)/member/page.tsx
+// web/app/(protected)/member/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -26,7 +27,7 @@ type MemberDashboardResponse = {
       placeOfBirth?: string | null;
       country?: string | null;
       city?: string | null;
-      profilePhotoUrl?: string; 
+      profilePhotoUrl?: string;
     };
   } | null;
   stats?: {
@@ -50,12 +51,12 @@ type MemberDashboardResponse = {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    VALIDATED: { label: 'Validée',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    PENDING:   { label: 'En attente',color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-    REJECTED:  { label: 'Rejetée',   color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-    IN_PROGRESS:{ label: 'En cours', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-    PUBLISHED: { label: 'Publié',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    DRAFT:     { label: 'Brouillon', color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
+    VALIDATED:  { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    PENDING:    { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    REJECTED:   { label: 'Rejetée',   color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    IN_PROGRESS:{ label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+    PUBLISHED:  { label: 'Publié',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    DRAFT:      { label: 'Brouillon', color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
   };
   const s = map[status] ?? { label: status, color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' };
   return (
@@ -86,19 +87,18 @@ function EmptyRow({ cols, label }: { cols: number; label: string }) {
 export default function MemberHomePage() {
   const [data, setData] = useState<MemberDashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isCardVisible, setIsCardVisible] = useState(false);
 
   useEffect(() => {
     void (async () => {
       try {
         const res = await api.dashboardMember() as MemberDashboardResponse;
-        
         if (res.virtualCard && res.virtualCard.user) {
           const userRef = res.virtualCard.user as { profilePhotoUrl?: string | null };
           if (userRef.profilePhotoUrl === null) {
             res.virtualCard.user.profilePhotoUrl = undefined;
           }
         }
-        
         setData(res);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur chargement dashboard');
@@ -185,6 +185,7 @@ export default function MemberHomePage() {
         .mb-wrap {
           font-family: 'DM Sans', sans-serif;
           padding: clamp(1.25rem, 3vw, 2rem);
+          padding-bottom: 8rem; /* espace pour FAB + bottom nav */
           max-width: 1280px;
           margin: 0 auto;
         }
@@ -214,8 +215,7 @@ export default function MemberHomePage() {
           animation: mbpulse 2s ease-in-out infinite;
         }
         @keyframes mbpulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.8)} }
-        
-        /* Titre plus affirmé */
+
         .mb-title {
           font-family: 'Cormorant Garamond', serif;
           font-size: clamp(1.6rem, 3.5vw, 2.1rem);
@@ -234,75 +234,15 @@ export default function MemberHomePage() {
           white-space: nowrap;
         }
 
-        /* ── HERO SECTION (DOCK CARTE + STATS) ── */
-        .mb-hero {
-          display: flex;
-          gap: 2rem;
-          align-items: flex-start;
-          margin-bottom: 1.5rem;
-        }
-        .mb-hero-left {
-          flex: 1;
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 1.5rem;
-        }
-        .mb-hero-right {
-          width: 400px;
-          flex-shrink: 0;
-        }
-        @media (max-width: 1024px) {
-          .mb-hero { flex-direction: column; }
-          .mb-hero-right { width: 100%; max-width: 400px; margin: 0 auto; }
-        }
-
-        /* ── LE DOCK (Emplacement Carte) ── */
-        .mb-card-dock {
-          position: relative;
-          width: 100%;
-          border: 2px dashed rgba(37,99,235,0.25);
-          border-radius: 24px;
-          background: rgba(37,99,235,0.02);
-          padding: 0.5rem; /* Espace autour du widget */
-          animation: mbin 0.5s 0.15s cubic-bezier(.22,1,.36,1) forwards;
-          opacity: 0;
-        }
-        .mb-dock-placeholder {
-          position: absolute;
-          inset: 0;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 0.6rem;
-          color: #94A3B8;
-          z-index: 0;
-        }
-        .mb-dock-text {
-          font-size: 0.75rem;
-          font-weight: 700;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-        }
-        .mb-card-layer {
-          position: relative;
-          z-index: 10;
-        }
-
         /* ── Stats ── */
         .mb-stats {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
           gap: 1rem;
+          margin-bottom: 1.5rem;
         }
-
-        /* SUR MOBILE : Forcer 3 colonnes pour les stats */
         @media (max-width: 768px) {
-          .mb-stats {
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.5rem; /* Réduire l'espacement pour que ça rentre */
-          }
+          .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
         }
 
         .mb-stat {
@@ -317,18 +257,7 @@ export default function MemberHomePage() {
           animation: mbin 0.5s cubic-bezier(.22,1,.36,1) forwards;
           transition: transform 0.2s, box-shadow 0.2s;
         }
-
-        /* Ajustements internes pour les stats sur mobile */
-        @media (max-width: 768px) {
-          .mb-stat {
-            padding: 0.8rem;
-            border-radius: 12px;
-          }
-          .mb-stat-accent {
-            border-radius: 12px 12px 0 0;
-          }
-        }
-
+        @media (max-width: 768px) { .mb-stat { padding: 0.8rem; border-radius: 12px; } }
         .mb-stat:hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 22px rgba(37,99,235,0.08), 0 0 0 1px rgba(255,255,255,0.9) inset;
@@ -341,66 +270,32 @@ export default function MemberHomePage() {
           display: flex; justify-content: space-between; align-items: flex-start;
           margin-bottom: 0.8rem;
         }
-        
         @media (max-width: 768px) {
-          .mb-stat-top {
-             flex-direction: column-reverse; /* Icône au dessus du texte sur mobile si besoin, ou on garde tel quel selon la place */
-             gap: 0.4rem;
-             margin-bottom: 0.5rem;
-          }
+          .mb-stat-top { flex-direction: column-reverse; gap: 0.4rem; margin-bottom: 0.5rem; }
         }
-
         .mb-stat-label {
           font-size: 0.68rem; font-weight: 800;
           letter-spacing: 0.08em; text-transform: uppercase;
           color: #4B5563; max-width: 110px; line-height: 1.4;
         }
-
-        @media (max-width: 768px) {
-          .mb-stat-label {
-            font-size: 0.55rem;
-          }
-        }
-
+        @media (max-width: 768px) { .mb-stat-label { font-size: 0.55rem; } }
         .mb-stat-icon {
           width: 36px; height: 36px; border-radius: 10px;
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
         }
-
         @media (max-width: 768px) {
-           .mb-stat-icon {
-             width: 24px; height: 24px; border-radius: 6px;
-           }
-           .mb-stat-icon svg {
-             width: 14px; height: 14px;
-           }
+          .mb-stat-icon { width: 24px; height: 24px; border-radius: 6px; }
+          .mb-stat-icon svg { width: 14px; height: 14px; }
         }
-
         .mb-stat-value {
           font-family: 'Cormorant Garamond', serif;
           font-size: 1.85rem; font-weight: 700;
           color: #111827; letter-spacing: -0.03em;
           line-height: 1; margin-bottom: 0.4rem;
         }
-
-        @media (max-width: 768px) {
-           .mb-stat-value {
-             font-size: 1.2rem;
-             word-break: break-word; /* Evite que le texte ne dépasse de la carte */
-           }
-        }
-
-        .mb-stat-sub {
-          font-size: 0.72rem; color: #6B7280; font-weight: 600;
-        }
-
-        @media (max-width: 768px) {
-           .mb-stat-sub {
-             font-size: 0.55rem;
-             line-height: 1.2;
-           }
-        }
-
+        @media (max-width: 768px) { .mb-stat-value { font-size: 1.2rem; word-break: break-word; } }
+        .mb-stat-sub { font-size: 0.72rem; color: #6B7280; font-weight: 600; }
+        @media (max-width: 768px) { .mb-stat-sub { font-size: 0.55rem; line-height: 1.2; } }
 
         /* ── Bottom grid ── */
         .mb-grid2 {
@@ -443,11 +338,9 @@ export default function MemberHomePage() {
           border: 1px solid #BFDBFE;
         }
 
-        /* ── Table (Textes plus visibles) ── */
+        /* ── Table ── */
         .mb-table { width: 100%; border-collapse: collapse; }
-        .mb-table thead tr {
-          border-bottom: 1px solid rgba(37,99,235,0.1);
-        }
+        .mb-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.1); }
         .mb-table thead th {
           padding: 0.75rem 1.4rem;
           font-size: 0.68rem; font-weight: 800;
@@ -471,29 +364,91 @@ export default function MemberHomePage() {
         }
         .mb-table td.muted { color: #6B7280; font-size: 0.78rem; font-weight: 500; }
 
-        /* Member pill */
-        .mb-member-pill {
-          display: flex; align-items: center; gap: 0.6rem;
-        }
+        .mb-member-pill { display: flex; align-items: center; gap: 0.6rem; }
         .mb-avatar-sm {
           width: 30px; height: 30px; border-radius: 50%;
           background: linear-gradient(135deg, #2563EB, #3B82F6);
           display: flex; align-items: center; justify-content: center;
           font-size: 0.65rem; font-weight: 700; color: white; flex-shrink: 0;
         }
-
-        /* late bar */
-        .mb-late-bar {
-          display: flex; align-items: center; gap: 0.6rem;
-        }
+        .mb-late-bar { display: flex; align-items: center; gap: 0.6rem; }
         .mb-late-track {
           flex: 1; height: 5px; background: #FEE2E2;
           border-radius: 99px; overflow: hidden; max-width: 65px;
         }
-        .mb-late-fill {
-          height: 100%; background: #DC2626;
-          border-radius: 99px;
+        .mb-late-fill { height: 100%; background: #DC2626; border-radius: 99px; }
+
+        /* ── FAB ── */
+        .mb-fab {
+          position: fixed;
+          bottom: calc(64px + 1rem); /* 64px = hauteur approx de la bottom nav */
+          right: 1rem;
+          z-index: 100;
+          background: linear-gradient(135deg, #10B981 0%, #065F46 100%);
+          color: white;
+          border: none;
+          border-radius: 50px;
+          padding: 0.85rem 1.4rem;
+          font-family: 'DM Sans', sans-serif;
+          font-weight: 700;
+          font-size: 0.88rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 0.55rem;
+          box-shadow: 0 6px 20px rgba(16,185,129,0.35), 0 2px 8px rgba(0,0,0,0.12);
+          transition: transform 0.2s, box-shadow 0.2s;
+          opacity: 0;
+          animation: mbin 0.5s 0.5s cubic-bezier(.22,1,.36,1) forwards;
         }
+        .mb-fab:hover {
+          transform: translateY(-3px) scale(1.03);
+          box-shadow: 0 10px 28px rgba(16,185,129,0.45), 0 4px 10px rgba(0,0,0,0.15);
+        }
+        .mb-fab:active { transform: scale(0.97); }
+
+        /* ── Modale ── */
+        .mb-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 200;
+          background: rgba(0,0,0,0.55);
+          backdrop-filter: blur(6px);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 1.5rem;
+          animation: mbfadein 0.25s ease forwards;
+        }
+        @keyframes mbfadein { from { opacity: 0 } to { opacity: 1 } }
+
+        .mb-modal-inner {
+          position: relative;
+          width: 100%;
+          max-width: 420px;
+          animation: mbscalein 0.3s cubic-bezier(.22,1,.36,1) forwards;
+        }
+        @keyframes mbscalein {
+          from { opacity: 0; transform: scale(0.88) translateY(20px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .mb-modal-close {
+          position: absolute;
+          top: -0.75rem;
+          right: -0.75rem;
+          z-index: 10;
+          width: 34px; height: 34px;
+          background: white;
+          border: 1px solid rgba(0,0,0,0.12);
+          border-radius: 50%;
+          cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          color: #374151;
+          transition: background 0.15s, transform 0.15s;
+        }
+        .mb-modal-close:hover { background: #F3F4F6; transform: scale(1.1); }
 
         /* error / loader */
         .mb-error {
@@ -503,12 +458,14 @@ export default function MemberHomePage() {
           border: 1px solid rgba(185,28,28,0.18);
           border-radius: 14px; color: #B91C1C;
           font-size: 0.82rem; margin-bottom: 1.5rem;
+          font-family: 'DM Sans', sans-serif;
         }
         .mb-loader {
           display: flex; flex-direction: column;
           align-items: center; justify-content: center;
           min-height: 55vh; gap: 1rem;
           color: #6B7280; font-size: 0.85rem; font-weight: 600;
+          font-family: 'DM Sans', sans-serif;
         }
         .mb-ring {
           width: 40px; height: 40px;
@@ -553,58 +510,31 @@ export default function MemberHomePage() {
             </div>
           </div>
 
-          {/* ── NOUVELLE DISPOSITION : HÉROS (Stats à gauche, Dock Carte à droite) ── */}
-          <div className="mb-hero">
-            
-            {/* Colonne de gauche (Bannière + Stats) */}
-            <div className="mb-hero-left">
-              {me && <MemberStatusBanner me={me} />}
+          {/* ── Bannière statut ── */}
+          {me && <MemberStatusBanner me={me} />}
 
-              <div className="mb-stats">
-                {stats.map((s, i) => (
-                  <div
-                    key={s.label}
-                    className="mb-stat"
-                    style={{ animationDelay: `${0.1 + i * 0.06}s` }}
-                  >
-                    <div className="mb-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}, ${s.color}55)` }} />
-                    <div className="mb-stat-top">
-                      <span className="mb-stat-label">{s.label}</span>
-                      <div className="mb-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                    </div>
-                    <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
-                    <div className="mb-stat-sub">{s.sub}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Colonne de droite (Le Dock de la Carte Virtuelle) */}
-            <div className="mb-hero-right">
-              <div className="mb-card-dock">
-                
-                {/* Le texte qui reste au fond quand on déplace la carte */}
-                <div className="mb-dock-placeholder">
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                  <span className="mb-dock-text">Emplacement de la carte</span>
+          {/* ── Stats ── */}
+          <div className="mb-stats" style={{ marginTop: '1.5rem' }}>
+            {stats.map((s, i) => (
+              <div
+                key={s.label}
+                className="mb-stat"
+                style={{ animationDelay: `${0.1 + i * 0.06}s` }}
+              >
+                <div className="mb-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}, ${s.color}55)` }} />
+                <div className="mb-stat-top">
+                  <span className="mb-stat-label">{s.label}</span>
+                  <div className="mb-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
                 </div>
-
-                {/* La carte par-dessus */}
-                <div className="mb-card-layer">
-                  <VirtualCardWidget card={data.virtualCard || null} />
-                </div>
-
+                <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
+                <div className="mb-stat-sub">{s.sub}</div>
               </div>
-            </div>
-
+            ))}
           </div>
 
           {/* ── Row 1 : Contributions + Projects ── */}
           <div className="mb-grid2">
 
-            {/* Cotisations */}
             <div className="mb-panel" style={{ animationDelay: '0.48s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
@@ -620,13 +550,7 @@ export default function MemberHomePage() {
                 )}
               </div>
               <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th>Montant</th>
-                    <th>Statut</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Montant</th><th>Statut</th><th>Date</th></tr></thead>
                 <tbody>
                   {(data.recentContributions || []).length === 0 && <EmptyRow cols={3} label="Aucune cotisation enregistrée" />}
                   {(data.recentContributions || []).map(c => (
@@ -640,7 +564,6 @@ export default function MemberHomePage() {
               </table>
             </div>
 
-            {/* Projets */}
             <div className="mb-panel" style={{ animationDelay: '0.53s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
@@ -658,13 +581,7 @@ export default function MemberHomePage() {
                 )}
               </div>
               <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th>Projet</th>
-                    <th>Statut</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Projet</th><th>Statut</th><th>Date</th></tr></thead>
                 <tbody>
                   {(data.projectsInProgress || []).length === 0 && <EmptyRow cols={3} label="Aucun projet actif" />}
                   {(data.projectsInProgress || []).map(p => (
@@ -682,7 +599,6 @@ export default function MemberHomePage() {
           {/* ── Row 2 : Contents + Late members ── */}
           <div className="mb-grid2">
 
-            {/* Actualités */}
             <div className="mb-panel" style={{ animationDelay: '0.58s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
@@ -695,13 +611,7 @@ export default function MemberHomePage() {
                 </div>
               </div>
               <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th>Titre</th>
-                    <th>Statut</th>
-                    <th>Date</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Titre</th><th>Statut</th><th>Date</th></tr></thead>
                 <tbody>
                   {(data.latestContents || []).length === 0 && <EmptyRow cols={3} label="Aucune actualité publiée" />}
                   {(data.latestContents || []).map(c => (
@@ -715,13 +625,12 @@ export default function MemberHomePage() {
               </table>
             </div>
 
-            {/* Retardataires */}
             <div className="mb-panel" style={{ animationDelay: '0.63s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
                   <div className="mb-panel-ico" style={{ background: '#FEF2F2', color: '#DC2626' }}>
                     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77-1.333.192 3 1.732 3z"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                     </svg>
                   </div>
                   Retardataires · +3 mois
@@ -733,12 +642,7 @@ export default function MemberHomePage() {
                 )}
               </div>
               <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th>Membre</th>
-                    <th>Retard</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Membre</th><th>Retard</th></tr></thead>
                 <tbody>
                   {(data.lateMembersPreview || []).length === 0 && <EmptyRow cols={2} label="Aucun retardataire — bravo !" />}
                   {(data.lateMembersPreview || []).map(m => {
@@ -776,6 +680,47 @@ export default function MemberHomePage() {
 
         </div>
       )}
+
+      {/* ── FAB flottant ── */}
+      {data && (
+        <button
+          type="button"
+          className="mb-fab"
+          onClick={() => setIsCardVisible(true)}
+          aria-label="Afficher ma carte virtuelle"
+        >
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+          Ma carte
+        </button>
+      )}
+
+      {/* ── Modale carte ── */}
+      {isCardVisible && (
+        <div
+          className="mb-modal-overlay"
+          onClick={() => setIsCardVisible(false)}
+        >
+          <div
+            className="mb-modal-inner"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="mb-modal-close"
+              onClick={() => setIsCardVisible(false)}
+              aria-label="Fermer"
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <VirtualCardWidget card={data?.virtualCard || null} />
+          </div>
+        </div>
+      )}
+
     </AppShell>
   );
 }

@@ -42,28 +42,24 @@ export default function LoginPage() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-          --gold: #A8782A;
-          --gold-light: #C9952E;
-          --gold-pale: #F5E6C0;
-          --bg: #F2EDE6;
-          --bg-2: #EDE6DC;
-          --surface: #FDFAF6;
-          --border: rgba(168,120,42,0.18);
-          --text: #1A1510;
-          --text-2: #3D3020;
-          --mist: #8A7A60;
-          --error: #C0392B;
+          --emerald: #059669;
+          --forest: #064E3B;
+          --mint: #ECFDF5;
+          --surface: #FFFFFF;
+          --text-deep: #064E3B;
+          --text-muted: #6B7280;
+          --error: #DC2626;
         }
 
         .lp-root {
           font-family: 'DM Sans', sans-serif;
           min-height: 100svh;
-          background: linear-gradient(145deg, #EDE6DC 0%, #F5EFE6 50%, #E8E0D4 100%);
+          background: radial-gradient(circle at top left, #F0FDF4, #DCFCE7);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -72,353 +68,213 @@ export default function LoginPage() {
           padding: 1.5rem;
         }
 
-        /* ── Orbs ── */
+        /* ── Animated Green Orbs ── */
         .lp-orb {
           position: absolute;
           border-radius: 50%;
-          filter: blur(90px);
+          filter: blur(80px);
           pointer-events: none;
-          will-change: transform;
+          z-index: 0;
+          opacity: 0.5;
         }
         .lp-orb-1 {
-          width: 420px; height: 420px;
-          background: radial-gradient(circle, rgba(201,168,76,0.22) 0%, transparent 70%);
-          top: -120px; left: -120px;
-          animation: drift1 14s ease-in-out infinite alternate;
+          width: 450px; height: 450px;
+          background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+          top: -150px; right: -100px;
+          animation: drift 15s ease-in-out infinite alternate;
         }
         .lp-orb-2 {
-          width: 340px; height: 340px;
-          background: radial-gradient(circle, rgba(100,140,200,0.12) 0%, transparent 70%);
-          bottom: -80px; right: -80px;
-          animation: drift2 18s ease-in-out infinite alternate;
-        }
-        .lp-orb-3 {
-          width: 200px; height: 200px;
-          background: radial-gradient(circle, rgba(201,168,76,0.14) 0%, transparent 70%);
-          top: 50%; left: 50%;
-          transform: translate(-50%, -50%);
-          animation: pulse 8s ease-in-out infinite;
+          width: 350px; height: 350px;
+          background: radial-gradient(circle, rgba(5, 150, 105, 0.15) 0%, transparent 70%);
+          bottom: -100px; left: -50px;
+          animation: drift 20s ease-in-out infinite alternate-reverse;
         }
 
-        @keyframes drift1 {
-          from { transform: translate(0, 0); }
-          to   { transform: translate(40px, 40px); }
-        }
-        @keyframes drift2 {
-          from { transform: translate(0, 0); }
-          to   { transform: translate(-30px, -30px); }
-        }
-        @keyframes pulse {
-          0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(1); }
-          50%       { opacity: 0.8; transform: translate(-50%, -50%) scale(1.2); }
+        @keyframes drift {
+          from { transform: translate(0, 0) scale(1); }
+          to { transform: translate(30px, 50px) scale(1.1); }
         }
 
-        /* ── Grid lines ── */
-        .lp-grid {
-          position: absolute; inset: 0;
-          background-image:
-            linear-gradient(rgba(168,120,42,0.07) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(168,120,42,0.07) 1px, transparent 1px);
-          background-size: 60px 60px;
-          pointer-events: none;
-        }
-
-        /* ── Card ── */
+        /* ── Login Card ── */
         .lp-card {
           position: relative; z-index: 10;
-          width: 100%; max-width: 440px;
-          background: rgba(253,250,246,0.85);
+          width: 100%; max-width: 480px;
+          background: rgba(255, 255, 255, 0.85);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(168,120,42,0.15);
-          border-radius: 28px;
-          padding: clamp(2rem, 6vw, 3rem);
-          box-shadow:
-            0 0 0 1px rgba(255,255,255,0.8) inset,
-            0 32px 80px rgba(100,80,40,0.12),
-            0 4px 16px rgba(168,120,42,0.08);
+          border: 1px solid rgba(5, 150, 105, 0.1);
+          border-radius: 32px;
+          padding: clamp(2rem, 5vw, 3.5rem);
+          box-shadow: 
+            0 25px 50px -12px rgba(6, 78, 59, 0.15),
+            0 0 0 1px rgba(255, 255, 255, 0.7) inset;
           opacity: 0;
-          transform: translateY(24px);
-          transition: opacity 0.7s cubic-bezier(.22,1,.36,1), transform 0.7s cubic-bezier(.22,1,.36,1);
+          transform: translateY(20px);
+          transition: all 0.8s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .lp-card.visible {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        .lp-card.visible { opacity: 1; transform: translateY(0); }
 
-        /* ── Logo ── */
+        /* ── Logo Container ── */
         .lp-logo-wrap {
           display: flex;
           flex-direction: column;
           align-items: center;
-          margin-bottom: 2.25rem;
-          gap: 1.25rem;
+          margin-bottom: 2rem;
+          gap: 1.5rem;
         }
-
-        .lp-logo-ring {
-          position: relative;
-          width: 80px; height: 80px;
-        }
-        .lp-logo-ring::before {
-          content: '';
-          position: absolute; inset: -3px;
+        .lp-logo-box {
+          width: 88px; height: 88px;
+          padding: 4px;
+          background: linear-gradient(135deg, var(--emerald), var(--forest));
           border-radius: 50%;
-          background: conic-gradient(var(--gold), var(--gold-light), transparent 60%, var(--gold));
-          animation: spin 8s linear infinite;
+          box-shadow: 0 10px 20px rgba(6, 78, 59, 0.2);
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-
         .lp-logo-inner {
-          position: relative; z-index: 1;
-          width: 80px; height: 80px;
-          background: var(--surface);
+          width: 100%; height: 100%;
+          background: white;
           border-radius: 50%;
-          display: flex; align-items: center; justify-content: center;
           overflow: hidden;
-          border: 2px solid rgba(168,120,42,0.2);
+          display: flex; align-items: center; justify-content: center;
         }
 
         .lp-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(1.8rem, 5vw, 2.25rem);
-          font-weight: 500;
-          color: var(--text);
-          letter-spacing: -0.02em;
+          font-size: clamp(1.4rem, 4vw, 1.8rem);
+          font-weight: 700;
+          color: var(--text-deep);
           text-align: center;
-          line-height: 1.1;
+          line-height: 1.2;
         }
         .lp-title span {
-          background: linear-gradient(135deg, var(--gold), var(--gold-light));
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-
-        .lp-subtitle {
-          font-size: 0.82rem;
-          color: var(--mist);
-          text-align: center;
-          letter-spacing: 0.03em;
+          display: block;
+          color: var(--emerald);
+          font-size: 0.85em;
           margin-top: 0.4rem;
-          font-weight: 400;
+          font-weight: 500;
         }
 
-        /* ── Divider ── */
-        .lp-divider {
-          width: 40px; height: 1px;
-          background: linear-gradient(90deg, transparent, var(--gold), transparent);
-          margin: 0 auto 1.75rem;
-        }
-
-        /* ── Fields ── */
-        .lp-field {
-          display: flex;
-          flex-direction: column;
-          gap: 0.45rem;
-          margin-bottom: 1.1rem;
-        }
-
+        /* ── Form Fields ── */
+        .lp-field { margin-bottom: 1.25rem; }
         .lp-label {
-          font-size: 0.72rem;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          color: var(--gold);
+          display: block; font-size: 0.72rem; font-weight: 700;
+          text-transform: uppercase; letter-spacing: 0.08em;
+          color: var(--forest); margin-bottom: 0.5rem; margin-left: 0.2rem;
         }
-
-        .lp-input-wrap {
-          position: relative;
-        }
-
+        .lp-input-wrap { position: relative; }
         .lp-input {
-          width: 100%;
-          height: 52px;
-          background: rgba(255,255,255,0.7);
-          border: 1px solid rgba(168,120,42,0.18);
-          border-radius: 14px;
-          padding: 0 1.1rem;
-          color: var(--text);
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.92rem;
-          outline: none;
-          transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
-          -webkit-appearance: none;
+          width: 100%; height: 54px;
+          background: rgba(255, 255, 255, 0.9);
+          border: 1.5px solid rgba(5, 150, 105, 0.1);
+          border-radius: 14px; padding: 0 1.25rem;
+          font-size: 0.95rem; color: var(--text-deep);
+          transition: all 0.25s ease; outline: none;
         }
-        .lp-input::placeholder { color: rgba(138,122,96,0.45); }
         .lp-input:focus {
-          border-color: rgba(168,120,42,0.55);
-          background: rgba(255,255,255,0.95);
-          box-shadow: 0 0 0 3px rgba(168,120,42,0.10), inset 0 1px 0 rgba(255,255,255,0.8);
+          border-color: var(--emerald);
+          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+          background: white;
         }
-        .lp-input.has-toggle { padding-right: 3rem; }
 
         .lp-toggle-btn {
-          position: absolute;
-          right: 0.9rem; top: 50%;
+          position: absolute; right: 1rem; top: 50%;
           transform: translateY(-50%);
-          background: none; border: none;
-          color: var(--mist);
-          cursor: pointer;
-          padding: 4px;
-          display: flex; align-items: center;
-          transition: color 0.2s;
-        }
-        .lp-toggle-btn:hover { color: var(--gold); }
-
-        /* ── Forgot ── */
-        .lp-forgot {
-          display: flex;
-          justify-content: flex-end;
-          margin-top: 0.5rem;
-        }
-        .lp-forgot a {
-          font-size: 0.76rem;
-          color: var(--mist);
-          text-decoration: none;
-          letter-spacing: 0.02em;
-          transition: color 0.2s;
-        }
-        .lp-forgot a:hover { color: var(--gold); }
-
-        /* ── Error ── */
-        .lp-error {
-          display: flex;
-          align-items: center;
-          gap: 0.6rem;
-          padding: 0.85rem 1rem;
-          background: rgba(192,57,43,0.06);
-          border: 1px solid rgba(192,57,43,0.2);
-          border-radius: 12px;
-          color: #A02020;
-          font-size: 0.82rem;
-          margin-bottom: 1.1rem;
-          line-height: 1.45;
+          background: none; border: none; color: var(--text-muted);
+          cursor: pointer; display: flex; padding: 4px;
         }
 
-        /* ── Submit ── */
+        .lp-forgot { text-align: right; margin-top: 0.5rem; }
+        .lp-forgot a { font-size: 0.75rem; color: var(--emerald); text-decoration: none; font-weight: 600; }
+
+        /* ── Submit Button ── */
         .lp-btn {
-          width: 100%;
-          height: 52px;
-          background: linear-gradient(135deg, #8A6018 0%, var(--gold) 50%, var(--gold-light) 100%);
-          background-size: 200% 100%;
-          background-position: 0% 0%;
-          border: none;
-          border-radius: 14px;
-          color: #FDFAF6;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.92rem;
-          font-weight: 700;
-          letter-spacing: 0.06em;
-          text-transform: uppercase;
-          cursor: pointer;
-          transition: background-position 0.4s ease, transform 0.15s, box-shadow 0.3s;
-          box-shadow: 0 4px 20px rgba(168,120,42,0.3);
-          display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-          margin-top: 1.5rem;
+          width: 100%; height: 54px;
+          background: var(--forest);
+          color: white; border: none; border-radius: 14px;
+          font-size: 1rem; font-weight: 700; letter-spacing: 0.03em;
+          cursor: pointer; margin-top: 1.5rem;
+          transition: all 0.3s ease;
+          display: flex; align-items: center; justify-content: center; gap: 0.75rem;
+          box-shadow: 0 10px 25px rgba(6, 78, 59, 0.2);
         }
         .lp-btn:hover:not(:disabled) {
-          background-position: 100% 0%;
-          box-shadow: 0 8px 28px rgba(168,120,42,0.45);
-          transform: translateY(-1px);
+          background: var(--emerald);
+          transform: translateY(-2px);
+          box-shadow: 0 15px 30px rgba(6, 78, 59, 0.3);
         }
-        .lp-btn:active:not(:disabled) { transform: translateY(0); }
-        .lp-btn:disabled {
-          opacity: 0.65; cursor: not-allowed;
+        .lp-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+
+        .lp-error {
+          background: #FEF2F2; border: 1px solid #FECACA;
+          padding: 0.8rem 1rem; color: var(--error);
+          font-size: 0.82rem; border-radius: 12px;
+          margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.6rem;
         }
 
-        .lp-spinner {
-          width: 18px; height: 18px;
-          border: 2px solid rgba(253,250,246,0.3);
-          border-top-color: #FDFAF6;
-          border-radius: 50%;
-          animation: spin 0.7s linear infinite;
-        }
-
-        /* ── Footer ── */
         .lp-footer {
-          margin-top: 1.75rem;
-          padding-top: 1.5rem;
-          border-top: 1px solid rgba(168,120,42,0.12);
+          margin-top: 2rem; padding-top: 1.5rem;
+          border-top: 1px dotted rgba(5, 150, 105, 0.2);
           text-align: center;
         }
-        .lp-footer p {
-          font-size: 0.8rem;
-          color: var(--mist);
-          margin-bottom: 1rem;
+        .lp-footer p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem; }
+        
+        .lp-signup-link {
+          display: inline-flex; align-items: center; gap: 0.5rem;
+          color: var(--forest); font-weight: 700;
+          text-decoration: none; font-size: 0.9rem;
+          transition: transform 0.2s ease;
         }
-        .lp-enroll-btn {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          width: 100%;
-          height: 50px;
-          background: transparent;
-          border: 1px solid rgba(168,120,42,0.3);
-          border-radius: 14px;
-          color: var(--gold);
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.86rem;
-          font-weight: 600;
-          text-decoration: none;
-          letter-spacing: 0.04em;
-          transition: background 0.25s, border-color 0.25s, transform 0.15s;
-        }
-        .lp-enroll-btn:hover {
-          background: rgba(168,120,42,0.07);
-          border-color: rgba(168,120,42,0.5);
-          transform: translateY(-1px);
-        }
-        .lp-enroll-btn svg {
-          transition: transform 0.25s;
-        }
-        .lp-enroll-btn:hover svg {
-          transform: translateX(4px);
-        }
+        .lp-signup-link:hover { transform: translateX(3px); color: var(--emerald); }
 
-        /* ── Mobile tweaks ── */
+        .spinner {
+          width: 20px; height: 20px;
+          border: 2.5px solid rgba(255,255,255,0.3);
+          border-top-color: #fff; border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         @media (max-width: 480px) {
-          .lp-root { padding: 1rem; }
-          .lp-card { border-radius: 22px; }
+          .lp-root { padding: 0; background: white; }
+          .lp-card { border-radius: 0; min-height: 100svh; border: none; box-shadow: none; display: flex; flex-direction: column; justify-content: center; }
+          .lp-orb { display: none; }
         }
       `}</style>
 
       <div className="lp-root">
-        <div className="lp-grid" />
         <div className="lp-orb lp-orb-1" />
         <div className="lp-orb lp-orb-2" />
-        <div className="lp-orb lp-orb-3" />
 
         <div className={`lp-card ${mounted ? 'visible' : ''}`}>
-
-          {/* Logo + Titre */}
+          {/* Logo Section */}
           <div className="lp-logo-wrap">
-            <div className="lp-logo-ring">
+            <div className="lp-logo-box">
               <div className="lp-logo-inner">
                 <Image
                   src="/assets/images/logolcd.jpg"
                   alt="Logo Lélouma Communauté"
-                  width={64}
-                  height={64}
-                  style={{ objectFit: 'contain', borderRadius: '50%' }}
+                  width={88}
+                  height={88}
                   priority
+                  style={{ objectFit: 'cover' }}
                 />
               </div>
             </div>
-            <div>
-              <h1 className="lp-title">
-                Bon <span>retour</span>
-              </h1>
-              <p className="lp-subtitle">Espace membres · Lélouma Communauté</p>
-            </div>
+            <h1 className="lp-title">
+              Bienvenue dans votre <span>Espace sécurisé</span>
+              <small style={{ display: 'block', fontSize: '0.6em', marginTop: '0.5rem', fontWeight: 400, opacity: 0.8, color: 'var(--text-muted)' }}>
+                LELOUMA COMMUNAUTE POUR LE DEVELOPPEMENT
+              </small>
+            </h1>
           </div>
 
-          <div className="lp-divider" />
+          {error && (
+            <div className="lp-error">
+              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+              {error}
+            </div>
+          )}
 
-          {/* Formulaire */}
           <form onSubmit={onSubmit}>
-
-            {/* Email */}
             <div className="lp-field">
               <label className="lp-label">Adresse email</label>
               <div className="lp-input-wrap">
@@ -427,42 +283,35 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="votre@email.com"
                   required
                   autoComplete="email"
-                  placeholder="vous@exemple.com"
                 />
               </div>
             </div>
 
-            {/* Mot de passe */}
             <div className="lp-field">
               <label className="lp-label">Mot de passe</label>
               <div className="lp-input-wrap">
                 <input
-                  className="lp-input has-toggle"
+                  className="lp-input"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
                   required
                   autoComplete="current-password"
-                  placeholder="••••••••"
                 />
                 <button
                   type="button"
                   className="lp-toggle-btn"
                   onClick={() => setShowPassword(!showPassword)}
-                  tabIndex={-1}
-                  aria-label={showPassword ? 'Masquer' : 'Afficher'}
+                  aria-label={showPassword ? "Masquer" : "Afficher"}
                 >
                   {showPassword ? (
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-                    </svg>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
                   ) : (
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                    </svg>
+                    <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                   )}
                 </button>
               </div>
@@ -471,38 +320,18 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Erreur */}
-            {error && (
-              <div className="lp-error">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{flexShrink:0}}>
-                  <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
-                </svg>
-                {error}
-              </div>
-            )}
-
-            {/* Bouton */}
             <button type="submit" className="lp-btn" disabled={loading}>
-              {loading ? (
-                <>
-                  <div className="lp-spinner" />
-                  Connexion…
-                </>
-              ) : 'Se connecter'}
+              {loading ? <div className="spinner" /> : 'Accéder à mon espace'}
             </button>
           </form>
 
-          {/* Footer inscription */}
-          <div className="lp-footer">
-            <p>Pas encore de compte ?</p>
-            <Link href="/signup" className="lp-enroll-btn">
-              S&apos;enrôler · Devenir membre
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
-              </svg>
+          <footer className="lp-footer">
+            <p>Pas encore membre ?</p>
+            <Link href="/signup" className="lp-signup-link">
+              Rejoindre la communauté
+              <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </Link>
-          </div>
-
+          </footer>
         </div>
       </div>
     </>

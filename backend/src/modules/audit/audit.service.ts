@@ -22,12 +22,12 @@ export type AuditLogInput = {
 export class AuditService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async log(input: AuditLogInput): Promise<void> {
+  async create(input: AuditLogInput): Promise<void> {
     await this.prisma.auditLog.create({
       data: {
         associationId: input.associationId,
         antennaId: input.antennaId,
-        actorType: input.actorType ?? 'USER',
+        actorType: input.actorType ?? AuditActorType.USER,
         actorUserId: input.actorUserId,
         action: input.action,
         targetModel: input.targetModel,
@@ -39,5 +39,9 @@ export class AuditService {
         userAgent: input.userAgent,
       },
     });
+  }
+
+  async log(input: AuditLogInput): Promise<void> {
+    await this.create(input);
   }
 }

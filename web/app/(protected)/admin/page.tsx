@@ -1,4 +1,5 @@
 // web/app/(protected)/admin/page.tsx
+// web/app/(protected)/admin/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -60,33 +61,30 @@ export default function AntennaAdminDashboard() {
     );
   }
 
+  // 6 stats → 3 colonnes sur mobile (3×2), 6 colonnes sur desktop
   const stats = [
     {
       label: 'Membres actifs',
       value: data.stats.members,
       icon: (
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
-      color: '#2563EB',
-      bg: '#EFF6FF',
-      border: '#BFDBFE',
-      trend: '+3 ce mois',
+      color: '#2563EB', bg: '#EFF6FF',
+      sub: '+3 ce mois',
       trendUp: true,
     },
     {
       label: 'Adhésions en attente',
       value: data.stats.pendingApprovals,
       icon: (
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
-      color: '#D97706',
-      bg: '#FFFBEB',
-      border: '#FDE68A',
-      trend: 'À traiter',
+      color: '#D97706', bg: '#FFFBEB',
+      sub: 'À traiter',
       trendUp: null,
       urgent: data.stats.pendingApprovals > 0,
     },
@@ -94,29 +92,52 @@ export default function AntennaAdminDashboard() {
       label: 'Cotisations à valider',
       value: data.stats.pendingContributions,
       icon: (
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
         </svg>
       ),
-      color: '#7C3AED',
-      bg: '#F5F3FF',
-      border: '#DDD6FE',
-      trend: 'En attente',
+      color: '#7C3AED', bg: '#F5F3FF',
+      sub: 'En attente',
       trendUp: null,
     },
     {
       label: 'Total récolté',
       value: `${data.stats.totalValidatedAmount.toLocaleString('fr-FR')} €`,
       icon: (
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
         </svg>
       ),
-      color: '#059669',
-      bg: '#ECFDF5',
-      border: '#A7F3D0',
-      trend: '+12% vs mois dernier',
+      color: '#059669', bg: '#ECFDF5',
+      sub: '+12% vs mois dernier',
       trendUp: true,
+    },
+    {
+      label: 'Projets actifs',
+      value: data.stats.activeProjects,
+      icon: (
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+      ),
+      color: '#0891B2', bg: '#ECFEFF',
+      sub: 'En cours',
+      trendUp: null,
+    },
+    {
+      label: 'Taux de cotisation',
+      value: data.stats.members > 0
+        ? `${Math.round(((data.stats.members - (data.stats.pendingApprovals ?? 0)) / data.stats.members) * 100)}%`
+        : '—',
+      icon: (
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
+        </svg>
+      ),
+      color: '#BE185D', bg: '#FDF2F8',
+      sub: 'Membres à jour',
+      trendUp: null,
     },
   ];
 
@@ -190,20 +211,67 @@ export default function AntennaAdminDashboard() {
         }
 
         /* ── Stats grid ── */
+        /* Desktop : 6 colonnes (ou auto-fit) */
         .ad-stats {
           display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 1rem;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 0.75rem;
           margin-bottom: 1.75rem;
         }
-        @media (max-width: 900px) { .ad-stats { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 520px) { .ad-stats { grid-template-columns: 1fr; } }
+
+        /* Tablette large : 3 colonnes */
+        @media (max-width: 1100px) {
+          .ad-stats { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        /* Tablette étroite : 3 colonnes (inchangé) */
+        @media (max-width: 768px) {
+          .ad-stats {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.55rem;
+          }
+        }
+
+        /* Mobile : 3 colonnes compactes */
+        @media (max-width: 520px) {
+          .ad-stats {
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+          }
+          .ad-stat-card {
+            padding: 0.8rem 0.7rem;
+            border-radius: 14px;
+          }
+          .ad-stat-value {
+            font-size: 1.4rem;
+          }
+          .ad-stat-label {
+            font-size: 0.55rem;
+          }
+          .ad-stat-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+          }
+          .ad-stat-icon svg {
+            width: 14px;
+            height: 14px;
+          }
+          .ad-stat-sub {
+            font-size: 0.58rem;
+          }
+          .ad-stat-top {
+            flex-direction: column-reverse;
+            gap: 0.35rem;
+            margin-bottom: 0.5rem;
+          }
+        }
 
         .ad-stat-card {
           background: rgba(253,253,255,0.9);
           backdrop-filter: blur(12px);
-          border-radius: 20px;
-          padding: 1.25rem 1.4rem;
+          border-radius: 18px;
+          padding: 1.1rem 1.15rem;
           border: 1px solid rgba(37,99,235,0.10);
           box-shadow: 0 2px 12px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.8) inset;
           position: relative;
@@ -217,19 +285,12 @@ export default function AntennaAdminDashboard() {
           transform: translateY(-2px);
           box-shadow: 0 8px 24px rgba(37,99,235,0.10), 0 0 0 1px rgba(255,255,255,0.9) inset;
         }
-        .ad-stat-card::before {
-          content: '';
-          position: absolute;
-          top: 0; left: 0; right: 0;
-          height: 3px;
-          border-radius: 20px 20px 0 0;
-        }
         .ad-stat-card.urgent::after {
           content: '';
           position: absolute;
           inset: 0;
-          border-radius: 20px;
-          border: 1.5px solid;
+          border-radius: 18px;
+          border: 1.5px solid currentColor;
           pointer-events: none;
           animation: urgentborder 2s ease-in-out infinite;
         }
@@ -242,37 +303,40 @@ export default function AntennaAdminDashboard() {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
-          margin-bottom: 0.85rem;
+          margin-bottom: 0.7rem;
         }
         .ad-stat-label {
-          font-size: 0.68rem;
+          font-size: 0.62rem;
           font-weight: 700;
           letter-spacing: 0.08em;
           text-transform: uppercase;
           color: #6B7280;
           line-height: 1.4;
-          max-width: 120px;
+          max-width: 90px;
         }
         .ad-stat-icon {
-          width: 38px; height: 38px;
-          border-radius: 11px;
+          width: 32px; height: 32px;
+          border-radius: 9px;
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
         }
         .ad-stat-value {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 2.2rem;
+          font-size: 1.9rem;
           font-weight: 600;
           color: #111827;
           letter-spacing: -0.03em;
           line-height: 1;
-          margin-bottom: 0.5rem;
+          margin-bottom: 0.35rem;
+          word-break: break-word;
         }
-        .ad-stat-trend {
-          font-size: 0.72rem;
+        .ad-stat-sub {
+          font-size: 0.66rem;
           font-weight: 600;
+          color: #6B7280;
           display: flex; align-items: center; gap: 0.25rem;
         }
+        .ad-stat-sub.up { color: #059669; }
 
         /* ── Bottom grid ── */
         .ad-bottom {
@@ -444,10 +508,7 @@ export default function AntennaAdminDashboard() {
           animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
-
-        @keyframes fadein {
-          to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadein { to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       <div className="ad-wrap">
@@ -468,30 +529,28 @@ export default function AntennaAdminDashboard() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Stats — 6 cartes, 3 par ligne sur mobile */}
         <div className="ad-stats">
           {stats.map((s, i) => (
             <div
               key={s.label}
               className={`ad-stat-card${s.urgent ? ' urgent' : ''}`}
-              style={{
-                animationDelay: `${0.08 + i * 0.07}s`,
-                ['--urgent-color' as string]: s.color,
-              }}
+              style={{ animationDelay: `${0.08 + i * 0.06}s` }}
             >
-              <div
-                style={{
-                  position: 'absolute', inset: 0, borderRadius: 20,
-                  border: s.urgent ? `1.5px solid ${s.color}40` : 'none',
-                  pointerEvents: 'none',
-                }}
-              />
-              {/* top accent bar */}
+              {/* accent bar */}
               <div style={{
                 position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-                background: `linear-gradient(90deg, ${s.color}, ${s.color}66)`,
-                borderRadius: '20px 20px 0 0',
+                background: `linear-gradient(90deg, ${s.color}, ${s.color}55)`,
+                borderRadius: '18px 18px 0 0',
               }} />
+              {/* urgent border */}
+              {s.urgent && (
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: 18,
+                  border: `1.5px solid ${s.color}50`,
+                  pointerEvents: 'none',
+                }} />
+              )}
 
               <div className="ad-stat-top">
                 <span className="ad-stat-label">{s.label}</span>
@@ -504,13 +563,13 @@ export default function AntennaAdminDashboard() {
                 {s.value}
               </div>
 
-              <div className="ad-stat-trend" style={{ color: s.trendUp === true ? '#059669' : s.trendUp === false ? '#DC2626' : s.color }}>
+              <div className={`ad-stat-sub${s.trendUp === true ? ' up' : ''}`}>
                 {s.trendUp === true && (
-                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
                   </svg>
                 )}
-                {s.trend}
+                {s.sub}
               </div>
             </div>
           ))}
@@ -538,9 +597,7 @@ export default function AntennaAdminDashboard() {
               {data.recentPendingAccounts.length > 0 ? (
                 data.recentPendingAccounts.map((acc) => (
                   <div key={acc.id} className="ad-member-row">
-                    <div className="ad-avatar">
-                      {getInitials(acc.firstName, acc.lastName)}
-                    </div>
+                    <div className="ad-avatar">{getInitials(acc.firstName, acc.lastName)}</div>
                     <div className="ad-member-info">
                       <div className="ad-member-name">{acc.firstName} {acc.lastName}</div>
                       <div className="ad-member-email">{acc.email}</div>
@@ -570,7 +627,7 @@ export default function AntennaAdminDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
                   </svg>
                 </div>
-                Alertes & Rappels
+                Alertes &amp; Rappels
               </div>
             </div>
             <div>
