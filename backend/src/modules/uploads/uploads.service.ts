@@ -6,6 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { ConfigService } from '@nestjs/config';
 import { LocalStorageProvider } from './storage/local-storage.provider';
 import { S3StorageProvider } from './storage/s3-storage.provider';
+import { CloudinaryService } from './cloudinary.service';
 import { FileCategory, FileVisibility, AuditAction } from '@prisma/client';
 
 @Injectable()
@@ -16,11 +17,14 @@ export class UploadsService {
     private readonly config: ConfigService,
     private readonly localProvider: LocalStorageProvider,
     private readonly s3Provider: S3StorageProvider,
+    private readonly cloudinaryProvider: CloudinaryService,
   ) {}
 
-  private get provider() {
-    const driver = this.config.get<string>('storage.driver') || 'local';
-    return driver === 's3' ? this.s3Provider : this.localProvider;
+  /**
+   * Sélectionne dynamiquement le fournisseur de stockage basé sur STORAGE_DRIVER
+   */
+  private get currentDriver(): string {
+    return this.config.get<string>('STORAGE_DRIVER') || 'local';
   }
 
   async uploadAndCreateFileAsset(params: {
@@ -31,41 +35,78 @@ export class UploadsService {
     description?: string;
     isPublic?: boolean;
   }) {
-    const driver = this.config.get<string>('storage.driver') || 'local';
+    const driver = this.currentDriver;
     
-    const stored = await this.provider.upload({
-      buffer: params.file.buffer,
-      fileName: params.file.originalname,
-      mimeType: params.file.mimetype,
-      folder: params.folder || 'uploads',
-    });
+    // Définition de la structure de retour
+    let stored: { url: string; storageKey: string; mimeType?: string; sizeBytes?: bigint };
 
+    // --- LOGIQUE D'AIGUILLAGE CHIRURGICALE ---
+    if (driver === 'cloudinary') {
+      const res = await this.cloudinaryProvider.uploadFile(params.file);
+      stored = {
+        url: res.secure_url,
+        storageKey: res.public_id,
+        mimeType: `${res.resource_type}/${res.format}`,
+        sizeBytes: BigInt(res.bytes),
+      };
+    } else if (driver === 's3') {
+      const s3Res = await this.s3Provider.upload({
+        buffer: params.file.buffer,
+        fileName: params.file.originalname,
+        mimeType: params.file.mimetype,
+        folder: params.folder || 'uploads',
+      });
+      
+      // Fix Type: Conversion explicite en BigInt
+      stored = {
+        ...s3Res,
+        sizeBytes: s3Res.sizeBytes ? BigInt(s3Res.sizeBytes) : BigInt(params.file.size),
+      };
+    } else {
+      const localRes = await this.localProvider.upload({
+        buffer: params.file.buffer,
+        fileName: params.file.originalname,
+        mimeType: params.file.mimetype,
+        folder: params.folder || 'uploads',
+      });
+
+      // Fix Type: Conversion explicite en BigInt
+      stored = {
+        ...localRes,
+        sizeBytes: localRes.sizeBytes ? BigInt(localRes.sizeBytes) : BigInt(params.file.size),
+      };
+    }
+
+    // Création de l'enregistrement en base de données (Neon/Prisma)
     const created = await this.prisma.fileAsset.create({
       data: {
         associationId: params.actor.associationId,
         uploadedByUserId: params.actor.id,
-        storageProvider: driver, // <-- C'est ce champ qui manquait !
+        storageProvider: driver,
         originalFilename: params.file.originalname,
         storageKey: stored.storageKey,
         url: stored.url,
         mimeType: stored.mimeType ?? params.file.mimetype,
+        // Sécurité supplémentaire pour le type BigInt
         sizeBytes: stored.sizeBytes ?? BigInt(params.file.size),
         category: (params.category as FileCategory) ?? FileCategory.OTHER,
         visibility: params.isPublic ? FileVisibility.PUBLIC : FileVisibility.PRIVATE,
       },
     });
 
+    // Journalisation de l'action (Audit)
     await this.audit.log({
       associationId: params.actor.associationId,
       actorUserId: params.actor.id,
       action: AuditAction.CREATE,
       targetModel: 'FileAsset',
       targetId: created.id,
-      summary: 'Upload fichier + création FileAsset',
+      summary: `Upload fichier (${driver}) + création FileAsset`,
       metadata: {
         originalName: params.file.originalname,
         mimeType: params.file.mimetype,
-        size: params.file.size,
+        size: params.file.size.toString(),
+        provider: driver,
       },
     });
 

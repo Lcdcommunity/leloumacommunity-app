@@ -41,7 +41,6 @@ export class AuthService {
         role: true,
         status: true,
         associationId: true,
-        // antennaId a été retiré ici car il est géré par la table de relation
       },
     });
 
@@ -63,7 +62,7 @@ export class AuthService {
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    
+
     if (!isPasswordValid) {
       throw new UnauthorizedException('Identifiants invalides');
     }
@@ -77,7 +76,6 @@ export class AuthService {
       meta
     );
 
-    // On renvoie les tokens ET les infos de l'utilisateur pour le frontend
     return {
       ...tokens,
       user: {
@@ -149,8 +147,11 @@ export class AuthService {
       },
     });
 
-    const front = process.env.FRONTEND_URL || process.env.APP_BASE_URL || 'http://localhost:3000';
+    // --- FIX CHIRURGICAL ICI ---
+    // On force la lecture de FRONTEND_URL configurée sur Render
+    const front = this.config.get<string>('FRONTEND_URL') || process.env.FRONTEND_URL || 'https://lcd-comminity.vercel.app';
     const resetUrl = `${front.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
+    // ---------------------------
 
     await this.authMailer.sendPasswordResetEmail({
       to: user.email,

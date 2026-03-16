@@ -30,7 +30,6 @@ async function bootstrap() {
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
   // --- CONFIGURATION DYNAMIQUE DES CORS ---
-  // On récupère CORS_ORIGINS ou FRONTEND_URL configurés sur Render
   const originsFromEnv = process.env.CORS_ORIGINS || process.env.FRONTEND_URL;
   
   const allowedOrigins = [
@@ -45,7 +44,6 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
   });
-  // ----------------------------------------
 
   app.useGlobalPipes(
     new ValidationPipe({

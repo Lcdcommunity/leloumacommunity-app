@@ -6,22 +6,19 @@ import {
 } from '@nestjs/common';
 import {
   AuditAction,
-  MembershipApprovalStatus,
   Prisma,
 } from '@prisma/client';
-import { createHash, randomUUID } from 'crypto';
-import { promises as fs } from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UpdateMeDto } from './dto/update-me.dto';
+import { CloudinaryService } from '../uploads/cloudinary.service';
 
 type RequestMeta = {
   ipAddress?: string;
   userAgent?: string;
 };
 
-// 👇 CORRECTION ICI : On retire le filtre "status: APPROVED" pour que l'antenne remonte toujours, même en attente.
+// Configuration de l'inclusion pour les réponses utilisateur
 const meUserInclude = Prisma.validator<Prisma.UserInclude>()({
   memberships: {
     include: {
@@ -44,6 +41,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly cloudinaryService: CloudinaryService, // Injecté pour le stockage permanent
   ) {}
 
   async getMe(userId: string) {
@@ -71,7 +69,6 @@ export class UsersService {
 
     const data: Prisma.UserUpdateInput = {};
 
-    // 👇 AJOUT : Sauvegarde du Prénom et Nom
     if (dto.firstName !== undefined && dto.firstName.trim().length > 0) {
       data.firstName = dto.firstName.trim();
     }
@@ -145,6 +142,9 @@ export class UsersService {
     return this.toMeResponse(updatedUser);
   }
 
+  /**
+   * Upload de la photo de profil vers Cloudinary (Stockage permanent)
+   */
   async uploadProfilePhoto(
     userId: string,
     file: Express.Multer.File,
@@ -152,9 +152,6 @@ export class UsersService {
   ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: {
-        profilePhoto: true,
-      },
     });
 
     if (!user) {
@@ -165,79 +162,69 @@ export class UsersService {
       throw new BadRequestException('Fichier vide ou invalide');
     }
 
-    const extension = this.getExtensionFromMimeType(file.mimetype);
-    const uploadsRoot = path.resolve(process.env.LOCAL_UPLOAD_DIR || './uploads');
-    const profilePhotosDir = path.join(uploadsRoot, 'profile-photos');
+    try {
+      // 1. Appel au service Cloudinary pour stockage permanent
+      const cloudinaryRes = await this.cloudinaryService.uploadFile(file);
 
-    await fs.mkdir(profilePhotosDir, { recursive: true });
-
-    const safeBaseName = this.slugify(`${user.firstName}-${user.lastName}`);
-    const filename = `${safeBaseName}-${randomUUID()}.${extension}`;
-    const absoluteFilePath = path.join(profilePhotosDir, filename);
-
-    await fs.writeFile(absoluteFilePath, file.buffer);
-
-    const checksumSha256 = createHash('sha256').update(file.buffer).digest('hex');
-    const publicUrl = `/static/profile-photos/${filename}`;
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const createdFileAsset = await tx.fileAsset.create({
-        data: {
-          associationId: user.associationId,
-          uploadedByUserId: user.id,
-          storageProvider: 'local',
-          storageKey: `profile-photos/${filename}`,
-          originalFilename: file.originalname,
-          mimeType: file.mimetype,
-          sizeBytes: BigInt(file.size),
-          checksumSha256,
-          category: 'PROFILE_PHOTO',
-          visibility: 'PRIVATE',
-          url: publicUrl,
-          metadata: {
-            purpose: 'member-profile-photo',
+      // 2. Mise à jour en base de données (Neon)
+      const result = await this.prisma.$transaction(async (tx) => {
+        const createdFileAsset = await tx.fileAsset.create({
+          data: {
+            associationId: user.associationId,
+            uploadedByUserId: user.id,
+            storageProvider: 'cloudinary',
+            storageKey: cloudinaryRes.public_id,
+            originalFilename: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: BigInt(file.size),
+            checksumSha256: 'cloudinary-managed',
+            category: 'PROFILE_PHOTO',
+            visibility: 'PUBLIC',
+            url: cloudinaryRes.secure_url, // URL permanente HTTPS
+            metadata: {
+              purpose: 'member-profile-photo',
+              cloudinary_version: cloudinaryRes.version,
+            },
           },
-        },
+        });
+
+        const updatedUser = await tx.user.update({
+          where: { id: user.id },
+          data: {
+            profilePhotoFileId: createdFileAsset.id,
+          },
+          include: meUserInclude,
+        });
+
+        return { createdFileAsset, updatedUser };
       });
 
-      const updatedUser = await tx.user.update({
-        where: { id: user.id },
-        data: {
-          profilePhotoFileId: createdFileAsset.id,
+      // 3. Audit log
+      await this.auditService.create({
+        associationId: user.associationId,
+        actorUserId: user.id,
+        action: AuditAction.UPDATE,
+        targetModel: 'User',
+        targetId: user.id,
+        targetUserId: user.id,
+        summary: 'Mise à jour de la photo de profil (Cloudinary)',
+        metadata: {
+          fileId: result.createdFileAsset.id,
+          url: result.createdFileAsset.url,
         },
-        include: meUserInclude,
+        ipAddress: meta?.ipAddress,
+        userAgent: meta?.userAgent,
       });
 
       return {
-        createdFileAsset,
-        updatedUser,
+        message: 'Photo de profil mise à jour avec succès',
+        profilePhotoUrl: result.updatedUser.profilePhoto?.url,
+        user: this.toMeResponse(result.updatedUser),
       };
-    });
 
-    await this.auditService.create({
-      associationId: user.associationId,
-      actorUserId: user.id,
-      action: AuditAction.UPDATE,
-      targetModel: 'User',
-      targetId: user.id,
-      targetUserId: user.id,
-      summary: 'Mise à jour de la photo de profil',
-      metadata: {
-        fileId: result.createdFileAsset.id,
-        storageKey: result.createdFileAsset.storageKey,
-        originalFilename: result.createdFileAsset.originalFilename,
-        mimeType: result.createdFileAsset.mimeType,
-        sizeBytes: result.createdFileAsset.sizeBytes.toString(),
-      },
-      ipAddress: meta?.ipAddress,
-      userAgent: meta?.userAgent,
-    });
-
-    return {
-      message: 'Photo de profil mise à jour avec succès',
-      profilePhotoUrl: result.updatedUser.profilePhoto?.url ?? publicUrl,
-      user: this.toMeResponse(result.updatedUser),
-    };
+    } catch (error) {
+      throw new BadRequestException("Échec de l'upload vers Cloudinary.");
+    }
   }
 
   private normalizeNullableString(
@@ -246,31 +233,8 @@ export class UsersService {
     if (value === undefined) {
       return undefined;
     }
-
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
-  }
-
-  private getExtensionFromMimeType(mimeType: string): string {
-    switch (mimeType) {
-      case 'image/jpeg':
-        return 'jpg';
-      case 'image/png':
-        return 'png';
-      case 'image/webp':
-        return 'webp';
-      default:
-        throw new BadRequestException('Type de fichier non supporté');
-    }
-  }
-
-  private slugify(value: string): string {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-zA-Z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase();
   }
 
   private toMeResponse(user: MeUserPayload) {
