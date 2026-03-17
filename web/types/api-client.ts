@@ -152,6 +152,8 @@ export const api = {
       }${typeof params?.isActive === 'boolean' ? `&isActive=${String(params.isActive)}` : ''}`
     ),
 
+  getAntenna: (id: string) => http<Antenna>(`/super-admin/antennas/${id}`),
+
   createAntenna: (body: { code: string; name: string; city?: string; country?: string; isActive?: boolean; }) => 
     http<Antenna, typeof body>('/super-admin/antennas', { method: 'POST', body }),
 

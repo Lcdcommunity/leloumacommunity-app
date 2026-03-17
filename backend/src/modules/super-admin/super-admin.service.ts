@@ -76,6 +76,16 @@ export class SuperAdminService {
     };
   }
 
+  async getAntennaById(id: string) {
+    const antenna = await this.prisma.antenna.findUnique({
+      where: { id },
+    });
+    if (!antenna) {
+      throw new NotFoundException('Antenne introuvable.');
+    }
+    return antenna;
+  }
+
   async listUsersByRole(role: UserRole, page: number, pageSize: number, q?: string, status?: string) {
     const skip = (page - 1) * pageSize;
 
@@ -140,6 +150,64 @@ export class SuperAdminService {
     });
   }
 
+  /* ── NOUVELLES MÉTHODES DE GESTION DES UTILISATEURS (SUPER ADMIN) ── */
+
+  async updateUser(userId: string, data: any) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phone,
+        birthDate: data.birthDate ? new Date(data.birthDate) : undefined,
+        originSubPrefecture: data.originSubPrefecture,
+        city: data.city,
+        country: data.country,
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
+      },
+    });
+  }
+
+  async suspendUser(userId: string, actorId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: UserStatus.SUSPENDED,
+        suspendedByUserId: actorId,
+        suspendedAt: new Date(),
+      },
+    });
+  }
+
+  async activateUser(userId: string, actorId: string) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: UserStatus.ACTIVE,
+        approvedByUserId: actorId,
+        approvedAt: new Date(),
+        suspendedAt: null,
+        suspendedByUserId: null,
+      },
+    });
+  }
+
+  async deleteUser(userId: string, actorId: string) {
+    // Suppression logique (soft delete) pour ne pas casser l'historique
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: UserStatus.DELETED,
+        deletedAt: new Date(),
+        deletedByUserId: actorId,
+      },
+    });
+  }
+
+  /* ─────────────────────────────────────────────────────────────────── */
+
   async createAntenna(data: CreateAntennaDto, actorId: string) {
     const association = await this.prisma.association.findFirst({
       where: { isActive: true },
@@ -170,6 +238,7 @@ export class SuperAdminService {
           phone: data.phone,
           email: data.email,
           isActive: data.isActive ?? true,
+          defaultCurrency: data.defaultCurrency, // <-- Enregistrement de la devise
           createdByUserId: actorId,
         },
       });
@@ -246,6 +315,7 @@ export class SuperAdminService {
         ...(data.phone !== undefined ? { phone: data.phone } : {}),
         ...(data.email !== undefined ? { email: data.email } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency } : {}), // <-- Mise à jour de la devise
       },
     });
   }
@@ -410,6 +480,18 @@ export class SuperAdminService {
       pageSize,
       totalPages: Math.ceil(total / pageSize),
     };
+  }
+
+  async deleteProject(id: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id },
+    });
+    if (!project) {
+      throw new NotFoundException('Projet introuvable.');
+    }
+    return this.prisma.project.delete({
+      where: { id },
+    });
   }
 
   async listDocuments(page: number, pageSize: number, q?: string) {

@@ -210,6 +210,8 @@ export const api = {
       }${typeof params?.isActive === 'boolean' ? `&isActive=${String(params.isActive)}` : ''}`
     ),
 
+  getAntenna: (id: string) => http<Antenna>(`/super-admin/antennas/${id}`),
+
   createAntenna: (body: { code: string; name: string; city?: string; country?: string; isActive?: boolean }) =>
     http<Antenna, typeof body>('/super-admin/antennas', { method: 'POST', body }),
 
@@ -227,6 +229,22 @@ export const api = {
 
   createAntennaAdmin: (body: { antennaId: string; firstName: string; lastName: string; email: string; phone?: string; sendInvite?: boolean }) =>
     http<UserSummary, typeof body>('/super-admin/admins', { method: 'POST', body }),
+
+  // ==========================================
+  // GESTION DES UTILISATEURS (SUPER ADMIN)
+  // ==========================================
+  
+  updateUserSuperAdmin: (id: string, body: Partial<FullUserProfile>) =>
+    http(`/super-admin/users/${id}`, { method: 'PATCH', body }),
+
+  suspendUserSuperAdmin: (id: string) =>
+    http(`/super-admin/users/${id}/suspend`, { method: 'PATCH' }),
+
+  activateUserSuperAdmin: (id: string) =>
+    http(`/super-admin/users/${id}/activate`, { method: 'PATCH' }),
+
+  deleteUserSuperAdmin: (id: string) =>
+    http(`/super-admin/users/${id}`, { method: 'DELETE' }),
 
   // ==========================================
   // GESTION DES MEMBRES (SUPER ADMIN / ADMIN ANTENNE)

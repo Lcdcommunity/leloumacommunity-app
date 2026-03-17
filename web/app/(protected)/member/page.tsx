@@ -1,5 +1,4 @@
 //////// web/app/(protected)/member/page.tsx
-// web/app/(protected)/member/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -41,12 +40,33 @@ type MemberDashboardResponse = {
     myLastContributionAt?: string | null;
     currency?: string;
   };
+  antennaBalances?: {
+    id: string;
+    name: string;
+    balance: number;
+    currency: string;
+  }[];
   me?: UserSummary;
   user?: UserSummary;
   recentContributions?: Contribution[];
   projectsInProgress?: Project[];
   latestContents?: ContentPost[];
   lateMembersPreview?: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
+};
+
+// FIX TYPE : On définit explicitement la structure de nos cartes
+type StatCard = {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: string;
+  bg: string;
+  sub: string;
+  spanClass: string;
+  urgent?: boolean;
+  wide?: boolean;
+  clickable?: boolean;
+  onClick?: () => void;
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -84,10 +104,68 @@ function EmptyRow({ cols, label }: { cols: number; label: string }) {
   );
 }
 
+function BalancesModal({
+  balances, onClose
+}: {
+  balances?: { id: string; name: string; balance: number; currency: string }[];
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }}
+        onClick={onClose}
+      />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        zIndex: 101, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)',
+        borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)',
+        width: 'min(480px,calc(100vw - 2rem))',
+        border: '1px solid rgba(37,99,235,.15)',
+        boxShadow: '0 24px 60px rgba(37,99,235,.12)',
+        maxHeight: '85vh', overflowY: 'auto'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+            Soldes par antenne
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {!balances || balances.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280', fontSize: '0.85rem' }}>
+              Aucune donnée de solde disponible.
+            </div>
+          ) : (
+            balances.map((b) => (
+              <div key={b.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '0.9rem 1.1rem', background: '#F9FAFB', borderRadius: 14,
+                border: '1px solid #F3F4F6'
+              }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>{b.name}</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.95rem', fontWeight: 800, color: '#1D4ED8' }}>
+                  {formatCurrency(b.balance, b.currency)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function MemberHomePage() {
   const [data, setData] = useState<MemberDashboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCardVisible, setIsCardVisible] = useState(false);
+  const [showBalancesModal, setShowBalancesModal] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -110,7 +188,8 @@ export default function MemberHomePage() {
   const cur = data?.stats?.currency || 'EUR';
   const lateMonths = data?.stats?.lateMonths ?? 0;
 
-  const stats = data ? [
+  // FIX TYPE : Utilisation de StatCard[]
+  const stats: StatCard[] = data ? [
     {
       label: 'Total cotisé',
       value: formatCurrency(data.stats?.myContributionsTotal ?? data.stats?.myTotalContributions ?? 0, cur),
@@ -120,6 +199,7 @@ export default function MemberHomePage() {
         </svg>
       ),
       color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé',
+      spanClass: 'mb-span-1'
     },
     {
       label: 'Cotisations validées',
@@ -130,6 +210,7 @@ export default function MemberHomePage() {
         </svg>
       ),
       color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin",
+      spanClass: 'mb-span-1'
     },
     {
       label: 'En attente',
@@ -141,6 +222,7 @@ export default function MemberHomePage() {
       ),
       color: '#D97706', bg: '#FFFBEB', sub: 'Dépôts à valider',
       urgent: (data.stats?.myPendingContributionsCount ?? 0) > 0,
+      spanClass: 'mb-span-1'
     },
     {
       label: 'Solde association',
@@ -151,6 +233,7 @@ export default function MemberHomePage() {
         </svg>
       ),
       color: '#7C3AED', bg: '#F5F3FF', sub: 'Fonds collectifs',
+      spanClass: 'mb-span-1'
     },
     {
       label: 'Retard',
@@ -164,6 +247,7 @@ export default function MemberHomePage() {
       bg: lateMonths > 0 ? '#FEF2F2' : '#ECFDF5',
       sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !',
       urgent: lateMonths > 2,
+      spanClass: 'mb-span-1'
     },
     {
       label: 'Dernière cotisation',
@@ -174,13 +258,28 @@ export default function MemberHomePage() {
         </svg>
       ),
       color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement',
+      spanClass: 'mb-span-1'
+    },
+    {
+      label: 'Autres soldes',
+      value: 'Voir détails',
+      icon: (
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+        </svg>
+      ),
+      color: '#2563EB', bg: '#EFF6FF', sub: 'Détails par antenne',
+      clickable: true,
+      wide: true,
+      onClick: () => setShowBalancesModal(true),
+      spanClass: 'mb-span-6'
     },
   ] : [];
 
   return (
     <AppShell title="Espace membre">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
         .mb-wrap {
           font-family: 'DM Sans', sans-serif;
@@ -234,15 +333,40 @@ export default function MemberHomePage() {
           white-space: nowrap;
         }
 
-        /* ── Stats ── */
+        /* ── Stats grid ── */
         .mb-stats {
           display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 1rem;
+          grid-template-columns: repeat(6, 1fr);
+          gap: 0.75rem;
           margin-bottom: 1.5rem;
         }
+        .mb-span-1 { grid-column: span 1; }
+        .mb-span-6 { grid-column: span 6; }
+
+        @media (max-width: 1100px) {
+          .mb-stats { grid-template-columns: repeat(3, 1fr); }
+          .mb-span-6 { grid-column: span 3; }
+        }
+
         @media (max-width: 768px) {
-          .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+          /* Mobile : 3 colonnes super compactes. 3 cartes par ligne. */
+          .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+          .mb-span-6 { grid-column: span 3; }
+
+          .mb-stat {
+            padding: 0.6rem 0.5rem !important;
+            border-radius: 12px !important;
+          }
+          .mb-stat-value { font-size: 1.1rem !important; word-break: break-word; }
+          .mb-stat-label { font-size: 0.52rem !important; }
+          .mb-stat-sub   { font-size: 0.5rem !important; }
+          .mb-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
+          .mb-stat-icon svg { width: 12px; height: 12px; }
+          .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
+          
+          /* Ajustements pour les grandes cartes sur mobile */
+          .mb-stat.wide { padding: 0.8rem !important; gap: 0.6rem !important; flex-direction: column !important; align-items: flex-start !important; }
+          .mb-stat.wide .mb-stat-value { font-size: 1.4rem !important; margin-bottom: 0 !important; }
         }
 
         .mb-stat {
@@ -257,35 +381,40 @@ export default function MemberHomePage() {
           animation: mbin 0.5s cubic-bezier(.22,1,.36,1) forwards;
           transition: transform 0.2s, box-shadow 0.2s;
         }
-        @media (max-width: 768px) { .mb-stat { padding: 0.8rem; border-radius: 12px; } }
-        .mb-stat:hover {
+        .mb-stat-clickable { cursor: pointer; }
+        .mb-stat-clickable:hover {
+          transform: translateY(-3px) scale(1.01);
+          box-shadow: 0 12px 24px rgba(37,99,235,0.12), 0 0 0 1px rgba(255,255,255,0.9) inset;
+        }
+        .mb-stat:not(.mb-stat-clickable):hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 22px rgba(37,99,235,0.08), 0 0 0 1px rgba(255,255,255,0.9) inset;
+        }
+        .mb-stat.wide {
+          display: flex; align-items: center;
+          gap: 1.25rem; padding: 1rem 1.4rem;
         }
         .mb-stat-accent {
           position: absolute; top: 0; left: 0; right: 0; height: 4px;
           border-radius: 18px 18px 0 0;
         }
+        .mb-stat.wide .mb-stat-accent {
+          width: 4px; height: auto;
+          top: 0; bottom: 0; left: 0; right: auto;
+          border-radius: 18px 0 0 18px;
+        }
         .mb-stat-top {
           display: flex; justify-content: space-between; align-items: flex-start;
           margin-bottom: 0.8rem;
-        }
-        @media (max-width: 768px) {
-          .mb-stat-top { flex-direction: column-reverse; gap: 0.4rem; margin-bottom: 0.5rem; }
         }
         .mb-stat-label {
           font-size: 0.68rem; font-weight: 800;
           letter-spacing: 0.08em; text-transform: uppercase;
           color: #4B5563; max-width: 110px; line-height: 1.4;
         }
-        @media (max-width: 768px) { .mb-stat-label { font-size: 0.55rem; } }
         .mb-stat-icon {
           width: 36px; height: 36px; border-radius: 10px;
           display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
-        @media (max-width: 768px) {
-          .mb-stat-icon { width: 24px; height: 24px; border-radius: 6px; }
-          .mb-stat-icon svg { width: 14px; height: 14px; }
         }
         .mb-stat-value {
           font-family: 'Cormorant Garamond', serif;
@@ -293,9 +422,8 @@ export default function MemberHomePage() {
           color: #111827; letter-spacing: -0.03em;
           line-height: 1; margin-bottom: 0.4rem;
         }
-        @media (max-width: 768px) { .mb-stat-value { font-size: 1.2rem; word-break: break-word; } }
+        .mb-stat.wide .mb-stat-value { font-size: 2.2rem; margin-bottom: 0.2rem; }
         .mb-stat-sub { font-size: 0.72rem; color: #6B7280; font-weight: 600; }
-        @media (max-width: 768px) { .mb-stat-sub { font-size: 0.55rem; line-height: 1.2; } }
 
         /* ── Bottom grid ── */
         .mb-grid2 {
@@ -518,16 +646,40 @@ export default function MemberHomePage() {
             {stats.map((s, i) => (
               <div
                 key={s.label}
-                className="mb-stat"
+                className={`mb-stat ${s.spanClass} ${s.clickable ? 'mb-stat-clickable' : ''} ${s.wide ? 'wide' : ''}`}
                 style={{ animationDelay: `${0.1 + i * 0.06}s` }}
+                onClick={s.onClick}
               >
-                <div className="mb-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}, ${s.color}55)` }} />
-                <div className="mb-stat-top">
-                  <span className="mb-stat-label">{s.label}</span>
-                  <div className="mb-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                </div>
-                <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
-                <div className="mb-stat-sub">{s.sub}</div>
+                <div className="mb-stat-accent" style={{ background: `linear-gradient(${s.wide ? '180deg' : '90deg'}, ${s.color}, ${s.color}55)` }} />
+                {s.urgent && (
+                  <div style={{
+                    position: 'absolute', inset: 0, borderRadius: 18,
+                    border: `1.5px solid ${s.color}50`,
+                    pointerEvents: 'none',
+                  }} />
+                )}
+
+                {s.wide ? (
+                  <>
+                    <div className="mb-stat-icon" style={{ background: s.bg, color: s.color, width: 44, height: 44, borderRadius: 13 }}>
+                      {s.icon}
+                    </div>
+                    <div>
+                      <div className="mb-stat-label" style={{ marginBottom: '0.3rem' }}>{s.label}</div>
+                      <div className="mb-stat-value" style={{ color: s.urgent ? s.color : (s.clickable ? s.color : '#111827') }}>{String(s.value)}</div>
+                      <div className="mb-stat-sub">{s.sub}</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="mb-stat-top">
+                      <span className="mb-stat-label">{s.label}</span>
+                      <div className="mb-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                    </div>
+                    <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
+                    <div className="mb-stat-sub">{s.sub}</div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -719,6 +871,14 @@ export default function MemberHomePage() {
             <VirtualCardWidget card={data?.virtualCard || null} />
           </div>
         </div>
+      )}
+
+      {/* Modale des autres soldes */}
+      {showBalancesModal && (
+        <BalancesModal
+          balances={data?.antennaBalances}
+          onClose={() => setShowBalancesModal(false)}
+        />
       )}
 
     </AppShell>

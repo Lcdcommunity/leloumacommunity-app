@@ -1,5 +1,4 @@
 // web/app/(protected)/super-admin/page.tsx
-// web/app/(protected)/super-admin/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -20,6 +19,13 @@ type DashboardData = {
     activeProjects: number;
     totalValidatedContributionsAmount: number;
   };
+  // NOUVEAU : On anticipe les soldes par antenne venant du backend
+  antennaBalances?: {
+    id: string;
+    name: string;
+    balance: number;
+    currency: string;
+  }[];
   recentPendingAccounts: UserSummary[];
   recentContributions: Contribution[];
   recentProjects: Project[];
@@ -66,9 +72,69 @@ function getInitials(name: string) {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
+/* ══════════════════════════════════════════════════════ BALANCES MODAL */
+function BalancesModal({
+  balances, onClose
+}: {
+  balances?: { id: string; name: string; balance: number; currency: string }[];
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }}
+        onClick={onClose}
+      />
+      <div style={{
+        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        zIndex: 101, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)',
+        borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)',
+        width: 'min(480px,calc(100vw - 2rem))',
+        border: '1px solid rgba(37,99,235,.15)',
+        boxShadow: '0 24px 60px rgba(37,99,235,.12)',
+        maxHeight: '85vh', overflowY: 'auto'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', margin: 0 }}>
+            Soldes par antenne
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {!balances || balances.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280', fontSize: '0.85rem' }}>
+              Aucune donnée de solde disponible.
+            </div>
+          ) : (
+            balances.map((b) => (
+              <div key={b.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '0.9rem 1.1rem', background: '#F9FAFB', borderRadius: 14,
+                border: '1px solid #F3F4F6'
+              }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>{b.name}</div>
+                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.95rem', fontWeight: 800, color: '#1D4ED8' }}>
+                  {formatCurrency(b.balance, b.currency)}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════ PAGE */
 export default function SuperAdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showBalancesModal, setShowBalancesModal] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -81,25 +147,27 @@ export default function SuperAdminDashboardPage() {
     })();
   }, []);
 
-  // 6 stats normales + 1 wide → 6 par ligne desktop, 3 par ligne mobile
   const stats = data ? [
     {
       label: 'Associations',
       value: data.stats.associations,
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>,
       color: '#2563EB', bg: '#EFF6FF', sub: 'Organisations',
+      spanClass: 'sa-span-1'
     },
     {
       label: 'Antennes',
       value: data.stats.antennas,
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>,
       color: '#7C3AED', bg: '#F5F3FF', sub: 'Sections locales',
+      spanClass: 'sa-span-1'
     },
     {
       label: 'Membres',
       value: data.stats.members,
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
       color: '#059669', bg: '#ECFDF5', sub: 'Membres validés',
+      spanClass: 'sa-span-1'
     },
     {
       label: 'Comptes en attente',
@@ -107,6 +175,7 @@ export default function SuperAdminDashboardPage() {
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>,
       color: '#D97706', bg: '#FFFBEB', sub: 'À valider',
       urgent: data.stats.pendingAccounts > 0,
+      spanClass: 'sa-span-1'
     },
     {
       label: 'Cotisations',
@@ -114,26 +183,38 @@ export default function SuperAdminDashboardPage() {
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>,
       color: '#0891B2', bg: '#ECFEFF', sub: 'En attente',
       urgent: data.stats.pendingContributions > 0,
+      spanClass: 'sa-span-1'
     },
     {
       label: 'Projets actifs',
       value: data.stats.activeProjects,
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>,
       color: '#7C3AED', bg: '#F5F3FF', sub: 'En cours',
+      spanClass: 'sa-span-1'
     },
     {
       label: 'Cagnotte validée',
       value: formatCurrency(data.stats.totalValidatedContributionsAmount, 'EUR'),
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>,
-      color: '#059669', bg: '#ECFDF5', sub: 'Total global confirmé',
+      color: '#059669', bg: '#ECFDF5', sub: 'Total global',
       wide: true,
+      spanClass: 'sa-span-4' // Prend 4 colonnes sur PC, 2 sur mobile
+    },
+    {
+      label: 'Autres soldes',
+      value: 'Voir détails',
+      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>,
+      color: '#2563EB', bg: '#EFF6FF', sub: 'Détails par antenne',
+      clickable: true,
+      onClick: () => setShowBalancesModal(true),
+      spanClass: 'sa-span-2' // Prend 2 colonnes sur PC, 1 sur mobile
     },
   ] : [];
 
   return (
     <AppShell title="Super Admin · Vue globale">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
 
         .sa-wrap {
           font-family: 'DM Sans', sans-serif;
@@ -166,7 +247,7 @@ export default function SuperAdminDashboardPage() {
         .sa-title {
           font-family: 'Cormorant Garamond', serif;
           font-size: clamp(1.5rem, 3vw, 1.95rem);
-          font-weight: 500; color: #111827;
+          font-weight: 700; color: #111827;
           letter-spacing: -0.02em; line-height: 1.15;
         }
         .sa-title span {
@@ -175,7 +256,7 @@ export default function SuperAdminDashboardPage() {
         }
         .sa-chip {
           display: flex; align-items: center; gap: 0.5rem;
-          font-size: 0.75rem; color: #6B7280;
+          font-size: 0.75rem; color: #6B7280; font-weight: 600;
           background: rgba(220,38,38,0.05);
           border: 1px solid rgba(220,38,38,0.12);
           border-radius: 8px; padding: 0.45rem 0.9rem;
@@ -183,46 +264,48 @@ export default function SuperAdminDashboardPage() {
         }
         .sa-chip-dot { width: 6px; height: 6px; background: #EF4444; border-radius: 50%; }
 
-        /* ── Stats grid ──
-           Desktop  : 6 colonnes (les 6 premières) + wide sur toute la largeur
-           Tablette : 3 colonnes
-           Mobile   : 3 colonnes (compactes) — même logique que member/admin
-        */
+        /* ── Stats grid ── */
+        /* PC: 6 Colonnes. (span 1 * 6) sur L1. (span 4 + span 2) sur L2. Total = parfait. */
         .sa-stats {
           display: grid;
           grid-template-columns: repeat(6, 1fr);
           gap: 0.75rem;
           margin-bottom: 1.5rem;
         }
-        .sa-stats .wide {
-          grid-column: span 6;
-        }
+        .sa-span-1 { grid-column: span 1; }
+        .sa-span-2 { grid-column: span 2; }
+        .sa-span-4 { grid-column: span 4; }
 
         @media (max-width: 1100px) {
+          /* Tablette : 3 colonnes. (span 1 * 3) x2. Puis (span 2 + span 1). Parfait. */
           .sa-stats { grid-template-columns: repeat(3, 1fr); }
-          .sa-stats .wide { grid-column: span 3; }
+          .sa-span-4 { grid-column: span 2; }
+          .sa-span-2 { grid-column: span 1; }
         }
 
-        /* Mobile : 3 colonnes compactes */
         @media (max-width: 520px) {
+          /* Mobile : 3 colonnes super compactes. 3 cartes par ligne. Aucun espace vide. */
           .sa-stats {
             grid-template-columns: repeat(3, 1fr);
-            gap: 0.5rem;
+            gap: 0.4rem;
           }
-          .sa-stats .wide { grid-column: span 3; }
+          .sa-span-4 { grid-column: span 2; }
+          .sa-span-2 { grid-column: span 1; }
+
           .sa-stat {
-            padding: 0.75rem 0.65rem;
-            border-radius: 13px;
+            padding: 0.6rem 0.5rem;
+            border-radius: 12px;
           }
-          .sa-stat-value { font-size: 1.35rem; }
-          .sa-stat-label { font-size: 0.52rem; }
-          .sa-stat-sub   { font-size: 0.52rem; }
-          .sa-stat-icon  { width: 24px; height: 24px; border-radius: 6px; }
-          .sa-stat-icon svg { width: 13px; height: 13px; }
-          .sa-stat-top { flex-direction: column-reverse; gap: 0.3rem; margin-bottom: 0.4rem; }
-          /* Wide sur mobile : layout horizontal compact */
-          .sa-stat.wide { padding: 0.85rem 1rem; gap: 0.85rem; }
-          .sa-stat.wide .sa-stat-value { font-size: 1.6rem; }
+          .sa-stat-value { font-size: 1.1rem !important; }
+          .sa-stat-label { font-size: 0.52rem !important; }
+          .sa-stat-sub   { font-size: 0.5rem !important; }
+          .sa-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
+          .sa-stat-icon svg { width: 12px; height: 12px; }
+          .sa-stat-top { flex-direction: column-reverse; gap: 0.2rem; margin-bottom: 0.4rem; }
+          
+          /* Ajustements pour les grandes cartes sur mobile */
+          .sa-stat.wide { padding: 0.8rem 0.8rem; gap: 0.6rem; flex-direction: column !important; align-items: flex-start !important; }
+          .sa-stat.wide .sa-stat-value { font-size: 1.4rem !important; margin-bottom: 0 !important; }
         }
 
         .sa-stat {
@@ -237,7 +320,12 @@ export default function SuperAdminDashboardPage() {
           animation: sain 0.5s cubic-bezier(.22,1,.36,1) forwards;
           transition: transform 0.2s, box-shadow 0.2s;
         }
-        .sa-stat:hover {
+        .sa-stat-clickable { cursor: pointer; }
+        .sa-stat-clickable:hover {
+          transform: translateY(-3px) scale(1.01);
+          box-shadow: 0 12px 24px rgba(37,99,235,0.12), 0 0 0 1px rgba(255,255,255,0.9) inset;
+        }
+        .sa-stat:not(.sa-stat-clickable):hover {
           transform: translateY(-2px);
           box-shadow: 0 8px 20px rgba(37,99,235,0.09), 0 0 0 1px rgba(255,255,255,0.9) inset;
         }
@@ -250,7 +338,7 @@ export default function SuperAdminDashboardPage() {
           margin-bottom: 0.65rem;
         }
         .sa-stat-label {
-          font-size: 0.6rem; font-weight: 700;
+          font-size: 0.6rem; font-weight: 800;
           letter-spacing: 0.08em; text-transform: uppercase;
           color: #6B7280; max-width: 90px; line-height: 1.4;
         }
@@ -260,12 +348,12 @@ export default function SuperAdminDashboardPage() {
         }
         .sa-stat-value {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.85rem; font-weight: 600;
+          font-size: 1.85rem; font-weight: 700;
           color: #111827; letter-spacing: -0.03em; line-height: 1;
           margin-bottom: 0.28rem; word-break: break-word;
         }
         .sa-stat.wide .sa-stat-value { font-size: 2.2rem; margin-bottom: 0.2rem; }
-        .sa-stat-sub { font-size: 0.62rem; color: #9CA3AF; font-weight: 500; }
+        .sa-stat-sub { font-size: 0.62rem; color: #9CA3AF; font-weight: 600; }
         .sa-stat-accent {
           position: absolute; top: 0; left: 0; right: 0; height: 3px;
           border-radius: 18px 18px 0 0;
@@ -299,7 +387,7 @@ export default function SuperAdminDashboardPage() {
           border-bottom: 1px solid rgba(37,99,235,0.07);
         }
         .sa-panel-title {
-          font-size: 0.73rem; font-weight: 700;
+          font-size: 0.73rem; font-weight: 800;
           letter-spacing: 0.08em; text-transform: uppercase;
           color: #374151;
           display: flex; align-items: center; gap: 0.45rem;
@@ -310,7 +398,7 @@ export default function SuperAdminDashboardPage() {
           color: #2563EB;
         }
         .sa-count-chip {
-          font-size: 0.66rem; font-weight: 700;
+          font-size: 0.66rem; font-weight: 800;
           padding: 0.18rem 0.55rem; border-radius: 99px;
           background: #FFFBEB; color: #92400E;
           border: 1px solid #FDE68A;
@@ -321,7 +409,7 @@ export default function SuperAdminDashboardPage() {
         .sa-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.08); }
         .sa-table thead th {
           padding: 0.6rem 1.2rem;
-          font-size: 0.63rem; font-weight: 700;
+          font-size: 0.63rem; font-weight: 800;
           letter-spacing: 0.09em; text-transform: uppercase;
           color: #9CA3AF; text-align: left; white-space: nowrap;
         }
@@ -333,22 +421,22 @@ export default function SuperAdminDashboardPage() {
         .sa-table tbody tr:hover { background: rgba(37,99,235,0.025); }
         .sa-table td {
           padding: 0.65rem 1.2rem;
-          font-size: 0.79rem; color: #374151;
+          font-size: 0.79rem; color: #374151; font-weight: 500;
           vertical-align: middle;
         }
         .sa-table td.mono {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 0.93rem; font-weight: 600; color: #111827;
+          font-size: 0.93rem; font-weight: 700; color: #111827;
         }
         .sa-table td.muted { color: #9CA3AF; font-size: 0.72rem; }
-        .sa-table td.bold { font-weight: 600; color: #111827; }
+        .sa-table td.bold { font-weight: 700; color: #111827; }
 
         .sa-user-cell { display: flex; align-items: center; gap: 0.55rem; }
         .sa-avatar {
           width: 28px; height: 28px; border-radius: 50%;
           background: linear-gradient(135deg, #2563EB, #60A5FA);
           display: flex; align-items: center; justify-content: center;
-          font-size: 0.59rem; font-weight: 700; color: white; flex-shrink: 0;
+          font-size: 0.59rem; font-weight: 800; color: white; flex-shrink: 0;
         }
         .sa-budget-wrap { display: flex; flex-direction: column; gap: 0.22rem; }
         .sa-budget-bar {
@@ -357,7 +445,7 @@ export default function SuperAdminDashboardPage() {
         }
         .sa-budget-fill { height: 100%; border-radius: 99px; }
         .sa-role {
-          font-size: 0.64rem; font-weight: 700;
+          font-size: 0.64rem; font-weight: 800;
           padding: 0.14rem 0.5rem; border-radius: 6px;
           background: #F0F9FF; color: #0369A1;
           border: 1px solid #BAE6FD;
@@ -366,7 +454,7 @@ export default function SuperAdminDashboardPage() {
         .sa-loader {
           display: flex; flex-direction: column; align-items: center;
           justify-content: center; min-height: 55vh; gap: 1rem;
-          color: #6B7280; font-size: 0.82rem;
+          color: #6B7280; font-size: 0.82rem; font-weight: 600;
         }
         .sa-ring {
           width: 40px; height: 40px;
@@ -381,7 +469,7 @@ export default function SuperAdminDashboardPage() {
           background: rgba(185,28,28,0.06);
           border: 1px solid rgba(185,28,28,0.18);
           border-radius: 14px; color: #B91C1C;
-          font-size: 0.82rem; margin-bottom: 1.5rem;
+          font-size: 0.82rem; font-weight: 700; margin-bottom: 1.5rem;
         }
         @keyframes saspin { to { transform: rotate(360deg); } }
         @keyframes sain { to { opacity: 1; transform: translateY(0); } }
@@ -418,13 +506,14 @@ export default function SuperAdminDashboardPage() {
             </div>
           </div>
 
-          {/* Stats — 6 normales + 1 wide */}
+          {/* Stats — 6 normales + 1 wide + 1 extra */}
           <div className="sa-stats">
             {stats.map((s, i) => (
               <div
                 key={s.label}
-                className={`sa-stat${s.wide ? ' wide' : ''}`}
+                className={`sa-stat ${s.spanClass} ${s.clickable ? 'sa-stat-clickable' : ''} ${s.wide ? 'wide' : ''}`}
                 style={{ animationDelay: `${0.08 + i * 0.06}s` }}
+                onClick={s.onClick}
               >
                 <div
                   className="sa-stat-accent"
@@ -456,7 +545,7 @@ export default function SuperAdminDashboardPage() {
                       <span className="sa-stat-label">{s.label}</span>
                       <div className="sa-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
                     </div>
-                    <div className="sa-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
+                    <div className="sa-stat-value" style={{ color: s.urgent ? s.color : (s.clickable ? s.color : '#111827') }}>{String(s.value)}</div>
                     <div className="sa-stat-sub">{s.sub}</div>
                   </>
                 )}
@@ -494,7 +583,7 @@ export default function SuperAdminDashboardPage() {
                         <div className="sa-user-cell">
                           <div className="sa-avatar">{getInitials(fullName(u))}</div>
                           <div>
-                            <div style={{ fontWeight: 600, color: '#111827', fontSize: '0.8rem', lineHeight: 1.3 }}>{fullName(u)}</div>
+                            <div style={{ fontWeight: 700, color: '#111827', fontSize: '0.8rem', lineHeight: 1.3 }}>{fullName(u)}</div>
                             <div style={{ fontSize: '0.69rem', color: '#9CA3AF' }}>{u.email}</div>
                           </div>
                         </div>
@@ -538,7 +627,7 @@ export default function SuperAdminDashboardPage() {
                           <div className="sa-avatar" style={{ background: 'linear-gradient(135deg, #059669, #34D399)' }}>
                             {c.member ? getInitials(`${c.member.firstName} ${c.member.lastName}`) : '??'}
                           </div>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#111827' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>
                             {c.member ? `${c.member.firstName} ${c.member.lastName}` : c.memberId}
                           </span>
                         </div>
@@ -609,7 +698,7 @@ export default function SuperAdminDashboardPage() {
                                   }}
                                 />
                               </div>
-                              <span style={{ fontSize: '0.67rem', color: overBudget ? '#DC2626' : '#6B7280', fontWeight: 600 }}>
+                              <span style={{ fontSize: '0.67rem', color: overBudget ? '#DC2626' : '#6B7280', fontWeight: 700 }}>
                                 {Math.round(pct)}%
                               </span>
                             </div>
@@ -625,6 +714,14 @@ export default function SuperAdminDashboardPage() {
           </div>
 
         </div>
+      )}
+
+      {/* Modale des autres soldes */}
+      {showBalancesModal && (
+        <BalancesModal
+          balances={data?.antennaBalances}
+          onClose={() => setShowBalancesModal(false)}
+        />
       )}
     </AppShell>
   );

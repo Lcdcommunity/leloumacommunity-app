@@ -7,6 +7,7 @@ export interface Antenna {
   city?: string | null;
   country?: string | null;
   isActive: boolean;
+  defaultCurrency?: string | null; // <-- Ajout chirurgical de la devise
   createdAt: string;
   updatedAt: string;
 }

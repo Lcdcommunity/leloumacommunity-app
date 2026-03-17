@@ -3,11 +3,13 @@ import { Type, Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
+  IsEnum,
   IsOptional,
   IsString,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { CurrencyCode } from '@prisma/client';
 
 class CreateEmbeddedAntennaAdminDto {
   @IsString()
@@ -115,6 +117,11 @@ export class CreateAntennaDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   isActive?: boolean = true;
+
+  // NOUVEAU : Validation stricte pour la devise depuis le frontend
+  @IsOptional()
+  @IsEnum(CurrencyCode)
+  defaultCurrency?: CurrencyCode;
 
   @IsOptional()
   @ValidateNested()

@@ -69,6 +69,12 @@ export class SuperAdminController {
     return this.service.deleteAntennaAdmin(id, actor.id);
   }
 
+  /* ── GESTION DES UTILISATEURS (MEMBRES) PAR LE SUPER ADMIN ── */
+  @Patch('users/:id')
+  updateUser(@Param('id') id: string, @Body() body: any) {
+    return this.service.updateUser(id, body);
+  }
+
   @Patch('users/:id/approve')
   approveMember(@Param('id') id: string, @CurrentUser() admin: AuthUser) {
     return this.service.approveUser(id, admin.id);
@@ -79,6 +85,22 @@ export class SuperAdminController {
     return this.service.rejectUser(id, admin.id, reason);
   }
 
+  @Patch('users/:id/suspend')
+  suspendUser(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.suspendUser(id, actor.id);
+  }
+
+  @Patch('users/:id/activate')
+  activateUser(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.activateUser(id, actor.id);
+  }
+
+  @Delete('users/:id')
+  deleteUser(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.deleteUser(id, actor.id);
+  }
+
+  /* ── ANTENNES, PROJETS, ETC. ── */
   @Get('antennas')
   listAntennas(@Query() query: ListAntennasQueryDto) {
     return this.service.listAntennas(
@@ -87,6 +109,11 @@ export class SuperAdminController {
       query.q,
       query.isActive,
     );
+  }
+
+  @Get('antennas/:id')
+  getAntenna(@Param('id') id: string) {
+    return this.service.getAntennaById(id);
   }
 
   @Post('antennas')
@@ -107,6 +134,11 @@ export class SuperAdminController {
   @Get('projects')
   listProjects(@Query() query: PaginationQueryDto) {
     return this.service.listProjects(query.page, query.pageSize, query.q);
+  }
+
+  @Delete('projects/:id')
+  deleteProject(@Param('id') id: string) {
+    return this.service.deleteProject(id);
   }
 
   @Get('documents')

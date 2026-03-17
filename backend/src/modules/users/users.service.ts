@@ -223,6 +223,8 @@ export class UsersService {
       };
 
     } catch (error) {
+      // LOG AJOUTÉ POUR DÉBOGAGE
+      console.error("🚨 ERREUR RÉELLE UPLOAD :", error);
       throw new BadRequestException("Échec de l'upload vers Cloudinary.");
     }
   }

@@ -1,5 +1,4 @@
-//////// web/components/member/VirtualCardWidget.tsx
-//////// web/components/member/VirtualCardWidget.tsx
+// web/components/member/VirtualCardWidget.tsx
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
@@ -21,6 +20,7 @@ export interface VirtualCardData {
     country?: string | null;
     city?: string | null;
     profilePhotoUrl?: string | null;
+    function?: string | null;
   };
   antennaName: string;
 }
@@ -165,6 +165,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
   const residence = [card?.user?.city, card?.user?.country].filter(Boolean).join(', ') || 'Non renseignée';
   const origin = card?.user?.originVillage || 'Non renseignée';
   const antenna = card?.antennaName || 'Non assignée';
+  const memberFunction = card?.user?.function || 'Non renseignée';
 
   const safeFirstName = card?.user?.firstName || '';
   const safeLastName = card?.user?.lastName || '';
@@ -172,7 +173,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
 
   const avatarUrl =
     card?.user?.profilePhotoUrl ||
-    `https://ui-avatars.com/api/?name=${safeFirstName || 'L'}+${safeLastName || 'C'}&background=FBBF24&color=fff`;
+    `https://ui-avatars.com/api/?name=${safeFirstName || 'L'}+${safeLastName || 'C'}&background=E8D2AB&color=6B4A2B`;
 
   if (isMinimized) {
     return (
@@ -188,21 +189,23 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
             gap: 0.55rem;
             padding: 0.8rem 1.05rem;
             border-radius: 999px;
-            border: 1px solid rgba(251, 191, 36, 0.45);
-            background: linear-gradient(135deg, #2e4a35 0%, #1c3022 100%);
-            color: #FBBF24;
+            border: 1px solid rgba(176, 135, 87, 0.35);
+            background: linear-gradient(135deg, #ba8d56 0%, #8b633d 100%);
+            color: #fffaf1;
             font-family: 'DM Sans', sans-serif;
             font-size: 0.82rem;
             font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 10px 24px rgba(46, 74, 53, 0.35);
+            box-shadow: 0 10px 24px rgba(111, 77, 47, 0.28);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             animation: vcw-popin 0.28s ease-out forwards;
           }
+
           .vcw-fab:hover {
             transform: translateY(-2px);
-            box-shadow: 0 14px 28px rgba(46, 74, 53, 0.42);
+            box-shadow: 0 14px 28px rgba(111, 77, 47, 0.36);
           }
+
           @keyframes vcw-popin {
             from { opacity: 0; transform: scale(0.88); }
             to { opacity: 1; transform: scale(1); }
@@ -313,23 +316,27 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-front,
         .vcw-back {
           box-shadow:
-            0 0 0 1px rgba(251, 191, 36, 0.22) inset,
-            0 18px 26px rgba(0, 0, 0, 0.38);
+            0 0 0 1px rgba(190, 150, 101, 0.22) inset,
+            0 18px 26px rgba(93, 65, 36, 0.2);
           transition: box-shadow 0.35s ease;
         }
 
         .vcw-scene.elevated .vcw-front,
         .vcw-scene.elevated .vcw-back {
           box-shadow:
-            0 0 0 1px rgba(251, 191, 36, 0.22) inset,
-            0 28px 38px rgba(0, 0, 0, 0.45);
+            0 0 0 1px rgba(190, 150, 101, 0.24) inset,
+            0 28px 38px rgba(93, 65, 36, 0.28);
         }
 
         .vcw-front {
-          background-color: #2e4a35; /* Vert plus doux */
+          background-color: #ead9b6;
           background-image:
-            radial-gradient(circle at 60% 30%, rgba(220, 180, 80, 0.35) 0%, transparent 60%),
-            linear-gradient(120deg, rgba(255,255,255,0) 25%, rgba(240, 210, 120, 0.22) 45%, rgba(255, 255, 255, 0.12) 50%, rgba(240, 210, 120, 0.22) 55%, rgba(255,255,255,0) 75%);
+            radial-gradient(ellipse at 18% 22%, rgba(255, 248, 228, 0.9) 0%, rgba(255, 248, 228, 0.36) 22%, transparent 42%),
+            radial-gradient(ellipse at 74% 28%, rgba(201, 153, 90, 0.28) 0%, rgba(201, 153, 90, 0.14) 16%, transparent 34%),
+            radial-gradient(ellipse at 62% 64%, rgba(170, 122, 67, 0.22) 0%, rgba(170, 122, 67, 0.1) 18%, transparent 36%),
+            radial-gradient(ellipse at 28% 78%, rgba(214, 176, 117, 0.2) 0%, rgba(214, 176, 117, 0.08) 20%, transparent 38%),
+            linear-gradient(112deg, rgba(145, 102, 58, 0.14) 0%, rgba(239, 220, 181, 0.08) 20%, rgba(173, 122, 68, 0.16) 40%, rgba(244, 229, 198, 0.08) 58%, rgba(156, 109, 61, 0.14) 78%, rgba(240, 224, 193, 0.06) 100%),
+            linear-gradient(180deg, #f4e8c8 0%, #ecdcb8 22%, #e6d1a9 48%, #f1e2bf 72%, #e4cfa7 100%);
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -343,21 +350,33 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           position: absolute;
           inset: 0;
           border-radius: 24px;
-          background-image:
-            linear-gradient(30deg, rgba(255,255,255,0.03) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.03) 87.5%, rgba(255,255,255,0.03)),
-            linear-gradient(150deg, rgba(255,255,255,0.03) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.03) 87.5%, rgba(255,255,255,0.03));
-          background-size: 20px 35px;
+          background:
+            radial-gradient(ellipse at 12% 18%, rgba(255,255,255,0.34) 0%, transparent 32%),
+            radial-gradient(ellipse at 84% 22%, rgba(150, 102, 55, 0.18) 0%, transparent 26%),
+            radial-gradient(ellipse at 68% 56%, rgba(161, 111, 62, 0.14) 0%, transparent 24%),
+            radial-gradient(ellipse at 30% 76%, rgba(255,255,255,0.18) 0%, transparent 28%),
+            repeating-radial-gradient(
+              ellipse at 50% 50%,
+              rgba(155, 107, 60, 0.12) 0px,
+              rgba(155, 107, 60, 0.12) 2px,
+              rgba(238, 220, 187, 0.03) 10px,
+              rgba(238, 220, 187, 0.03) 18px
+            ),
+            linear-gradient(120deg, rgba(255,255,255,0) 18%, rgba(255,255,255,0.22) 34%, rgba(255,255,255,0.08) 42%, rgba(255,255,255,0) 56%);
           pointer-events: none;
-          mix-blend-mode: overlay;
-          opacity: 0.28;
+          mix-blend-mode: multiply;
+          opacity: 0.95;
         }
 
         .vcw-back {
           transform: rotateY(180deg);
-          background-color: #2e4a35;
+          background-color: #e7d2ac;
           background-image:
-            radial-gradient(circle at 40% 70%, rgba(220, 180, 80, 0.3) 0%, transparent 60%),
-            linear-gradient(60deg, rgba(255,255,255,0) 25%, rgba(240, 210, 120, 0.18) 45%, rgba(255, 255, 255, 0.08) 50%, rgba(240, 210, 120, 0.18) 55%, rgba(255,255,255,0) 75%);
+            radial-gradient(ellipse at 20% 20%, rgba(255, 248, 228, 0.78) 0%, rgba(255, 248, 228, 0.26) 20%, transparent 40%),
+            radial-gradient(ellipse at 78% 30%, rgba(187, 138, 79, 0.24) 0%, rgba(187, 138, 79, 0.1) 18%, transparent 34%),
+            radial-gradient(ellipse at 58% 70%, rgba(160, 112, 61, 0.18) 0%, rgba(160, 112, 61, 0.08) 18%, transparent 36%),
+            linear-gradient(110deg, rgba(145, 102, 58, 0.12) 0%, rgba(240, 225, 192, 0.08) 22%, rgba(173, 122, 68, 0.14) 42%, rgba(245, 229, 197, 0.06) 62%, rgba(156, 109, 61, 0.12) 82%, rgba(239, 223, 190, 0.06) 100%),
+            linear-gradient(180deg, #f2e5c6 0%, #ead8b2 24%, #e3cca2 52%, #efdebb 76%, #e2c99d 100%);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -370,11 +389,20 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           position: absolute;
           inset: 0;
           border-radius: 24px;
-          background-image:
-            linear-gradient(30deg, rgba(255,255,255,0.02) 12%, transparent 12.5%, transparent 87%, rgba(255,255,255,0.02) 87.5%, rgba(255,255,255,0.02));
-          background-size: 20px 35px;
+          background:
+            radial-gradient(ellipse at 14% 18%, rgba(255,255,255,0.24) 0%, transparent 28%),
+            radial-gradient(ellipse at 80% 72%, rgba(157, 109, 62, 0.14) 0%, transparent 24%),
+            repeating-radial-gradient(
+              ellipse at 50% 50%,
+              rgba(150, 104, 58, 0.08) 0px,
+              rgba(150, 104, 58, 0.08) 2px,
+              rgba(239, 223, 190, 0.02) 10px,
+              rgba(239, 223, 190, 0.02) 18px
+            ),
+            linear-gradient(120deg, rgba(255,255,255,0) 18%, rgba(255,255,255,0.16) 34%, rgba(255,255,255,0.06) 42%, rgba(255,255,255,0) 56%);
           pointer-events: none;
-          mix-blend-mode: overlay;
+          mix-blend-mode: multiply;
+          opacity: 0.92;
         }
 
         .vcw-shimmer {
@@ -383,12 +411,14 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           z-index: 2;
           pointer-events: none;
           border-radius: 24px;
-          background: radial-gradient(
-            ellipse at var(--mx, 50%) var(--my, 50%),
-            rgba(255, 235, 160, 0.25) 0%,
-            transparent 65%
-          );
-          mix-blend-mode: overlay;
+          background:
+            radial-gradient(
+              ellipse at var(--mx, 50%) var(--my, 50%),
+              rgba(255, 255, 255, 0.44) 0%,
+              rgba(255, 245, 220, 0.2) 20%,
+              transparent 62%
+            );
+          mix-blend-mode: screen;
           transition: opacity 0.25s ease;
         }
 
@@ -412,7 +442,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-back-logo-ring {
           border-radius: 50%;
           overflow: hidden;
-          background: #fff;
+          background: rgba(255,255,255,0.92);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -422,18 +452,19 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-logo-ring {
           width: 38px;
           height: 38px;
-          border: 2px solid rgba(251, 191, 36, 0.82);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.35), 0 0 14px rgba(251, 191, 36, 0.35);
+          border: 2px solid rgba(201, 160, 105, 0.72);
+          box-shadow: 0 4px 12px rgba(107, 74, 43, 0.12);
         }
 
+        /* LELOUMA COMMUNAUTE devant = vert */
         .vcw-org {
           font-size: 0.78rem;
           font-weight: 800;
           line-height: 1.12;
           letter-spacing: 0.13em;
           text-transform: uppercase;
-          color: #FFFFFF;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.75);
+          color: #198754;
+          text-shadow: none;
         }
 
         .vcw-status {
@@ -446,22 +477,25 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 800;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.28);
+          box-shadow: 0 4px 12px rgba(0,0,0,0.12);
           white-space: nowrap;
           flex-shrink: 0;
         }
 
+        /* voyant actif = vert brillant */
         .vcw-status.valid {
-          background: rgba(16, 185, 129, 0.15);
-          border: 1px solid rgba(16, 185, 129, 0.4);
-          color: #A7F3D0;
-          box-shadow: 0 0 10px rgba(16, 185, 129, 0.1) inset;
+          background: rgba(25, 135, 84, 0.14);
+          border: 1px solid rgba(25, 135, 84, 0.55);
+          color: #00c853;
+          box-shadow:
+            0 0 10px rgba(0, 200, 83, 0.22),
+            0 0 16px rgba(0, 200, 83, 0.12) inset;
         }
 
         .vcw-status.invalid {
-          background: rgba(239, 68, 68, 0.2);
-          border: 1px solid rgba(239, 68, 68, 0.5);
-          color: #FECACA;
+          background: rgba(239, 68, 68, 0.14);
+          border: 1px solid rgba(239, 68, 68, 0.4);
+          color: #9f2d2d;
         }
 
         .vcw-status-dot {
@@ -491,10 +525,10 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           width: 92px;
           aspect-ratio: 3 / 4;
           border-radius: 12px;
-          border: 2px solid rgba(251, 191, 36, 0.7);
-          box-shadow: 0 8px 20px rgba(0,0,0,0.46);
+          border: 2px solid rgba(186, 141, 86, 0.62);
+          box-shadow: 0 8px 20px rgba(107, 74, 43, 0.14);
           overflow: hidden;
-          background: rgba(0,0,0,0.2);
+          background: rgba(255,255,255,0.28);
           position: relative;
           flex-shrink: 0;
         }
@@ -512,16 +546,18 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           justify-content: center;
         }
 
+        /* Membre adhérent = bleu */
         .vcw-role-tag {
           margin-bottom: 0.22rem;
           font-size: 0.68rem;
           font-weight: 800;
-          color: #FCD34D;
+          color: #0d6efd;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+          text-shadow: none;
         }
 
+        /* Nom prénom = noir */
         .vcw-name {
           margin-bottom: 0.45rem;
           font-family: 'Cormorant Garamond', serif;
@@ -529,8 +565,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 700;
           line-height: 0.98;
           letter-spacing: 0.01em;
-          color: #FFFFFF;
-          text-shadow: 0 2px 8px rgba(0,0,0,0.85);
+          color: #000000;
+          text-shadow: none;
           word-break: break-word;
         }
 
@@ -542,23 +578,25 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           margin-top: 0.08rem;
         }
 
+        /* Née, Origine, Résidence, Antenne, Fonction = noir */
         .vcw-detail-label {
           font-size: 0.6rem;
           font-weight: 700;
           letter-spacing: 0.05em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.72);
+          color: #000000;
           align-self: start;
           white-space: nowrap;
         }
 
+        /* Contenu de ces champs = vert */
         .vcw-detail-val {
           min-width: 0;
           font-size: 0.86rem;
           font-weight: 700;
-          color: #FFFFFF;
+          color: #198754;
           line-height: 1.15;
-          text-shadow: 0 1px 3px rgba(0,0,0,0.85);
+          text-shadow: none;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -571,7 +609,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           grid-template-columns: minmax(0, 1fr) auto;
           gap: 0.8rem;
           align-items: end;
-          border-top: 1px solid rgba(251, 191, 36, 0.3);
+          border-top: 1px solid rgba(187, 142, 87, 0.26);
           padding-top: 0.65rem;
         }
 
@@ -589,6 +627,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           align-items: flex-end;
         }
 
+        /* N° identifiant unique = bleu ; Expire fin = noir */
         .vcw-card-id-label,
         .vcw-exp-label {
           display: block;
@@ -597,16 +636,24 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 800;
           letter-spacing: 0.15em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.62);
         }
 
+        .vcw-card-id-label {
+          color: #0d6efd;
+        }
+
+        .vcw-exp-label {
+          color: #000000;
+        }
+
+        /* Numéro identifiant + date expiration = rouge */
         .vcw-card-num {
           font-family: 'DM Mono', monospace;
           font-size: 1rem;
           font-weight: 500;
           letter-spacing: 0.14em;
-          color: #FFFFFF;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.65);
+          color: #dc3545;
+          text-shadow: none;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -617,8 +664,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-size: 0.92rem;
           font-weight: 700;
           letter-spacing: 0.08em;
-          color: #FFFFFF;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.65);
+          color: #dc3545;
+          text-shadow: none;
           white-space: nowrap;
         }
 
@@ -647,53 +694,56 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-back-logo-ring {
           width: 36px;
           height: 36px;
-          border: 2px solid rgba(251, 191, 36, 0.84);
-          box-shadow: 0 4px 12px rgba(0,0,0,0.42), 0 0 16px rgba(251, 191, 36, 0.34);
+          border: 2px solid rgba(201, 160, 105, 0.72);
+          box-shadow: 0 4px 12px rgba(107, 74, 43, 0.1);
         }
 
+        /* Derrière : LELOUMA COMMUNAUTE = vert */
         .vcw-back-org {
           font-size: 0.85rem;
           font-weight: 800;
           line-height: 1.15;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          color: #FFFFFF;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.82);
+          color: #198754;
+          text-shadow: none;
         }
 
         .vcw-back-sep {
           width: 100%;
           height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(251,191,36,0.45), transparent);
+          background: linear-gradient(90deg, transparent, rgba(186, 141, 86, 0.54), transparent);
         }
 
+        /* Derrière : Scan d'authenticité = noir */
         .vcw-back-title {
           font-size: 0.66rem;
           font-weight: 800;
           letter-spacing: 0.16em;
           text-transform: uppercase;
-          color: rgba(255,255,255,0.72);
+          color: #000000;
         }
 
         .vcw-qr-card {
           width: fit-content;
-          background: rgba(255,255,255,0.96);
+          background: rgba(255,255,255,0.94);
           border-radius: 12px;
           padding: 6px;
           box-shadow:
-            0 12px 30px rgba(0,0,0,0.55),
-            0 0 20px rgba(251, 191, 36, 0.22);
+            0 10px 24px rgba(107, 74, 43, 0.18),
+            0 0 16px rgba(255, 248, 235, 0.22);
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
+        /* Derrière : autres textes = noir */
         .vcw-back-footer {
           max-width: 310px;
           font-size: 0.62rem;
           font-weight: 500;
           line-height: 1.4;
-          color: rgba(255,255,255,0.66);
+          color: #000000;
         }
 
         .vcw-hint {
@@ -1089,12 +1139,13 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                         <span className="vcw-detail-val">{origin}</span>
 
                         <span className="vcw-detail-label">Résidence</span>
-                        <span className="vcw-detail-val" style={{ color: '#FDE68A' }}>
-                          {residence}
-                        </span>
+                        <span className="vcw-detail-val">{residence}</span>
 
                         <span className="vcw-detail-label">Antenne</span>
                         <span className="vcw-detail-val">{antenna}</span>
+
+                        <span className="vcw-detail-label">Fonction</span>
+                        <span className="vcw-detail-val">{memberFunction}</span>
                       </div>
                     </div>
                   </div>
