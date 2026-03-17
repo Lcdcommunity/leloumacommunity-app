@@ -20,16 +20,58 @@ if (typeof BigInt !== 'undefined' && !(BigInt.prototype as { toJSON?: () => stri
   };
 }
 
-function getAllowedOrigins(): string[] {
-  const raw = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '';
+function normalizeOrigins(values: string[]): string[] {
+  return values
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map((value) => value.replace(/\/+$/, ''));
+}
 
-  return [
+function getAllowedOrigins(): string[] {
+  const fromEnv = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '';
+
+  return normalizeOrigins([
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    ...raw.split(','),
-  ]
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+    ...fromEnv.split(','),
+  ]);
+}
+
+function isAllowedOrigin(origin: string | undefined, allowedOrigins: string[]): boolean {
+  if (!origin) {
+    return true;
+  }
+
+  const cleanOrigin = origin.replace(/\/+$/, '');
+
+  if (allowedOrigins.includes(cleanOrigin)) {
+    return true;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(cleanOrigin);
+  } catch {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  if (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1'
+  ) {
+    return true;
+  }
+
+  if (
+    hostname === 'lcd-comminity.vercel.app' ||
+    hostname.endsWith('.vercel.app')
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 async function bootstrap() {
@@ -44,7 +86,14 @@ async function bootstrap() {
   const allowedOrigins = getAllowedOrigins();
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin, allowedOrigins)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin non autorisée par CORS: ${origin}`), false);
+    },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
@@ -62,7 +111,6 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   const swaggerEnabled = (process.env.SWAGGER_ENABLED || 'true') === 'true';
-
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Association Community API')
@@ -90,7 +138,6 @@ async function bootstrap() {
   await app.listen(port);
 
   console.log(`🚀 Serveur lancé sur : http://localhost:${port}/api`);
-  console.log('✅ CORS autorisés pour :', allowedOrigins);
+  console.log('✅ Origines CORS configurées :', allowedOrigins);
 }
-
 void bootstrap();

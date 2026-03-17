@@ -36,7 +36,6 @@ export async function logout(logoutAll = false): Promise<void> {
   }
 }
 
-// Optionnel si ton backend expose /auth/me
 export async function getCurrentUser(): Promise<CurrentUser> {
   return http<CurrentUser>('/auth/me', { method: 'GET' });
 }
