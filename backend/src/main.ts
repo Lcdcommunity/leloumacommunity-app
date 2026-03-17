@@ -20,6 +20,18 @@ if (typeof BigInt !== 'undefined' && !(BigInt.prototype as { toJSON?: () => stri
   };
 }
 
+function getAllowedOrigins(): string[] {
+  const raw = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '';
+
+  return [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...raw.split(','),
+  ]
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false });
 
@@ -29,14 +41,7 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  // --- CONFIGURATION DYNAMIQUE DES CORS ---
-  const originsFromEnv = process.env.CORS_ORIGINS || process.env.FRONTEND_URL;
-  
-  const allowedOrigins = [
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    ...(originsFromEnv ? originsFromEnv.split(',') : []),
-  ].map(origin => origin.trim()).filter(Boolean);
+  const allowedOrigins = getAllowedOrigins();
 
   app.enableCors({
     origin: allowedOrigins,
@@ -57,10 +62,11 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   const swaggerEnabled = (process.env.SWAGGER_ENABLED || 'true') === 'true';
+
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Association Community API')
-      .setDescription('API de gestion d’association communautaire')
+      .setDescription("API de gestion d'association communautaire")
       .setVersion('1.0.0')
       .addBearerAuth()
       .build();
@@ -82,8 +88,9 @@ async function bootstrap() {
   const port = Number(process.env.PORT || 3001);
 
   await app.listen(port);
+
   console.log(`🚀 Serveur lancé sur : http://localhost:${port}/api`);
-  console.log(`✅ CORS autorisés pour :`, allowedOrigins);
+  console.log('✅ CORS autorisés pour :', allowedOrigins);
 }
 
 void bootstrap();

@@ -1,27 +1,41 @@
 // web/lib/env.ts
-
-function getRequiredPublicEnv(name: 'NEXT_PUBLIC_API_URL' | 'NEXT_PUBLIC_WEB_URL'): string {
+function readEnv(name: string): string | undefined {
   const value = process.env[name]?.trim();
+  return value && value.length > 0 ? value : undefined;
+}
 
-  if (!value) {
-    if (process.env.NODE_ENV === 'development') {
-      if (name === 'NEXT_PUBLIC_API_URL') {
-        return 'http://localhost:3001/api';
-      }
+function getApiUrl(): string {
+  const value = readEnv('NEXT_PUBLIC_API_URL');
 
-      return 'http://localhost:3000';
-    }
-
-    throw new Error(`Variable d'environnement manquante: ${name}`);
+  if (value) {
+    return value;
   }
 
-  return value;
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3001/api';
+  }
+
+  throw new Error("Variable d'environnement manquante: NEXT_PUBLIC_API_URL");
+}
+
+function getWebUrl(): string {
+  const value = readEnv('NEXT_PUBLIC_WEB_URL');
+
+  if (value) {
+    return value;
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:3000';
+  }
+
+  return 'http://localhost:3000';
 }
 
 export const env = {
-  apiUrl: getRequiredPublicEnv('NEXT_PUBLIC_API_URL'),
-  appName: process.env.NEXT_PUBLIC_APP_NAME?.trim() || 'Lelouma Community',
-  webUrl: getRequiredPublicEnv('NEXT_PUBLIC_WEB_URL'),
+  apiUrl: getApiUrl(),
+  appName: readEnv('NEXT_PUBLIC_APP_NAME') || 'Lelouma Community',
+  webUrl: getWebUrl(),
 };
 
 if (process.env.NODE_ENV === 'development') {
