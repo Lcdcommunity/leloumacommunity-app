@@ -1,6 +1,11 @@
 //web/lib/http.ts
 import { env } from './env';
-import { getAccessToken, getRefreshToken, setTokens, clearAuthState } from './auth-store';
+import {
+  getAccessToken,
+  getRefreshToken,
+  setTokens,
+  clearAuthState,
+} from './auth-store';
 import type { ApiErrorPayload } from '../types/api';
 import type { RefreshResponse } from '../types/auth';
 
@@ -15,21 +20,26 @@ export interface RequestOptions<TBody = unknown> {
 }
 
 /**
- * Sécurisation de l'URL API
+ * Retourne l'URL de base de l'API.
+ * En production, on échoue proprement si NEXT_PUBLIC_API_URL est absente.
  */
-const getBaseUrl = () => {
-  // En Next.js sur Vercel, on doit utiliser NEXT_PUBLIC_
-  const url = env.apiUrl;
-  if (!url || url === 'undefined') {
-    console.error("ERREUR : L'URL de l'API (NEXT_PUBLIC_API_URL) n'est pas configurée.");
-    return ''; 
+function getBaseUrl(): string {
+  const url = env.apiUrl?.trim();
+
+  if (!url) {
+    throw new Error("Configuration manquante : NEXT_PUBLIC_API_URL");
   }
-  return url;
-};
+
+  return url.replace(/\/+$/, '');
+}
 
 async function parseJsonSafe(res: Response): Promise<unknown> {
   const text = await res.text();
-  if (!text) return null;
+
+  if (!text) {
+    return null;
+  }
+
   try {
     return JSON.parse(text) as unknown;
   } catch {
@@ -39,12 +49,18 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
 
 async function refreshTokenRequest(): Promise<boolean> {
   const refreshToken = getRefreshToken();
-  if (!refreshToken) return false;
+
+  if (!refreshToken) {
+    return false;
+  }
 
   const baseUrl = getBaseUrl();
+
   const res = await fetch(`${baseUrl}/auth/refresh`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({ refreshToken }),
   });
 
@@ -54,6 +70,7 @@ async function refreshTokenRequest(): Promise<boolean> {
   }
 
   const data = (await res.json()) as RefreshResponse;
+
   setTokens({
     accessToken: data.accessToken,
     refreshToken: data.refreshToken,
@@ -72,6 +89,8 @@ export async function http<TResponse, TBody = unknown>(
   const retryOn401 = options?.retryOn401 ?? true;
   const baseUrl = getBaseUrl();
 
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
   const headers: Record<string, string> = {
     ...(options?.headers ?? {}),
   };
@@ -87,11 +106,13 @@ export async function http<TResponse, TBody = unknown>(
 
   if (useAuth) {
     const accessToken = getAccessToken();
-    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
   }
 
-  // Fetch avec protection contre URL undefined
-  const res = await fetch(`${baseUrl}${path}`, {
+  const res = await fetch(`${baseUrl}${normalizedPath}`, {
     method,
     headers,
     body,
@@ -99,23 +120,31 @@ export async function http<TResponse, TBody = unknown>(
 
   if (res.status === 401 && useAuth && retryOn401) {
     const refreshed = await refreshTokenRequest();
+
     if (refreshed) {
-      return http<TResponse, TBody>(path, { ...options, retryOn401: false });
+      return http<TResponse, TBody>(normalizedPath, {
+        ...options,
+        retryOn401: false,
+      });
     }
   }
 
   if (!res.ok) {
     const payload = (await parseJsonSafe(res)) as ApiErrorPayload | string | null;
+
     const message =
       typeof payload === 'string'
         ? payload
         : Array.isArray(payload?.message)
-        ? payload?.message.join(', ')
-        : payload?.message || `Erreur HTTP ${res.status}`;
+          ? payload.message.join(', ')
+          : payload?.message || `Erreur HTTP ${res.status}`;
+
     throw new Error(message);
   }
 
-  if (res.status === 204) return undefined as TResponse;
+  if (res.status === 204) {
+    return undefined as TResponse;
+  }
 
   return (await res.json()) as TResponse;
 }

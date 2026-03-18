@@ -6,7 +6,10 @@ import { clearAuthState, setTokens } from './auth-store';
 import type { LoginResponse } from '../types/auth';
 import type { CurrentUser } from '../types/user';
 
-export async function login(email: string, password: string): Promise<LoginResponse> {
+export async function login(
+  email: string,
+  password: string,
+): Promise<LoginResponse> {
   const data = await http<LoginResponse, { email: string; password: string }>(
     '/auth/login',
     {
@@ -27,7 +30,7 @@ export async function login(email: string, password: string): Promise<LoginRespo
 
 export async function logout(logoutAll = false): Promise<void> {
   try {
-    await http('/auth/logout', {
+    await http<void, { logoutAll: boolean }>('/auth/logout', {
       method: 'POST',
       body: { logoutAll },
     });
@@ -37,5 +40,7 @@ export async function logout(logoutAll = false): Promise<void> {
 }
 
 export async function getCurrentUser(): Promise<CurrentUser> {
-  return http<CurrentUser>('/auth/me', { method: 'GET' });
+  return http<CurrentUser>('/auth/me', {
+    method: 'GET',
+  });
 }

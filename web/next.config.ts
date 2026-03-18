@@ -1,11 +1,8 @@
 import type { NextConfig } from 'next';
 
-const BACKEND_URL = process.env.BACKEND_URL ?? 'http://localhost:3001';
+const BACKEND_URL = (process.env.BACKEND_URL ?? 'http://localhost:3001').replace(/\/+$/, '');
 
 const nextConfig: NextConfig = {
-  // Proxifie /static/* → backend NestJS qui sert les uploads via express.static
-  // Sans ce rewrite, le navigateur cherche /static/... sur localhost:3000 (Next)
-  // au lieu de localhost:3001 (NestJS) → 404 sur toutes les images de projets/avatars.
   async rewrites() {
     return [
       {
