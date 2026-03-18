@@ -14,6 +14,19 @@ export interface RequestOptions<TBody = unknown> {
   retryOn401?: boolean;
 }
 
+/**
+ * Sécurisation de l'URL API
+ */
+const getBaseUrl = () => {
+  // En Next.js sur Vercel, on doit utiliser NEXT_PUBLIC_
+  const url = env.apiUrl;
+  if (!url || url === 'undefined') {
+    console.error("ERREUR : L'URL de l'API (NEXT_PUBLIC_API_URL) n'est pas configurée.");
+    return ''; 
+  }
+  return url;
+};
+
 async function parseJsonSafe(res: Response): Promise<unknown> {
   const text = await res.text();
   if (!text) return null;
@@ -24,15 +37,12 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
   }
 }
 
-/**
- * Gère le rafraîchissement automatique du token JWT
- */
 async function refreshTokenRequest(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return false;
 
-  // Utilisation de env.apiUrl pour pointer vers le backend [3001]
-  const res = await fetch(`${env.apiUrl}/auth/refresh`, {
+  const baseUrl = getBaseUrl();
+  const res = await fetch(`${baseUrl}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken }),
@@ -53,9 +63,6 @@ async function refreshTokenRequest(): Promise<boolean> {
   return true;
 }
 
-/**
- * Fonction HTTP universelle pour communiquer avec le backend NestJS
- */
 export async function http<TResponse, TBody = unknown>(
   path: string,
   options?: RequestOptions<TBody>,
@@ -63,6 +70,7 @@ export async function http<TResponse, TBody = unknown>(
   const method = options?.method ?? 'GET';
   const useAuth = options?.auth ?? true;
   const retryOn401 = options?.retryOn401 ?? true;
+  const baseUrl = getBaseUrl();
 
   const headers: Record<string, string> = {
     ...(options?.headers ?? {}),
@@ -82,23 +90,20 @@ export async function http<TResponse, TBody = unknown>(
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  // Construction de l'URL finale sans le bug "undefined"
-  const res = await fetch(`${env.apiUrl}${path}`, {
+  // Fetch avec protection contre URL undefined
+  const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers,
     body,
   });
 
-  // Gestion automatique de l'expiration du token (401)
   if (res.status === 401 && useAuth && retryOn401) {
     const refreshed = await refreshTokenRequest();
     if (refreshed) {
-      // On rejoue la requête initiale avec le nouveau token
       return http<TResponse, TBody>(path, { ...options, retryOn401: false });
     }
   }
 
-  // Gestion des erreurs d'API
   if (!res.ok) {
     const payload = (await parseJsonSafe(res)) as ApiErrorPayload | string | null;
     const message =
@@ -110,7 +115,6 @@ export async function http<TResponse, TBody = unknown>(
     throw new Error(message);
   }
 
-  // Cas particulier du 204 No Content
   if (res.status === 204) return undefined as TResponse;
 
   return (await res.json()) as TResponse;
