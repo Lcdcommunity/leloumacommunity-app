@@ -1,8 +1,23 @@
-//web/lib/super-admin-api.ts
+// web/lib/super-admin-api.ts
 import type { ApiListResponse } from '../types/api';
 import type { Antenna } from '../types/antenna';
 import type { UserSummary } from '../types/user';
 import { http } from './http';
+
+/**
+ * Type détaillé pour un utilisateur (Admin d'antenne)
+ * Étend UserSummary pour inclure les champs de profil complets
+ */
+export interface UserDetail extends UserSummary {
+  phone?: string;
+  city?: string;
+  country?: string;
+  originSubPrefecture?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  postalCode?: string;
+  associationTitle?: string;
+}
 
 export type SuperAdminAdminPayload = {
   antennaId: string;
@@ -35,6 +50,7 @@ export type CreateAntennaPayload = {
 };
 
 export const superAdminApi = {
+  // --- Gestion des Antennes ---
   listAntennas: (params?: { page?: number; pageSize?: number; q?: string; isActive?: boolean }) =>
     http<ApiListResponse<Antenna>>(
       `/super-admin/antennas?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
@@ -57,6 +73,7 @@ export const superAdminApi = {
   deleteAntenna: (id: string) =>
     http(`/super-admin/antennas/${id}`, { method: 'DELETE' }),
 
+  // --- Gestion des Administrateurs d'Antenne ---
   listAntennaAdmins: (params?: { page?: number; pageSize?: number; q?: string; status?: string }) =>
     http<ApiListResponse<UserSummary>>(
       `/super-admin/admins?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
@@ -64,9 +81,18 @@ export const superAdminApi = {
       }${params?.status ? `&status=${encodeURIComponent(params.status)}` : ''}`,
     ),
 
+  getAntennaAdmin: (id: string) =>
+    http<UserDetail>(`/super-admin/admins/${id}`),
+
   createAntennaAdmin: (body: SuperAdminAdminPayload) =>
     http<UserSummary, SuperAdminAdminPayload>('/super-admin/admins', {
       method: 'POST',
+      body,
+    }),
+
+  updateAntennaAdmin: (id: string, body: Partial<SuperAdminAdminPayload>) =>
+    http<UserSummary, Partial<SuperAdminAdminPayload>>(`/super-admin/admins/${id}`, {
+      method: 'PATCH',
       body,
     }),
 

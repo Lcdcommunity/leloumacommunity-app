@@ -15,7 +15,7 @@ type SendAdminInvitationParams = {
 export class MailService {
   private readonly logger = new Logger(MailService.name);
 
-  private getTransporter() {
+  private getTransporter(): nodemailer.Transporter | null {
     const host = process.env.SMTP_HOST;
     const port = Number(process.env.SMTP_PORT || 587);
     const user = process.env.SMTP_USER;
@@ -36,16 +36,37 @@ export class MailService {
     });
   }
 
-  private getFromAddress() {
+  private getFromAddress(): string {
     return process.env.SMTP_FROM || 'no-reply@localhost.local';
   }
 
-  private getLoginUrl() {
-    const raw = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000';
-    return `${raw.replace(/\/$/, '')}/login`;
+  private normalizeUrl(url: string): string {
+    return url.replace(/\/+$/, '');
   }
 
-  async sendAntennaAdminInvitation(params: SendAdminInvitationParams): Promise<void> {
+  private getFrontendBaseUrl(): string {
+    const raw = process.env.FRONTEND_URL || process.env.APP_URL;
+
+    if (raw && raw.trim().length > 0) {
+      return this.normalizeUrl(raw.trim());
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      return 'http://localhost:3000';
+    }
+
+    throw new Error(
+      'Configuration manquante : FRONTEND_URL ou APP_URL est requis en production.',
+    );
+  }
+
+  private getLoginUrl(): string {
+    return `${this.getFrontendBaseUrl()}/login`;
+  }
+
+  async sendAntennaAdminInvitation(
+    params: SendAdminInvitationParams,
+  ): Promise<void> {
     const transporter = this.getTransporter();
 
     if (!transporter) {
@@ -83,7 +104,7 @@ export class MailService {
     const text = [
       `Bonjour ${params.firstName} ${params.lastName},`,
       '',
-      `Votre compte administrateur d’antenne a été créé.`,
+      'Votre compte administrateur d’antenne a été créé.',
       `Antenne : ${params.antennaName}`,
       params.associationTitle ? `Fonction : ${params.associationTitle}` : '',
       `Adresse email : ${params.to}`,
@@ -91,7 +112,7 @@ export class MailService {
       '',
       `Connexion : ${loginUrl}`,
       '',
-      `Important : changez ce mot de passe dès votre première connexion.`,
+      'Important : changez ce mot de passe dès votre première connexion.',
     ]
       .filter(Boolean)
       .join('\n');

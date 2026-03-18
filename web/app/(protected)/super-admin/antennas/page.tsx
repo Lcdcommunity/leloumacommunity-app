@@ -1,8 +1,10 @@
 // web/app/(protected)/super-admin/antennas/page.tsx
+// web/app/(protected)/super-admin/antennas/page.tsx
 'use client';
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
 import type { Antenna } from '../../../../types/antenna';
@@ -26,7 +28,7 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════ ANTENNA INITIAL */
+/* ══════════════════════════════════════════════════════ ANTENNA ICON */
 function AntennaIcon({ code }: { code: string }) {
   return (
     <div style={{
@@ -42,68 +44,13 @@ function AntennaIcon({ code }: { code: string }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════ DELETE MODAL */
-function DeleteModal({
-  antenna, onConfirm, onCancel, busy,
-}: { antenna: Antenna; onConfirm: () => void; onCancel: () => void; busy: boolean }) {
-  return (
-    <>
-      <div
-        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }}
-        onClick={onCancel}
-      />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        zIndex: 101, background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(18px)',
-        borderRadius: 20, padding: 'clamp(1.5rem,4vw,2rem)',
-        width: 'min(440px,calc(100vw - 2rem))',
-        border: '1px solid rgba(220,38,38,.15)',
-        boxShadow: '0 24px 60px rgba(220,38,38,.12)',
-      }}>
-        <div style={{
-          width: 48, height: 48, borderRadius: '50%',
-          background: '#FEF2F2', border: '1px solid #FECACA',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 1rem',
-        }}>
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2">
-            <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </div>
-        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.3rem', fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: '.4rem' }}>
-          Supprimer cette antenne&nbsp;?
-        </h2>
-        <p style={{ fontSize: '.82rem', color: '#6B7280', textAlign: 'center', marginBottom: '1.5rem', fontWeight: 600, lineHeight: 1.55 }}>
-          <strong style={{ color: '#111827' }}>{antenna.name}</strong> ({antenna.code}) sera supprim&eacute;e d&eacute;finitivement.
-        </p>
-        <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center' }}>
-          <button
-            onClick={onCancel} disabled={busy}
-            style={{ height: 40, padding: '0 1.2rem', borderRadius: 10, border: '1px solid rgba(220,38,38,.18)', background: 'rgba(249,250,251,.95)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}
-          >
-            Annuler
-          </button>
-          <button
-            onClick={onConfirm} disabled={busy}
-            style={{ height: 40, padding: '0 1.3rem', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#991B1B,#DC2626)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 800, color: 'white', cursor: 'pointer', boxShadow: '0 4px 14px rgba(220,38,38,.35)', opacity: busy ? .6 : 1, display: 'flex', alignItems: 'center', gap: '.4rem' }}
-          >
-            {busy && <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'saspin .7s linear infinite' }} />}
-            Supprimer
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 /* ══════════════════════════════════════════════════════ PAGE */
 export default function SuperAdminAntennasPage() {
-  const [items,        setItems]        = useState<Antenna[]>([]);
-  const [q,            setQ]            = useState('');
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState<string | null>(null);
-  const [busyId,       setBusyId]       = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Antenna | null>(null);
+  const router = useRouter();
+  const [items,   setItems]   = useState<Antenna[]>([]);
+  const [q,       setQ]       = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState<string | null>(null);
 
   const load = useCallback(async (qVal?: string) => {
     setLoading(true); setError(null);
@@ -116,16 +63,6 @@ export default function SuperAdminAntennasPage() {
   }, [q]);
 
   useEffect(() => { void load(''); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleDelete(antenna: Antenna) {
-    setBusyId(antenna.id); setDeleteTarget(null);
-    try {
-      await api.deleteAntenna(antenna.id);
-      await load(q);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur suppression');
-    } finally { setBusyId(null); }
-  }
 
   const activeCount   = items.filter(a => a.isActive).length;
   const inactiveCount = items.length - activeCount;
@@ -176,13 +113,17 @@ export default function SuperAdminAntennasPage() {
 
         /* ── Table ── */
         .sa-tw{overflow-x:auto}
-        .sa-table{width:100%;border-collapse:collapse;min-width:620px}
+        .sa-table{width:100%;border-collapse:collapse;min-width:520px}
         .sa-table thead tr{border-bottom:2px solid rgba(220,38,38,.1)}
         .sa-table th{padding:.8rem 1.2rem;font-size:.65rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase;color:#374151;background:rgba(254,242,242,.35);text-align:left;white-space:nowrap}
-        .sa-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:sain .4s cubic-bezier(.22,1,.36,1) both}
+        .sa-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s,transform .12s;animation:sain .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
         .sa-table tbody tr:last-child{border-bottom:none}
-        .sa-table tbody tr:hover{background:rgba(220,38,38,.025)}
+        .sa-table tbody tr:hover{background:rgba(220,38,38,.04)}
+        .sa-table tbody tr:hover .sa-row-arrow{opacity:1;transform:translateX(0)}
         .sa-table td{padding:.9rem 1.2rem;font-size:.82rem;color:#111827;vertical-align:middle}
+
+        /* ── Row arrow hint ── */
+        .sa-row-arrow{opacity:0;transform:translateX(-4px);transition:opacity .18s,transform .18s;color:#DC2626}
 
         /* ── Cell types ── */
         .sa-code{font-family:'DM Mono',monospace;font-size:.82rem;font-weight:700;color:#111827;background:rgba(254,242,242,.6);border:1px solid rgba(220,38,38,.12);border-radius:6px;padding:.18rem .5rem;white-space:nowrap}
@@ -192,23 +133,16 @@ export default function SuperAdminAntennasPage() {
         .sa-geo-country{font-size:.7rem;color:#9CA3AF;font-weight:600;margin-top:1px}
         .sa-date{font-size:.75rem;font-weight:700;color:#6B7280}
 
-        /* ── Action buttons ── */
-        .sa-actions{display:flex;gap:.35rem;justify-content:flex-end;align-items:center}
-        .sa-btn-edit{height:30px;padding:0 .7rem;border-radius:7px;border:1.5px solid rgba(220,38,38,.2);background:rgba(254,242,242,.6);color:#B91C1C;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.25rem;transition:all .15s;white-space:nowrap;text-decoration:none}
-        .sa-btn-edit:hover{background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
-        .sa-btn-del{height:30px;padding:0 .7rem;border-radius:7px;border:1.5px solid rgba(220,38,38,.2);background:rgba(255,255,255,.7);color:#DC2626;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.25rem;transition:all .15s;white-space:nowrap}
-        .sa-btn-del:hover:not(:disabled){background:#FEF2F2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
-        .sa-btn-del:disabled{opacity:.45;cursor:not-allowed}
-
         /* ── Mobile cards ── */
         .sa-mob{display:none;flex-direction:column}
         @media(max-width:680px){.sa-tw{display:none}.sa-mob{display:flex}}
-        .sa-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sain .4s cubic-bezier(.22,1,.36,1) both}
+        .sa-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sain .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer;transition:background .15s}
         .sa-mc:last-child{border-bottom:none}
-        .sa-mc-top{display:flex;align-items:flex-start;gap:.65rem;margin-bottom:.6rem}
+        .sa-mc:hover{background:rgba(220,38,38,.04)}
+        .sa-mc-top{display:flex;align-items:flex-start;gap:.65rem;margin-bottom:.5rem}
         .sa-mc-info{flex:1;min-width:0}
-        .sa-mc-row2{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.55rem}
-        .sa-mc-actions{display:flex;gap:.4rem}
+        .sa-mc-row2{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.4rem}
+        .sa-mc-hint{font-size:.72rem;color:#DC2626;font-weight:700;display:flex;align-items:center;gap:.25rem;margin-top:.3rem}
 
         /* ── States ── */
         .sa-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
@@ -232,9 +166,9 @@ export default function SuperAdminAntennasPage() {
         {/* Stats */}
         <div className="sa-stats">
           {([
-            { label: 'Total antennes', value: items.length,   color: '#DC2626' },
-            { label: 'Actives',        value: activeCount,    color: '#059669' },
-            { label: 'Inactives',      value: inactiveCount,  color: '#9CA3AF' },
+            { label: 'Total antennes', value: items.length,  color: '#DC2626' },
+            { label: 'Actives',        value: activeCount,   color: '#059669' },
+            { label: 'Inactives',      value: inactiveCount, color: '#9CA3AF' },
           ] as const).map(s => (
             <div key={s.label} className="sa-stat" style={{ borderTopColor: s.color }}>
               <div className="sa-stat-val" style={{ color: s.color }}>{s.value}</div>
@@ -318,14 +252,19 @@ export default function SuperAdminAntennasPage() {
                       <th>Antenne</th>
                       <th>Code</th>
                       <th>Localisation</th>
+                      <th>Devise</th>
                       <th>Statut</th>
                       <th>Cr&eacute;&eacute; le</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((a, i) => (
-                      <tr key={a.id} style={{ animationDelay: `${i * 0.04}s` }}>
+                      <tr
+                        key={a.id}
+                        style={{ animationDelay: `${i * 0.04}s` }}
+                        onClick={() => router.push(`/super-admin/antennas/${a.id}`)}
+                      >
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem' }}>
                             <AntennaIcon code={a.code} />
@@ -342,30 +281,18 @@ export default function SuperAdminAntennasPage() {
                             : <span style={{ color: '#D1D5DB', fontWeight: 700 }}>—</span>
                           }
                         </td>
+                        <td>
+                          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.78rem', fontWeight: 700, color: '#374151' }}>
+                            {a.defaultCurrency ?? 'EUR'}
+                          </span>
+                        </td>
                         <td><StatusBadge active={a.isActive} /></td>
                         <td><span className="sa-date">{formatDate(a.createdAt)}</span></td>
                         <td>
-                          <div className="sa-actions">
-                            <Link
-                              href={`/super-admin/antennas/${a.id}`}
-                              className="sa-btn-edit"
-                            >
-                              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                              </svg>
-                              Modifier
-                            </Link>
-                            <button
-                              className="sa-btn-del"
-                              disabled={busyId === a.id}
-                              onClick={() => setDeleteTarget(a)}
-                            >
-                              {busyId === a.id
-                                ? <div style={{ width: 11, height: 11, border: '2px solid rgba(220,38,38,.3)', borderTopColor: '#DC2626', borderRadius: '50%', animation: 'saspin .7s linear infinite' }} />
-                                : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              }
-                              Supprimer
-                            </button>
+                          <div className="sa-row-arrow">
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
                           </div>
                         </td>
                       </tr>
@@ -377,7 +304,12 @@ export default function SuperAdminAntennasPage() {
               {/* ── Mobile cards ── */}
               <div className="sa-mob">
                 {items.map((a, i) => (
-                  <div key={a.id} className="sa-mc" style={{ animationDelay: `${i * 0.04}s` }}>
+                  <div
+                    key={a.id}
+                    className="sa-mc"
+                    style={{ animationDelay: `${i * 0.04}s` }}
+                    onClick={() => router.push(`/super-admin/antennas/${a.id}`)}
+                  >
                     <div className="sa-mc-top">
                       <AntennaIcon code={a.code} />
                       <div className="sa-mc-info">
@@ -388,17 +320,14 @@ export default function SuperAdminAntennasPage() {
                     </div>
                     <div className="sa-mc-row2">
                       <span className="sa-code">{a.code}</span>
+                      <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.75rem', fontWeight: 700, color: '#6B7280' }}>{a.defaultCurrency ?? 'EUR'}</span>
                       <span className="sa-date">{formatDate(a.createdAt)}</span>
                     </div>
-                    <div className="sa-mc-actions">
-                      <Link href={`/super-admin/antennas/${a.id}`} className="sa-btn-edit" style={{ flex: 1, justifyContent: 'center' }}>
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        Modifier
-                      </Link>
-                      <button className="sa-btn-del" disabled={busyId === a.id} onClick={() => setDeleteTarget(a)} style={{ flex: 1, justifyContent: 'center' }}>
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        Supprimer
-                      </button>
+                    <div className="sa-mc-hint">
+                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                      Voir les détails
                     </div>
                   </div>
                 ))}
@@ -407,16 +336,6 @@ export default function SuperAdminAntennasPage() {
           ) : null}
         </div>
       </div>
-
-      {/* Delete modal */}
-      {deleteTarget && (
-        <DeleteModal
-          antenna={deleteTarget}
-          busy={busyId !== null}
-          onConfirm={() => void handleDelete(deleteTarget)}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
     </AppShell>
   );
 }

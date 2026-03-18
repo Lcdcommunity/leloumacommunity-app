@@ -29,7 +29,30 @@ export class AuthService {
     return createHash('sha256').update(input).digest('hex');
   }
 
-  // 👇 FONCTION GET ME CORRIGÉE 👇
+  private normalizeUrl(url: string): string {
+    return url.replace(/\/+$/, '');
+  }
+
+  private getFrontendBaseUrl(): string {
+    const raw =
+      this.config.get<string>('FRONTEND_URL') ||
+      process.env.FRONTEND_URL ||
+      this.config.get<string>('APP_URL') ||
+      process.env.APP_URL;
+
+    if (raw && raw.trim().length > 0) {
+      return this.normalizeUrl(raw.trim());
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      return 'http://localhost:3000';
+    }
+
+    throw new BadRequestException(
+      'Configuration manquante : FRONTEND_URL ou APP_URL est requis en production.',
+    );
+  }
+
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -51,8 +74,10 @@ export class AuthService {
     return user;
   }
 
-  // 👇 FONCTION DE LOGIN EXISTANTE 👇
-  async login(dto: LoginDto, meta?: { userAgent?: string; ipAddress?: string }) {
+  async login(
+    dto: LoginDto,
+    meta?: { userAgent?: string; ipAddress?: string },
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase().trim() },
     });
@@ -61,19 +86,29 @@ export class AuthService {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
     if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Votre compte n\'est pas actif ou en attente de validation.');
+      throw new UnauthorizedException(
+        "Votre compte n'est pas actif ou en attente de validation.",
+      );
     }
 
     const tokens = await this.tokens.issueLoginTokens(
-      { id: user.id, associationId: user.associationId, role: user.role, email: user.email },
-      meta
+      {
+        id: user.id,
+        associationId: user.associationId,
+        role: user.role,
+        email: user.email,
+      },
+      meta,
     );
 
     return {
@@ -84,12 +119,17 @@ export class AuthService {
         role: user.role,
         firstName: user.firstName,
         lastName: user.lastName,
-      }
+      },
     };
   }
 
-  async refresh(dto: RefreshTokenDto, meta?: { userAgent?: string; ipAddress?: string }) {
-    if (!dto.refreshToken) throw new UnauthorizedException('Refresh token requis');
+  async refresh(
+    dto: RefreshTokenDto,
+    meta?: { userAgent?: string; ipAddress?: string },
+  ) {
+    if (!dto.refreshToken) {
+      throw new UnauthorizedException('Refresh token requis');
+    }
 
     const rotated = await this.tokens.rotateRefreshToken(dto.refreshToken, meta);
     const accessToken = await this.tokens.signAccessToken(rotated.user);
@@ -123,14 +163,19 @@ export class AuthService {
 
     const generic = {
       success: true,
-      message: 'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
+      message:
+        'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
     };
 
-    if (!user || user.status === 'REJECTED') return generic;
+    if (!user || user.status === 'REJECTED') {
+      return generic;
+    }
 
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.sha256(rawToken);
-    const ttlMinutes = Number(this.config.get('auth.passwordResetTokenTtlMinutes') ?? 30);
+    const ttlMinutes = Number(
+      this.config.get('auth.passwordResetTokenTtlMinutes') ?? 30,
+    );
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
     await this.prisma.passwordResetToken.updateMany({
@@ -147,11 +192,8 @@ export class AuthService {
       },
     });
 
-    // --- FIX CHIRURGICAL ICI ---
-    // On force la lecture de FRONTEND_URL configurée sur Render
-    const front = this.config.get<string>('FRONTEND_URL') || process.env.FRONTEND_URL || 'https://lcd-comminity.vercel.app';
-    const resetUrl = `${front.replace(/\/$/, '')}/reset-password?token=${rawToken}`;
-    // ---------------------------
+    const front = this.getFrontendBaseUrl();
+    const resetUrl = `${front}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
     await this.authMailer.sendPasswordResetEmail({
       to: user.email,
@@ -171,7 +213,9 @@ export class AuthService {
     });
 
     if (!record || record.usedAt || record.expiresAt <= new Date()) {
-      throw new BadRequestException('Token de réinitialisation invalide ou expiré');
+      throw new BadRequestException(
+        'Token de réinitialisation invalide ou expiré',
+      );
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 12);

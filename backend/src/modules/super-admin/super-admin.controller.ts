@@ -1,4 +1,5 @@
 //backend/src/modules/super-admin/super-admin.controller.ts
+//backend/src/modules/super-admin/super-admin.controller.ts
 import {
   Body,
   Controller,
@@ -52,6 +53,12 @@ export class SuperAdminController {
   @Post('admins')
   createAdmin(@Body() body: CreateAntennaAdminDto, @CurrentUser() actor: AuthUser) {
     return this.service.createAntennaAdmin(body, actor.id);
+  }
+
+  // ── NOUVELLE ROUTE : modifier un admin d'antenne ──
+  @Patch('admins/:id')
+  updateAdmin(@Param('id') id: string, @Body() body: any, @CurrentUser() actor: AuthUser) {
+    return this.service.updateAntennaAdmin(id, body, actor.id);
   }
 
   @Patch('admins/:id/suspend')

@@ -6,19 +6,26 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class AuthMailerService {
   private readonly logger = new Logger(AuthMailerService.name);
-  private transporter: nodemailer.Transporter;
+  private readonly transporter: nodemailer.Transporter;
 
   constructor(private readonly config: ConfigService) {
-    // Configuration du "facteur" Nodemailer avec vos variables .env
     this.transporter = nodemailer.createTransport({
       host: this.config.get<string>('SMTP_HOST'),
-      port: this.config.get<number>('SMTP_PORT'),
-      secure: this.config.get<string>('SMTP_SECURE') === 'true', // true pour le port 465
+      port: Number(this.config.get<string>('SMTP_PORT')),
+      secure: this.config.get<string>('SMTP_SECURE') === 'true',
       auth: {
         user: this.config.get<string>('SMTP_USER'),
         pass: this.config.get<string>('SMTP_PASS'),
       },
     });
+  }
+
+  private getMailFrom(appName: string, fallbackLabel: string): string {
+    const smtpUser = this.config.get<string>('SMTP_USER') ?? '';
+    return (
+      this.config.get<string>('MAIL_FROM') ||
+      `"${fallbackLabel} ${appName}" <${smtpUser}>`
+    );
   }
 
   async sendPasswordResetEmail(params: {
@@ -27,8 +34,7 @@ export class AuthMailerService {
     appName?: string;
   }): Promise<void> {
     const appName = params.appName || 'Lélouma';
-    // Utilise le MAIL_FROM du .env, sinon par défaut l'adresse d'envoi
-    const mailFrom = this.config.get<string>('MAIL_FROM') || `"Support ${appName}" <${this.config.get('SMTP_USER')}>`;
+    const mailFrom = this.getMailFrom(appName, 'Support');
 
     try {
       await this.transporter.sendMail({
@@ -40,19 +46,24 @@ export class AuthMailerService {
             <div style="text-align: center; margin-bottom: 25px;">
               <h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>
             </div>
-            
+
             <h2 style="color: #111827; font-size: 20px; font-weight: 600;">Réinitialisation de mot de passe</h2>
             <p style="color: #374151; font-size: 16px; line-height: 1.5;">Bonjour,</p>
-            <p style="color: #374151; font-size: 16px; line-height: 1.5;">Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en créer un nouveau en toute sécurité :</p>
-            
+            <p style="color: #374151; font-size: 16px; line-height: 1.5;">
+              Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en créer un nouveau en toute sécurité :
+            </p>
+
             <div style="text-align: center; margin: 35px 0;">
-              <a href="${params.resetUrl}" style="background-color: #2563EB; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">Réinitialiser mon mot de passe</a>
+              <a href="${params.resetUrl}" style="background-color: #2563EB; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                Réinitialiser mon mot de passe
+              </a>
             </div>
-            
+
             <p style="font-size: 13px; color: #6B7280; line-height: 1.5; padding-top: 20px; border-top: 1px solid #F3F4F6;">
               Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br/>
               <a href="${params.resetUrl}" style="color: #3B82F6; word-break: break-all;">${params.resetUrl}</a>
             </p>
+
             <p style="font-size: 13px; color: #9CA3AF; margin-top: 15px;">
               Si vous n'avez pas demandé cette réinitialisation, vous pouvez simplement ignorer cet email. Votre compte restera sécurisé.
             </p>
@@ -60,20 +71,23 @@ export class AuthMailerService {
         `,
       });
 
-      this.logger.log(`✅ VRAI Email de reset envoyé avec succès à -> ${params.to}`);
-    } catch (error) {
-      this.logger.error(`❌ Échec de l'envoi de l'email de reset à ${params.to}`, error.stack);
+      this.logger.log(`✅ Email de reset envoyé avec succès à -> ${params.to}`);
+    } catch (error: unknown) {
+      this.logger.error(
+        `❌ Échec de l'envoi de l'email de reset à ${params.to}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
     }
   }
 
-  // 👇 NOUVELLE MÉTHODE POUR LA VÉRIFICATION D'EMAIL 👇
   async sendVerificationEmail(params: {
     to: string;
     verifyUrl: string;
     appName?: string;
   }): Promise<void> {
     const appName = params.appName || 'Lélouma';
-    const mailFrom = this.config.get<string>('MAIL_FROM') || `"Bienvenue ${appName}" <${this.config.get('SMTP_USER')}>`;
+    const mailFrom = this.getMailFrom(appName, 'Bienvenue');
 
     try {
       await this.transporter.sendMail({
@@ -85,15 +99,19 @@ export class AuthMailerService {
             <div style="text-align: center; margin-bottom: 25px;">
               <h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>
             </div>
-            
+
             <h2 style="color: #111827; font-size: 20px; font-weight: 600;">Bienvenue parmi nous !</h2>
             <p style="color: #374151; font-size: 16px; line-height: 1.5;">Bonjour,</p>
-            <p style="color: #374151; font-size: 16px; line-height: 1.5;">Merci de nous avoir rejoints. Pour activer votre compte, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :</p>
-            
+            <p style="color: #374151; font-size: 16px; line-height: 1.5;">
+              Merci de nous avoir rejoints. Pour activer votre compte, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :
+            </p>
+
             <div style="text-align: center; margin: 35px 0;">
-              <a href="${params.verifyUrl}" style="background-color: #15803D; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(21, 128, 61, 0.2);">Vérifier mon email</a>
+              <a href="${params.verifyUrl}" style="background-color: #15803D; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(21, 128, 61, 0.2);">
+                Vérifier mon email
+              </a>
             </div>
-            
+
             <p style="font-size: 13px; color: #6B7280; line-height: 1.5; padding-top: 20px; border-top: 1px solid #F3F4F6;">
               Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br/>
               <a href="${params.verifyUrl}" style="color: #3B82F6; word-break: break-all;">${params.verifyUrl}</a>
@@ -103,8 +121,12 @@ export class AuthMailerService {
       });
 
       this.logger.log(`✅ Email de vérification envoyé avec succès à -> ${params.to}`);
-    } catch (error) {
-      this.logger.error(`❌ Échec de l'envoi de l'email de vérification à ${params.to}`, error.stack);
+    } catch (error: unknown) {
+      this.logger.error(
+        `❌ Échec de l'envoi de l'email de vérification à ${params.to}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      throw error;
     }
   }
 }

@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import type { UserSummary } from '../../../../types/user';
@@ -40,53 +41,12 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function DeleteModal({
-  user,
-  onConfirm,
-  onCancel,
-  busy,
-}: {
-  user: UserSummary;
-  onConfirm: () => void;
-  onCancel: () => void;
-  busy: boolean;
-}) {
-  return (
-    <>
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }} onClick={onCancel} />
-      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 101, background: 'rgba(255,255,255,.97)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)', width: 'min(440px,calc(100vw - 2rem))', border: '1px solid rgba(220,38,38,.15)', boxShadow: '0 24px 60px rgba(220,38,38,.12)' }}>
-        <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-          <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2">
-            <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </div>
-        <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.3rem', fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: '.4rem' }}>
-          Supprimer cet administrateur&nbsp;?
-        </h2>
-        <p style={{ fontSize: '.82rem', color: '#6B7280', textAlign: 'center', marginBottom: '1.5rem', fontWeight: 600, lineHeight: 1.55 }}>
-          Le compte de <strong style={{ color: '#111827' }}>{fullName(user)}</strong> sera supprim&eacute; logiquement. Cette action est r&eacute;versible uniquement par intervention technique.
-        </p>
-        <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center' }}>
-          <button onClick={onCancel} disabled={busy} style={{ height: 40, padding: '0 1.2rem', borderRadius: 10, border: '1px solid rgba(220,38,38,.18)', background: 'rgba(249,250,251,.95)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>
-            Annuler
-          </button>
-          <button onClick={onConfirm} disabled={busy} style={{ height: 40, padding: '0 1.3rem', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#991B1B,#DC2626)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 800, color: 'white', cursor: 'pointer', boxShadow: '0 4px 14px rgba(220,38,38,.35)', opacity: busy ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-            {busy && <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'sadspin .7s linear infinite' }} />}
-            Supprimer
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
 export default function SuperAdminAdminsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<UserSummary[]>([]);
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<UserSummary | null>(null);
 
   const load = useCallback(async (qVal?: string) => {
     setLoading(true);
@@ -104,37 +64,6 @@ export default function SuperAdminAdminsPage() {
   useEffect(() => {
     void load('');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleToggleStatus(user: UserSummary) {
-    setBusyId(user.id);
-    setError(null);
-    try {
-      if (user.status === 'ACTIVE') {
-        await superAdminApi.suspendAntennaAdmin(user.id);
-      } else {
-        await superAdminApi.activateAntennaAdmin(user.id);
-      }
-      await load(q);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du changement de statut');
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function handleDelete(user: UserSummary) {
-    setBusyId(user.id);
-    setDeleteTarget(null);
-    setError(null);
-    try {
-      await superAdminApi.deleteAntennaAdmin(user.id);
-      await load(q);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur suppression');
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   const total = items.length;
   const activeCount = items.filter((u) => u.status === 'ACTIVE').length;
@@ -172,36 +101,26 @@ export default function SuperAdminAdminsPage() {
         .sad-search::placeholder{color:rgba(107,114,128,.45);font-weight:400}
         .sad-search-btn{height:40px;padding:0 1.1rem;border-radius:11px;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:800;display:flex;align-items:center;gap:.4rem;box-shadow:0 3px 10px rgba(37,99,235,.3);transition:all .18s;white-space:nowrap}
         .sad-search-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(37,99,235,.4)}
-        .sad-search-btn:disabled{opacity:.6;cursor:not-allowed}
         .sad-tw{overflow-x:auto}
         .sad-table{width:100%;border-collapse:collapse;min-width:820px}
         .sad-table thead tr{border-bottom:2px solid rgba(220,38,38,.1)}
         .sad-table th{padding:.8rem 1.2rem;font-size:.65rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase;color:#374151;background:rgba(254,242,242,.35);text-align:left;white-space:nowrap}
-        .sad-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:sadin .4s cubic-bezier(.22,1,.36,1) both}
+        .sad-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:sadin .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
         .sad-table tbody tr:last-child{border-bottom:none}
-        .sad-table tbody tr:hover{background:rgba(220,38,38,.025)}
+        .sad-table tbody tr:hover{background:rgba(220,38,38,.04)}
         .sad-table td{padding:.9rem 1.2rem;font-size:.82rem;color:#111827;vertical-align:middle}
         .sad-name{font-weight:800;font-size:.88rem;color:#0F172A}
         .sad-email{font-size:.72rem;color:#6B7280;font-weight:500;margin-top:2px}
         .sad-role{font-family:'DM Mono',monospace;font-size:.72rem;font-weight:700;color:#2563EB;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:6px;padding:.15rem .45rem}
         .sad-date{font-size:.75rem;font-weight:700;color:#6B7280}
-        .sad-actions{display:flex;gap:.4rem;justify-content:flex-end;align-items:center}
-        .sad-btn-act{height:30px;padding:0 .65rem;border-radius:7px;border:1.5px solid;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.25rem;transition:all .15s;white-space:nowrap}
-        .sad-btn-suspend{color:#D97706;background:rgba(255,251,235,.6);border-color:rgba(217,119,6,.2)}
-        .sad-btn-suspend:hover:not(:disabled){background:#FEF3C7;border-color:rgba(217,119,6,.4);transform:translateY(-1px)}
-        .sad-btn-enable{color:#059669;background:rgba(236,253,245,.6);border-color:rgba(5,150,105,.2)}
-        .sad-btn-enable:hover:not(:disabled){background:#D1FAE5;border-color:rgba(5,150,105,.4);transform:translateY(-1px)}
-        .sad-btn-del{color:#DC2626;background:rgba(254,242,242,.6);border-color:rgba(220,38,38,.2)}
-        .sad-btn-del:hover:not(:disabled){background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
-        .sad-btn-act:disabled{opacity:.45;cursor:not-allowed}
         .sad-mob{display:none;flex-direction:column}
         @media(max-width:760px){.sad-tw{display:none}.sad-mob{display:flex}}
-        .sad-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sadin .4s cubic-bezier(.22,1,.36,1) both}
+        .sad-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sadin .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
         .sad-mc:last-child{border-bottom:none}
+        .sad-mc:active{background:rgba(220,38,38,.04)}
         .sad-mc-top{display:flex;align-items:flex-start;gap:.65rem;margin-bottom:.6rem}
         .sad-mc-info{flex:1;min-width:0}
-        .sad-mc-row2{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem}
-        .sad-mc-actions{display:flex;gap:.4rem}
+        .sad-mc-row2{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
         .sad-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .sad-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:sadspin .8s linear infinite}
         .sad-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
@@ -268,20 +187,12 @@ export default function SuperAdminAdminsPage() {
               />
             </div>
             <button className="sad-search-btn" disabled={loading} onClick={() => void load(q)}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="11" cy="11" r="8" />
-                <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
-              </svg>
               Rechercher
             </button>
           </div>
 
           {error && (
             <div className="sad-error">
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="10" />
-                <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-              </svg>
               {error}
             </div>
           )}
@@ -290,9 +201,6 @@ export default function SuperAdminAdminsPage() {
             <div className="sad-loader"><div className="sad-ring" />Chargement&#8230;</div>
           ) : !error && items.length === 0 ? (
             <div className="sad-empty">
-              <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
               <p>Aucun administrateur trouv&eacute;</p>
             </div>
           ) : !error ? (
@@ -305,12 +213,16 @@ export default function SuperAdminAdminsPage() {
                       <th>R&ocirc;le</th>
                       <th>Statut</th>
                       <th>Cr&eacute;&eacute; le</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
+                      <th style={{ textAlign: 'right' }}>Détails</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((u, i) => (
-                      <tr key={u.id} style={{ animationDelay: `${i * 0.04}s` }}>
+                      <tr 
+                        key={u.id} 
+                        style={{ animationDelay: `${i * 0.04}s` }}
+                        onClick={() => router.push(`/super-admin/admins/${u.id}`)}
+                      >
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem' }}>
                             <AvatarIcon firstName={u.firstName} lastName={u.lastName} />
@@ -325,23 +237,10 @@ export default function SuperAdminAdminsPage() {
                         </td>
                         <td><StatusBadge status={u.status} /></td>
                         <td><span className="sad-date">{formatDate(u.createdAt)}</span></td>
-                        <td>
-                          <div className="sad-actions">
-                            {u.status === 'ACTIVE' ? (
-                              <button className="sad-btn-act sad-btn-suspend" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)}>
-                                {busyId === u.id ? <div style={{ width: 11, height: 11, border: '2px solid rgba(217,119,6,.3)', borderTopColor: '#D97706', borderRadius: '50%', animation: 'sadspin .7s linear infinite' }} /> : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                                Suspendre
-                              </button>
-                            ) : (
-                              <button className="sad-btn-act sad-btn-enable" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)}>
-                                {busyId === u.id ? <div style={{ width: 11, height: 11, border: '2px solid rgba(5,150,105,.3)', borderTopColor: '#059669', borderRadius: '50%', animation: 'sadspin .7s linear infinite' }} /> : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                                Activer
-                              </button>
-                            )}
-                            <button className="sad-btn-act sad-btn-del" disabled={busyId === u.id} onClick={() => setDeleteTarget(u)}>
-                              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          </div>
+                        <td style={{ textAlign: 'right' }}>
+                          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
                         </td>
                       </tr>
                     ))}
@@ -351,32 +250,28 @@ export default function SuperAdminAdminsPage() {
 
               <div className="sad-mob">
                 {items.map((u, i) => (
-                  <div key={u.id} className="sad-mc" style={{ animationDelay: `${i * 0.04}s` }}>
+                  <div 
+                    key={u.id} 
+                    className="sad-mc" 
+                    style={{ animationDelay: `${i * 0.04}s` }}
+                    onClick={() => router.push(`/super-admin/admins/${u.id}`)}
+                  >
                     <div className="sad-mc-top">
                       <AvatarIcon firstName={u.firstName} lastName={u.lastName} />
                       <div className="sad-mc-info">
                         <div className="sad-name">{fullName(u)}</div>
                         <div className="sad-email">{u.email}</div>
                       </div>
-                      <StatusBadge status={u.status} />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '.4rem' }}>
+                        <StatusBadge status={u.status} />
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </div>
                     </div>
                     <div className="sad-mc-row2">
                       <span className="sad-role">ADMIN ANTENNE</span>
-                      <span className="sad-date">{formatDate(u.createdAt)}</span>
-                    </div>
-                    <div style={{ display: 'flex', gap: '.4rem' }}>
-                      {u.status === 'ACTIVE' ? (
-                        <button className="sad-btn-act sad-btn-suspend" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)} style={{ flex: 1, justifyContent: 'center' }}>
-                          Suspendre
-                        </button>
-                      ) : (
-                        <button className="sad-btn-act sad-btn-enable" disabled={busyId === u.id} onClick={() => void handleToggleStatus(u)} style={{ flex: 1, justifyContent: 'center' }}>
-                          Activer
-                        </button>
-                      )}
-                      <button className="sad-btn-act sad-btn-del" disabled={busyId === u.id} onClick={() => setDeleteTarget(u)} style={{ padding: '0 1rem' }}>
-                        Supprimer
-                      </button>
+                      <span className="sad-date" style={{ marginLeft: 'auto' }}>{formatDate(u.createdAt)}</span>
                     </div>
                   </div>
                 ))}
@@ -385,15 +280,6 @@ export default function SuperAdminAdminsPage() {
           ) : null}
         </div>
       </div>
-
-      {deleteTarget && (
-        <DeleteModal
-          user={deleteTarget}
-          busy={busyId !== null}
-          onConfirm={() => void handleDelete(deleteTarget)}
-          onCancel={() => setDeleteTarget(null)}
-        />
-      )}
     </AppShell>
   );
 }

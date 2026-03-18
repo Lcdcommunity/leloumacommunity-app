@@ -1,4 +1,5 @@
 //backend/src/modules/super-admin/super-admin.service.ts
+//backend/src/modules/super-admin/super-admin.service.ts
 import {
   ConflictException,
   Injectable,
@@ -150,7 +151,7 @@ export class SuperAdminService {
     });
   }
 
-  /* ── NOUVELLES MÉTHODES DE GESTION DES UTILISATEURS (SUPER ADMIN) ── */
+  /* ── GESTION DES UTILISATEURS (MEMBRES) ── */
 
   async updateUser(userId: string, data: any) {
     return this.prisma.user.update({
@@ -195,7 +196,6 @@ export class SuperAdminService {
   }
 
   async deleteUser(userId: string, actorId: string) {
-    // Suppression logique (soft delete) pour ne pas casser l'historique
     return this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -203,6 +203,41 @@ export class SuperAdminService {
         deletedAt: new Date(),
         deletedByUserId: actorId,
       },
+    });
+  }
+
+  /* ── NOUVELLE MÉTHODE : modifier un admin d'antenne ── */
+
+  async updateAntennaAdmin(userId: string, data: any, actorId: string) {
+    // Vérifie que l'utilisateur existe et est bien un admin d'antenne
+    const admin = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        role: UserRole.ANTENNA_ADMIN,
+        NOT: { status: UserStatus.DELETED },
+      },
+    });
+
+    if (!admin) {
+      throw new NotFoundException('Administrateur introuvable.');
+    }
+
+    // Mise à jour des champs fournis uniquement (patch partiel)
+    const updateData: Prisma.UserUpdateInput = {};
+
+    if (data.firstName !== undefined) updateData.firstName = data.firstName;
+    if (data.lastName  !== undefined) updateData.lastName  = data.lastName;
+    if (data.phone     !== undefined) updateData.phone     = data.phone;
+    if (data.city      !== undefined) updateData.city      = data.city;
+    if (data.country   !== undefined) updateData.country   = data.country;
+    if (data.postalCode          !== undefined) updateData.postalCode          = data.postalCode;
+    if (data.originSubPrefecture !== undefined) updateData.originSubPrefecture = data.originSubPrefecture;
+    if (data.addressLine1        !== undefined) updateData.addressLine1        = data.addressLine1;
+    if (data.addressLine2        !== undefined) updateData.addressLine2        = data.addressLine2;
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
     });
   }
 
@@ -238,7 +273,7 @@ export class SuperAdminService {
           phone: data.phone,
           email: data.email,
           isActive: data.isActive ?? true,
-          defaultCurrency: data.defaultCurrency, // <-- Enregistrement de la devise
+          defaultCurrency: data.defaultCurrency,
           createdByUserId: actorId,
         },
       });
@@ -305,17 +340,17 @@ export class SuperAdminService {
     return this.prisma.antenna.update({
       where: { id },
       data: {
-        ...(data.code !== undefined ? { code: data.code } : {}),
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
-        ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
-        ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
-        ...(data.city !== undefined ? { city: data.city } : {}),
-        ...(data.country !== undefined ? { country: data.country } : {}),
-        ...(data.phone !== undefined ? { phone: data.phone } : {}),
-        ...(data.email !== undefined ? { email: data.email } : {}),
-        ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
-        ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency } : {}), // <-- Mise à jour de la devise
+        ...(data.code            !== undefined ? { code:            data.code            } : {}),
+        ...(data.name            !== undefined ? { name:            data.name            } : {}),
+        ...(data.addressLine1    !== undefined ? { addressLine1:    data.addressLine1    } : {}),
+        ...(data.addressLine2    !== undefined ? { addressLine2:    data.addressLine2    } : {}),
+        ...(data.postalCode      !== undefined ? { postalCode:      data.postalCode      } : {}),
+        ...(data.city            !== undefined ? { city:            data.city            } : {}),
+        ...(data.country         !== undefined ? { country:         data.country         } : {}),
+        ...(data.phone           !== undefined ? { phone:           data.phone           } : {}),
+        ...(data.email           !== undefined ? { email:           data.email           } : {}),
+        ...(data.isActive        !== undefined ? { isActive:        data.isActive        } : {}),
+        ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency } : {}),
       },
     });
   }
@@ -483,15 +518,9 @@ export class SuperAdminService {
   }
 
   async deleteProject(id: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id },
-    });
-    if (!project) {
-      throw new NotFoundException('Projet introuvable.');
-    }
-    return this.prisma.project.delete({
-      where: { id },
-    });
+    const project = await this.prisma.project.findUnique({ where: { id } });
+    if (!project) throw new NotFoundException('Projet introuvable.');
+    return this.prisma.project.delete({ where: { id } });
   }
 
   async listDocuments(page: number, pageSize: number, q?: string) {
@@ -522,9 +551,7 @@ export class SuperAdminService {
 
   async listAllContributions(page: number, pageSize: number, status?: string) {
     const skip = (page - 1) * pageSize;
-    const where: Prisma.ContributionWhereInput = status
-      ? { status: status as any }
-      : {};
+    const where: Prisma.ContributionWhereInput = status ? { status: status as any } : {};
 
     const [items, total] = await Promise.all([
       this.prisma.contribution.findMany({
@@ -613,20 +640,15 @@ export class SuperAdminService {
       },
     });
 
-    return {
-      user,
-      temporaryPassword,
-    };
+    return { user, temporaryPassword };
   }
 
   private generateTemporaryPassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
     let out = '';
-
     for (let i = 0; i < 12; i += 1) {
       out += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-
     return out;
   }
 
@@ -641,17 +663,10 @@ export class SuperAdminService {
 
     while (true) {
       const exists = await this.prisma.antenna.findFirst({
-        where: {
-          associationId,
-          code: candidate,
-        },
+        where: { associationId, code: candidate },
         select: { id: true },
       });
-
-      if (!exists) {
-        return candidate;
-      }
-
+      if (!exists) return candidate;
       counter += 1;
       candidate = `${base}${counter}`;
     }
@@ -664,10 +679,7 @@ export class SuperAdminService {
       .replace(/[^A-Za-z0-9]/g, '')
       .toUpperCase();
 
-    if (normalized.length >= 4) {
-      return normalized.slice(0, 8);
-    }
-
+    if (normalized.length >= 4) return normalized.slice(0, 8);
     return `${normalized || 'ANT'}01`;
   }
 }
