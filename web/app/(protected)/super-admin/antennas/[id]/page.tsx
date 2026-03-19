@@ -448,4 +448,4 @@ export default function AntennaDetailPage() {
       )}
     </AppShell>
   );
-}
+} 

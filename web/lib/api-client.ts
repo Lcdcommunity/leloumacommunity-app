@@ -133,7 +133,7 @@ export const api = {
   }) =>
     http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body }),
 
-// ==========================================
+  // ==========================================
   // TARIFICATION (MULTI-DEVISES)
   // ==========================================
   getPricingSuperAdmin: () =>
@@ -226,14 +226,14 @@ export const api = {
     city?: string;
     country?: string;
     isActive?: boolean;
-    defaultCurrency?: 'GNF' | 'EUR' | 'USD' | 'XOF';
+    defaultCurrency?: string | null;
   }) =>
     http<Antenna, typeof body>('/super-admin/antennas', { method: 'POST', body }),
 
   updateAntenna: (
     id: string,
     body: Partial<Antenna> & {
-      defaultCurrency?: 'GNF' | 'EUR' | 'USD' | 'XOF';
+      defaultCurrency?: string | null;
     },
   ) =>
     http<Antenna, typeof body>(`/super-admin/antennas/${id}`, { method: 'PATCH', body }),
