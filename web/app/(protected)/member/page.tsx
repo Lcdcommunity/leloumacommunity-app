@@ -1,4 +1,4 @@
-//////// web/app/(protected)/member/page.tsx
+// web/app/(protected)/member/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -12,7 +12,21 @@ import type { Contribution } from '../../../types/contribution';
 import type { Project } from '../../../types/project';
 import type { ContentPost } from '../../../types/content';
 
-type MemberDashboardResponse = {
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type DashboardData = {
+  stats: {
+    myTotalContributions?: number;
+    activeProjects?: number;
+    myContributionsTotal?: number;
+    myContributionsValidatedTotal?: number;
+    myPendingContributionsCount?: number;
+    associationTotalBalance?: number;
+    lateMonths?: number;
+    myLastContributionAt?: string | null;
+    currency?: string;
+  };
+  me: UserSummary;
   virtualCard?: {
     cardNumber: string;
     isLocked: boolean;
@@ -26,67 +40,77 @@ type MemberDashboardResponse = {
       placeOfBirth?: string | null;
       country?: string | null;
       city?: string | null;
-      profilePhotoUrl?: string;
+      profilePhotoUrl?: string | null;
     };
   } | null;
-  stats?: {
-    myTotalContributions?: number;
-    activeProjects?: number;
-    myContributionsTotal?: number;
-    myContributionsValidatedTotal?: number;
-    myPendingContributionsCount?: number;
-    associationTotalBalance?: number;
-    lateMonths?: number;
-    myLastContributionAt?: string | null;
-    currency?: string;
-  };
-  antennaBalances?: {
-    id: string;
-    name: string;
-    balance: number;
-    currency: string;
-  }[];
-  me?: UserSummary;
-  user?: UserSummary;
-  recentContributions?: Contribution[];
-  projectsInProgress?: Project[];
-  latestContents?: ContentPost[];
-  lateMembersPreview?: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
+  recentContributions: Contribution[];
+  projectsInProgress: Project[];
+  latestContents: ContentPost[];
+  lateMembersPreview: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
 };
 
-// FIX TYPE : On définit explicitement la structure de nos cartes
-type StatCard = {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: string;
-  bg: string;
-  sub: string;
-  spanClass: string;
-  urgent?: boolean;
-  wide?: boolean;
-  clickable?: boolean;
-  onClick?: () => void;
+type BalanceSummary = {
+  associationId: string;
+  associationName: string;
+  totalValidatedContributionsAmount: number;
+  currency: string;
+  lastUpdatedAt?: string | null;
 };
+
+// ✅ Type étendu pour éviter les (as any) — couvre tous les champs optionnels
+type ExtendedContribution = Contribution & {
+  purpose?: string | null;
+  currency?: string;
+  method?: string | null;
+  validatedAt?: string | null;
+  note?: string | null;
+};
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getStatusConfig(status: string) {
+  const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    VALIDATED:          { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    PENDING:            { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    REJECTED:           { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    CANCELLED:          { label: 'Annulée',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    IN_PROGRESS:        { label: 'En cours',   color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+    PUBLISHED:          { label: 'Publié',     color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    DRAFT:              { label: 'Brouillon',  color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
+    APPROVED:           { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    COMPLETED:          { label: 'Terminé',    color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
+  };
+  return map[status] ?? { label: status, color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' };
+}
+
+function getPurposeConfig(purpose?: string | null) {
+  const map: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+    REGULAR_QUOTA:   { label: 'Cotisation régulière',  icon: '📅', color: '#059669', bg: '#ECFDF5' },
+    MEMBERSHIP_CARD: { label: 'Carte membre annuelle', icon: '💳', color: '#2563EB', bg: '#EFF6FF' },
+    DONATION:        { label: 'Don libre',             icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
+  };
+  return purpose ? (map[purpose] ?? null) : null;
+}
+
+function getMethodLabel(method?: string | null) {
+  const map: Record<string, string> = {
+    CASH: 'Espèces', BANK_TRANSFER: 'Virement bancaire', MOBILE_MONEY: 'Mobile Money',
+  };
+  return method ? (map[method] ?? method) : '—';
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    VALIDATED:  { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    PENDING:    { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-    REJECTED:   { label: 'Rejetée',   color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-    IN_PROGRESS:{ label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-    PUBLISHED:  { label: 'Publié',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    DRAFT:      { label: 'Brouillon', color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
-  };
-  const s = map[status] ?? { label: status, color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' };
+  const s = getStatusConfig(status);
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '0.28rem',
       fontSize: '0.7rem', fontWeight: 800,
       color: s.color, background: s.bg,
       border: `1px solid ${s.border}`,
-      borderRadius: 99, padding: '0.18rem 0.6rem',
-      whiteSpace: 'nowrap',
+      borderRadius: 99, padding: '0.18rem 0.6rem', whiteSpace: 'nowrap',
     }}>
       <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
       {s.label}
@@ -97,182 +121,386 @@ function StatusBadge({ status }: { status: string }) {
 function EmptyRow({ cols, label }: { cols: number; label: string }) {
   return (
     <tr>
-      <td colSpan={cols} style={{ textAlign: 'center', padding: '1.75rem 1rem', color: '#6B7280', fontSize: '0.8rem', fontWeight: 500 }}>
+      <td colSpan={cols} style={{
+        textAlign: 'center', padding: '1.75rem 1rem',
+        color: '#6B7280', fontSize: '0.8rem', fontWeight: 500,
+      }}>
         {label}
       </td>
     </tr>
   );
 }
 
-function BalancesModal({
-  balances, onClose
+// ─── Contribution Detail Modal ───────────────────────────────────────────────
+
+function ContributionDetailModal({
+  item,
+  currency,
+  onClose,
 }: {
-  balances?: { id: string; name: string; balance: number; currency: string }[];
+  item: ExtendedContribution;  // ✅ ExtendedContribution au lieu de Contribution
+  currency: string;
   onClose: () => void;
 }) {
+  const purposeCfg = getPurposeConfig(item.purpose);  // ✅ plus de (as any)
+  const statusCfg = getStatusConfig(item.status);
+
   return (
-    <>
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'rgba(0,0,0,0.45)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1.25rem',
+        animation: 'mbin2 0.2s ease',
+      }}
+      onClick={onClose}
+    >
       <div
-        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }}
-        onClick={onClose}
-      />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        zIndex: 101, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)',
-        borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)',
-        width: 'min(480px,calc(100vw - 2rem))',
-        border: '1px solid rgba(37,99,235,.15)',
-        boxShadow: '0 24px 60px rgba(37,99,235,.12)',
-        maxHeight: '85vh', overflowY: 'auto'
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', margin: 0 }}>
-            Soldes par antenne
-          </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
-            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        style={{
+          width: '100%', maxWidth: 420,
+          background: '#fff', borderRadius: 22,
+          padding: '0 0 1.5rem',
+          maxHeight: '88vh', overflowY: 'auto',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
+          animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div style={{
+          padding: '1rem 1.25rem 0.75rem',
+          borderBottom: '1px solid #F3F4F6',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.25rem', fontWeight: 500, color: '#111827' }}>
+            Détail du versement
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              width: 32, height: 32, borderRadius: '50%',
+              background: '#F3F4F6', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280',
+            }}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-          {!balances || balances.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280', fontSize: '0.85rem' }}>
-              Aucune donnée de solde disponible.
-            </div>
-          ) : (
-            balances.map((b) => (
-              <div key={b.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.9rem 1.1rem', background: '#F9FAFB', borderRadius: 14,
-                border: '1px solid #F3F4F6'
+        {/* Amount */}
+        <div style={{ padding: '1.25rem 1.25rem 0', display: 'flex', alignItems: 'baseline', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 600, color: '#111827' }}>
+            {formatCurrency(item.amount, item.currency || currency)}  {/* ✅ plus de (as any) */}
+          </span>
+          <StatusBadge status={item.status} />
+        </div>
+
+        {/* Rows */}
+        <div style={{ padding: '0.5rem 1.25rem 0', display: 'flex', flexDirection: 'column' }}>
+          {[
+            purposeCfg && {
+              label: 'Motif',
+              content: (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                  fontSize: '0.78rem', fontWeight: 600,
+                  padding: '0.25rem 0.65rem', borderRadius: 99,
+                  background: purposeCfg.bg, color: purposeCfg.color,
+                }}>
+                  {purposeCfg.icon} {purposeCfg.label}
+                </span>
+              ),
+            },
+            {
+              label: 'Méthode',
+              content: <span style={{ fontSize: '0.83rem', color: '#1F2937', fontWeight: 500 }}>{getMethodLabel(item.method)}</span>,
+            },
+            {
+              label: 'Date du dépôt',
+              content: <span style={{ fontSize: '0.83rem', color: '#1F2937', fontWeight: 500 }}>{formatDate(item.depositedAt || item.createdAt)}</span>,
+            },
+            {
+              label: 'Validation',
+              content: (
+                <span style={{ fontSize: '0.83rem', fontWeight: 500, color: item.validatedAt ? '#1F2937' : '#9CA3AF' }}>
+                  {item.validatedAt ? formatDate(item.validatedAt) : 'En attente'}  {/* ✅ plus de (as any) */}
+                </span>
+              ),
+            },
+            item.note && {  // ✅ plus de (as any)
+              label: 'Commentaire',
+              content: (
+                <span style={{
+                  fontSize: '0.8rem', color: '#374151', fontStyle: 'italic',
+                  background: '#F9FAFB', border: '1px solid #E5E7EB',
+                  borderRadius: 10, padding: '0.5rem 0.75rem', display: 'block',
+                  lineHeight: 1.55, textAlign: 'left',
+                }}>
+                  &ldquo;{item.note}&rdquo;
+                </span>
+              ),
+            },
+            {
+              label: 'Statut',
+              content: <span style={{ fontSize: '0.83rem', fontWeight: 700, color: statusCfg.color }}>{statusCfg.label}</span>,
+            },
+          ].filter(Boolean).map((row, i) => {
+            const r = row as { label: string; content: React.ReactNode };
+            return (
+              <div key={i} style={{
+                display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+                padding: '0.72rem 0', borderBottom: '1px solid #F9FAFB', gap: '1rem',
               }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>{b.name}</div>
-                <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.95rem', fontWeight: 800, color: '#1D4ED8' }}>
-                  {formatCurrency(b.balance, b.currency)}
-                </div>
+                <span style={{
+                  fontSize: '0.71rem', fontWeight: 700, letterSpacing: '0.07em',
+                  textTransform: 'uppercase', color: '#9CA3AF', flexShrink: 0, paddingTop: 2,
+                }}>
+                  {r.label}
+                </span>
+                <div style={{ textAlign: 'right' }}>{r.content}</div>
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
+// ─── Balance Modal ───────────────────────────────────────────────────────────
+
+function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; onClose: () => void }) {
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 300,
+        background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1.25rem', animation: 'mbin2 0.2s ease',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          width: '100%', maxWidth: 420, background: '#fff', borderRadius: 22,
+          padding: '1.5rem', boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
+          animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 600, color: '#111827', margin: 0 }}>
+            Solde de l&apos;association
+          </h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        {!summary ? (
+          <div style={{ textAlign: 'center', padding: '1.5rem', color: '#9CA3AF', fontSize: '0.85rem' }}>
+            Données non disponibles
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            <div style={{
+              background: '#F0FDF4', border: '1px solid #BBF7D0',
+              borderRadius: 16, padding: '1.25rem 1.5rem',
+              display: 'flex', flexDirection: 'column', gap: '0.3rem',
+            }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669' }}>
+                Total validé
+              </span>
+              <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 700, color: '#111827' }}>
+                {formatCurrency(summary.totalValidatedContributionsAmount, summary.currency)}
+              </span>
+              <span style={{ fontSize: '0.74rem', color: '#6B7280' }}>{summary.associationName}</span>
+            </div>
+            {summary.lastUpdatedAt && (
+              <p style={{ fontSize: '0.72rem', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>
+                Dernière mise à jour : {formatDate(summary.lastUpdatedAt)}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────────
+
 export default function MemberHomePage() {
-  const [data, setData] = useState<MemberDashboardResponse | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [myContributions, setMyContributions] = useState<ExtendedContribution[]>([]);
+  const [balanceSummary, setBalanceSummary] = useState<BalanceSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isCardVisible, setIsCardVisible] = useState(false);
-  const [showBalancesModal, setShowBalancesModal] = useState(false);
+  const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [selectedContribution, setSelectedContribution] = useState<ExtendedContribution | null>(null);
 
+  // ✅ FIX react-hooks/set-state-in-effect :
+  // La fonction async est définie et appelée DIRECTEMENT dans useEffect
+  // (pas de useCallback intermédiaire — ESLint n'accepte pas void fn() externe)
   useEffect(() => {
-    void (async () => {
+    const fetchAll = async () => {
       try {
-        const res = await api.dashboardMember() as MemberDashboardResponse;
-        if (res.virtualCard && res.virtualCard.user) {
-          const userRef = res.virtualCard.user as { profilePhotoUrl?: string | null };
-          if (userRef.profilePhotoUrl === null) {
-            res.virtualCard.user.profilePhotoUrl = undefined;
+        const [dashRes, balanceRes, contribRes] = await Promise.allSettled([
+          api.dashboardMember(),
+          api.getAssociationBalanceSummary(),
+          api.listMyContributions({ page: 1, pageSize: 10 }),
+        ]);
+
+        if (dashRes.status === 'fulfilled') {
+          const res = dashRes.value;
+          if (res.virtualCard?.user) {
+            const u = res.virtualCard.user as { profilePhotoUrl?: string | null };
+            if (u.profilePhotoUrl === null) u.profilePhotoUrl = undefined;
           }
+          setData(res as DashboardData);
+        } else {
+          setError(
+            dashRes.reason instanceof Error
+              ? dashRes.reason.message
+              : 'Erreur chargement dashboard'
+          );
         }
-        setData(res);
+
+        if (balanceRes.status === 'fulfilled') {
+          setBalanceSummary(balanceRes.value as BalanceSummary);
+        }
+
+        if (contribRes.status === 'fulfilled') {
+          setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erreur chargement dashboard');
+        setError(err instanceof Error ? err.message : 'Erreur inattendue');
       }
-    })();
+    };
+
+    void fetchAll();
   }, []);
 
-  const me = data?.me ?? data?.user;
-  const cur = data?.stats?.currency || 'EUR';
+  const me = data?.me;
+  const cur = data?.stats?.currency || balanceSummary?.currency || 'EUR';
   const lateMonths = data?.stats?.lateMonths ?? 0;
 
-  // FIX TYPE : Utilisation de StatCard[]
+  const assocBalance =
+    balanceSummary?.totalValidatedContributionsAmount ??
+    data?.stats?.associationTotalBalance ??
+    0;
+
+  // Cotisations récentes : appel dédié > dashboard
+  const recentContribs: ExtendedContribution[] = myContributions.length > 0
+    ? myContributions
+    : (data?.recentContributions ?? []) as ExtendedContribution[];
+
+  const totalCotise =
+    data?.stats?.myContributionsTotal ??
+    data?.stats?.myTotalContributions ??
+    recentContribs.reduce((s, c) => s + (c.amount ?? 0), 0);
+
+  const totalValide =
+    data?.stats?.myContributionsValidatedTotal ??
+    recentContribs
+      .filter(c => c.status === 'VALIDATED')
+      .reduce((s, c) => s + (c.amount ?? 0), 0);
+
+  const pendingCount =
+    data?.stats?.myPendingContributionsCount ??
+    recentContribs.filter(c =>
+      c.status === 'PENDING' || c.status === 'PENDING_VALIDATION'
+    ).length;
+
+  const lastContribDate =
+    data?.stats?.myLastContributionAt ??
+    (recentContribs.length > 0
+      ? recentContribs[0].depositedAt || recentContribs[0].createdAt
+      : null);
+
+  type StatCard = {
+    label: string;
+    value: string | number;
+    icon: React.ReactNode;
+    color: string;
+    bg: string;
+    sub: string;
+    spanClass: string;
+    urgent?: boolean;
+    clickable?: boolean;
+    onClick?: () => void;
+  };
+
   const stats: StatCard[] = data ? [
     {
       label: 'Total cotisé',
-      value: formatCurrency(data.stats?.myContributionsTotal ?? data.stats?.myTotalContributions ?? 0, cur),
+      value: formatCurrency(totalCotise, cur),
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
       ),
-      color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé',
-      spanClass: 'mb-span-1'
+      color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé', spanClass: 'mb-span-1',
     },
     {
       label: 'Cotisations validées',
-      value: formatCurrency(data.stats?.myContributionsValidatedTotal ?? data.stats?.myTotalContributions ?? 0, cur),
+      value: formatCurrency(totalValide, cur),
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
         </svg>
       ),
-      color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin",
-      spanClass: 'mb-span-1'
+      color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin", spanClass: 'mb-span-1',
     },
     {
       label: 'En attente',
-      value: data.stats?.myPendingContributionsCount ?? 0,
+      value: pendingCount,
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
       ),
       color: '#D97706', bg: '#FFFBEB', sub: 'Dépôts à valider',
-      urgent: (data.stats?.myPendingContributionsCount ?? 0) > 0,
-      spanClass: 'mb-span-1'
+      urgent: pendingCount > 0, spanClass: 'mb-span-1',
     },
     {
       label: 'Solde association',
-      value: formatCurrency(data.stats?.associationTotalBalance ?? 0, cur),
+      value: formatCurrency(assocBalance, cur),
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
         </svg>
       ),
       color: '#7C3AED', bg: '#F5F3FF', sub: 'Fonds collectifs',
-      spanClass: 'mb-span-1'
+      clickable: true, onClick: () => setShowBalanceModal(true), spanClass: 'mb-span-1',
     },
     {
       label: 'Retard',
       value: `${lateMonths} mois`,
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
         </svg>
       ),
       color: lateMonths > 0 ? '#DC2626' : '#059669',
       bg: lateMonths > 0 ? '#FEF2F2' : '#ECFDF5',
       sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !',
-      urgent: lateMonths > 2,
-      spanClass: 'mb-span-1'
+      urgent: lateMonths > 2, spanClass: 'mb-span-1',
     },
     {
       label: 'Dernière cotisation',
-      value: formatDate(data.stats?.myLastContributionAt ?? null),
+      value: formatDate(lastContribDate),
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
         </svg>
       ),
-      color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement',
-      spanClass: 'mb-span-1'
-    },
-    {
-      label: 'Autres soldes',
-      value: 'Voir détails',
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-        </svg>
-      ),
-      color: '#2563EB', bg: '#EFF6FF', sub: 'Détails par antenne',
-      clickable: true,
-      wide: true,
-      onClick: () => setShowBalancesModal(true),
-      spanClass: 'mb-span-6'
+      color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement', spanClass: 'mb-span-1',
     },
   ] : [];
 
@@ -281,40 +509,39 @@ export default function MemberHomePage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
+        @keyframes mbin  { to { opacity: 1; transform: translateY(0); } }
+        @keyframes mbin2 { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes mbscale2 {
+          from { opacity: 0; transform: scale(0.94); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+        @keyframes mbpulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.8)} }
+        @keyframes mbspin  { to { transform: rotate(360deg); } }
+
         .mb-wrap {
           font-family: 'DM Sans', sans-serif;
           padding: clamp(1.25rem, 3vw, 2rem);
-          padding-bottom: 8rem; /* espace pour FAB + bottom nav */
-          max-width: 1280px;
-          margin: 0 auto;
+          padding-bottom: 8rem;
+          max-width: 1280px; margin: 0 auto;
         }
 
-        /* ── Page header ── */
         .mb-header {
-          display: flex;
-          align-items: flex-end;
-          justify-content: space-between;
-          flex-wrap: wrap;
-          gap: 1rem;
-          margin-bottom: 2rem;
-          padding-bottom: 1.5rem;
+          display: flex; align-items: flex-end; justify-content: space-between;
+          flex-wrap: wrap; gap: 1rem;
+          margin-bottom: 2rem; padding-bottom: 1.5rem;
           border-bottom: 1px solid rgba(37,99,235,0.10);
-          opacity: 0;
-          transform: translateY(10px);
+          opacity: 0; transform: translateY(10px);
           animation: mbin 0.5s 0.05s cubic-bezier(.22,1,.36,1) forwards;
         }
         .mb-eyebrow {
-          font-size: 0.68rem; font-weight: 800;
-          letter-spacing: 0.12em; text-transform: uppercase;
-          color: #2563EB; margin-bottom: 0.4rem;
+          font-size: 0.68rem; font-weight: 800; letter-spacing: 0.12em;
+          text-transform: uppercase; color: #2563EB; margin-bottom: 0.4rem;
           display: flex; align-items: center; gap: 0.4rem;
         }
         .mb-eyebrow-dot {
           width: 6px; height: 6px; background: #3B82F6; border-radius: 50%;
           animation: mbpulse 2s ease-in-out infinite;
         }
-        @keyframes mbpulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.8)} }
-
         .mb-title {
           font-family: 'Cormorant Garamond', serif;
           font-size: clamp(1.6rem, 3.5vw, 2.1rem);
@@ -327,53 +554,31 @@ export default function MemberHomePage() {
         }
         .mb-greeting-chip {
           font-size: 0.8rem; font-weight: 600; color: #374151;
-          background: rgba(37,99,235,0.06);
-          border: 1px solid rgba(37,99,235,0.15);
-          border-radius: 8px; padding: 0.5rem 1rem;
-          white-space: nowrap;
+          background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.15);
+          border-radius: 8px; padding: 0.5rem 1rem; white-space: nowrap;
         }
 
-        /* ── Stats grid ── */
         .mb-stats {
-          display: grid;
-          grid-template-columns: repeat(6, 1fr);
-          gap: 0.75rem;
-          margin-bottom: 1.5rem;
+          display: grid; grid-template-columns: repeat(6, 1fr);
+          gap: 0.75rem; margin-bottom: 1.5rem;
         }
         .mb-span-1 { grid-column: span 1; }
-        .mb-span-6 { grid-column: span 6; }
 
-        @media (max-width: 1100px) {
-          .mb-stats { grid-template-columns: repeat(3, 1fr); }
-          .mb-span-6 { grid-column: span 3; }
-        }
-
+        @media (max-width: 1100px) { .mb-stats { grid-template-columns: repeat(3, 1fr); } }
         @media (max-width: 768px) {
-          /* Mobile : 3 colonnes super compactes. 3 cartes par ligne. */
           .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-          .mb-span-6 { grid-column: span 3; }
-
-          .mb-stat {
-            padding: 0.6rem 0.5rem !important;
-            border-radius: 12px !important;
-          }
+          .mb-stat { padding: 0.6rem 0.5rem !important; border-radius: 12px !important; }
           .mb-stat-value { font-size: 1.1rem !important; word-break: break-word; }
           .mb-stat-label { font-size: 0.52rem !important; }
           .mb-stat-sub   { font-size: 0.5rem !important; }
           .mb-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
           .mb-stat-icon svg { width: 12px; height: 12px; }
           .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
-          
-          /* Ajustements pour les grandes cartes sur mobile */
-          .mb-stat.wide { padding: 0.8rem !important; gap: 0.6rem !important; flex-direction: column !important; align-items: flex-start !important; }
-          .mb-stat.wide .mb-stat-value { font-size: 1.4rem !important; margin-bottom: 0 !important; }
         }
 
         .mb-stat {
-          background: rgba(253,253,255,0.9);
-          backdrop-filter: blur(12px);
-          border-radius: 18px;
-          padding: 1.2rem 1.25rem;
+          background: rgba(253,253,255,0.9); backdrop-filter: blur(12px);
+          border-radius: 18px; padding: 1.2rem 1.25rem;
           border: 1px solid rgba(37,99,235,0.12);
           box-shadow: 0 4px 12px rgba(37,99,235,0.04), 0 0 0 1px rgba(255,255,255,0.8) inset;
           position: relative; overflow: hidden;
@@ -390,27 +595,17 @@ export default function MemberHomePage() {
           transform: translateY(-2px);
           box-shadow: 0 8px 22px rgba(37,99,235,0.08), 0 0 0 1px rgba(255,255,255,0.9) inset;
         }
-        .mb-stat.wide {
-          display: flex; align-items: center;
-          gap: 1.25rem; padding: 1rem 1.4rem;
-        }
         .mb-stat-accent {
           position: absolute; top: 0; left: 0; right: 0; height: 4px;
           border-radius: 18px 18px 0 0;
-        }
-        .mb-stat.wide .mb-stat-accent {
-          width: 4px; height: auto;
-          top: 0; bottom: 0; left: 0; right: auto;
-          border-radius: 18px 0 0 18px;
         }
         .mb-stat-top {
           display: flex; justify-content: space-between; align-items: flex-start;
           margin-bottom: 0.8rem;
         }
         .mb-stat-label {
-          font-size: 0.68rem; font-weight: 800;
-          letter-spacing: 0.08em; text-transform: uppercase;
-          color: #4B5563; max-width: 110px; line-height: 1.4;
+          font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
+          text-transform: uppercase; color: #4B5563; max-width: 110px; line-height: 1.4;
         }
         .mb-stat-icon {
           width: 36px; height: 36px; border-radius: 10px;
@@ -418,40 +613,28 @@ export default function MemberHomePage() {
         }
         .mb-stat-value {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.85rem; font-weight: 700;
-          color: #111827; letter-spacing: -0.03em;
-          line-height: 1; margin-bottom: 0.4rem;
+          font-size: 1.85rem; font-weight: 700; color: #111827;
+          letter-spacing: -0.03em; line-height: 1; margin-bottom: 0.4rem;
         }
-        .mb-stat.wide .mb-stat-value { font-size: 2.2rem; margin-bottom: 0.2rem; }
         .mb-stat-sub { font-size: 0.72rem; color: #6B7280; font-weight: 600; }
 
-        /* ── Bottom grid ── */
-        .mb-grid2 {
-          display: grid; grid-template-columns: 1fr 1fr;
-          gap: 1.25rem; margin-bottom: 1.5rem;
-        }
+        .mb-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
         @media (max-width: 860px) { .mb-grid2 { grid-template-columns: 1fr; } }
 
-        /* ── Panel ── */
         .mb-panel {
-          background: rgba(253,253,255,0.9);
-          backdrop-filter: blur(12px);
-          border-radius: 20px;
-          border: 1px solid rgba(37,99,235,0.12);
+          background: rgba(253,253,255,0.9); backdrop-filter: blur(12px);
+          border-radius: 20px; border: 1px solid rgba(37,99,235,0.12);
           box-shadow: 0 4px 15px rgba(37,99,235,0.03), 0 0 0 1px rgba(255,255,255,0.8) inset;
-          overflow: hidden;
-          opacity: 0;
+          overflow: hidden; opacity: 0;
           animation: mbin 0.5s cubic-bezier(.22,1,.36,1) forwards;
         }
         .mb-panel-head {
           display: flex; align-items: center; justify-content: space-between;
-          padding: 1.2rem 1.4rem;
-          border-bottom: 1px solid rgba(37,99,235,0.08);
+          padding: 1.2rem 1.4rem; border-bottom: 1px solid rgba(37,99,235,0.08);
         }
         .mb-panel-title {
-          font-size: 0.78rem; font-weight: 800;
-          letter-spacing: 0.08em; text-transform: uppercase;
-          color: #1F2937;
+          font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em;
+          text-transform: uppercase; color: #1F2937;
           display: flex; align-items: center; gap: 0.5rem;
         }
         .mb-panel-ico {
@@ -460,20 +643,16 @@ export default function MemberHomePage() {
           color: #2563EB;
         }
         .mb-count-chip {
-          font-size: 0.7rem; font-weight: 800;
-          padding: 0.2rem 0.6rem; border-radius: 99px;
-          background: #EFF6FF; color: #1D4ED8;
-          border: 1px solid #BFDBFE;
+          font-size: 0.7rem; font-weight: 800; padding: 0.2rem 0.6rem;
+          border-radius: 99px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
         }
 
-        /* ── Table ── */
         .mb-table { width: 100%; border-collapse: collapse; }
         .mb-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.1); }
         .mb-table thead th {
           padding: 0.75rem 1.4rem;
-          font-size: 0.68rem; font-weight: 800;
-          letter-spacing: 0.09em; text-transform: uppercase;
-          color: #6B7280; text-align: left;
+          font-size: 0.68rem; font-weight: 800; letter-spacing: 0.09em;
+          text-transform: uppercase; color: #6B7280; text-align: left;
         }
         .mb-table tbody tr {
           border-bottom: 1px solid rgba(37,99,235,0.06);
@@ -492,6 +671,10 @@ export default function MemberHomePage() {
         }
         .mb-table td.muted { color: #6B7280; font-size: 0.78rem; font-weight: 500; }
 
+        .mb-contrib-row { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .mb-contrib-row:hover { background: rgba(37,99,235,0.04) !important; }
+        .mb-contrib-row:active { background: rgba(37,99,235,0.08) !important; }
+
         .mb-member-pill { display: flex; align-items: center; gap: 0.6rem; }
         .mb-avatar-sm {
           width: 30px; height: 30px; border-radius: 50%;
@@ -500,93 +683,49 @@ export default function MemberHomePage() {
           font-size: 0.65rem; font-weight: 700; color: white; flex-shrink: 0;
         }
         .mb-late-bar { display: flex; align-items: center; gap: 0.6rem; }
-        .mb-late-track {
-          flex: 1; height: 5px; background: #FEE2E2;
-          border-radius: 99px; overflow: hidden; max-width: 65px;
-        }
-        .mb-late-fill { height: 100%; background: #DC2626; border-radius: 99px; }
+        .mb-late-track { flex: 1; height: 5px; background: #FEE2E2; border-radius: 99px; overflow: hidden; max-width: 65px; }
+        .mb-late-fill  { height: 100%; background: #DC2626; border-radius: 99px; }
 
-        /* ── FAB ── */
         .mb-fab {
-          position: fixed;
-          bottom: calc(64px + 1rem); /* 64px = hauteur approx de la bottom nav */
-          right: 1rem;
-          z-index: 100;
+          position: fixed; bottom: calc(64px + 1rem); right: 1rem; z-index: 100;
           background: linear-gradient(135deg, #10B981 0%, #065F46 100%);
-          color: white;
-          border: none;
-          border-radius: 50px;
+          color: white; border: none; border-radius: 50px;
           padding: 0.85rem 1.4rem;
-          font-family: 'DM Sans', sans-serif;
-          font-weight: 700;
-          font-size: 0.88rem;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 0.55rem;
+          font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.88rem;
+          cursor: pointer; display: flex; align-items: center; gap: 0.55rem;
           box-shadow: 0 6px 20px rgba(16,185,129,0.35), 0 2px 8px rgba(0,0,0,0.12);
           transition: transform 0.2s, box-shadow 0.2s;
-          opacity: 0;
-          animation: mbin 0.5s 0.5s cubic-bezier(.22,1,.36,1) forwards;
+          opacity: 0; animation: mbin 0.5s 0.5s cubic-bezier(.22,1,.36,1) forwards;
         }
-        .mb-fab:hover {
-          transform: translateY(-3px) scale(1.03);
-          box-shadow: 0 10px 28px rgba(16,185,129,0.45), 0 4px 10px rgba(0,0,0,0.15);
-        }
+        .mb-fab:hover { transform: translateY(-3px) scale(1.03); box-shadow: 0 10px 28px rgba(16,185,129,0.45), 0 4px 10px rgba(0,0,0,0.15); }
         .mb-fab:active { transform: scale(0.97); }
 
-        /* ── Modale ── */
         .mb-modal-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 200;
-          background: rgba(0,0,0,0.55);
-          backdrop-filter: blur(6px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5rem;
-          animation: mbfadein 0.25s ease forwards;
-        }
-        @keyframes mbfadein { from { opacity: 0 } to { opacity: 1 } }
-
-        .mb-modal-inner {
-          position: relative;
-          width: 100%;
-          max-width: 420px;
-          animation: mbscalein 0.3s cubic-bezier(.22,1,.36,1) forwards;
-        }
-        @keyframes mbscalein {
-          from { opacity: 0; transform: scale(0.88) translateY(20px); }
-          to   { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        .mb-modal-close {
-          position: absolute;
-          top: -0.75rem;
-          right: -0.75rem;
-          z-index: 10;
-          width: 34px; height: 34px;
-          background: white;
-          border: 1px solid rgba(0,0,0,0.12);
-          border-radius: 50%;
-          cursor: pointer;
+          position: fixed; inset: 0; z-index: 200;
+          background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
           display: flex; align-items: center; justify-content: center;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          color: #374151;
+          padding: 1.5rem; animation: mbin2 0.25s ease forwards;
+        }
+        .mb-modal-inner {
+          position: relative; width: 100%; max-width: 420px;
+          animation: mbscale2 0.3s cubic-bezier(.22,1,.36,1) forwards;
+        }
+        .mb-modal-close {
+          position: absolute; top: -0.75rem; right: -0.75rem; z-index: 10;
+          width: 34px; height: 34px; background: white;
+          border: 1px solid rgba(0,0,0,0.12); border-radius: 50%; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15); color: #374151;
           transition: background 0.15s, transform 0.15s;
         }
         .mb-modal-close:hover { background: #F3F4F6; transform: scale(1.1); }
 
-        /* error / loader */
         .mb-error {
           display: flex; align-items: center; gap: 0.6rem;
           padding: 1rem 1.25rem;
-          background: rgba(185,28,28,0.06);
-          border: 1px solid rgba(185,28,28,0.18);
-          border-radius: 14px; color: #B91C1C;
-          font-size: 0.82rem; margin-bottom: 1.5rem;
-          font-family: 'DM Sans', sans-serif;
+          background: rgba(185,28,28,0.06); border: 1px solid rgba(185,28,28,0.18);
+          border-radius: 14px; color: #B91C1C; font-size: 0.82rem;
+          margin-bottom: 1.5rem; font-family: 'DM Sans', sans-serif;
         }
         .mb-loader {
           display: flex; flex-direction: column;
@@ -597,13 +736,9 @@ export default function MemberHomePage() {
         }
         .mb-ring {
           width: 40px; height: 40px;
-          border: 3px solid rgba(37,99,235,0.1);
-          border-top-color: #2563EB;
-          border-radius: 50%;
-          animation: mbspin 0.8s linear infinite;
+          border: 3px solid rgba(37,99,235,0.1); border-top-color: #2563EB;
+          border-radius: 50%; animation: mbspin 0.8s linear infinite;
         }
-        @keyframes mbspin { to { transform: rotate(360deg); } }
-        @keyframes mbin { to { opacity:1; transform:translateY(0); } }
       `}</style>
 
       {!data && !error && (
@@ -616,7 +751,7 @@ export default function MemberHomePage() {
       {error && (
         <div className="mb-error">
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+            <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
           </svg>
           {error}
         </div>
@@ -625,68 +760,44 @@ export default function MemberHomePage() {
       {data && (
         <div className="mb-wrap">
 
-          {/* ── Header ── */}
           <div className="mb-header">
             <div>
-              <div className="mb-eyebrow"><div className="mb-eyebrow-dot" />Espace membre</div>
-              <h1 className="mb-title">
-                Bonjour, <span>{me?.firstName ?? 'Membre'}</span>
-              </h1>
+              <div className="mb-eyebrow"><div className="mb-eyebrow-dot"/>Espace membre</div>
+              <h1 className="mb-title">Bonjour, <span>{me?.firstName ?? 'Membre'}</span></h1>
             </div>
             <div className="mb-greeting-chip">
               {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
             </div>
           </div>
 
-          {/* ── Bannière statut ── */}
           {me && <MemberStatusBanner me={me} />}
 
-          {/* ── Stats ── */}
           <div className="mb-stats" style={{ marginTop: '1.5rem' }}>
             {stats.map((s, i) => (
               <div
                 key={s.label}
-                className={`mb-stat ${s.spanClass} ${s.clickable ? 'mb-stat-clickable' : ''} ${s.wide ? 'wide' : ''}`}
+                className={`mb-stat mb-span-1${s.clickable ? ' mb-stat-clickable' : ''}`}
                 style={{ animationDelay: `${0.1 + i * 0.06}s` }}
                 onClick={s.onClick}
+                role={s.clickable ? 'button' : undefined}
+                tabIndex={s.clickable ? 0 : undefined}
               >
-                <div className="mb-stat-accent" style={{ background: `linear-gradient(${s.wide ? '180deg' : '90deg'}, ${s.color}, ${s.color}55)` }} />
+                <div className="mb-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}, ${s.color}55)` }} />
                 {s.urgent && (
-                  <div style={{
-                    position: 'absolute', inset: 0, borderRadius: 18,
-                    border: `1.5px solid ${s.color}50`,
-                    pointerEvents: 'none',
-                  }} />
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: 18, border: `1.5px solid ${s.color}50`, pointerEvents: 'none' }}/>
                 )}
-
-                {s.wide ? (
-                  <>
-                    <div className="mb-stat-icon" style={{ background: s.bg, color: s.color, width: 44, height: 44, borderRadius: 13 }}>
-                      {s.icon}
-                    </div>
-                    <div>
-                      <div className="mb-stat-label" style={{ marginBottom: '0.3rem' }}>{s.label}</div>
-                      <div className="mb-stat-value" style={{ color: s.urgent ? s.color : (s.clickable ? s.color : '#111827') }}>{String(s.value)}</div>
-                      <div className="mb-stat-sub">{s.sub}</div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="mb-stat-top">
-                      <span className="mb-stat-label">{s.label}</span>
-                      <div className="mb-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                    </div>
-                    <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
-                    <div className="mb-stat-sub">{s.sub}</div>
-                  </>
-                )}
+                <div className="mb-stat-top">
+                  <span className="mb-stat-label">{s.label}</span>
+                  <div className="mb-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                </div>
+                <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
+                <div className="mb-stat-sub">{s.sub}</div>
               </div>
             ))}
           </div>
 
-          {/* ── Row 1 : Contributions + Projects ── */}
+          {/* Cotisations récentes + Projets */}
           <div className="mb-grid2">
-
             <div className="mb-panel" style={{ animationDelay: '0.48s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
@@ -697,21 +808,45 @@ export default function MemberHomePage() {
                   </div>
                   Cotisations récentes
                 </div>
-                {(data.recentContributions?.length ?? 0) > 0 && (
-                  <span className="mb-count-chip">{data.recentContributions!.length}</span>
+                {recentContribs.length > 0 && (
+                  <span className="mb-count-chip">{recentContribs.length}</span>
                 )}
               </div>
               <table className="mb-table">
-                <thead><tr><th>Montant</th><th>Statut</th><th>Date</th></tr></thead>
+                <thead>
+                  <tr><th>Montant</th><th>Motif</th><th>Statut</th><th>Date</th></tr>
+                </thead>
                 <tbody>
-                  {(data.recentContributions || []).length === 0 && <EmptyRow cols={3} label="Aucune cotisation enregistrée" />}
-                  {(data.recentContributions || []).map(c => (
-                    <tr key={c.id}>
-                      <td className="mono">{formatCurrency(c.amount, c.currency)}</td>
-                      <td><StatusBadge status={c.status} /></td>
-                      <td className="muted">{formatDate(c.depositedAt || c.createdAt)}</td>
-                    </tr>
-                  ))}
+                  {recentContribs.length === 0 && (
+                    <EmptyRow cols={4} label="Aucune cotisation enregistrée"/>
+                  )}
+                  {recentContribs.map(c => {
+                    const pc = getPurposeConfig(c.purpose);  // ✅ plus de (as any)
+                    return (
+                      <tr
+                        key={c.id}
+                        className="mb-contrib-row"
+                        onClick={() => setSelectedContribution(c)}
+                        title="Voir le détail"
+                      >
+                        <td className="mono">{formatCurrency(c.amount, c.currency || cur)}</td>
+                        <td>
+                          {pc ? (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '0.28rem',
+                              fontSize: '0.7rem', fontWeight: 600,
+                              background: pc.bg, color: pc.color,
+                              padding: '0.15rem 0.5rem', borderRadius: 99,
+                            }}>
+                              {pc.icon} {pc.label.split(' ')[0]}
+                            </span>
+                          ) : <span className="muted">—</span>}
+                        </td>
+                        <td><StatusBadge status={c.status}/></td>
+                        <td className="muted">{formatDate(c.depositedAt || c.createdAt)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -728,18 +863,18 @@ export default function MemberHomePage() {
                 </div>
                 {(data.projectsInProgress?.length ?? 0) > 0 && (
                   <span className="mb-count-chip" style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
-                    {data.projectsInProgress!.length}
+                    {data.projectsInProgress.length}
                   </span>
                 )}
               </div>
               <table className="mb-table">
                 <thead><tr><th>Projet</th><th>Statut</th><th>Date</th></tr></thead>
                 <tbody>
-                  {(data.projectsInProgress || []).length === 0 && <EmptyRow cols={3} label="Aucun projet actif" />}
+                  {(data.projectsInProgress || []).length === 0 && <EmptyRow cols={3} label="Aucun projet actif"/>}
                   {(data.projectsInProgress || []).map(p => (
                     <tr key={p.id}>
                       <td style={{ fontWeight: 700, color: '#111827' }}>{p.title}</td>
-                      <td><StatusBadge status={p.status} /></td>
+                      <td><StatusBadge status={p.status}/></td>
                       <td className="muted">{formatDate(p.createdAt)}</td>
                     </tr>
                   ))}
@@ -748,15 +883,14 @@ export default function MemberHomePage() {
             </div>
           </div>
 
-          {/* ── Row 2 : Contents + Late members ── */}
+          {/* Contenus + Retardataires */}
           <div className="mb-grid2">
-
             <div className="mb-panel" style={{ animationDelay: '0.58s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
                   <div className="mb-panel-ico" style={{ background: '#ECFDF5', color: '#059669' }}>
                     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
                     </svg>
                   </div>
                   Informations récentes
@@ -765,11 +899,13 @@ export default function MemberHomePage() {
               <table className="mb-table">
                 <thead><tr><th>Titre</th><th>Statut</th><th>Date</th></tr></thead>
                 <tbody>
-                  {(data.latestContents || []).length === 0 && <EmptyRow cols={3} label="Aucune actualité publiée" />}
+                  {(data.latestContents || []).length === 0 && <EmptyRow cols={3} label="Aucune actualité publiée"/>}
                   {(data.latestContents || []).map(c => (
                     <tr key={c.id}>
-                      <td style={{ fontWeight: 700, color: '#111827', maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title}</td>
-                      <td><StatusBadge status={c.status} /></td>
+                      <td style={{ fontWeight: 700, color: '#111827', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {c.title}
+                      </td>
+                      <td><StatusBadge status={c.status}/></td>
                       <td className="muted">{formatDate(c.createdAt)}</td>
                     </tr>
                   ))}
@@ -789,33 +925,28 @@ export default function MemberHomePage() {
                 </div>
                 {(data.lateMembersPreview?.length ?? 0) > 0 && (
                   <span className="mb-count-chip" style={{ background: '#FEF2F2', color: '#B91C1C', border: '1px solid #FECACA' }}>
-                    {data.lateMembersPreview!.length}
+                    {data.lateMembersPreview.length}
                   </span>
                 )}
               </div>
               <table className="mb-table">
                 <thead><tr><th>Membre</th><th>Retard</th></tr></thead>
                 <tbody>
-                  {(data.lateMembersPreview || []).length === 0 && <EmptyRow cols={2} label="Aucun retardataire — bravo !" />}
+                  {(data.lateMembersPreview || []).length === 0 && <EmptyRow cols={2} label="Aucun retardataire — bravo !"/>}
                   {(data.lateMembersPreview || []).map(m => {
                     const months = m.lateMonths ?? 0;
-                    const pct = Math.min((months / 12) * 100, 100);
                     return (
                       <tr key={m.id}>
                         <td>
                           <div className="mb-member-pill">
-                            <div className="mb-avatar-sm">
-                              {(m.firstName[0] ?? '') + (m.lastName[0] ?? '')}
-                            </div>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>
-                              {m.firstName} {m.lastName}
-                            </span>
+                            <div className="mb-avatar-sm">{(m.firstName[0] ?? '') + (m.lastName[0] ?? '')}</div>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>{m.firstName} {m.lastName}</span>
                           </div>
                         </td>
                         <td>
                           <div className="mb-late-bar">
                             <div className="mb-late-track">
-                              <div className="mb-late-fill" style={{ width: `${pct}%` }} />
+                              <div className="mb-late-fill" style={{ width: `${Math.min((months / 12) * 100, 100)}%` }}/>
                             </div>
                             <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#DC2626', whiteSpace: 'nowrap' }}>
                               {months > 0 ? `${months} mois` : '—'}
@@ -829,58 +960,45 @@ export default function MemberHomePage() {
               </table>
             </div>
           </div>
-
         </div>
       )}
 
-      {/* ── FAB flottant ── */}
       {data && (
-        <button
-          type="button"
-          className="mb-fab"
-          onClick={() => setIsCardVisible(true)}
-          aria-label="Afficher ma carte virtuelle"
-        >
+        <button type="button" className="mb-fab" onClick={() => setIsCardVisible(true)} aria-label="Afficher ma carte virtuelle">
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
           </svg>
           Ma carte
         </button>
       )}
 
-      {/* ── Modale carte ── */}
       {isCardVisible && (
-        <div
-          className="mb-modal-overlay"
-          onClick={() => setIsCardVisible(false)}
-        >
-          <div
-            className="mb-modal-inner"
-            onClick={e => e.stopPropagation()}
-          >
-            <button
-              type="button"
-              className="mb-modal-close"
-              onClick={() => setIsCardVisible(false)}
-              aria-label="Fermer"
-            >
+        <div className="mb-modal-overlay" onClick={() => setIsCardVisible(false)}>
+          <div className="mb-modal-inner" onClick={e => e.stopPropagation()}>
+            <button type="button" className="mb-modal-close" onClick={() => setIsCardVisible(false)} aria-label="Fermer">
               <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
               </svg>
             </button>
-            <VirtualCardWidget card={data?.virtualCard || null} />
+            <VirtualCardWidget card={data?.virtualCard || null}/>
           </div>
         </div>
       )}
 
-      {/* Modale des autres soldes */}
-      {showBalancesModal && (
-        <BalancesModal
-          balances={data?.antennaBalances}
-          onClose={() => setShowBalancesModal(false)}
+      {selectedContribution && (
+        <ContributionDetailModal
+          item={selectedContribution}
+          currency={cur}
+          onClose={() => setSelectedContribution(null)}
         />
       )}
 
+      {showBalanceModal && (
+        <BalanceModal
+          summary={balanceSummary}
+          onClose={() => setShowBalanceModal(false)}
+        />
+      )}
     </AppShell>
   );
 }

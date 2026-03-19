@@ -15,7 +15,6 @@ import type { AntennaDashboardStats, ProjectionResult } from '../types/stats';
 
 import { http } from './http';
 
-// Définition propre du type VirtualCardData pour l'API
 export interface VirtualCardData {
   cardNumber: string;
   isLocked: boolean;
@@ -35,7 +34,6 @@ export interface VirtualCardData {
   };
 }
 
-// 👇 NOUVELLE INTERFACE : Le profil au complet pour rassurer TypeScript
 export interface FullUserProfile extends UserSummary {
   phone?: string | null;
   addressLine1?: string | null;
@@ -109,10 +107,8 @@ export const api = {
   // ==========================================
   me: () => http<UserSummary & { permissions?: string[] }>('/auth/me'),
 
-  // 👇 PLUS DE "any" ICI !
   getMyProfile: () => http<FullUserProfile>('/users/me'),
 
-  // 👇 Typage mis à jour pour la mise à jour
   updateMyProfile: (body: Partial<UserSummary>) =>
     http<FullUserProfile, Partial<UserSummary>>('/users/me', { method: 'PATCH', body }),
 
@@ -136,6 +132,18 @@ export const api = {
     theme?: 'light' | 'dark' | 'system' | string;
   }) =>
     http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body }),
+
+// ==========================================
+  // TARIFICATION (MULTI-DEVISES)
+  // ==========================================
+  getPricingSuperAdmin: () =>
+    http<Record<string, { monthlyQuota: number; membershipCard: number }>>('/super-admin/settings/pricing'),
+
+  updatePricingSuperAdmin: (body: Record<string, { monthlyQuota: number; membershipCard: number }>) =>
+    http('/super-admin/settings/pricing', { method: 'PUT', body }),
+
+  getAssociationPricing: () =>
+    http<Record<string, { monthlyQuota: number; membershipCard: number }>>('/member/pricing'),
 
   // ==========================================
   // DASHBOARDS & RÉSUMÉS
@@ -212,11 +220,23 @@ export const api = {
 
   getAntenna: (id: string) => http<Antenna>(`/super-admin/antennas/${id}`),
 
-  createAntenna: (body: { code: string; name: string; city?: string; country?: string; isActive?: boolean }) =>
+  createAntenna: (body: {
+    code: string;
+    name: string;
+    city?: string;
+    country?: string;
+    isActive?: boolean;
+    defaultCurrency?: 'GNF' | 'EUR' | 'USD' | 'XOF';
+  }) =>
     http<Antenna, typeof body>('/super-admin/antennas', { method: 'POST', body }),
 
-  updateAntenna: (id: string, body: Partial<Antenna>) =>
-    http<Antenna, Partial<Antenna>>(`/super-admin/antennas/${id}`, { method: 'PATCH', body }),
+  updateAntenna: (
+    id: string,
+    body: Partial<Antenna> & {
+      defaultCurrency?: 'GNF' | 'EUR' | 'USD' | 'XOF';
+    },
+  ) =>
+    http<Antenna, typeof body>(`/super-admin/antennas/${id}`, { method: 'PATCH', body }),
 
   deleteAntenna: (id: string) => http(`/super-admin/antennas/${id}`, { method: 'DELETE' }),
 
@@ -233,7 +253,6 @@ export const api = {
   // ==========================================
   // GESTION DES UTILISATEURS (SUPER ADMIN)
   // ==========================================
-  
   updateUserSuperAdmin: (id: string, body: Partial<FullUserProfile>) =>
     http(`/super-admin/users/${id}`, { method: 'PATCH', body }),
 
@@ -323,6 +342,8 @@ export const api = {
 
   updateContributionAntenna: (id: string, payload: { amount: number }) =>
     http(`/admin/contributions/${id}`, { method: 'PATCH', body: payload }),
+  deleteContributionAntenna: (id: string) => 
+    http(`/admin/contributions/${id}`, { method: 'DELETE' }),
 
   createContributionMember: (body: {
     amount: number;

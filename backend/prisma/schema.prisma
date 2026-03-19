@@ -67,7 +67,8 @@ enum ContributionStatus {
 
 // NOUVEAU : Motif de la contribution
 enum ContributionPurpose {
-  REGULAR_QUOTA    // Cotisation (Mensuelle, Trimestrielle, etc.)
+  REGULAR_QUOTA    // Cotisation du mois en cours / mois normal
+  LATE_QUOTA       // NOUVEAU : Paiement des retards
   MEMBERSHIP_CARD  // Règlement Carte Membre
   DONATION         // Don libre
 }
@@ -353,7 +354,7 @@ model Antenna {
 
   // Paramètres spécifiques antenne (peuvent override les réglages globaux)
   delayThresholdMonthsOverride Int?
-  defaultCurrency              CurrencyCode?
+  defaultCurrency              CurrencyCode @default(EUR)
 
   // Gouvernance : créée uniquement par SUPER_ADMIN (règle backend)
   createdByUserId String?

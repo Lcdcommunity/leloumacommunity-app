@@ -1,14 +1,17 @@
 // web/app/(protected)/member/contributions/new/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../../../components/layout/AppShell';
 import { ContributionCreateForm } from '../../../../../components/member/ContributionCreateForm';
 import { api } from '../../../../../lib/api-client';
 
+type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF';
+
 type ContributionFormData = {
   amount: number;
+  currency: SupportedCurrency;
   method: string;
   depositedAt?: string;
   note?: string;
@@ -16,23 +19,84 @@ type ContributionFormData = {
   receiptFileAssetId?: string;
 };
 
+function normalizeCurrency(value?: string | null): SupportedCurrency {
+  if (value === 'GNF' || value === 'EUR' || value === 'USD' || value === 'XOF') {
+    return value;
+  }
+  return 'EUR';
+}
+
 export default function MemberNewContributionPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isBootLoading, setIsBootLoading] = useState(true);
+  const [defaultCurrency, setDefaultCurrency] = useState<SupportedCurrency>('EUR');
+  const [pricing, setPricing] = useState<{ monthlyQuota: number; membershipCard: number }>({ monthlyQuota: 0, membershipCard: 0 });
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function bootstrap() {
+      try {
+        const [dashboard, allPricing] = await Promise.all([
+          api.dashboardMember(),
+          api.getAssociationPricing().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)), 
+        ]);
+        
+        if (!mounted) return;
+
+        const currentCurrency = normalizeCurrency(dashboard?.stats?.currency);
+        setDefaultCurrency(currentCurrency);
+        
+        // On extrait le prix de LA devise du membre et on l'envoie au formulaire
+        const localPricing = allPricing[currentCurrency] || { monthlyQuota: 0, membershipCard: 0 };
+        setPricing({
+          monthlyQuota: Number(localPricing.monthlyQuota) || 0,
+          membershipCard: Number(localPricing.membershipCard) || 0,
+        });
+
+      } catch (error) {
+        console.error('Erreur récupération infos:', error);
+        if (!mounted) return;
+        setDefaultCurrency('EUR');
+      } finally {
+        if (mounted) setIsBootLoading(false);
+      }
+    }
+
+    void bootstrap();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (values: ContributionFormData) => {
     setIsSubmitting(true);
     setErrorMsg(null);
+
     try {
-      // 👇 CORRECTION ICI : Utilisation du nom correct de la fonction de l'API
-      await api.createContributionMember(values);
+      await api.createContributionMember({
+        amount: values.amount,
+        currency: values.currency,
+        method: values.method,
+        depositedAt: values.depositedAt,
+        note: values.note,
+        purpose: values.purpose,
+        receiptFileAssetId: values.receiptFileAssetId ?? null,
+      });
+
       setSuccess(true);
       setTimeout(() => router.push('/member/contributions/history'), 1800);
     } catch (error) {
       console.error('Erreur dépôt:', error);
-      setErrorMsg(error instanceof Error ? error.message : "Une erreur inattendue s'est produite. Veuillez réessayer.");
+      setErrorMsg(
+        error instanceof Error
+          ? error.message
+          : "Une erreur inattendue s'est produite. Veuillez réessayer.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -77,7 +141,6 @@ export default function MemberNewContributionPage() {
         }
         @media (max-width: 820px) { .nc-grid { grid-template-columns: 1fr; } }
 
-        /* Form panel */
         .nc-panel {
           background: rgba(253,253,255,0.9);
           backdrop-filter: blur(12px);
@@ -102,7 +165,6 @@ export default function MemberNewContributionPage() {
         }
         .nc-panel-body { padding: 1.4rem; }
 
-        /* Info panel */
         .nc-info {
           display: flex; flex-direction: column; gap: 0.85rem;
           opacity: 0; animation: ncin 0.5s 0.18s cubic-bezier(.22,1,.36,1) forwards;
@@ -149,7 +211,17 @@ export default function MemberNewContributionPage() {
         }
         .nc-notice p { font-size: 0.76rem; color: #78350F; line-height: 1.55; }
 
-        /* Error Box */
+        .nc-currency-box {
+          background: #ECFDF5;
+          border: 1px solid #A7F3D0;
+          border-radius: 12px;
+          padding: 0.85rem 1rem;
+          display: flex;
+          gap: 0.6rem;
+          align-items: flex-start;
+        }
+        .nc-currency-box p { font-size: 0.76rem; color: #065F46; line-height: 1.55; }
+
         .nc-error-box {
           background: #FEF2F2;
           border: 1px solid #FECACA;
@@ -164,7 +236,26 @@ export default function MemberNewContributionPage() {
           line-height: 1.4;
         }
 
-        /* Success */
+        .nc-loader {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 240px;
+          gap: 0.75rem;
+          color: #6B7280;
+          font-size: 0.84rem;
+          font-weight: 700;
+        }
+        .nc-ring {
+          width: 24px;
+          height: 24px;
+          border: 2.5px solid rgba(37,99,235,0.12);
+          border-top-color: #2563EB;
+          border-radius: 50%;
+          animation: ncspin 0.8s linear infinite;
+        }
+        @keyframes ncspin { to { transform: rotate(360deg); } }
+
         .nc-success {
           display: flex; flex-direction: column;
           align-items: center; justify-content: center;
@@ -186,66 +277,92 @@ export default function MemberNewContributionPage() {
 
       <div className="nc-wrap">
         <div className="nc-header">
-          <div className="nc-eyebrow"><div className="nc-eyebrow-dot" />Espace membre</div>
+          <div className="nc-eyebrow">
+            <div className="nc-eyebrow-dot" />Espace membre
+          </div>
           <h1 className="nc-title">Déclarer un <span>versement</span></h1>
         </div>
 
         <div className="nc-grid">
-
-          {/* Form */}
           <div className="nc-panel">
             <div className="nc-panel-head">
               <div className="nc-panel-ico">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
               <span className="nc-panel-title">Nouveau dépôt</span>
             </div>
+
             <div className="nc-panel-body">
-              {success ? (
+              {isBootLoading ? (
+                <div className="nc-loader">
+                  <div className="nc-ring" />
+                  Chargement...
+                </div>
+              ) : success ? (
                 <div className="nc-success">
                   <div className="nc-success-icon">
                     <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2">
-                      <polyline points="20 6 9 17 4 12"/>
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
                   <p className="nc-success-title">Versement enregistré !</p>
-                  <p className="nc-success-sub">Votre dépôt est en attente de validation<br/>par l&apos;administrateur de votre antenne.</p>
+                  <p className="nc-success-sub">
+                    Votre dépôt est en attente de validation
+                    <br />
+                    par l&apos;administrateur de votre antenne.
+                  </p>
                 </div>
               ) : (
                 <>
                   {errorMsg && (
                     <div className="nc-error-box">
                       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       {errorMsg}
                     </div>
                   )}
-                  <ContributionCreateForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
+
+                  <ContributionCreateForm
+                    onSubmit={handleSubmit}
+                    isSubmitting={isSubmitting}
+                    defaultCurrency={defaultCurrency}
+                    pricing={pricing}
+                  />
                 </>
               )}
             </div>
           </div>
 
-          {/* Info sidebar */}
           <div className="nc-info">
+            <div className="nc-currency-box">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="1.8" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+              <p>
+                La devise de votre dépôt est automatiquement alignée sur celle de votre antenne :
+                <strong> {defaultCurrency}</strong>.
+              </p>
+            </div>
+
             <div className="nc-info-card">
               <div className="nc-info-title">
                 <div className="nc-info-ico" style={{ background: '#EFF6FF', color: '#2563EB' }}>
                   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
                 Comment ça marche
               </div>
+
               {[
                 { n: '1', text: <>Remplissez le formulaire avec le <strong>motif</strong>, le <strong>montant</strong> et la <strong>méthode de paiement</strong>.</> },
-                { n: '2', text: <>Votre dépôt est enregistré au statut <strong>En attente</strong>.</> },
-                { n: '3', text: <>L&apos;administrateur de votre antenne <strong>valide ou rejette</strong> la cotisation après vérification.</> },
-                { n: '4', text: <>Une fois <strong>validée</strong>, la cotisation est comptabilisée dans votre historique.</> },
-              ].map(s => (
+                { n: '2', text: <>La <strong>devise est imposée automatiquement</strong> selon l’antenne à laquelle vous appartenez.</> },
+                { n: '3', text: <>Votre dépôt est enregistré au statut <strong>En attente</strong>.</> },
+                { n: '4', text: <>L&apos;administrateur de votre antenne <strong>valide ou rejette</strong> la cotisation après vérification.</> },
+              ].map((s) => (
                 <div key={s.n} className="nc-step">
                   <div className="nc-step-num">{s.n}</div>
                   <p className="nc-step-text">{s.text}</p>
@@ -255,12 +372,13 @@ export default function MemberNewContributionPage() {
 
             <div className="nc-notice">
               <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#D97706" strokeWidth="1.8" style={{ flexShrink: 0, marginTop: 1 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <p>Le dépôt est une <strong>déclaration</strong>. La cotisation est validée uniquement après confirmation de réception par votre administrateur.</p>
+              <p>
+                Le dépôt est une <strong>déclaration</strong>. La cotisation est validée uniquement après confirmation de réception par votre administrateur.
+              </p>
             </div>
           </div>
-
         </div>
       </div>
     </AppShell>

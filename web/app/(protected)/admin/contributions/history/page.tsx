@@ -7,7 +7,7 @@ import { api } from '../../../../../lib/api-client';
 import type { Contribution, ContributionStatus } from '../../../../../types/contribution';
 import { formatDate } from '../../../../../lib/format';
 
-type ModalType = 'validate' | 'reject' | 'edit' | null;
+type ModalType = 'validate' | 'reject' | 'edit' | 'delete' | 'detail' | null;
 
 interface ModalState {
   type: ModalType;
@@ -21,6 +21,21 @@ type StatusMeta = {
   border: string;
 };
 
+type ExtendedContribution = Contribution & {
+  currency?: string;
+  paymentMethod?: string;
+  method?: string;
+  note?: string;
+  memberComment?: string;
+  adminComment?: string;
+  rejectionReason?: string;
+  member?: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  };
+};
+
 function memberName(c: Contribution): string {
   if (c.member) {
     const firstName =
@@ -32,144 +47,70 @@ function memberName(c: Contribution): string {
         ? c.member.lastName
         : '';
     const fullName = `${firstName} ${lastName}`.trim();
-
     if (fullName) return fullName;
   }
-
-  if ('memberId' in c && typeof c.memberId === 'string') {
-    return c.memberId;
-  }
-
-  if ('memberUserId' in c && typeof c.memberUserId === 'string') {
-    return c.memberUserId;
-  }
-
+  if ('memberId' in c && typeof c.memberId === 'string') return c.memberId;
+  if ('memberUserId' in c && typeof c.memberUserId === 'string') return c.memberUserId;
   return c.id;
 }
 
 function getStatusMeta(status: ContributionStatus | string): StatusMeta {
   const map: Partial<Record<ContributionStatus | string, StatusMeta>> = {
-    DRAFT: {
-      label: 'Brouillon',
-      color: '#6B7280',
-      bg: '#F3F4F6',
-      border: '#E5E7EB',
-    },
-    SUBMITTED: {
-      label: 'Soumise',
-      color: '#2563EB',
-      bg: '#EFF6FF',
-      border: '#BFDBFE',
-    },
-    PENDING_VALIDATION: {
-      label: 'En attente',
-      color: '#D97706',
-      bg: '#FFFBEB',
-      border: '#FDE68A',
-    },
-    PENDING: {
-      label: 'En attente',
-      color: '#D97706',
-      bg: '#FFFBEB',
-      border: '#FDE68A',
-    },
-    VALIDATED: {
-      label: 'Validée',
-      color: '#059669',
-      bg: '#ECFDF5',
-      border: '#A7F3D0',
-    },
-    REJECTED: {
-      label: 'Rejetée',
-      color: '#DC2626',
-      bg: '#FEF2F2',
-      border: '#FECACA',
-    },
-    CANCELLED: {
-      label: 'Annulée',
-      color: '#6B7280',
-      bg: '#F3F4F6',
-      border: '#E5E7EB',
-    },
+    DRAFT:              { label: 'Brouillon',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    SUBMITTED:          { label: 'Soumise',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+    PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    PENDING:            { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    VALIDATED:          { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    REJECTED:           { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    CANCELLED:          { label: 'Annulée',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   };
-
-  return (
-    map[status] ?? {
-      label: String(status ?? 'Inconnu'),
-      color: '#6B7280',
-      bg: '#F3F4F6',
-      border: '#E5E7EB',
-    }
-  );
+  return map[status] ?? { label: String(status ?? 'Inconnu'), color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
 }
 
-function StatusBadge({ status }: { status: ContributionStatus }) {
+function StatusBadge({ status }: { status: ContributionStatus | string }) {
   const s = getStatusMeta(status);
-
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '0.28rem',
-        fontSize: '0.69rem',
-        fontWeight: 800,
-        letterSpacing: '0.03em',
-        color: s.color,
-        background: s.bg,
-        border: `1px solid ${s.border}`,
-        borderRadius: 99,
-        padding: '0.22rem 0.6rem',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <span
-        style={{
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: s.color,
-          flexShrink: 0,
-        }}
-      />
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.28rem',
+      fontSize: '0.69rem', fontWeight: 800, letterSpacing: '0.03em',
+      color: s.color, background: s.bg, border: `1px solid ${s.border}`,
+      borderRadius: 99, padding: '0.22rem 0.6rem', whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
       {s.label}
     </span>
   );
 }
 
-function AmountPill({ amount }: { amount: number }) {
+function AmountPill({ amount, currency = 'GNF' }: { amount: number; currency?: string }) {
   return (
-    <span
-      style={{
-        display: 'inline-block',
-        fontFamily: "'DM Mono', monospace",
-        fontSize: '0.84rem',
-        fontWeight: 700,
-        color: '#0F172A',
-        background: '#F0F9FF',
-        border: '1px solid #BAE6FD',
-        borderRadius: 8,
-        padding: '0.18rem 0.55rem',
-      }}
-    >
+    <span style={{
+      display: 'inline-block', fontFamily: "'DM Mono', monospace",
+      fontSize: '0.84rem', fontWeight: 700, color: '#0F172A',
+      background: '#F0F9FF', border: '1px solid #BAE6FD',
+      borderRadius: 8, padding: '0.18rem 0.55rem',
+    }}>
       {amount.toLocaleString('fr-FR', { minimumFractionDigits: 0 })}{' '}
-      <span style={{ fontSize: '0.7rem', color: '#0369A1', fontWeight: 600 }}>
-        GNF
-      </span>
+      <span style={{ fontSize: '0.7rem', color: '#0369A1', fontWeight: 600 }}>{currency}</span>
     </span>
   );
 }
 
+const InfoField = ({ label, children, fullWidth }: { label: string; children: React.ReactNode; fullWidth?: boolean }) => (
+  <div style={{ gridColumn: fullWidth ? '1 / -1' : undefined, background: '#F8FAFC', padding: '0.8rem 1rem', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
+    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{children}</div>
+  </div>
+);
+
 function Modal({
-  modal,
-  onClose,
-  onConfirm,
-  busy,
+  modal, onClose, onConfirm, busy, setModal,
 }: {
   modal: ModalState;
   onClose: () => void;
   onConfirm: (v: string) => void;
   busy: boolean;
+  setModal: (m: ModalState) => void;
 }) {
   const getInitial = useCallback(
     (m: ModalState) => (m.type === 'edit' ? String(m.contribution?.amount ?? '') : ''),
@@ -178,20 +119,71 @@ function Modal({
 
   const [value, setValue] = useState(() => getInitial(modal));
 
-  useEffect(() => {
-    setValue(getInitial(modal));
-  }, [modal, getInitial]);
+  useEffect(() => { setValue(getInitial(modal)); }, [modal, getInitial]);
 
   if (!modal.type || !modal.contribution) return null;
+
+  if (modal.type === 'detail') {
+    const extC = modal.contribution as ExtendedContribution;
+    return (
+      <>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', zIndex: 100 }} onClick={onClose} />
+        <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 101, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(18px)', borderRadius: 20, padding: 'clamp(1.5rem,4vw,2rem)', width: 'min(600px,calc(100vw - 2rem))', border: '1px solid rgba(37,99,235,0.1)', boxShadow: '0 24px 60px rgba(37,99,235,0.14)', maxHeight: '90vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 600, color: '#111827' }}>Détails de la transaction</h2>
+            </div>
+            <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.8rem', marginBottom: '1.5rem' }}>
+            <InfoField label="Membre" fullWidth>
+              {memberName(modal.contribution)}{' '}
+              <span style={{ color: '#6B7280', fontSize: '0.75rem', marginLeft: '0.5rem', fontWeight: 500 }}>
+                ({extC.member?.email || 'Aucun email'})
+              </span>
+            </InfoField>
+            <InfoField label="Montant"><AmountPill amount={extC.amount} currency={extC.currency} /></InfoField>
+            <InfoField label="Statut"><StatusBadge status={extC.status} /></InfoField>
+            <InfoField label="Méthode de paiement">{extC.paymentMethod || extC.method || 'Non précisé'}</InfoField>
+            <InfoField label="Date de dépôt">{formatDate(extC.depositedAt || extC.createdAt)}</InfoField>
+            <InfoField label="Identifiant Transaction" fullWidth>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem' }}>{extC.id}</span>
+            </InfoField>
+            <InfoField label="Note du membre" fullWidth>
+              {extC.note || extC.memberComment || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucune note laissée par le membre.</span>}
+            </InfoField>
+            {(extC.adminComment || extC.rejectionReason) && (
+              <InfoField label="Note Administrative" fullWidth>
+                <span style={{ color: extC.status === 'REJECTED' ? '#DC2626' : '#059669' }}>
+                  {extC.adminComment || extC.rejectionReason}
+                </span>
+              </InfoField>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'flex-end', paddingTop: '1rem', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+            <button onClick={() => setModal({ type: 'delete', contribution: modal.contribution })} className="ach-btn ach-btn-red" style={{ height: 40, padding: '0 1rem' }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> Supprimer
+            </button>
+            <button onClick={() => setModal({ type: 'edit', contribution: modal.contribution })} className="ach-btn ach-btn-blue" style={{ height: 40, padding: '0 1.2rem' }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg> Modifier
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   const configs = {
     validate: {
       title: 'Valider la cotisation',
-      icon: (
-        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      ),
+      icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>,
       iconBg: '#ECFDF5',
       label: 'Note interne',
       placeholder: 'Note de validation (optionnel)…',
@@ -203,11 +195,7 @@ function Modal({
     },
     reject: {
       title: 'Rejeter la cotisation',
-      icon: (
-        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      ),
+      icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>,
       iconBg: '#FEF2F2',
       label: 'Motif du rejet',
       placeholder: 'Motif du rejet (obligatoire)…',
@@ -219,17 +207,9 @@ function Modal({
     },
     edit: {
       title: 'Modifier le montant',
-      icon: (
-        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-          />
-        </svg>
-      ),
+      icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
       iconBg: '#EFF6FF',
-      label: 'Nouveau montant (GNF)',
+      label: `Nouveau montant (${(modal.contribution as ExtendedContribution)?.currency || 'GNF'})`,
       placeholder: '',
       cta: 'Enregistrer',
       ctaGrad: 'linear-gradient(135deg,#1D4ED8,#2563EB)',
@@ -237,139 +217,71 @@ function Modal({
       ib: 'rgba(37,99,235,0.25)',
       ibg: 'rgba(239,246,255,0.5)',
     },
+    delete: {
+      title: 'Supprimer la cotisation',
+      icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
+      iconBg: '#FEF2F2',
+      label: 'Confirmation de sécurité',
+      // ✅ FIX 1 : guillemets droits retirés du placeholder (étaient col 117 et 127)
+      placeholder: 'Tapez SUPPRIMER pour confirmer',
+      cta: 'Supprimer définitivement',
+      ctaGrad: 'linear-gradient(135deg,#991B1B,#DC2626)',
+      ctaShadow: 'rgba(220,38,38,0.3)',
+      ib: 'rgba(220,38,38,0.25)',
+      ibg: 'rgba(254,242,242,0.5)',
+    },
   } as const;
 
-  const cfg = configs[modal.type];
-  const canConfirm = modal.type === 'reject' ? value.trim().length > 0 : true;
+  type ConfigType = 'validate' | 'reject' | 'edit' | 'delete';
+  const cfg = configs[modal.type as ConfigType];
+  const canConfirm = modal.type === 'reject' ? value.trim().length > 0 : modal.type === 'delete' ? value === 'SUPPRIMER' : true;
 
   return (
     <>
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(15,23,42,0.45)',
-          backdropFilter: 'blur(4px)',
-          zIndex: 100,
-        }}
-        onClick={onClose}
-      />
-      <div
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%,-50%)',
-          zIndex: 101,
-          background: 'rgba(255,255,255,0.97)',
-          backdropFilter: 'blur(18px)',
-          borderRadius: 20,
-          padding: 'clamp(1.5rem,4vw,2rem)',
-          width: 'min(460px,calc(100vw - 2rem))',
-          border: '1px solid rgba(37,99,235,0.1)',
-          boxShadow: '0 24px 60px rgba(37,99,235,0.14)',
-        }}
-      >
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', zIndex: 100 }} onClick={onClose} />
+      <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 101, background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(18px)', borderRadius: 20, padding: 'clamp(1.5rem,4vw,2rem)', width: 'min(460px,calc(100vw - 2rem))', border: '1px solid rgba(37,99,235,0.1)', boxShadow: '0 24px 60px rgba(37,99,235,0.14)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
-          <div
-            style={{
-              width: 42,
-              height: 42,
-              borderRadius: 12,
-              background: cfg.iconBg,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
+          <div style={{ width: 42, height: 42, borderRadius: 12, background: cfg.iconBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {cfg.icon}
           </div>
-          <h2
-            style={{
-              fontFamily: "'Cormorant Garamond',serif",
-              fontSize: '1.3rem',
-              fontWeight: 600,
-              color: '#111827',
-            }}
-          >
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.3rem', fontWeight: 600, color: '#111827' }}>
             {cfg.title}
           </h2>
         </div>
 
-        <div
-          style={{
-            background: '#F8FAFC',
-            borderRadius: 10,
-            padding: '0.65rem 0.9rem',
-            marginBottom: '1.1rem',
-            border: '1px solid #E2E8F0',
-          }}
-        >
+        <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '0.65rem 0.9rem', marginBottom: '1.1rem', border: '1px solid #E2E8F0' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#6B7280' }}>Membre :</span>
           <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827', marginLeft: '0.4rem' }}>
             {memberName(modal.contribution)}
           </span>
-          <span style={{ marginLeft: '0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#6B7280' }}>
-            Montant :
-          </span>
+          <span style={{ marginLeft: '0.75rem', fontSize: '0.75rem', fontWeight: 700, color: '#6B7280' }}>Montant :</span>
           <span style={{ marginLeft: '0.4rem' }}>
-            <AmountPill amount={modal.contribution.amount} />
+            <AmountPill amount={modal.contribution.amount} currency={(modal.contribution as ExtendedContribution).currency} />
           </span>
         </div>
 
-        <label
-          style={{
-            fontSize: '0.73rem',
-            fontWeight: 700,
-            color: '#374151',
-            display: 'block',
-            marginBottom: '0.35rem',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}
-        >
+        <label style={{ fontSize: '0.73rem', fontWeight: 700, color: '#374151', display: 'block', marginBottom: '0.35rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
           {cfg.label}
         </label>
 
         {modal.type === 'edit' ? (
-          <input
-            type="number"
-            min="1"
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            style={{
-              width: '100%',
-              height: 44,
-              borderRadius: 11,
-              padding: '0 1rem',
-              border: `1px solid ${cfg.ib}`,
-              background: cfg.ibg,
-              fontFamily: "'DM Mono',monospace",
-              fontSize: '0.9rem',
-              fontWeight: 600,
-              color: '#0F172A',
-              outline: 'none',
-            }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type="number" min="1" value={value}
+              onChange={(e) => setValue(e.target.value)}
+              style={{ width: '100%', height: 44, borderRadius: 11, padding: '0 3.5rem 0 1rem', border: `1px solid ${cfg.ib}`, background: cfg.ibg, fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 600, color: '#0F172A', outline: 'none' }}
+            />
+            <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#6B7280', fontSize: '0.8rem', fontWeight: 700 }}>
+              {(modal.contribution as ExtendedContribution).currency || 'GNF'}
+            </span>
+          </div>
         ) : (
           <textarea
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={cfg.placeholder}
             rows={3}
-            style={{
-              width: '100%',
-              borderRadius: 11,
-              padding: '0.7rem 1rem',
-              border: `1px solid ${cfg.ib}`,
-              background: cfg.ibg,
-              fontFamily: "'DM Sans',sans-serif",
-              fontSize: '0.84rem',
-              color: '#111827',
-              outline: 'none',
-              resize: 'vertical',
-            }}
+            style={{ width: '100%', borderRadius: 11, padding: '0.7rem 1rem', border: `1px solid ${cfg.ib}`, background: cfg.ibg, fontFamily: "'DM Sans',sans-serif", fontSize: '0.84rem', color: '#111827', outline: 'none', resize: 'vertical' }}
           />
         )}
 
@@ -378,60 +290,19 @@ function Modal({
             Le motif est obligatoire pour rejeter.
           </p>
         )}
+        {modal.type === 'delete' && value !== 'SUPPRIMER' && (
+          <p style={{ fontSize: '0.69rem', color: '#DC2626', fontWeight: 600, marginTop: '0.3rem' }}>
+            {/* ✅ FIX 2 : &ldquo; et &rdquo; remplacent les " non échappés */}
+            Veuillez taper &ldquo;SUPPRIMER&rdquo; pour confirmer.
+          </p>
+        )}
 
         <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.1rem', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onClose}
-            disabled={busy}
-            style={{
-              height: 42,
-              padding: '0 1.1rem',
-              borderRadius: 10,
-              border: '1px solid rgba(37,99,235,0.15)',
-              background: 'rgba(249,250,251,0.9)',
-              fontFamily: "'DM Sans',sans-serif",
-              fontSize: '0.8rem',
-              fontWeight: 600,
-              color: '#374151',
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={onClose} disabled={busy} style={{ height: 42, padding: '0 1.1rem', borderRadius: 10, border: '1px solid rgba(37,99,235,0.15)', background: 'rgba(249,250,251,0.9)', fontFamily: "'DM Sans',sans-serif", fontSize: '0.8rem', fontWeight: 600, color: '#374151', cursor: 'pointer' }}>
             Annuler
           </button>
-
-          <button
-            onClick={() => onConfirm(value)}
-            disabled={busy || !canConfirm}
-            style={{
-              height: 42,
-              padding: '0 1.25rem',
-              borderRadius: 10,
-              border: 'none',
-              background: cfg.ctaGrad,
-              fontFamily: "'DM Sans',sans-serif",
-              fontSize: '0.8rem',
-              fontWeight: 700,
-              color: 'white',
-              cursor: 'pointer',
-              boxShadow: `0 4px 12px ${cfg.ctaShadow}`,
-              opacity: busy || !canConfirm ? 0.6 : 1,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.4rem',
-            }}
-          >
-            {busy && (
-              <div
-                style={{
-                  width: 13,
-                  height: 13,
-                  border: '2px solid rgba(255,255,255,0.3)',
-                  borderTopColor: 'white',
-                  borderRadius: '50%',
-                  animation: 'achspin 0.7s linear infinite',
-                }}
-              />
-            )}
+          <button onClick={() => onConfirm(value)} disabled={busy || !canConfirm} style={{ height: 42, padding: '0 1.25rem', borderRadius: 10, border: 'none', background: cfg.ctaGrad, fontFamily: "'DM Sans',sans-serif", fontSize: '0.8rem', fontWeight: 700, color: 'white', cursor: 'pointer', boxShadow: `0 4px 12px ${cfg.ctaShadow}`, opacity: busy || !canConfirm ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            {busy && <div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'achspin 0.7s linear infinite' }} />}
             {cfg.cta}
           </button>
         </div>
@@ -452,15 +323,12 @@ export default function AdminContributionsHistoryPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-
     try {
       const res = await api.listAntennaContributions({
-        page: 1,
-        pageSize: 100,
+        page: 1, pageSize: 100,
         status: status || undefined,
         q: q || undefined,
       });
-
       setItems(res?.items ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
@@ -469,16 +337,12 @@ export default function AdminContributionsHistoryPage() {
     }
   }, [status, q]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   async function handleConfirm(value: string) {
     if (!modal.contribution) return;
-
     const id = modal.contribution.id;
     setBusyId(id);
-
     try {
       if (modal.type === 'validate') {
         await api.validateContributionAntenna(id, { note: value || undefined });
@@ -486,12 +350,13 @@ export default function AdminContributionsHistoryPage() {
         await api.rejectContributionAntenna(id, { reason: value });
       } else if (modal.type === 'edit') {
         const amount = parseFloat(value.replace(',', '.'));
-
         if (!Number.isNaN(amount) && amount > 0) {
           await api.updateContributionAntenna(id, { amount });
         }
+      } else if (modal.type === 'delete') {
+        const apiClient = api as unknown as { deleteContributionAntenna: (id: string) => Promise<void> };
+        if (apiClient.deleteContributionAntenna) await apiClient.deleteContributionAntenna(id);
       }
-
       setModal({ type: null, contribution: null });
       await load();
     } finally {
@@ -499,20 +364,14 @@ export default function AdminContributionsHistoryPage() {
     }
   }
 
-  const isPendingStatus = (itemStatus: string) =>
-    itemStatus === 'PENDING' ||
-    itemStatus === 'SUBMITTED' ||
-    itemStatus === 'PENDING_VALIDATION';
-
-  const canReviewStatus = (itemStatus: string) =>
-    itemStatus === 'PENDING' ||
-    itemStatus === 'SUBMITTED' ||
-    itemStatus === 'PENDING_VALIDATION';
+  const isPendingStatus = (s: string) => s === 'PENDING' || s === 'SUBMITTED' || s === 'PENDING_VALIDATION';
+  const canReviewStatus = (s: string) => s === 'PENDING' || s === 'SUBMITTED' || s === 'PENDING_VALIDATION';
 
   const validated = items.filter((i) => i.status === 'VALIDATED').length;
-  const pending = items.filter((i) => isPendingStatus(i.status)).length;
-  const rejected = items.filter((i) => i.status === 'REJECTED').length;
-  const total = items.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+  const pending   = items.filter((i) => isPendingStatus(i.status)).length;
+  const rejected  = items.filter((i) => i.status === 'REJECTED').length;
+  const total     = items.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+  const mainCurrency = (items[0] as ExtendedContribution)?.currency || 'GNF';
 
   const BtnIcon = ({ d }: { d: string }) => (
     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -521,60 +380,30 @@ export default function AdminContributionsHistoryPage() {
   );
 
   const Spinner = () => (
-    <div
-      style={{
-        width: 12,
-        height: 12,
-        border: '2px solid rgba(255,255,255,0.3)',
-        borderTopColor: 'white',
-        borderRadius: '50%',
-        animation: 'achspin 0.7s linear infinite',
-      }}
-    />
+    <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'achspin 0.7s linear infinite' }} />
   );
 
+  const methodLabel = (c: Contribution) => {
+    const m = (c as ExtendedContribution).paymentMethod || (c as ExtendedContribution).method;
+    const map: Record<string, string> = {
+      CASH: 'Espèces', BANK_TRANSFER: 'Virement bancaire', MOBILE_MONEY: 'Mobile Money',
+      CARD: 'Carte bancaire', OTHER: 'Autre',
+    };
+    return m ? (map[m] ?? m) : '—';
+  };
+
   const ActionButtons = ({ c, flex }: { c: Contribution; flex?: boolean }) => (
-    <div
-      style={{
-        display: 'flex',
-        gap: '0.35rem',
-        justifyContent: flex ? undefined : 'flex-end',
-        flexWrap: 'wrap',
-      }}
-    >
+    <div style={{ display: 'flex', gap: '0.35rem', justifyContent: flex ? undefined : 'flex-end', flexWrap: 'wrap' }}>
       {canReviewStatus(c.status) && (
         <>
-          <button
-            className="ach-btn ach-btn-green"
-            style={flex ? { flex: 1, justifyContent: 'center' } : undefined}
-            disabled={busyId === c.id}
-            onClick={() => setModal({ type: 'validate', contribution: c })}
-          >
-            {busyId === c.id ? <Spinner /> : <BtnIcon d="M5 13l4 4L19 7" />}
-            Valider
+          <button className="ach-btn ach-btn-green" style={flex ? { flex: 1, justifyContent: 'center' } : undefined} disabled={busyId === c.id} onClick={(e) => { e.stopPropagation(); setModal({ type: 'validate', contribution: c }); }}>
+            {busyId === c.id ? <Spinner /> : <BtnIcon d="M5 13l4 4L19 7" />} Valider
           </button>
-
-          <button
-            className="ach-btn ach-btn-red"
-            style={flex ? { flex: 1, justifyContent: 'center' } : undefined}
-            disabled={busyId === c.id}
-            onClick={() => setModal({ type: 'reject', contribution: c })}
-          >
-            <BtnIcon d="M6 18L18 6M6 6l12 12" />
-            Rejeter
+          <button className="ach-btn ach-btn-red" style={flex ? { flex: 1, justifyContent: 'center' } : undefined} disabled={busyId === c.id} onClick={(e) => { e.stopPropagation(); setModal({ type: 'reject', contribution: c }); }}>
+            <BtnIcon d="M6 18L18 6M6 6l12 12" /> Rejeter
           </button>
         </>
       )}
-
-      <button
-        className="ach-btn ach-btn-blue"
-        style={flex ? { flex: 1, justifyContent: 'center' } : undefined}
-        disabled={busyId === c.id}
-        onClick={() => setModal({ type: 'edit', contribution: c })}
-      >
-        <BtnIcon d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-        Modifier
-      </button>
     </div>
   );
 
@@ -608,14 +437,15 @@ export default function AdminContributionsHistoryPage() {
         .ach-table{width:100%;border-collapse:collapse;min-width:700px}
         .ach-table thead tr{border-bottom:1px solid rgba(37,99,235,.09)}
         .ach-table thead th{padding:.8rem 1.1rem;font-size:.66rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#374151;text-align:left;background:rgba(248,250,252,.7);white-space:nowrap}
-        .ach-table tbody tr{border-bottom:1px solid rgba(37,99,235,.055);transition:background .15s;animation:achin .4s cubic-bezier(.22,1,.36,1) both}
+        .ach-table tbody tr{border-bottom:1px solid rgba(37,99,235,.055);transition:background .15s;animation:achin .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
         .ach-table tbody tr:last-child{border-bottom:none}
-        .ach-table tbody tr:hover{background:rgba(37,99,235,.025)}
+        .ach-table tbody tr:hover{background:rgba(37,99,235,.04)}
         .ach-table td{padding:.85rem 1.1rem;vertical-align:middle}
         .ach-name{font-size:.87rem;font-weight:800;color:#0F172A}
         .ach-ref{font-family:'DM Mono',monospace;font-size:.68rem;color:#6B7280;font-weight:500}
         .ach-date{font-size:.78rem;color:#374151;font-weight:600;white-space:nowrap}
         .ach-note{font-size:.75rem;color:#4B5563;font-weight:500;max-width:180px}
+        .ach-method{display:inline-flex;align-items:center;font-size:.72rem;font-weight:600;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:7px;padding:.18rem .55rem;color:#374151;white-space:nowrap}
         .ach-btn{height:33px;padding:0 .8rem;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:all .15s;white-space:nowrap;border:none}
         .ach-btn-green{background:linear-gradient(135deg,#059669,#10B981);color:white;box-shadow:0 2px 6px rgba(5,150,105,.28)}
         .ach-btn-green:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 4px 12px rgba(5,150,105,.38)}
@@ -626,7 +456,7 @@ export default function AdminContributionsHistoryPage() {
         .ach-btn:disabled{opacity:.5;cursor:not-allowed}
         .ach-mob{display:none}
         @media(max-width:680px){.ach-tw{display:none}.ach-mob{display:flex;flex-direction:column}}
-        .ach-mc{padding:1rem 1.1rem;border-bottom:1px solid rgba(37,99,235,.07);animation:achin .4s cubic-bezier(.22,1,.36,1) both}
+        .ach-mc{padding:1rem 1.1rem;border-bottom:1px solid rgba(37,99,235,.07);animation:achin .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
         .ach-mc:last-child{border-bottom:none}
         .ach-mc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.55rem}
         .ach-mc-meta{font-size:.71rem;color:#6B7280;font-weight:500;display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:.65rem;align-items:center}
@@ -643,31 +473,20 @@ export default function AdminContributionsHistoryPage() {
       <div className="ach-wrap">
         <div className="ach-header">
           <div>
-            <div className="ach-eyebrow">
-              <div className="ach-dot" />
-              Archives antenne
-            </div>
-            <h1 className="ach-title">
-              Historique des <span>cotisations</span>
-            </h1>
+            <div className="ach-eyebrow"><div className="ach-dot" />Archives antenne</div>
+            <h1 className="ach-title">Historique des <span>cotisations</span></h1>
           </div>
         </div>
 
         <div className="ach-stats">
           {([
-            {
-              label: 'Total reçu',
-              value: `${total.toLocaleString('fr-FR')} GNF`,
-              color: '#2563EB',
-            },
-            { label: 'Validées', value: validated, color: '#059669' },
-            { label: 'En attente', value: pending, color: '#D97706' },
-            { label: 'Rejetées', value: rejected, color: '#DC2626' },
+            { label: 'Total reçu', value: `${total.toLocaleString('fr-FR')} ${mainCurrency}`, color: '#2563EB' },
+            { label: 'Validées',   value: validated, color: '#059669' },
+            { label: 'En attente', value: pending,   color: '#D97706' },
+            { label: 'Rejetées',   value: rejected,  color: '#DC2626' },
           ] as const).map((s) => (
             <div key={s.label} className="ach-stat" style={{ borderTopColor: s.color }}>
-              <div className="ach-stat-val" style={{ color: s.color }}>
-                {s.value}
-              </div>
+              <div className="ach-stat-val" style={{ color: s.color }}>{s.value}</div>
               <div className="ach-stat-lbl">{s.label}</div>
             </div>
           ))}
@@ -675,17 +494,8 @@ export default function AdminContributionsHistoryPage() {
 
         {error && (
           <div className="ach-err">
-            <svg
-              width="14"
-              height="14"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2"
-              style={{ flexShrink: 0 }}
-            >
-              <circle cx="12" cy="12" r="10" />
-              <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
             </svg>
             {error}
           </div>
@@ -695,18 +505,11 @@ export default function AdminContributionsHistoryPage() {
           <div className="ach-sw">
             <span className="ach-si">
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" />
-                <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+                <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
               </svg>
             </span>
-            <input
-              className="ach-search"
-              type="text"
-              placeholder="Recherche membre / référence…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void load()}
-            />
+            <input className="ach-search" type="text" placeholder="Recherche membre / référence…" value={q}
+              onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load()} />
           </div>
 
           <select className="ach-select" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -721,8 +524,7 @@ export default function AdminContributionsHistoryPage() {
 
           <button className="ach-fbtn" onClick={() => void load()}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-              <circle cx="11" cy="11" r="8" />
-              <path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+              <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
             </svg>
             Filtrer
           </button>
@@ -730,69 +532,58 @@ export default function AdminContributionsHistoryPage() {
 
         <div className="ach-panel">
           {loading ? (
-            <div className="ach-loader">
-              <div className="ach-ring" />
-              Chargement&#8230;
-            </div>
+            <div className="ach-loader"><div className="ach-ring" />Chargement&#8230;</div>
           ) : items.length === 0 ? (
             <div className="ach-empty">
               <div className="ach-empty-ico">
                 <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.5">
-                  <path
-                    strokeLinecap="round"
-                    d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                  />
+                  <path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                 </svg>
               </div>
               <p>Aucune cotisation trouvée</p>
             </div>
           ) : (
             <>
+              {/* Desktop table */}
               <div className="ach-tw">
                 <table className="ach-table">
                   <thead>
                     <tr>
-                      <th>Membre</th>
-                      <th>Montant</th>
-                      <th>Statut</th>
-                      <th>Note</th>
-                      <th>Date</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
+                      <th>Membre</th><th>Montant</th><th>Méthode</th><th>Statut</th>
+                      <th>Note</th><th>Date</th><th style={{ textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((c, i) => (
-                      <tr key={c.id} style={{ animationDelay: `${i * 0.03}s` }}>
+                      <tr key={c.id} style={{ animationDelay: `${i * 0.03}s` }}
+                        onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; setModal({ type: 'detail', contribution: c }); }}>
                         <td>
                           <div className="ach-name">{memberName(c)}</div>
                           <div className="ach-ref">{c.id.slice(0, 8)}</div>
                         </td>
+                        <td><AmountPill amount={c.amount} currency={(c as ExtendedContribution).currency} /></td>
                         <td>
-                          <AmountPill amount={c.amount} />
+                          <span className="ach-method">{methodLabel(c)}</span>
                         </td>
-                        <td>
-                          <StatusBadge status={c.status} />
-                        </td>
+                        <td><StatusBadge status={c.status} /></td>
                         <td>
                           <span className="ach-note">
-                            {c.note ?? <span style={{ color: '#D1D5DB' }}>—</span>}
+                            {(c as ExtendedContribution).note ?? <span style={{ color: '#D1D5DB' }}>—</span>}
                           </span>
                         </td>
-                        <td>
-                          <span className="ach-date">{formatDate(c.createdAt)}</span>
-                        </td>
-                        <td>
-                          <ActionButtons c={c} />
-                        </td>
+                        <td><span className="ach-date">{formatDate(c.createdAt)}</span></td>
+                        <td><ActionButtons c={c} /></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
+              {/* Mobile cards */}
               <div className="ach-mob">
                 {items.map((c, i) => (
-                  <div key={c.id} className="ach-mc" style={{ animationDelay: `${i * 0.03}s` }}>
+                  <div key={c.id} className="ach-mc" style={{ animationDelay: `${i * 0.03}s` }}
+                    onClick={(e) => { if ((e.target as HTMLElement).closest('button')) return; setModal({ type: 'detail', contribution: c }); }}>
                     <div className="ach-mc-row">
                       <div>
                         <div className="ach-name">{memberName(c)}</div>
@@ -800,18 +591,14 @@ export default function AdminContributionsHistoryPage() {
                       </div>
                       <StatusBadge status={c.status} />
                     </div>
-
                     <div className="ach-mc-meta">
-                      <AmountPill amount={c.amount} />
+                      <AmountPill amount={c.amount} currency={(c as ExtendedContribution).currency} />
+                      <span className="ach-method">{methodLabel(c)}</span>
                       <span>{formatDate(c.createdAt)}</span>
                     </div>
-
-                    {c.note && (
-                      <p className="ach-note" style={{ marginBottom: '.6rem' }}>
-                        {c.note}
-                      </p>
+                    {(c as ExtendedContribution).note && (
+                      <p className="ach-note" style={{ marginBottom: '.6rem' }}>{(c as ExtendedContribution).note}</p>
                     )}
-
                     <ActionButtons c={c} flex />
                   </div>
                 ))}
@@ -822,7 +609,7 @@ export default function AdminContributionsHistoryPage() {
       </div>
 
       <Modal
-        modal={modal}
+        modal={modal} setModal={setModal}
         onClose={() => setModal({ type: null, contribution: null })}
         onConfirm={(v) => void handleConfirm(v)}
         busy={busyId !== null}

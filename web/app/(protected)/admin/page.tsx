@@ -108,7 +108,7 @@ function BalancesModal({
               }}>
                 <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>{b.name}</div>
                 <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.95rem', fontWeight: 800, color: '#1D4ED8' }}>
-                  {formatCurrency(b.balance, b.currency)}
+                  {formatCurrency(b.balance, b.currency || 'GNF')}
                 </div>
               </div>
             ))
@@ -121,22 +121,27 @@ function BalancesModal({
 
 export default function AntennaAdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [error, setError] = useState<string | null>(null); // <-- AJOUT DE LA VARIABLE D'ERREUR
+  const [error, setError] = useState<string | null>(null); 
   const [showBalancesModal, setShowBalancesModal] = useState(false);
 
   useEffect(() => {
-    // <-- AJOUT DU TRY/CATCH POUR GÉRER L'ERREUR PROPREMENT
+    let isMounted = true; // Protection contre le setState asynchrone
+
     void (async () => {
       try {
         const res = await api.dashboardAntennaAdmin();
-        setData(res as unknown as DashboardData);
+        if (isMounted) setData(res as unknown as DashboardData);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erreur chargement dashboard');
+        if (isMounted) setError(err instanceof Error ? err.message : 'Erreur chargement dashboard');
       }
     })();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  const cur = data?.stats?.currency || 'EUR';
+  const cur = data?.stats?.currency || 'EUR'; // Devise par défaut de la page s'il n'y a pas d'infos
 
   const stats: StatCard[] = data ? [
     {

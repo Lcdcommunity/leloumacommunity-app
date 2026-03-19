@@ -1,5 +1,4 @@
 //backend/src/modules/super-admin/super-admin.service.ts
-//backend/src/modules/super-admin/super-admin.service.ts
 import {
   ConflictException,
   Injectable,
@@ -41,6 +40,48 @@ export class SuperAdminService {
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
   ) {}
+
+  /* ── GESTION DES PRIX (PRICING CONFIG) ── */
+
+  async getPricingConfig(associationId: string) {
+    const setting = await this.prisma.associationSetting.findUnique({
+      where: {
+        associationId_key: {
+          associationId,
+          key: 'PRICING_CONFIG',
+        },
+      },
+    });
+
+    return setting?.value ?? {}; // Retourne un objet vide par défaut
+  }
+
+  async updatePricingConfig(
+    associationId: string, 
+    pricingData: Record<string, { monthlyQuota: number; membershipCard: number }>, 
+    actorId: string
+  ) {
+    return this.prisma.associationSetting.upsert({
+      where: {
+        associationId_key: {
+          associationId,
+          key: 'PRICING_CONFIG',
+        },
+      },
+      update: {
+        value: pricingData as any,
+        updatedByUserId: actorId,
+      },
+      create: {
+        associationId,
+        key: 'PRICING_CONFIG',
+        value: pricingData as any,
+        description: 'Tarifs globaux par devise',
+        updatedByUserId: actorId,
+      },
+    });
+  }
+  /* ─────────────────────────────────────────────────────────────────── */
 
   async listAntennas(page: number, pageSize: number, q?: string, isActive?: boolean) {
     const skip = (page - 1) * pageSize;
@@ -209,7 +250,6 @@ export class SuperAdminService {
   /* ── NOUVELLE MÉTHODE : modifier un admin d'antenne ── */
 
   async updateAntennaAdmin(userId: string, data: any, actorId: string) {
-    // Vérifie que l'utilisateur existe et est bien un admin d'antenne
     const admin = await this.prisma.user.findFirst({
       where: {
         id: userId,
@@ -222,7 +262,6 @@ export class SuperAdminService {
       throw new NotFoundException('Administrateur introuvable.');
     }
 
-    // Mise à jour des champs fournis uniquement (patch partiel)
     const updateData: Prisma.UserUpdateInput = {};
 
     if (data.firstName !== undefined) updateData.firstName = data.firstName;

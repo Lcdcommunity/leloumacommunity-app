@@ -1,5 +1,4 @@
 //backend/src/modules/super-admin/super-admin.controller.ts
-//backend/src/modules/super-admin/super-admin.controller.ts
 import {
   Body,
   Controller,
@@ -8,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -27,6 +27,23 @@ import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
 @Roles(UserRole.SUPER_ADMIN)
 export class SuperAdminController {
   constructor(private readonly service: SuperAdminService) {}
+
+  /* ── GESTION DES PRIX (PRICING) ── */
+/* ── GESTION DES PRIX (PRICING) ── */
+  @Get('settings/pricing')
+  getPricing(@CurrentUser() actor: AuthUser) {
+    return this.service.getPricingConfig(actor.associationId);
+  }
+
+  @Put('settings/pricing')
+  updatePricing(
+    @Body() pricingData: Record<string, { monthlyQuota: number; membershipCard: number }>,
+    @CurrentUser() actor: AuthUser
+  ) {
+    return this.service.updatePricingConfig(actor.associationId, pricingData, actor.id);
+  }
+
+  /* ────────────────────────────────────────────────── */
 
   @Get('members')
   listMembers(@Query() query: PaginationQueryDto) {
@@ -55,7 +72,6 @@ export class SuperAdminController {
     return this.service.createAntennaAdmin(body, actor.id);
   }
 
-  // ── NOUVELLE ROUTE : modifier un admin d'antenne ──
   @Patch('admins/:id')
   updateAdmin(@Param('id') id: string, @Body() body: any, @CurrentUser() actor: AuthUser) {
     return this.service.updateAntennaAdmin(id, body, actor.id);

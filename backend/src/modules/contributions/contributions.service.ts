@@ -5,13 +5,26 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ContributionStatus, Prisma, UserRole } from '@prisma/client';
+import {
+  ContributionStatus,
+  PaymentMethod,
+  Prisma,
+  UserRole,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthUser } from '../../common/types/auth-user.type';
 import { CreateContributionDto } from './dto/create-contribution.dto';
 import { ValidateContributionDto } from './dto/validate-contribution.dto';
 import { RejectContributionDto } from './dto/reject-contribution.dto';
 import { AuditService } from '../audit/audit.service';
+
+type CreateContributionInputCompat = CreateContributionDto & {
+  method?: string;
+  depositedAt?: string;
+  note?: string;
+  reference?: string;
+  receiptFileAssetId?: string | null;
+};
 
 @Injectable()
 export class ContributionsService {
@@ -25,6 +38,8 @@ export class ContributionsService {
       throw new ForbiddenException('Seul un membre peut créer une cotisation');
     }
 
+    const incoming = dto as CreateContributionInputCompat;
+
     const membership = await this.prisma.membership.findFirst({
       where: {
         userId: actor.id,
@@ -32,42 +47,129 @@ export class ContributionsService {
         isPrimary: true,
         status: 'APPROVED',
       },
+      include: {
+        antenna: {
+          select: {
+            id: true,
+            defaultCurrency: true,
+          },
+        },
+        association: {
+          select: {
+            id: true,
+            defaultCurrency: true,
+          },
+        },
+      },
     });
 
     if (!membership) {
       throw new ForbiddenException('Membre non approuvé sur cette antenne');
     }
 
-    const contribution = await this.prisma.contribution.create({
-      data: {
-        associationId: actor.associationId,
-        antennaId: dto.antennaId,
-        memberUserId: actor.id,
-        amount: new Prisma.Decimal(dto.amount),
-        currency: dto.currency ?? 'EUR',
-        paymentMethod: dto.paymentMethod,
-        status: ContributionStatus.PENDING_VALIDATION,
-        contributionDate: dto.contributionDate ? new Date(dto.contributionDate) : null,
-        monthReference: dto.monthReference,
-        yearReference: dto.yearReference,
-        memberComment: dto.memberComment?.trim(),
-        externalReference: dto.externalReference?.trim(),
-        proofFileId: dto.proofFileId,
+    const resolvedCurrency =
+      membership.antenna.defaultCurrency ??
+      membership.association.defaultCurrency ??
+      'EUR';
+
+    const rawPaymentMethod = dto.paymentMethod ?? incoming.method;
+    if (!rawPaymentMethod) {
+      throw new BadRequestException('Mode de paiement requis');
+    }
+
+    const contributionDateInput = dto.contributionDate ?? incoming.depositedAt;
+    const memberCommentInput = dto.memberComment ?? incoming.note;
+    const externalReferenceInput = dto.externalReference ?? incoming.reference;
+    const proofFileIdInput = dto.proofFileId ?? incoming.receiptFileAssetId ?? undefined;
+    const purpose = (dto.purpose as any) ?? 'REGULAR_QUOTA'; 
+
+    // ── 1. RÉCUPÉRATION DE LA CONFIGURATION TARIFAIRE (MULTI-DEVISES) ──
+    const pricingSetting = await this.prisma.associationSetting.findUnique({
+      where: {
+        associationId_key: {
+          associationId: actor.associationId,
+          key: 'PRICING_CONFIG',
+        },
       },
     });
 
+    const allPricing = (pricingSetting?.value as Record<string, any>) || {};
+    const localPricing = allPricing[resolvedCurrency] || { monthlyQuota: 0, membershipCard: 0 };
+    const monthlyPrice = Number(localPricing.monthlyQuota) || 0;
+
+    // ── 2. LOGIQUE DE SCINDAGE (SPLIT) DES COTISATIONS / RETARDS ──
+    const contributionsToCreate = [];
+    let remainingAmount = Number(dto.amount);
+    let currentMonth = dto.monthReference ?? new Date().getMonth() + 1;
+    let currentYear = dto.yearReference ?? new Date().getFullYear();
+
+    const baseData = {
+      associationId: actor.associationId,
+      antennaId: dto.antennaId,
+      memberUserId: actor.id,
+      currency: resolvedCurrency,
+      paymentMethod: rawPaymentMethod as PaymentMethod,
+      purpose,
+      status: ContributionStatus.PENDING_VALIDATION,
+      contributionDate: contributionDateInput ? new Date(contributionDateInput) : null,
+      memberComment: memberCommentInput?.trim(),
+      externalReference: externalReferenceInput?.trim(),
+      proofFileId: proofFileIdInput ?? null,
+    };
+
+    if ((purpose === 'REGULAR_QUOTA' || purpose === 'LATE_QUOTA') && monthlyPrice > 0 && remainingAmount > monthlyPrice) {
+      while (remainingAmount > 0) {
+        const amountToApply = remainingAmount >= monthlyPrice ? monthlyPrice : remainingAmount;
+        
+        contributionsToCreate.push({
+          ...baseData,
+          amount: new Prisma.Decimal(amountToApply),
+          monthReference: currentMonth,
+          yearReference: currentYear,
+          memberComment: remainingAmount !== Number(dto.amount) 
+            ? `${memberCommentInput?.trim() || ''} [Avance automatique]`.trim() 
+            : memberCommentInput?.trim(),
+        });
+
+        remainingAmount -= amountToApply;
+        
+        currentMonth++;
+        if (currentMonth > 12) {
+          currentMonth = 1;
+          currentYear++;
+        }
+      }
+    } else {
+      contributionsToCreate.push({
+        ...baseData,
+        amount: new Prisma.Decimal(remainingAmount),
+        monthReference: dto.monthReference,
+        yearReference: dto.yearReference,
+      });
+    }
+
+    // ── 3. CRÉATION EN BASE DE DONNÉES ──
+    const createdContributions = await this.prisma.$transaction(
+      contributionsToCreate.map(data => this.prisma.contribution.create({ data }))
+    );
+
     await this.audit.log({
-      associationId: contribution.associationId,
-      antennaId: contribution.antennaId,
+      associationId: actor.associationId,
+      antennaId: dto.antennaId,
       actorUserId: actor.id,
       action: 'SUBMIT_CONTRIBUTION',
       targetModel: 'Contribution',
-      targetId: contribution.id,
+      targetId: createdContributions[0].id,
       targetUserId: actor.id,
-      summary: 'Dépôt de cotisation soumis par membre',
+      summary: `Dépôt soumis (Total: ${dto.amount}${resolvedCurrency}, scindé en ${createdContributions.length} ligne(s))`,
+      metadata: {
+        currency: resolvedCurrency,
+        antennaId: dto.antennaId,
+        splitCount: createdContributions.length,
+      },
     });
 
-    return contribution;
+    return createdContributions[0];
   }
 
   private async assertAntennaAdminCanValidate(actor: AuthUser, antennaId: string): Promise<void> {
@@ -86,12 +188,16 @@ export class ContributionsService {
       },
     });
 
-    if (!assignment) throw new ForbiddenException('Admin non affecté à cette antenne');
+    if (!assignment) {
+      throw new ForbiddenException('Admin non affecté à cette antenne');
+    }
   }
 
   async validateContribution(id: string, dto: ValidateContributionDto, actor: AuthUser) {
     const contribution = await this.prisma.contribution.findUnique({ where: { id } });
-    if (!contribution) throw new NotFoundException('Cotisation introuvable');
+    if (!contribution) {
+      throw new NotFoundException('Cotisation introuvable');
+    }
 
     await this.assertAntennaAdminCanValidate(actor, contribution.antennaId);
 
@@ -99,8 +205,10 @@ export class ContributionsService {
       return { message: 'Déjà validée', contribution };
     }
 
-    // <-- CORRECTION TypeScript ICI : suppression du .includes() -->
-    if (contribution.status === ContributionStatus.CANCELLED || contribution.status === ContributionStatus.REJECTED) {
+    if (
+      contribution.status === ContributionStatus.CANCELLED ||
+      contribution.status === ContributionStatus.REJECTED
+    ) {
       throw new BadRequestException('Cotisation non validable dans cet état');
     }
 
@@ -115,7 +223,7 @@ export class ContributionsService {
           type: 'CONTRIBUTION_IN',
           amount: contribution.amount,
           currency: contribution.currency,
-          title: 'Cotisation validée',
+          title: `Cotisation validée (${contribution.purpose})`,
           createdByUserId: actor.id,
         },
       });
@@ -152,7 +260,9 @@ export class ContributionsService {
 
   async rejectContribution(id: string, dto: RejectContributionDto, actor: AuthUser) {
     const contribution = await this.prisma.contribution.findUnique({ where: { id } });
-    if (!contribution) throw new NotFoundException('Cotisation introuvable');
+    if (!contribution) {
+      throw new NotFoundException('Cotisation introuvable');
+    }
 
     await this.assertAntennaAdminCanValidate(actor, contribution.antennaId);
 
@@ -185,7 +295,11 @@ export class ContributionsService {
   async listMine(actor: AuthUser) {
     return this.prisma.contribution.findMany({
       where: { memberUserId: actor.id },
-      include: { antenna: { select: { id: true, name: true, code: true } } },
+      include: {
+        antenna: {
+          select: { id: true, name: true, code: true },
+        },
+      },
       orderBy: { submittedAt: 'desc' },
     });
   }
@@ -205,17 +319,27 @@ export class ContributionsService {
       include: {
         user: {
           select: {
-            id: true, firstName: true, lastName: true, email: true,
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
             contributions: {
               where: { status: ContributionStatus.VALIDATED },
               orderBy: { validatedAt: 'desc' },
               take: 1,
-              select: { id: true, amount: true, validatedAt: true, currency: true }
-            }
-          }
+              select: {
+                id: true,
+                amount: true,
+                validatedAt: true,
+                currency: true,
+              },
+            },
+          },
         },
-        antenna: { select: { id: true, name: true, code: true } }
-      }
+        antenna: {
+          select: { id: true, name: true, code: true },
+        },
+      },
     });
 
     return memberships
