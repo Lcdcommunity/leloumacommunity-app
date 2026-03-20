@@ -445,6 +445,10 @@ export const api = {
       }`
     ),
 
+  // 👇 AJOUT CHIRURGICAL : Route pour créer le document en base après l'upload
+  createSuperAdminDocument: (body: { title: string; description?: string; fileAssetId: string }) =>
+    http<DocumentItem, typeof body>('/super-admin/documents', { method: 'POST', body }),
+
   deleteDocument: (id: string) => http(`/super-admin/documents/${id}`, { method: 'DELETE' }),
 
   listAntennaDocuments: (params?: { page?: number; pageSize?: number; q?: string }) =>

@@ -29,6 +29,27 @@ export class DashboardSuperAdminService {
       }),
     ]);
 
+    // 👇 AJOUT CHIRURGICAL : Récupération des soldes de toutes les antennes pour les cartes dynamiques
+    const allAntennas = await this.prisma.antenna.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, defaultCurrency: true }
+    });
+
+    const antennaBalances = await Promise.all(
+      allAntennas.map(async (ant) => {
+        const agg = await this.prisma.contribution.aggregate({
+          where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
+          _sum: { amount: true }
+        });
+        return {
+          id: ant.id,
+          name: ant.name,
+          balance: Number(agg._sum.amount ?? 0),
+          currency: ant.defaultCurrency || 'GNF'
+        };
+      })
+    );
+
     const recentPendingAccounts = await this.prisma.user.findMany({
       where: { status: UserStatus.PENDING_APPROVAL },
       orderBy: { createdAt: 'desc' },
@@ -80,6 +101,7 @@ export class DashboardSuperAdminService {
         activeProjects: activeProjectsCount,
         totalValidatedContributionsAmount: Number(aggValidatedContributions._sum.amount ?? 0),
       },
+      antennaBalances, // <-- INJECTION DU TABLEAU DES SOLDES
       recentPendingAccounts,
       recentContributions: recentContributions.map((c) => ({
         ...c,

@@ -20,9 +20,6 @@ export class UploadsService {
     private readonly cloudinaryProvider: CloudinaryService,
   ) {}
 
-  /**
-   * Sélectionne dynamiquement le fournisseur de stockage basé sur STORAGE_DRIVER
-   */
   private get currentDriver(): string {
     return this.config.get<string>('STORAGE_DRIVER') || 'local';
   }
@@ -36,11 +33,8 @@ export class UploadsService {
     isPublic?: boolean;
   }) {
     const driver = this.currentDriver;
-    
-    // Définition de la structure de retour
     let stored: { url: string; storageKey: string; mimeType?: string; sizeBytes?: bigint };
 
-    // --- LOGIQUE D'AIGUILLAGE CHIRURGICALE ---
     if (driver === 'cloudinary') {
       const res = await this.cloudinaryProvider.uploadFile(params.file);
       stored = {
@@ -56,8 +50,6 @@ export class UploadsService {
         mimeType: params.file.mimetype,
         folder: params.folder || 'uploads',
       });
-      
-      // Fix Type: Conversion explicite en BigInt
       stored = {
         ...s3Res,
         sizeBytes: s3Res.sizeBytes ? BigInt(s3Res.sizeBytes) : BigInt(params.file.size),
@@ -69,15 +61,12 @@ export class UploadsService {
         mimeType: params.file.mimetype,
         folder: params.folder || 'uploads',
       });
-
-      // Fix Type: Conversion explicite en BigInt
       stored = {
         ...localRes,
         sizeBytes: localRes.sizeBytes ? BigInt(localRes.sizeBytes) : BigInt(params.file.size),
       };
     }
 
-    // Création de l'enregistrement en base de données (Neon/Prisma)
     const created = await this.prisma.fileAsset.create({
       data: {
         associationId: params.actor.associationId,
@@ -87,14 +76,12 @@ export class UploadsService {
         storageKey: stored.storageKey,
         url: stored.url,
         mimeType: stored.mimeType ?? params.file.mimetype,
-        // Sécurité supplémentaire pour le type BigInt
         sizeBytes: stored.sizeBytes ?? BigInt(params.file.size),
         category: (params.category as FileCategory) ?? FileCategory.OTHER,
         visibility: params.isPublic ? FileVisibility.PUBLIC : FileVisibility.PRIVATE,
       },
     });
 
-    // Journalisation de l'action (Audit)
     await this.audit.log({
       associationId: params.actor.associationId,
       actorUserId: params.actor.id,

@@ -81,7 +81,8 @@ export class ContributionsService {
     const memberCommentInput = dto.memberComment ?? incoming.note;
     const externalReferenceInput = dto.externalReference ?? incoming.reference;
     const proofFileIdInput = dto.proofFileId ?? incoming.receiptFileAssetId ?? undefined;
-    const purpose = (dto.purpose as any) ?? 'REGULAR_QUOTA'; 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const purpose = (dto.purpose as any) ?? 'REGULAR_QUOTA';
 
     // ── 1. RÉCUPÉRATION DE LA CONFIGURATION TARIFAIRE (MULTI-DEVISES) ──
     const pricingSetting = await this.prisma.associationSetting.findUnique({
@@ -93,6 +94,7 @@ export class ContributionsService {
       },
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allPricing = (pricingSetting?.value as Record<string, any>) || {};
     const localPricing = allPricing[resolvedCurrency] || { monthlyQuota: 0, membershipCard: 0 };
     const monthlyPrice = Number(localPricing.monthlyQuota) || 0;
@@ -117,22 +119,27 @@ export class ContributionsService {
       proofFileId: proofFileIdInput ?? null,
     };
 
-    if ((purpose === 'REGULAR_QUOTA' || purpose === 'LATE_QUOTA') && monthlyPrice > 0 && remainingAmount > monthlyPrice) {
+    if (
+      (purpose === 'REGULAR_QUOTA' || purpose === 'LATE_QUOTA') &&
+      monthlyPrice > 0 &&
+      remainingAmount > monthlyPrice
+    ) {
       while (remainingAmount > 0) {
         const amountToApply = remainingAmount >= monthlyPrice ? monthlyPrice : remainingAmount;
-        
+
         contributionsToCreate.push({
           ...baseData,
           amount: new Prisma.Decimal(amountToApply),
           monthReference: currentMonth,
           yearReference: currentYear,
-          memberComment: remainingAmount !== Number(dto.amount) 
-            ? `${memberCommentInput?.trim() || ''} [Avance automatique]`.trim() 
-            : memberCommentInput?.trim(),
+          memberComment:
+            remainingAmount !== Number(dto.amount)
+              ? `${memberCommentInput?.trim() || ''} [Avance automatique]`.trim()
+              : memberCommentInput?.trim(),
         });
 
         remainingAmount -= amountToApply;
-        
+
         currentMonth++;
         if (currentMonth > 12) {
           currentMonth = 1;
@@ -150,7 +157,7 @@ export class ContributionsService {
 
     // ── 3. CRÉATION EN BASE DE DONNÉES ──
     const createdContributions = await this.prisma.$transaction(
-      contributionsToCreate.map(data => this.prisma.contribution.create({ data }))
+      contributionsToCreate.map((data) => this.prisma.contribution.create({ data })),
     );
 
     await this.audit.log({
@@ -293,7 +300,7 @@ export class ContributionsService {
   }
 
   async listMine(actor: AuthUser) {
-    return this.prisma.contribution.findMany({
+    const contributions = await this.prisma.contribution.findMany({
       where: { memberUserId: actor.id },
       include: {
         antenna: {
@@ -302,6 +309,23 @@ export class ContributionsService {
       },
       orderBy: { submittedAt: 'desc' },
     });
+
+    // ✅ Mapper les noms de champs Prisma → noms attendus par le frontend
+    // Prisma : paymentMethod, contributionDate, memberComment
+    // Frontend : method, depositedAt, note
+    return contributions.map((c) => ({
+      ...c,
+      amount: Number(c.amount),
+      method: c.paymentMethod ?? null,           // CASH / BANK_TRANSFER / MOBILE_MONEY
+      depositedAt: c.contributionDate            // date du versement
+        ? c.contributionDate.toISOString()
+        : null,
+      note: c.memberComment ?? null,             // commentaire du membre
+      validatedAt: c.validatedAt                 // date de validation
+        ? c.validatedAt.toISOString()
+        : null,
+      // purpose est déjà un champ scalaire Prisma — retourné tel quel
+    }));
   }
 
   async lateMembers(associationId: string, antennaId?: string, thresholdMonths = 3) {

@@ -67,6 +67,27 @@ export class DashboardMemberService {
         }),
       ]);
 
+    // 👇 2.5 AJOUT CHIRURGICAL : Récupération des soldes de toutes les antennes
+    const allAntennas = await this.prisma.antenna.findMany({
+      where: { associationId: me.associationId, isActive: true },
+      select: { id: true, name: true, defaultCurrency: true }
+    });
+
+    const antennaBalances = await Promise.all(
+      allAntennas.map(async (ant) => {
+        const agg = await this.prisma.contribution.aggregate({
+          where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
+          _sum: { amount: true }
+        });
+        return {
+          id: ant.id,
+          name: ant.name,
+          balance: Number(agg._sum.amount ?? 0),
+          currency: ant.defaultCurrency || 'GNF'
+        };
+      })
+    );
+
     // 3. Dernières contributions du membre
     const recentContributions = await this.prisma.contribution.findMany({
       where: { memberUserId: userId },
@@ -185,6 +206,7 @@ export class DashboardMemberService {
         associationId: me.associationId,
         antennaId: primaryAntennaId,
       },
+      antennaBalances, // <-- INJECTION DU TABLEAU DES SOLDES
       recentContributions: recentContributions.map((x) => ({
         ...x,
         amount: Number(x.amount),

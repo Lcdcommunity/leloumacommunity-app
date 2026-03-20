@@ -36,7 +36,7 @@ export class LocalStorageProvider implements StorageProvider {
       storageKey: key,
       url,
       mimeType: params.mimeType,
-      sizeBytes: params.buffer.length,
+      sizeBytes: params.buffer.length, // Pas besoin de BigInt ici, le service parent s'en occupe
     };
   }
 }

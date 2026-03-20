@@ -1,5 +1,6 @@
 //backend/src/modules/super-admin/super-admin.service.ts
 import {
+  BadRequestException, 
   ConflictException,
   Injectable,
   NotFoundException,
@@ -14,6 +15,7 @@ import * as bcrypt from 'bcryptjs';
 import { MailService } from '../../common/services/mail.service';
 import { CreateAntennaDto } from './dto/create-antenna.dto';
 import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
+import { memberMapper } from '../member/member.mapper';
 
 type PrismaLike = PrismaService | Prisma.TransactionClient;
 
@@ -53,7 +55,7 @@ export class SuperAdminService {
       },
     });
 
-    return setting?.value ?? {}; // Retourne un objet vide par défaut
+    return setting?.value ?? {}; 
   }
 
   async updatePricingConfig(
@@ -81,6 +83,7 @@ export class SuperAdminService {
       },
     });
   }
+
   /* ─────────────────────────────────────────────────────────────────── */
 
   async listAntennas(page: number, pageSize: number, q?: string, isActive?: boolean) {
@@ -192,8 +195,6 @@ export class SuperAdminService {
     });
   }
 
-  /* ── GESTION DES UTILISATEURS (MEMBRES) ── */
-
   async updateUser(userId: string, data: any) {
     return this.prisma.user.update({
       where: { id: userId },
@@ -247,8 +248,6 @@ export class SuperAdminService {
     });
   }
 
-  /* ── NOUVELLE MÉTHODE : modifier un admin d'antenne ── */
-
   async updateAntennaAdmin(userId: string, data: any, actorId: string) {
     const admin = await this.prisma.user.findFirst({
       where: {
@@ -279,8 +278,6 @@ export class SuperAdminService {
       data: updateData,
     });
   }
-
-  /* ─────────────────────────────────────────────────────────────────── */
 
   async createAntenna(data: CreateAntennaDto, actorId: string) {
     const association = await this.prisma.association.findFirst({
@@ -345,8 +342,7 @@ export class SuperAdminService {
           country: data.admin.country,
           originSubPrefecture: data.admin.originSubPrefecture,
           sendInvite: data.admin.sendInvite,
-        }, actorId);
-
+        }, actorId);        
         createdAdmin = {
           email: result.user.email,
           firstName: result.user.firstName,
@@ -530,6 +526,7 @@ export class SuperAdminService {
     });
   }
 
+  // 👇 AJOUT CHIRURGICAL : Inclusion des `attachments` pour le dashboard Super Admin
   async listProjects(page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
     const where: Prisma.ProjectWhereInput = q
@@ -542,13 +539,25 @@ export class SuperAdminService {
         skip,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
-        include: { antenna: true },
+        include: { 
+          antenna: true,
+          attachments: { include: { file: true } } 
+        },
       }),
       this.prisma.project.count({ where }),
     ]);
 
     return {
-      items,
+      items: items.map(p => {
+        const mappedProject = memberMapper.project(p as any);
+        return {
+          ...mappedProject,
+          attachments: (p as any).attachments?.map((a: any) => ({
+            id: a.file.id,
+            url: a.file.url
+          })) || []
+        };
+      }),
       total,
       page,
       pageSize,
@@ -560,6 +569,25 @@ export class SuperAdminService {
     const project = await this.prisma.project.findUnique({ where: { id } });
     if (!project) throw new NotFoundException('Projet introuvable.');
     return this.prisma.project.delete({ where: { id } });
+  }
+
+  async createDocument(data: { title: string; description?: string; fileAssetId: string }, actorId: string, associationId: string) {
+    if (!data.fileAssetId) {
+      throw new BadRequestException('Un fichier est requis.');
+    }
+
+    return this.prisma.document.create({
+      data: {
+        associationId,
+        title: data.title,
+        description: data.description,
+        fileId: data.fileAssetId,
+        uploadedByUserId: actorId,
+        scope: 'GLOBAL', 
+        isDownloadable: true,
+      },
+      include: { file: true },
+    });
   }
 
   async listDocuments(page: number, pageSize: number, q?: string) {
@@ -580,12 +608,25 @@ export class SuperAdminService {
     ]);
 
     return {
-      items,
+      items: items.map(d => memberMapper.documentItem(d as any)),
       total,
       page,
       pageSize,
       totalPages: Math.ceil(total / pageSize),
     };
+  }
+
+  async deleteDocument(id: string) {
+    const doc = await this.prisma.document.findUnique({ where: { id } });
+    if (!doc) throw new NotFoundException('Document introuvable.');
+    
+    return this.prisma.$transaction(async (tx) => {
+      await tx.document.delete({ where: { id } });
+      if (doc.fileId) {
+        await tx.fileAsset.delete({ where: { id: doc.fileId } });
+      }
+      return { success: true };
+    });
   }
 
   async listAllContributions(page: number, pageSize: number, status?: string) {

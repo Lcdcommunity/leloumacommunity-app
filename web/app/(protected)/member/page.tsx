@@ -1,7 +1,7 @@
 // web/app/(protected)/member/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { MemberStatusBanner } from '../../../components/member/MemberStatusBanner';
 import { VirtualCardWidget } from '../../../components/member/VirtualCardWidget';
@@ -47,6 +47,7 @@ type DashboardData = {
   projectsInProgress: Project[];
   latestContents: ContentPost[];
   lateMembersPreview: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
+  antennaBalances?: Array<{ id: string; name: string; balance: number; currency: string }>;
 };
 
 type BalanceSummary = {
@@ -57,7 +58,6 @@ type BalanceSummary = {
   lastUpdatedAt?: string | null;
 };
 
-// ✅ Type étendu pour éviter les (as any) — couvre tous les champs optionnels
 type ExtendedContribution = Contribution & {
   purpose?: string | null;
   currency?: string;
@@ -86,8 +86,8 @@ function getStatusConfig(status: string) {
 
 function getPurposeConfig(purpose?: string | null) {
   const map: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-    REGULAR_QUOTA:   { label: 'Cotisation régulière',  icon: '📅', color: '#059669', bg: '#ECFDF5' },
-    MEMBERSHIP_CARD: { label: 'Carte membre annuelle', icon: '💳', color: '#2563EB', bg: '#EFF6FF' },
+    REGULAR_QUOTA:   { label: 'Cotisation',  icon: '📅', color: '#059669', bg: '#ECFDF5' },
+    MEMBERSHIP_CARD: { label: 'Carte membre', icon: '💳', color: '#2563EB', bg: '#EFF6FF' },
     DONATION:        { label: 'Don libre',             icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
   };
   return purpose ? (map[purpose] ?? null) : null;
@@ -105,14 +105,8 @@ function getMethodLabel(method?: string | null) {
 function StatusBadge({ status }: { status: string }) {
   const s = getStatusConfig(status);
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: '0.28rem',
-      fontSize: '0.7rem', fontWeight: 800,
-      color: s.color, background: s.bg,
-      border: `1px solid ${s.border}`,
-      borderRadius: 99, padding: '0.18rem 0.6rem', whiteSpace: 'nowrap',
-    }}>
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+    <span className="mb-status-badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>
+      <span className="mb-status-dot" style={{ background: s.color }} />
       {s.label}
     </span>
   );
@@ -121,10 +115,7 @@ function StatusBadge({ status }: { status: string }) {
 function EmptyRow({ cols, label }: { cols: number; label: string }) {
   return (
     <tr>
-      <td colSpan={cols} style={{
-        textAlign: 'center', padding: '1.75rem 1rem',
-        color: '#6B7280', fontSize: '0.8rem', fontWeight: 500,
-      }}>
+      <td colSpan={cols} style={{ textAlign: 'center', padding: '1.75rem 1rem', color: '#6B7280', fontSize: '0.8rem', fontWeight: 500 }}>
         {label}
       </td>
     </tr>
@@ -138,142 +129,13 @@ function ContributionDetailModal({
   currency,
   onClose,
 }: {
-  item: ExtendedContribution;  // ✅ ExtendedContribution au lieu de Contribution
+  item: ExtendedContribution;
   currency: string;
   onClose: () => void;
 }) {
-  const purposeCfg = getPurposeConfig(item.purpose);  // ✅ plus de (as any)
+  const purposeCfg = getPurposeConfig(item.purpose);
   const statusCfg = getStatusConfig(item.status);
 
-  return (
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 300,
-        background: 'rgba(0,0,0,0.45)',
-        backdropFilter: 'blur(4px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '1.25rem',
-        animation: 'mbin2 0.2s ease',
-      }}
-      onClick={onClose}
-    >
-      <div
-        style={{
-          width: '100%', maxWidth: 420,
-          background: '#fff', borderRadius: 22,
-          padding: '0 0 1.5rem',
-          maxHeight: '88vh', overflowY: 'auto',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
-          animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)',
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div style={{
-          padding: '1rem 1.25rem 0.75rem',
-          borderBottom: '1px solid #F3F4F6',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.25rem', fontWeight: 500, color: '#111827' }}>
-            Détail du versement
-          </span>
-          <button
-            onClick={onClose}
-            style={{
-              width: 32, height: 32, borderRadius: '50%',
-              background: '#F3F4F6', border: 'none', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280',
-            }}
-          >
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
-
-        {/* Amount */}
-        <div style={{ padding: '1.25rem 1.25rem 0', display: 'flex', alignItems: 'baseline', gap: '0.65rem', flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 600, color: '#111827' }}>
-            {formatCurrency(item.amount, item.currency || currency)}  {/* ✅ plus de (as any) */}
-          </span>
-          <StatusBadge status={item.status} />
-        </div>
-
-        {/* Rows */}
-        <div style={{ padding: '0.5rem 1.25rem 0', display: 'flex', flexDirection: 'column' }}>
-          {[
-            purposeCfg && {
-              label: 'Motif',
-              content: (
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                  fontSize: '0.78rem', fontWeight: 600,
-                  padding: '0.25rem 0.65rem', borderRadius: 99,
-                  background: purposeCfg.bg, color: purposeCfg.color,
-                }}>
-                  {purposeCfg.icon} {purposeCfg.label}
-                </span>
-              ),
-            },
-            {
-              label: 'Méthode',
-              content: <span style={{ fontSize: '0.83rem', color: '#1F2937', fontWeight: 500 }}>{getMethodLabel(item.method)}</span>,
-            },
-            {
-              label: 'Date du dépôt',
-              content: <span style={{ fontSize: '0.83rem', color: '#1F2937', fontWeight: 500 }}>{formatDate(item.depositedAt || item.createdAt)}</span>,
-            },
-            {
-              label: 'Validation',
-              content: (
-                <span style={{ fontSize: '0.83rem', fontWeight: 500, color: item.validatedAt ? '#1F2937' : '#9CA3AF' }}>
-                  {item.validatedAt ? formatDate(item.validatedAt) : 'En attente'}  {/* ✅ plus de (as any) */}
-                </span>
-              ),
-            },
-            item.note && {  // ✅ plus de (as any)
-              label: 'Commentaire',
-              content: (
-                <span style={{
-                  fontSize: '0.8rem', color: '#374151', fontStyle: 'italic',
-                  background: '#F9FAFB', border: '1px solid #E5E7EB',
-                  borderRadius: 10, padding: '0.5rem 0.75rem', display: 'block',
-                  lineHeight: 1.55, textAlign: 'left',
-                }}>
-                  &ldquo;{item.note}&rdquo;
-                </span>
-              ),
-            },
-            {
-              label: 'Statut',
-              content: <span style={{ fontSize: '0.83rem', fontWeight: 700, color: statusCfg.color }}>{statusCfg.label}</span>,
-            },
-          ].filter(Boolean).map((row, i) => {
-            const r = row as { label: string; content: React.ReactNode };
-            return (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-                padding: '0.72rem 0', borderBottom: '1px solid #F9FAFB', gap: '1rem',
-              }}>
-                <span style={{
-                  fontSize: '0.71rem', fontWeight: 700, letterSpacing: '0.07em',
-                  textTransform: 'uppercase', color: '#9CA3AF', flexShrink: 0, paddingTop: 2,
-                }}>
-                  {r.label}
-                </span>
-                <div style={{ textAlign: 'right' }}>{r.content}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Balance Modal ───────────────────────────────────────────────────────────
-
-function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; onClose: () => void }) {
   return (
     <div
       style={{
@@ -286,48 +148,262 @@ function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; on
     >
       <div
         style={{
-          width: '100%', maxWidth: 420, background: '#fff', borderRadius: 22,
-          padding: '1.5rem', boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
+          width: '100%', maxWidth: 420,
+          background: '#fff', borderRadius: 22,
+          padding: '0 0 1.5rem', maxHeight: '88vh', overflowY: 'auto',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.18)',
           animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)',
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 600, color: '#111827', margin: 0 }}>
-            Solde de l&apos;association
-          </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <div style={{ padding: '1rem 1.25rem 0.75rem', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.25rem', fontWeight: 500, color: '#111827' }}>
+            Détail du versement
+          </span>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: '#F3F4F6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280' }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
           </button>
         </div>
+
+        <div style={{ padding: '1.25rem 1.25rem 0', display: 'flex', alignItems: 'baseline', gap: '0.65rem', flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 600, color: '#111827' }}>
+            {formatCurrency(item.amount, item.currency || currency)}
+          </span>
+          <StatusBadge status={item.status} />
+        </div>
+
+        <div style={{ padding: '0.5rem 1.25rem 0', display: 'flex', flexDirection: 'column' }}>
+          {[
+            purposeCfg && {
+              label: 'Motif',
+              content: (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', fontWeight: 600, padding: '0.25rem 0.65rem', borderRadius: 99, background: purposeCfg.bg, color: purposeCfg.color }}>
+                  {purposeCfg.icon} {purposeCfg.label}
+                </span>
+              ),
+            },
+            { label: 'Méthode', content: <span style={{ fontSize: '0.83rem', color: '#1F2937', fontWeight: 500 }}>{getMethodLabel(item.method)}</span> },
+            { label: 'Date du dépôt', content: <span style={{ fontSize: '0.83rem', color: '#1F2937', fontWeight: 500 }}>{formatDate(item.depositedAt || item.createdAt)}</span> },
+            { label: 'Validation', content: <span style={{ fontSize: '0.83rem', fontWeight: 500, color: item.validatedAt ? '#1F2937' : '#9CA3AF' }}>{item.validatedAt ? formatDate(item.validatedAt) : 'En attente'}</span> },
+            item.note && {
+              label: 'Commentaire',
+              content: (
+                <span style={{ fontSize: '0.8rem', color: '#374151', fontStyle: 'italic', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: 10, padding: '0.5rem 0.75rem', display: 'block', lineHeight: 1.55, textAlign: 'left' }}>
+                  &ldquo;{item.note}&rdquo;
+                </span>
+              ),
+            },
+            { label: 'Statut', content: <span style={{ fontSize: '0.83rem', fontWeight: 700, color: statusCfg.color }}>{statusCfg.label}</span> },
+          ].filter(Boolean).map((row, i) => {
+            const r = row as { label: string; content: React.ReactNode };
+            return (
+              <div key={i} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', padding: '0.72rem 0', borderBottom: '1px solid #F9FAFB', gap: '1rem' }}>
+                <span style={{ fontSize: '0.71rem', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: '#9CA3AF', flexShrink: 0, paddingTop: 2 }}>{r.label}</span>
+                <div style={{ textAlign: 'right' }}>{r.content}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Currency Balances Modal ─────────────────────────────────────────────────
+
+function CurrencyBalancesModal({
+  currency, balances, onClose,
+}: {
+  currency: string;
+  balances?: { id: string; name: string; balance: number; currency: string }[];
+  onClose: () => void;
+}) {
+  const label = FIXED_CURRENCIES_MEMBER.find(c => c.cur === currency)?.label ?? `Soldes — ${currency}`;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 460, background: '#fff', borderRadius: 22, padding: '1.5rem', maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 60px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.35rem', fontWeight: 700, color: '#111827', margin: 0 }}>{label}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+            <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+          {!balances || balances.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.85rem' }}>
+              <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏦</div>
+              Aucune antenne n&apos;utilise cette devise pour le moment.
+            </div>
+          ) : balances.map(b => (
+            <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.85rem 1rem', background: '#F9FAFB', borderRadius: 12, border: '1px solid #F3F4F6' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#374151' }}>{b.name}</div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1rem', fontWeight: 800, color: '#2563EB' }}>{formatCurrency(b.balance, b.currency)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; onClose: () => void }) {
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', animation: 'mbin2 0.2s ease' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 22, padding: '1.5rem', boxShadow: '0 24px 60px rgba(0,0,0,0.18)', animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 600, color: '#111827', margin: 0 }}>Solde de l&apos;association</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
         {!summary ? (
-          <div style={{ textAlign: 'center', padding: '1.5rem', color: '#9CA3AF', fontSize: '0.85rem' }}>
-            Données non disponibles
-          </div>
+          <div style={{ textAlign: 'center', padding: '1.5rem', color: '#9CA3AF', fontSize: '0.85rem' }}>Données non disponibles</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            <div style={{
-              background: '#F0FDF4', border: '1px solid #BBF7D0',
-              borderRadius: 16, padding: '1.25rem 1.5rem',
-              display: 'flex', flexDirection: 'column', gap: '0.3rem',
-            }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669' }}>
-                Total validé
-              </span>
-              <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 700, color: '#111827' }}>
-                {formatCurrency(summary.totalValidatedContributionsAmount, summary.currency)}
-              </span>
+            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 16, padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669' }}>Total validé</span>
+              <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 700, color: '#111827' }}>{formatCurrency(summary.totalValidatedContributionsAmount, summary.currency)}</span>
               <span style={{ fontSize: '0.74rem', color: '#6B7280' }}>{summary.associationName}</span>
             </div>
             {summary.lastUpdatedAt && (
-              <p style={{ fontSize: '0.72rem', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>
-                Dernière mise à jour : {formatDate(summary.lastUpdatedAt)}
-              </p>
+              <p style={{ fontSize: '0.72rem', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>Dernière mise à jour : {formatDate(summary.lastUpdatedAt)}</p>
             )}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// 4 devises fixes
+const FIXED_CURRENCIES_MEMBER = [
+  { cur: 'GNF', label: 'Solde antennes (GNF)',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  { cur: 'EUR', label: 'Solde antennes (Euro)',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  { cur: 'USD', label: 'Solde antennes (Dollar)',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  { cur: 'XOF', label: 'Solde antennes (XOF)',     color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+];
+
+// ─── Project Detail Modal (membre) ──────────────────────────────────────────
+
+function ProjectDetailModal({ project, onClose }: { project: Project; onClose: () => void }) {
+  const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string; bar: string }> = {
+    IN_PROGRESS: { label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', bar: '#3B82F6' },
+    APPROVED:    { label: 'Approuvé',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', bar: '#10B981' },
+    COMPLETED:   { label: 'Terminé',   color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', bar: '#8B5CF6' },
+    SUSPENDED:   { label: 'Suspendu',  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', bar: '#F59E0B' },
+    CANCELLED:   { label: 'Annulé',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', bar: '#EF4444' },
+    DRAFT:       { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
+  };
+  const cfg = STATUS_CFG[project.status] ?? STATUS_CFG['DRAFT'];
+  const planned = (project as unknown as { budgetPlanned?: number | null }).budgetPlanned ?? (project as unknown as { budgetAmount?: number | null }).budgetAmount ?? 0;
+  const spent   = (project as unknown as { budgetSpent?: number | null }).budgetSpent   ?? (project as unknown as { amountSpent?: number | null }).amountSpent   ?? 0;
+  const pct     = planned > 0 ? Math.min(((spent) / planned) * 100, 100) : 0;
+  const over    = spent > planned && planned > 0;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 500, background: '#fff', borderRadius: 24, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 72px rgba(0,0,0,0.18)', animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ height: 4, background: cfg.bar, borderRadius: '24px 24px 0 0' }} />
+        <div style={{ padding: '1.1rem 1.3rem 0.8rem', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.22rem', fontSize: '0.62rem', fontWeight: 700, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 99, padding: '0.18rem 0.5rem', marginBottom: '0.45rem' }}>
+              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
+            </span>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.35rem', fontWeight: 600, color: '#111827', margin: 0, lineHeight: 1.25 }}>{project.title}</h2>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: '#F3F4F6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280', flexShrink: 0 }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div style={{ padding: '0 1.3rem 1.5rem', overflowY: 'auto', maxHeight: 'calc(90vh - 110px)' }}>
+          {project.description && (
+            <div style={{ margin: '1rem 0 0', padding: '0.85rem 1rem', background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.4rem' }}>Description</div>
+              <p style={{ fontSize: '0.83rem', color: '#374151', lineHeight: 1.65, margin: 0 }}>{project.description}</p>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.75rem' }}>
+            {[
+              { label: 'Début', value: (project as unknown as { startsAt?: string | null }).startsAt ? formatDate((project as unknown as { startsAt: string }).startsAt) : '—' },
+              { label: 'Fin prévue', value: (project as unknown as { endsAt?: string | null }).endsAt ? formatDate((project as unknown as { endsAt: string }).endsAt) : '—' },
+              { label: 'Budget prévu', value: planned > 0 ? formatCurrency(planned) : '—' },
+              { label: 'Budget dépensé', value: spent > 0 ? formatCurrency(spent) : '—', urgent: over },
+            ].map(row => (
+              <div key={row.label} style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
+                <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>{row.label}</div>
+                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.05rem', fontWeight: 700, color: row.urgent ? '#DC2626' : '#111827' }}>{row.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {planned > 0 && (
+            <div style={{ marginTop: '0.65rem', background: '#F8FAFC', borderRadius: 12, padding: '0.85rem 1rem', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+                <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Avancement budgétaire</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: over ? '#DC2626' : pct > 80 ? '#D97706' : '#059669' }}>{Math.round(pct)}%{over ? ' ⚠' : ''}</span>
+              </div>
+              <div style={{ height: 7, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, borderRadius: 99, background: over ? 'linear-gradient(90deg,#F97316,#DC2626)' : pct > 80 ? '#F59E0B' : 'linear-gradient(90deg,#3B82F6,#6366F1)', transition: 'width 0.9s cubic-bezier(.22,1,.36,1)' }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.65rem' }}>
+            <div style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Créé le</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate(project.createdAt)}</div>
+            </div>
+            <div style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Mis à jour</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate(project.updatedAt)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Content Detail Modal (membre) ───────────────────────────────────────────
+
+function ContentDetailModal({ content, onClose }: { content: ContentPost; onClose: () => void }) {
+  const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    PUBLISHED: { label: 'Publié',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    DRAFT:     { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    ARCHIVED:  { label: 'Archivé',   color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  };
+  const cfg = STATUS_CFG[content.status] ?? STATUS_CFG['PUBLISHED'];
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 520, background: '#fff', borderRadius: 24, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 72px rgba(0,0,0,0.18)', animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ height: 4, background: 'linear-gradient(90deg,#059669,#10B981)', borderRadius: '24px 24px 0 0' }} />
+        <div style={{ padding: '1.1rem 1.3rem 0.8rem', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.22rem', fontSize: '0.62rem', fontWeight: 700, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 99, padding: '0.18rem 0.5rem', marginBottom: '0.45rem' }}>
+              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
+            </span>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.35rem', fontWeight: 600, color: '#111827', margin: 0, lineHeight: 1.25 }}>{content.title}</h2>
+            <div style={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 500, marginTop: '0.35rem' }}>Publié le {formatDate(content.createdAt)}</div>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: '#F3F4F6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280', flexShrink: 0 }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div style={{ padding: '1.1rem 1.3rem 1.5rem' }}>
+          {content.body ? (
+            <div style={{ fontSize: '0.88rem', color: '#374151', lineHeight: 1.75, whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', sans-serif" }}>{content.body}</div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.85rem' }}><div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📄</div>Aucun contenu disponible pour le moment.</div>
+          )}
+          {content.updatedAt && content.updatedAt !== content.createdAt && (
+            <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #F3F4F6', fontSize: '0.7rem', color: '#CBD5E1', textAlign: 'right' }}>Dernière mise à jour : {formatDate(content.updatedAt)}</div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -342,11 +418,11 @@ export default function MemberHomePage() {
   const [error, setError] = useState<string | null>(null);
   const [isCardVisible, setIsCardVisible] = useState(false);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
+  const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<ExtendedContribution | null>(null);
 
-  // ✅ FIX react-hooks/set-state-in-effect :
-  // La fonction async est définie et appelée DIRECTEMENT dans useEffect
-  // (pas de useCallback intermédiaire — ESLint n'accepte pas void fn() externe)
   useEffect(() => {
     const fetchAll = async () => {
       try {
@@ -364,25 +440,15 @@ export default function MemberHomePage() {
           }
           setData(res as DashboardData);
         } else {
-          setError(
-            dashRes.reason instanceof Error
-              ? dashRes.reason.message
-              : 'Erreur chargement dashboard'
-          );
+          setError(dashRes.reason instanceof Error ? dashRes.reason.message : 'Erreur chargement dashboard');
         }
 
-        if (balanceRes.status === 'fulfilled') {
-          setBalanceSummary(balanceRes.value as BalanceSummary);
-        }
-
-        if (contribRes.status === 'fulfilled') {
-          setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]);
-        }
+        if (balanceRes.status === 'fulfilled') { setBalanceSummary(balanceRes.value as BalanceSummary); }
+        if (contribRes.status === 'fulfilled') { setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]); }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur inattendue');
       }
     };
-
     void fetchAll();
   }, []);
 
@@ -390,118 +456,35 @@ export default function MemberHomePage() {
   const cur = data?.stats?.currency || balanceSummary?.currency || 'EUR';
   const lateMonths = data?.stats?.lateMonths ?? 0;
 
-  const assocBalance =
-    balanceSummary?.totalValidatedContributionsAmount ??
-    data?.stats?.associationTotalBalance ??
-    0;
+  const recentContribs: ExtendedContribution[] = myContributions.length > 0 ? myContributions : (data?.recentContributions ?? []) as ExtendedContribution[];
+  const totalCotise = data?.stats?.myContributionsTotal ?? data?.stats?.myTotalContributions ?? recentContribs.reduce((s, c) => s + (c.amount ?? 0), 0);
+  const totalValide = data?.stats?.myContributionsValidatedTotal ?? recentContribs.filter(c => c.status === 'VALIDATED').reduce((s, c) => s + (c.amount ?? 0), 0);
+  const pendingCount = data?.stats?.myPendingContributionsCount ?? recentContribs.filter(c => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION').length;
+  const lastContribDate = data?.stats?.myLastContributionAt ?? (recentContribs.length > 0 ? recentContribs[0].depositedAt || recentContribs[0].createdAt : null);
 
-  // Cotisations récentes : appel dédié > dashboard
-  const recentContribs: ExtendedContribution[] = myContributions.length > 0
-    ? myContributions
-    : (data?.recentContributions ?? []) as ExtendedContribution[];
+  type StatCard = { label: string; value: string | number; icon: React.ReactNode; color: string; bg: string; sub: string; spanClass: string; urgent?: boolean; clickable?: boolean; onClick?: () => void; };
 
-  const totalCotise =
-    data?.stats?.myContributionsTotal ??
-    data?.stats?.myTotalContributions ??
-    recentContribs.reduce((s, c) => s + (c.amount ?? 0), 0);
-
-  const totalValide =
-    data?.stats?.myContributionsValidatedTotal ??
-    recentContribs
-      .filter(c => c.status === 'VALIDATED')
-      .reduce((s, c) => s + (c.amount ?? 0), 0);
-
-  const pendingCount =
-    data?.stats?.myPendingContributionsCount ??
-    recentContribs.filter(c =>
-      c.status === 'PENDING' || c.status === 'PENDING_VALIDATION'
-    ).length;
-
-  const lastContribDate =
-    data?.stats?.myLastContributionAt ??
-    (recentContribs.length > 0
-      ? recentContribs[0].depositedAt || recentContribs[0].createdAt
-      : null);
-
-  type StatCard = {
-    label: string;
-    value: string | number;
-    icon: React.ReactNode;
-    color: string;
-    bg: string;
-    sub: string;
-    spanClass: string;
-    urgent?: boolean;
-    clickable?: boolean;
-    onClick?: () => void;
-  };
+  const mbCurrencyGroups = useMemo(() => {
+    if (!data?.antennaBalances) return {} as Record<string, { total: number; antennas: { id: string; name: string; balance: number; currency: string }[] }>;
+    return data.antennaBalances.reduce<Record<string, { total: number; antennas: { id: string; name: string; balance: number; currency: string }[] }>>((acc, curr) => {
+      const c = curr.currency || 'EUR';
+      if (!acc[c]) acc[c] = { total: 0, antennas: [] };
+      acc[c].total += curr.balance;
+      acc[c].antennas.push(curr);
+      return acc;
+    }, {});
+  }, [data]);
 
   const stats: StatCard[] = data ? [
-    {
-      label: 'Total cotisé',
-      value: formatCurrency(totalCotise, cur),
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-      ),
-      color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé', spanClass: 'mb-span-1',
-    },
-    {
-      label: 'Cotisations validées',
-      value: formatCurrency(totalValide, cur),
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/>
-        </svg>
-      ),
-      color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin", spanClass: 'mb-span-1',
-    },
-    {
-      label: 'En attente',
-      value: pendingCount,
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-        </svg>
-      ),
-      color: '#D97706', bg: '#FFFBEB', sub: 'Dépôts à valider',
-      urgent: pendingCount > 0, spanClass: 'mb-span-1',
-    },
-    {
-      label: 'Solde association',
-      value: formatCurrency(assocBalance, cur),
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
-        </svg>
-      ),
-      color: '#7C3AED', bg: '#F5F3FF', sub: 'Fonds collectifs',
-      clickable: true, onClick: () => setShowBalanceModal(true), spanClass: 'mb-span-1',
-    },
-    {
-      label: 'Retard',
-      value: `${lateMonths} mois`,
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-        </svg>
-      ),
-      color: lateMonths > 0 ? '#DC2626' : '#059669',
-      bg: lateMonths > 0 ? '#FEF2F2' : '#ECFDF5',
-      sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !',
-      urgent: lateMonths > 2, spanClass: 'mb-span-1',
-    },
-    {
-      label: 'Dernière cotisation',
-      value: formatDate(lastContribDate),
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-        </svg>
-      ),
-      color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement', spanClass: 'mb-span-1',
-    },
+    { label: 'Total cotisé', value: formatCurrency(totalCotise, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé', spanClass: 'mb-span-1' },
+    { label: 'Cotisations validées', value: formatCurrency(totalValide, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>, color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin", spanClass: 'mb-span-1' },
+    { label: 'En attente', value: pendingCount, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, color: '#D97706', bg: '#FFFBEB', sub: 'Dépôts à valider', urgent: pendingCount > 0, spanClass: 'mb-span-1' },
+    ...FIXED_CURRENCIES_MEMBER.map(({ cur: fc, label, color, bg }) => {
+      const grp = mbCurrencyGroups[fc] ?? { total: 0, antennas: [] };
+      return { label, value: formatCurrency(grp.total, fc), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>, color, bg, sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails', clickable: true, onClick: () => setSelectedCurrency(fc), spanClass: 'mb-span-1' };
+    }),
+    { label: 'Retard', value: `${lateMonths} mois`, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>, color: lateMonths > 0 ? '#DC2626' : '#059669', bg: lateMonths > 0 ? '#FEF2F2' : '#ECFDF5', sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !', urgent: lateMonths > 2, spanClass: 'mb-span-1' },
+    { label: 'Dernière cotisation', value: formatDate(lastContribDate), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>, color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement', spanClass: 'mb-span-1' },
   ] : [];
 
   return (
@@ -739,6 +722,32 @@ export default function MemberHomePage() {
           border: 3px solid rgba(37,99,235,0.1); border-top-color: #2563EB;
           border-radius: 50%; animation: mbspin 0.8s linear infinite;
         }
+
+        /* ── Classes pour les badges ── */
+        .mb-status-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.7rem; font-weight: 800; border-radius: 99px; padding: 0.18rem 0.6rem; white-space: nowrap; }
+        .mb-status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        
+        .mb-motif-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.68rem; font-weight: 600; border-radius: 99px; padding: 0.18rem 0.55rem; white-space: nowrap; max-width: 100%; }
+        .mb-motif-icon { flex-shrink: 0; }
+        .mb-motif-text { overflow: hidden; text-overflow: ellipsis; }
+
+        .truncate-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* ── Compression Mobile (3 colonnes, sans scroll) ── */
+        @media (max-width: 768px) {
+          .hide-mobile { display: none !important; }
+          .mb-table th { padding: 0.6rem 0.4rem; font-size: 0.6rem; letter-spacing: 0; }
+          .mb-table td { padding: 0.7rem 0.4rem; font-size: 0.75rem; } 
+          .mb-table td.mono { font-size: 0.85rem; }
+          .mb-panel-head { padding: 1rem; }
+          
+          /* Tronquer doucement pour garder 3 colonnes propres */
+          .truncate-cell { max-width: 120px; }
+          
+          /* Ajustement léger des badges (moins extrême qu'avec 4 colonnes) */
+          .mb-status-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
+          .mb-motif-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
+        }
       `}</style>
 
       {!data && !error && (
@@ -814,14 +823,18 @@ export default function MemberHomePage() {
               </div>
               <table className="mb-table">
                 <thead>
-                  <tr><th>Montant</th><th>Motif</th><th>Statut</th><th>Date</th></tr>
+                  <tr>
+                    <th style={{ textAlign: 'center' }}>Montant</th>
+                    <th style={{ textAlign: 'center' }}>Motif</th>
+                    <th style={{ textAlign: 'center' }}>Statut</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {recentContribs.length === 0 && (
-                    <EmptyRow cols={4} label="Aucune cotisation enregistrée"/>
+                    <EmptyRow cols={3} label="Aucune cotisation enregistrée"/>
                   )}
                   {recentContribs.map(c => {
-                    const pc = getPurposeConfig(c.purpose);  // ✅ plus de (as any)
+                    const pc = getPurposeConfig(c.purpose);
                     return (
                       <tr
                         key={c.id}
@@ -829,21 +842,21 @@ export default function MemberHomePage() {
                         onClick={() => setSelectedContribution(c)}
                         title="Voir le détail"
                       >
-                        <td className="mono">{formatCurrency(c.amount, c.currency || cur)}</td>
-                        <td>
+                        <td className="mono" style={{ textAlign: 'center' }}>{formatCurrency(c.amount, c.currency || cur)}</td>
+                        <td style={{ textAlign: 'center' }}>
                           {pc ? (
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '0.28rem',
-                              fontSize: '0.7rem', fontWeight: 600,
-                              background: pc.bg, color: pc.color,
-                              padding: '0.15rem 0.5rem', borderRadius: 99,
-                            }}>
-                              {pc.icon} {pc.label.split(' ')[0]}
+                            <span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}>
+                              <span className="mb-motif-icon">{pc.icon}</span> 
+                              <span className="mb-motif-text">{pc.label}</span>
                             </span>
-                          ) : <span className="muted">—</span>}
+                          ) : (
+                            <span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}>
+                              <span className="mb-motif-icon">📅</span> 
+                              <span className="mb-motif-text">Cotisation</span>
+                            </span>
+                          )}
                         </td>
-                        <td><StatusBadge status={c.status}/></td>
-                        <td className="muted">{formatDate(c.depositedAt || c.createdAt)}</td>
+                        <td style={{ textAlign: 'center' }}><StatusBadge status={c.status}/></td>
                       </tr>
                     );
                   })}
@@ -856,7 +869,7 @@ export default function MemberHomePage() {
                 <div className="mb-panel-title">
                   <div className="mb-panel-ico" style={{ background: '#F5F3FF', color: '#7C3AED' }}>
                     <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2"/>
                     </svg>
                   </div>
                   Projets en cours
@@ -868,14 +881,25 @@ export default function MemberHomePage() {
                 )}
               </div>
               <table className="mb-table">
-                <thead><tr><th>Projet</th><th>Statut</th><th>Date</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Projet</th>
+                    <th>Statut</th>
+                    <th className="hide-mobile">Date</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {(data.projectsInProgress || []).length === 0 && <EmptyRow cols={3} label="Aucun projet actif"/>}
                   {(data.projectsInProgress || []).map(p => (
-                    <tr key={p.id}>
-                      <td style={{ fontWeight: 700, color: '#111827' }}>{p.title}</td>
+                    <tr
+                      key={p.id}
+                      className="mb-contrib-row"
+                      onClick={() => setSelectedProject(p)}
+                      title="Voir les détails"
+                    >
+                      <td className="truncate-cell" style={{ fontWeight: 700, color: '#111827' }}>{p.title}</td>
                       <td><StatusBadge status={p.status}/></td>
-                      <td className="muted">{formatDate(p.createdAt)}</td>
+                      <td className="muted hide-mobile">{formatDate(p.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -897,16 +921,27 @@ export default function MemberHomePage() {
                 </div>
               </div>
               <table className="mb-table">
-                <thead><tr><th>Titre</th><th>Statut</th><th>Date</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Titre</th>
+                    <th>Statut</th>
+                    <th className="hide-mobile">Date</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {(data.latestContents || []).length === 0 && <EmptyRow cols={3} label="Aucune actualité publiée"/>}
                   {(data.latestContents || []).map(c => (
-                    <tr key={c.id}>
-                      <td style={{ fontWeight: 700, color: '#111827', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <tr
+                      key={c.id}
+                      className="mb-contrib-row"
+                      onClick={() => setSelectedContent(c)}
+                      title="Lire l'article"
+                    >
+                      <td className="truncate-cell" style={{ fontWeight: 700, color: '#111827' }}>
                         {c.title}
                       </td>
                       <td><StatusBadge status={c.status}/></td>
-                      <td className="muted">{formatDate(c.createdAt)}</td>
+                      <td className="muted hide-mobile">{formatDate(c.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -940,7 +975,7 @@ export default function MemberHomePage() {
                         <td>
                           <div className="mb-member-pill">
                             <div className="mb-avatar-sm">{(m.firstName[0] ?? '') + (m.lastName[0] ?? '')}</div>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>{m.firstName} {m.lastName}</span>
+                            <span className="truncate-cell" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>{m.firstName} {m.lastName}</span>
                           </div>
                         </td>
                         <td>
@@ -997,6 +1032,28 @@ export default function MemberHomePage() {
         <BalanceModal
           summary={balanceSummary}
           onClose={() => setShowBalanceModal(false)}
+        />
+      )}
+
+      {selectedCurrency && (
+        <CurrencyBalancesModal
+          currency={selectedCurrency}
+          balances={mbCurrencyGroups[selectedCurrency]?.antennas}
+          onClose={() => setSelectedCurrency(null)}
+        />
+      )}
+
+      {selectedProject && (
+        <ProjectDetailModal
+          project={selectedProject}
+          onClose={() => setSelectedProject(null)}
+        />
+      )}
+
+      {selectedContent && (
+        <ContentDetailModal
+          content={selectedContent}
+          onClose={() => setSelectedContent(null)}
         />
       )}
     </AppShell>

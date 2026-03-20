@@ -29,7 +29,6 @@ export class SuperAdminController {
   constructor(private readonly service: SuperAdminService) {}
 
   /* ── GESTION DES PRIX (PRICING) ── */
-/* ── GESTION DES PRIX (PRICING) ── */
   @Get('settings/pricing')
   getPricing(@CurrentUser() actor: AuthUser) {
     return this.service.getPricingConfig(actor.associationId);
@@ -164,9 +163,19 @@ export class SuperAdminController {
     return this.service.deleteProject(id);
   }
 
+  @Post('documents')
+  createDocument(@Body() body: { title: string; description?: string; fileAssetId: string }, @CurrentUser() actor: AuthUser) {
+    return this.service.createDocument(body, actor.id, actor.associationId);
+  }
+
   @Get('documents')
   listDocuments(@Query() query: PaginationQueryDto) {
     return this.service.listDocuments(query.page, query.pageSize, query.q);
+  }
+
+  @Delete('documents/:id')
+  deleteDocument(@Param('id') id: string) {
+    return this.service.deleteDocument(id);
   }
 
   @Get('contributions')

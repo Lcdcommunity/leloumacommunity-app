@@ -88,11 +88,18 @@ export default function SuperAdminDocumentsPage() {
     if (!file) return;
     setUploading(true); setError(null); setUploadMsg(null);
     try {
-      await api.uploadFile(file, {
-        category: 'DOCUMENT',
+      // 👇 FIX CHIRURGICAL : Bonne catégorie + Enregistrement de l'entité
+      const uploaded = await api.uploadFile(file, {
+        category: 'ASSOCIATION_DOCUMENT',
         folder: 'association-docs',
         description: 'Upload super admin',
       });
+
+      await api.createSuperAdminDocument({
+        title: file.name,
+        fileAssetId: uploaded.id,
+      });
+
       setUploadMsg(`\u00ab\u00a0${file.name}\u00a0\u00bb upload\u00e9 avec succ\u00e8s.`);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await load(q);
@@ -257,7 +264,6 @@ export default function SuperAdminDocumentsPage() {
               }
             </label>
           </div>
-
           {/* Upload success */}
           {uploadMsg && (
             <div className="sd-upload-success">
