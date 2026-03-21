@@ -1,4 +1,4 @@
-//web/types/user.ts
+// web/types/user.ts
 export type UserRole = 'SUPER_ADMIN' | 'ANTENNA_ADMIN' | 'MEMBER';
 
 export type UserStatus =
@@ -6,7 +6,8 @@ export type UserStatus =
   | 'PENDING_APPROVAL'
   | 'ACTIVE'
   | 'SUSPENDED'
-  | 'REJECTED';
+  | 'REJECTED'
+  | 'DELETED';
 
 export interface UserSummary {
   id: string;
@@ -21,6 +22,15 @@ export interface UserSummary {
   emailVerifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  
+  // 👇 On rajoute officiellement les champs de localisation ici
+  city?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  originSubPrefecture?: string | null;
+  originVillage?: string | null;
 }
 
 export interface CurrentUser extends UserSummary {

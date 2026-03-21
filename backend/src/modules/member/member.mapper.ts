@@ -18,6 +18,9 @@ export const memberMapper = {
       country: u.country ?? null,
       addressLine1: u.addressLine1 ?? null,
       addressLine2: u.addressLine2 ?? null,
+      postalCode: u.postalCode ?? null,                   // <-- Ajouté
+      originSubPrefecture: u.originSubPrefecture ?? null, // <-- Ajouté
+      originVillage: u.originVillage ?? null,             // <-- Ajouté
       createdAt: u.createdAt?.toISOString?.() ?? u.createdAt,
       updatedAt: u.updatedAt?.toISOString?.() ?? u.updatedAt,
     };
@@ -44,7 +47,6 @@ export const memberMapper = {
       title: p.title,
       description: p.description ?? null,
       status: p.status,
-      // 👇 CORRECTION : On lit les bonnes propriétés Prisma (budgetAmount, amountSpent, startDate, endDate)
       budgetPlanned: p.budgetAmount != null ? Number(p.budgetAmount) : null,
       budgetSpent: p.amountSpent != null ? Number(p.amountSpent) : null,
       startsAt: p.startDate?.toISOString?.() ?? p.startDate ?? null,

@@ -16,30 +16,60 @@ type PublicAntenna = {
 
 const STEPS = ['Identité', 'Contact', 'Photo', 'Sécurité'];
 
+// ── Liste des rôles au sein de l'association ──
+export const ASSOCIATION_ROLES = [
+  'Membre (simple)',
+  "Secrétaire à l'organisation",
+  'Secrétaire Général(e)',
+  'Trésorier / Trésorière',
+  'Président(e)',
+  'Vice-président(e)',
+  'Chargé(e) de communication',
+  'Conseiller / Conseillère',
+  'Autre'
+];
+
 export default function MemberSignupPage() {
   const [antennas, setAntennas] = useState<PublicAntenna[]>([]);
   const [loadingAntennas, setLoadingAntennas] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(0);
 
+  // ── Étape 0 : Identité ──
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [antennaId, setAntennaId] = useState('');
 
+  // ── Étape 1 : Contact & Origine ──
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+
+  // Origine
+  const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  const [originVillage, setOriginVillage] = useState('');
+
+  // Naissance
+  const [birthDate, setBirthDate] = useState('');
+  const [placeOfBirth, setPlaceOfBirth] = useState('');
+  const [birthCountry, setBirthCountry] = useState('');
+
+  // Résidence
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
-  const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
 
-  // Photo
+  // Profession / Rôle
+  const [profession, setProfession] = useState('');
+
+  // ── Étape 2 : Photo ──
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Étape 3 : Sécurité ──
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -141,13 +171,22 @@ export default function MemberSignupPage() {
         phone: phone || undefined,
         password,
         antennaId,
+        // Origine
+        originSubPrefecture: originSubPrefecture.trim(),
+        originVillage: originVillage || undefined,
+        // Naissance
+        birthDate: birthDate || undefined,
+        placeOfBirth: placeOfBirth || undefined,
+        birthCountry: birthCountry || undefined,
+        // Résidence
         city: city || undefined,
         country: country || undefined,
+        postalCode: postalCode || undefined,
         addressLine1: addressLine1 || undefined,
         addressLine2: addressLine2 || undefined,
-        originSubPrefecture: originSubPrefecture.trim(),
+        // Rôle/Profession
+        function: profession || undefined,
       });
-      // Upload photo separately if provided (best-effort, non-blocking)
       if (selectedPhotoFile) {
         try { await api.uploadProfilePhoto(selectedPhotoFile); } catch { /* ignore */ }
       }
@@ -453,10 +492,7 @@ export default function MemberSignupPage() {
         .sp-panel { animation: fadeup 0.35s cubic-bezier(.22,1,.36,1); }
         @keyframes fadeup { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 
-        /* ══════════════════════════════
-           PHOTO STEP — harmonisé profil
-        ══════════════════════════════ */
-
+        /* ── Photo step ── */
         .sp-photo-avatar {
           width: 96px; height: 96px; border-radius: 50%; margin: 0 auto 1rem;
           background: linear-gradient(135deg, var(--g-deep), var(--g-mid));
@@ -467,18 +503,13 @@ export default function MemberSignupPage() {
           overflow: hidden; transition: all 0.3s;
         }
         .sp-photo-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
         .sp-photo-box {
           border: 1.5px dashed rgba(45,106,79,0.22);
           border-radius: 16px; padding: 1.25rem 1rem;
           background: rgba(255,255,255,0.75); text-align: center;
         }
-        .sp-photo-box-title {
-          font-size: 0.88rem; font-weight: 700; color: var(--s-dark);
-          margin-bottom: 0.2rem;
-        }
+        .sp-photo-box-title { font-size: 0.88rem; font-weight: 700; color: var(--s-dark); margin-bottom: 0.2rem; }
         .sp-photo-box-sub { font-size: 0.74rem; color: var(--s-muted); line-height: 1.55; margin-bottom: 1rem; }
-
         .sp-photo-actions {
           display: flex; gap: 0.65rem; flex-wrap: wrap;
           align-items: center; justify-content: center; margin-top: 0.85rem;
@@ -493,7 +524,6 @@ export default function MemberSignupPage() {
         }
         .sp-file-label:hover { border-color: var(--g-mid); box-shadow: 0 0 0 3px var(--g-accent); }
         .sp-file-input { display: none; }
-
         .sp-photo-remove-btn {
           min-height: 44px; padding: 0.65rem 0.95rem;
           border-radius: 11px; border: 1px solid rgba(185,28,28,0.22);
@@ -503,10 +533,8 @@ export default function MemberSignupPage() {
           transition: all 0.18s;
         }
         .sp-photo-remove-btn:hover { background: rgba(185,28,28,0.08); border-color: rgba(185,28,28,0.35); }
-
         .sp-photo-help { font-size: 0.7rem; color: var(--s-muted); margin-top: 0.6rem; line-height: 1.5; }
         .sp-photo-filename { font-size: 0.73rem; color: var(--s-muted); margin-top: 0.4rem; word-break: break-word; }
-
         .sp-photo-meta {
           display: flex; align-items: center; justify-content: space-between;
           flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem;
@@ -575,7 +603,9 @@ export default function MemberSignupPage() {
           {success ? (
             <div className="sp-success sp-panel">
               <div className="sp-photo-avatar" style={{width:'80px',height:'80px',fontSize:'1.7rem'}}>
-                {photoPreviewUrl ? <Image src={photoPreviewUrl} alt="Photo profil" width={80} height={80} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} unoptimized /> : (initials || '?')}
+                {photoPreviewUrl
+                  ? <Image src={photoPreviewUrl} alt="Photo profil" width={80} height={80} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} unoptimized />
+                  : (initials || '?')}
               </div>
               <div className="sp-success-icon">
                 <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#15803D" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -637,16 +667,44 @@ export default function MemberSignupPage() {
                 </div>
               )}
 
-              {/* ── STEP 1 : Contact & Origine ── */}
+              {/* ── STEP 1 : Contact, Origine & Naissance ── */}
               {step === 1 && (
                 <div className="sp-panel sp-stack">
+
+                  {/* Origine */}
                   <p className="sp-section-title">Identité communautaire</p>
 
-                  <div className="sp-field">
-                    <label className="sp-label">Commune d&apos;origine</label>
-                    <input className="sp-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} placeholder="Ex: Lafou" required />
+                  <div className="sp-grid-2">
+                    <div className="sp-field">
+                      <label className="sp-label">Commune d&apos;origine</label>
+                      <input className="sp-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} placeholder="Ex : Lafou" required />
+                    </div>
+                    <div className="sp-field">
+                      <label className="sp-label">Village d&apos;origine <span className="sp-opt">(optionnel)</span></label>
+                      <input className="sp-input" value={originVillage} onChange={e => setOriginVillage(e.target.value)} placeholder="Ex : Balaya" />
+                    </div>
                   </div>
 
+                  {/* Naissance */}
+                  <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Naissance &amp; Origine</p>
+
+                  <div className="sp-grid-2">
+                    <div className="sp-field">
+                      <label className="sp-label">Date de naissance <span className="sp-opt">(optionnel)</span></label>
+                      <input className="sp-input" type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} />
+                    </div>
+                    <div className="sp-field">
+                      <label className="sp-label">Lieu de naissance <span className="sp-opt">(optionnel)</span></label>
+                      <input className="sp-input" value={placeOfBirth} onChange={e => setPlaceOfBirth(e.target.value)} placeholder="Ex : Lélouma" />
+                    </div>
+                  </div>
+
+                  <div className="sp-field">
+                    <label className="sp-label">Pays de naissance <span className="sp-opt">(optionnel)</span></label>
+                    <input className="sp-input" value={birthCountry} onChange={e => setBirthCountry(e.target.value)} placeholder="Ex : Guinée" />
+                  </div>
+
+                  {/* Coordonnées */}
                   <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Coordonnées</p>
 
                   <div className="sp-grid-2">
@@ -660,6 +718,17 @@ export default function MemberSignupPage() {
                     </div>
                   </div>
 
+                  <div className="sp-field">
+                    <label className="sp-label">Poste occupé <span className="sp-opt">(optionnel)</span></label>
+                    <select className="sp-select" value={profession} onChange={e => setProfession(e.target.value)}>
+                      <option value="">Sélectionnez un rôle dans l&apos;association</option>
+                      {ASSOCIATION_ROLES.map(p => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Résidence */}
                   <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Lieu de résidence actuelle</p>
 
                   <div className="sp-grid-2">
@@ -668,9 +737,14 @@ export default function MemberSignupPage() {
                       <input className="sp-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Paris" />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Pays <span className="sp-opt">(optionnel)</span></label>
-                      <input className="sp-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="France" />
+                      <label className="sp-label">Code postal <span className="sp-opt">(optionnel)</span></label>
+                      <input className="sp-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="75001" />
                     </div>
+                  </div>
+
+                  <div className="sp-field">
+                    <label className="sp-label">Pays <span className="sp-opt">(optionnel)</span></label>
+                    <input className="sp-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="France" />
                   </div>
 
                   <div className="sp-grid-2">
@@ -692,7 +766,6 @@ export default function MemberSignupPage() {
                   <p className="sp-section-title">Photo de profil</p>
 
                   <div className="sp-photo-box">
-                    {/* Avatar live */}
                     <div className="sp-photo-avatar">
                       {photoPreviewUrl
                         ? <Image src={photoPreviewUrl} alt="Aperçu" width={96} height={96} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} unoptimized />

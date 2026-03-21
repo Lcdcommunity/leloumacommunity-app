@@ -1,4 +1,4 @@
-//web/components/layout/Topbar.tsx
+// web/components/layout/Topbar.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,7 +9,7 @@ import type { UserRole } from '../../types/user';
 
 function resolveRoutes(role: UserRole | null) {
   if (role === 'SUPER_ADMIN')   return { notifications: '/super-admin/notifications', profile: '/super-admin/settings' };
-  if (role === 'ANTENNA_ADMIN') return { notifications: '/admin/notifications',       profile: '/admin/settings' };
+  if (role === 'ANTENNA_ADMIN') return { notifications: '/admin/notifications',       profile: '/admin/profile' }; // ← MODIFIÉ ICI
   return                               { notifications: '/member/notifications',       profile: '/member/profile' };
 }
 

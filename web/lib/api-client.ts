@@ -1,4 +1,4 @@
-//////// web/lib/api-client.ts
+// web/lib/api-client.ts
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
@@ -15,6 +15,14 @@ import type { AntennaDashboardStats, ProjectionResult } from '../types/stats';
 
 import { http } from './http';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// VirtualCardData — source de vérité partagée entre :
+//   • web/app/(public)/signup/page.tsx        (collecte des données)
+//   • web/app/(protected)/member/profile/page.tsx (affichage / mise à jour)
+//   • web/components/member/VirtualCardWidget.tsx (rendu de la carte)
+//
+// RÈGLE : tout champ collecté au signup doit être déclaré ici (optionnel OK).
+// ─────────────────────────────────────────────────────────────────────────────
 export interface VirtualCardData {
   cardNumber: string;
   isLocked: boolean;
@@ -22,14 +30,27 @@ export interface VirtualCardData {
   qrToken: string;
   antennaName: string;
   user: {
+    // ── Identité ──
     firstName: string;
     lastName: string;
+    function?: string | null;            // profession (champ "Profession" du signup)
+
+    // ── Naissance (signup étape 1 → section "Naissance") ──
     birthDate?: string | null;
     placeOfBirth?: string | null;
-    originSubPrefecture?: string | null;
-    originVillage?: string | null;
+    birthCountry?: string | null;        // "Pays de naissance" signup
+
+    // ── Origine (signup étape 1 → section "Identité communautaire") ──
+    originSubPrefecture?: string | null; // commune d'origine (obligatoire signup)
+    originCommune?: string | null;       // alias de originSubPrefecture pour le widget
+    originVillage?: string | null;       // village d'origine (optionnel signup)
+
+    // ── Résidence ──
     country?: string | null;
     city?: string | null;
+    postalCode?: string | null;
+
+    // ── Photo ──
     profilePhotoUrl?: string | null;
   };
 }
@@ -43,15 +64,18 @@ export interface FullUserProfile extends UserSummary {
   country?: string | null;
   birthDate?: string | null;
   placeOfBirth?: string | null;
-  countryOfBirth?: string | null;
+  birthCountry?: string | null;       // pays de naissance (alias de countryOfBirth)
+  countryOfBirth?: string | null;     // alias possible côté backend
   profilePhotoUrl?: string | null;
-  originVillage?: string | null;
-  originSubPrefecture?: string | null;
+  originVillage?: string | null;      // village d'origine (optionnel)
+  originSubPrefecture?: string | null; // commune d'origine (obligatoire)
+  function?: string | null;           // profession
   cardNumber?: string | null;
   isCardLocked?: boolean;
   cardExpiresAt?: string | null;
   qrToken?: string | null;
   antennaName?: string | null;
+  associationTitle?: string | null;
   virtualCard?: {
     id: string;
     cardNumber: string;
@@ -64,7 +88,20 @@ export interface FullUserProfile extends UserSummary {
     name: string;
     code: string;
     membershipStatus: string;
+    city?: string | null;            // <-- AJOUT POUR L'ADMIN D'ANTENNE
+    country?: string | null;         // <-- AJOUT POUR L'ADMIN D'ANTENNE
+    defaultCurrency?: string | null; // <-- AJOUT POUR L'ADMIN D'ANTENNE
   } | null;
+  // Ajout pour récupérer les assignments d'antenne de l'admin
+  adminAssignments?: Array<{
+    antenna?: {
+      name?: string | null;
+      code?: string | null;
+      city?: string | null;
+      country?: string | null;
+      defaultCurrency?: string | null;
+    } | null;
+  }> | null;
 }
 
 export const api = {
@@ -72,18 +109,34 @@ export const api = {
   // AUTH / ENRÔLEMENT MEMBRE
   // ==========================================
   memberSignup: (body: {
+    // ── Identité (étape 0) ──
     firstName: string;
     lastName: string;
     email: string;
-    phone?: string;
     password?: string;
     antennaId: string;
+
+    // ── Contact (étape 1) ──
+    phone?: string;
+
+    // ── Origine ──
+    originSubPrefecture?: string;   // commune d'origine (obligatoire)
+    originVillage?: string;         // village d'origine (optionnel)
+
+    // ── Naissance ──
+    birthDate?: string;
+    placeOfBirth?: string;
+    birthCountry?: string;          // pays de naissance
+
+    // ── Résidence ──
     city?: string;
     country?: string;
+    postalCode?: string;
     addressLine1?: string;
     addressLine2?: string;
-    originSubPrefecture?: string;
-    placeOfBirth?: string;
+
+    // ── Profession ──
+    function?: string;
   }) =>
     http<{ id: string; message: string }, typeof body>('/public/signup', {
       method: 'POST',
@@ -342,7 +395,8 @@ export const api = {
 
   updateContributionAntenna: (id: string, payload: { amount: number }) =>
     http(`/admin/contributions/${id}`, { method: 'PATCH', body: payload }),
-  deleteContributionAntenna: (id: string) => 
+
+  deleteContributionAntenna: (id: string) =>
     http(`/admin/contributions/${id}`, { method: 'DELETE' }),
 
   createContributionMember: (body: {
@@ -445,7 +499,6 @@ export const api = {
       }`
     ),
 
-  // 👇 AJOUT CHIRURGICAL : Route pour créer le document en base après l'upload
   createSuperAdminDocument: (body: { title: string; description?: string; fileAssetId: string }) =>
     http<DocumentItem, typeof body>('/super-admin/documents', { method: 'POST', body }),
 
