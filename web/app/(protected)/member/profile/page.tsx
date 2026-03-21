@@ -302,15 +302,13 @@ export default function MemberProfilePage() {
     setSaving(true);
     setMessage(null);
     try {
-      // ⚠️ RETRAIT VOLONTAIRE des champs function, birthCountry et originVillage
-      // car ils sont interdits par le DTO du backend lors d'un update.
+      // On ne garde que les champs autorisés par le backend (DTO)
       const payload: Record<string, string | undefined> = {
         firstName:           firstName.trim()           || undefined,
         lastName:            lastName.trim()            || undefined,
         phone:               phone.trim()               || undefined,
         birthDate:           birthDate                  || undefined,
         placeOfBirth:        placeOfBirth.trim()        || undefined,
-        countryOfBirth:      countryOfBirth.trim()      || undefined, // Alias généralement toléré
         originSubPrefecture: originSubPrefecture.trim() || undefined,
         addressLine1:        addressLine1.trim()        || undefined,
         addressLine2:        addressLine2.trim()        || undefined,
@@ -322,6 +320,7 @@ export default function MemberProfilePage() {
       const nextUser = (await api.updateMyProfile(
         payload,
       )) as FullUserProfileWithProfession;
+      
       setMe(nextUser);
       populateFields(nextUser);
       setIsEditing(false);
