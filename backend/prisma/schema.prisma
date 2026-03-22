@@ -1172,6 +1172,7 @@ model Document {
   description    String?
   categoryLabel  String?
   scope          DocumentScope @default(GLOBAL)
+  visibility     String        @default("ALL")
   isDownloadable Boolean       @default(true)
   isPinned       Boolean       @default(false)
 

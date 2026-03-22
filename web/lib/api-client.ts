@@ -564,7 +564,7 @@ export const api = {
       }`
     ),
 
-  createSuperAdminDocument: (body: { title: string; description?: string; fileAssetId: string }) =>
+  createSuperAdminDocument: (body: { title: string; description?: string; visibility?: string; fileAssetId: string }) =>
     http<DocumentItem, typeof body>('/super-admin/documents', { method: 'POST', body }),
 
   deleteDocument: (id: string) =>

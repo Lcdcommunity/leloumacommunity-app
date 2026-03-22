@@ -5,7 +5,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, ContributionStatus, ProjectStatus, ProposalStatus, PostStatus, UserStatus, PaymentMethod, ContributionPurpose } from '@prisma/client';
+import {
+  Prisma,
+  ContributionStatus,
+  ProjectStatus,
+  ProposalStatus,
+  PostStatus,
+  UserStatus,
+  PaymentMethod,
+  ContributionPurpose,
+} from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { memberMapper } from './member.mapper';
 import { MemberProfileUpdateDto } from './dto/member-profile-update.dto';
@@ -32,7 +41,12 @@ export class MemberService {
         role: true,
         status: true,
         associationId: true,
-        memberships: { where: { isPrimary: true }, select: { antennaId: true } },
+        memberships: {
+          where: { isPrimary: true },
+          select: {
+            antennaId: true,
+          },
+        },
         email: true,
         firstName: true,
         lastName: true,
@@ -46,8 +60,14 @@ export class MemberService {
       },
     });
 
-    if (!user) throw new NotFoundException('Utilisateur introuvable');
-    return { ...user, antennaId: user.memberships[0]?.antennaId || null };
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    return {
+      ...user,
+      antennaId: user.memberships[0]?.antennaId || null,
+    };
   }
 
   async getDashboard(userId: string) {
@@ -55,23 +75,37 @@ export class MemberService {
 
     const [totalMyContributions, activeProjects, virtualCard] = await Promise.all([
       this.prisma.contribution.aggregate({
-        where: { memberUserId: userId, status: ContributionStatus.VALIDATED },
+        where: {
+          memberUserId: userId,
+          status: ContributionStatus.VALIDATED,
+        },
         _sum: { amount: true },
       }),
       this.prisma.project.count({
-        where: { associationId: me.associationId, status: ProjectStatus.IN_PROGRESS },
+        where: {
+          associationId: me.associationId,
+          status: ProjectStatus.IN_PROGRESS,
+        },
       }),
       this.prisma.virtualCard.findUnique({
         where: { userId },
         include: {
           user: {
-            include: { memberships: { include: { antenna: true } }, profilePhoto: true }
-          }
-        }
-      })
+            include: {
+              memberships: {
+                include: {
+                  antenna: true,
+                },
+              },
+              profilePhoto: true,
+            },
+          },
+        },
+      }),
     ]);
 
     let cardData = null;
+
     if (virtualCard) {
       cardData = {
         cardNumber: virtualCard.cardNumber,
@@ -82,16 +116,15 @@ export class MemberService {
         user: {
           firstName: virtualCard.user.firstName,
           lastName: virtualCard.user.lastName,
-          birthDate: virtualCard.user.birthDate ? virtualCard.user.birthDate.toISOString() : null,
-          
-          // 👇 AJOUT CHIRURGICAL : Récupération des données pour la carte
+          birthDate: virtualCard.user.birthDate
+            ? virtualCard.user.birthDate.toISOString()
+            : null,
           placeOfBirth: virtualCard.user.placeOfBirth,
-          originVillage: virtualCard.user.originSubPrefecture, // Mappé sur originSubPrefecture
-          
+          originVillage: virtualCard.user.originSubPrefecture,
           country: virtualCard.user.country,
           city: virtualCard.user.city,
           profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
-        }
+        },
       };
     }
 
@@ -101,7 +134,7 @@ export class MemberService {
         myTotalContributions: Number(totalMyContributions._sum.amount ?? 0),
         activeProjects,
       },
-      virtualCard: cardData
+      virtualCard: cardData,
     };
   }
 
@@ -120,8 +153,12 @@ export class MemberService {
         ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
         ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone.trim() || null } : {}),
-        ...(dto.addressLine1 !== undefined ? { addressLine1: dto.addressLine1.trim() || null } : {}),
-        ...(dto.addressLine2 !== undefined ? { addressLine2: dto.addressLine2.trim() || null } : {}),
+        ...(dto.addressLine1 !== undefined
+          ? { addressLine1: dto.addressLine1.trim() || null }
+          : {}),
+        ...(dto.addressLine2 !== undefined
+          ? { addressLine2: dto.addressLine2.trim() || null }
+          : {}),
         ...(dto.city !== undefined ? { city: dto.city.trim() || null } : {}),
         ...(dto.country !== undefined ? { country: dto.country.trim() || null } : {}),
       },
@@ -142,9 +179,15 @@ export class MemberService {
         pushEnabled: dto.pushNotifications ?? false,
       },
       update: {
-        ...(dto.emailNotifications !== undefined ? { emailEnabled: dto.emailNotifications } : {}),
-        ...(dto.smsNotifications !== undefined ? { smsEnabled: dto.smsNotifications } : {}),
-        ...(dto.pushNotifications !== undefined ? { pushEnabled: dto.pushNotifications } : {}),
+        ...(dto.emailNotifications !== undefined
+          ? { emailEnabled: dto.emailNotifications }
+          : {}),
+        ...(dto.smsNotifications !== undefined
+          ? { smsEnabled: dto.smsNotifications }
+          : {}),
+        ...(dto.pushNotifications !== undefined
+          ? { pushEnabled: dto.pushNotifications }
+          : {}),
       },
     });
 
@@ -156,7 +199,9 @@ export class MemberService {
     this.ensureMemberActiveEnough(me.status);
 
     if (!me.associationId || !me.antennaId) {
-      throw new BadRequestException('Utilisateur non rattaché à une association / antenne.');
+      throw new BadRequestException(
+        'Utilisateur non rattaché à une association / antenne.',
+      );
     }
 
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
@@ -183,8 +228,12 @@ export class MemberService {
     return memberMapper.contribution(created);
   }
 
-  async listMyContributions(userId: string, query: MemberContributionsQueryDto): Promise<PaginatedResponseDto<any>> {
+  async listMyContributions(
+    userId: string,
+    query: MemberContributionsQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
     await this.getMeOrThrow(userId);
+
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
@@ -203,21 +252,33 @@ export class MemberService {
       }),
     ]);
 
-    return { items: items.map(memberMapper.contribution), total, page, pageSize };
+    return {
+      items: items.map(memberMapper.contribution),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async getAssociationBalanceSummary(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
     const [association, agg] = await Promise.all([
-      this.prisma.association.findUnique({ where: { id: me.associationId } }),
+      this.prisma.association.findUnique({
+        where: { id: me.associationId },
+      }),
       this.prisma.contribution.aggregate({
-        where: { associationId: me.associationId, status: ContributionStatus.VALIDATED },
+        where: {
+          associationId: me.associationId,
+          status: ContributionStatus.VALIDATED,
+        },
         _sum: { amount: true },
       }),
     ]);
 
-    if (!association) throw new NotFoundException('Association introuvable.');
+    if (!association) {
+      throw new NotFoundException('Association introuvable.');
+    }
 
     return {
       associationId: association.id,
@@ -228,31 +289,48 @@ export class MemberService {
     };
   }
 
-  async listLateMembers(userId: string, query: LateMembersQueryDto): Promise<PaginatedResponseDto<any>> {
+  async listLateMembers(
+    userId: string,
+    query: LateMembersQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
     const me = await this.getMeOrThrow(userId);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
     const members = await this.prisma.user.findMany({
-      where: { associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
+      where: {
+        associationId: me.associationId,
+        role: 'MEMBER',
+        status: 'ACTIVE',
+      },
       select: {
         id: true,
         firstName: true,
         lastName: true,
-        memberships: { include: { antenna: true } },
+        memberships: {
+          include: {
+            antenna: true,
+          },
+        },
         contributions: {
           where: { status: 'VALIDATED' },
           orderBy: [{ validatedAt: 'desc' }],
           take: 1,
-          select: { validatedAt: true, createdAt: true },
+          select: {
+            validatedAt: true,
+            createdAt: true,
+          },
         },
       },
     });
 
     const now = new Date();
+
     const computed = members
       .map((m) => {
-        const last = m.contributions[0]?.validatedAt ?? m.contributions[0]?.createdAt ?? null;
+        const last =
+          m.contributions[0]?.validatedAt ?? m.contributions[0]?.createdAt ?? null;
+
         return {
           id: m.id,
           firstName: m.firstName,
@@ -265,29 +343,68 @@ export class MemberService {
       .sort((a, b) => b.lateMonths - a.lateMonths);
 
     const start = (page - 1) * pageSize;
-    return { items: computed.slice(start, start + pageSize), total: computed.length, page, pageSize };
+
+    return {
+      items: computed.slice(start, start + pageSize),
+      total: computed.length,
+      page,
+      pageSize,
+    };
   }
 
-  async listProjectsForMembers(userId: string, query: MemberProjectsQueryDto): Promise<PaginatedResponseDto<any>> {
+  async listProjectsForMembers(
+    userId: string,
+    query: MemberProjectsQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
     const me = await this.getMeOrThrow(userId);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
+    const projectSearchOr: Prisma.ProjectWhereInput[] = query.q
+      ? [
+          {
+            title: {
+              contains: query.q,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+          {
+            description: {
+              contains: query.q,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+        ]
+      : [];
+
     const where: Prisma.ProjectWhereInput = {
       associationId: me.associationId,
       ...(query.status ? { status: query.status as ProjectStatus } : {}),
-      ...(query.q ? { OR: [{ title: { contains: query.q, mode: 'insensitive' } }, { description: { contains: query.q, mode: 'insensitive' } }] } : {}),
+      ...(projectSearchOr.length > 0 ? { OR: projectSearchOr } : {}),
     };
 
     const [total, items] = await Promise.all([
       this.prisma.project.count({ where }),
-      this.prisma.project.findMany({ where, orderBy: [{ createdAt: 'desc' }], skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.project.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
     ]);
 
-    return { items: items.map(memberMapper.project), total, page, pageSize };
+    return {
+      items: items.map(memberMapper.project),
+      total,
+      page,
+      pageSize,
+    };
   }
 
-  async createProjectProposal(userId: string, dto: CreateProjectProposalDto & { attachmentFileAssetId?: string }) {
+  async createProjectProposal(
+    userId: string,
+    dto: CreateProjectProposalDto & { attachmentFileAssetId?: string },
+  ) {
     const me = await this.getMeOrThrow(userId);
     this.ensureMemberActiveEnough(me.status);
 
@@ -298,22 +415,29 @@ export class MemberService {
         authorUserId: me.id,
         title: dto.title.trim(),
         description: dto.description.trim(),
-        estimatedBudget: dto.expectedBudget ? new Prisma.Decimal(dto.expectedBudget) : null,
+        estimatedBudget: dto.expectedBudget
+          ? new Prisma.Decimal(dto.expectedBudget)
+          : null,
         status: ProposalStatus.SUBMITTED,
-        ...(dto.attachmentFileAssetId ? {
-          attachments: {
-            create: {
-              fileId: dto.attachmentFileAssetId
+        ...(dto.attachmentFileAssetId
+          ? {
+              attachments: {
+                create: {
+                  fileId: dto.attachmentFileAssetId,
+                },
+              },
             }
-          }
-        } : {})
+          : {}),
       },
     });
 
     return memberMapper.projectProposal(created);
   }
 
-  async listMyProjectProposals(userId: string, query: MemberProjectProposalsQueryDto): Promise<PaginatedResponseDto<any>> {
+  async listMyProjectProposals(
+    userId: string,
+    query: MemberProjectProposalsQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
     const me = await this.getMeOrThrow(userId);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
@@ -325,34 +449,84 @@ export class MemberService {
 
     const [total, items] = await Promise.all([
       this.prisma.projectProposal.count({ where }),
-      this.prisma.projectProposal.findMany({ 
-        where, 
-        orderBy: [{ createdAt: 'desc' }], 
-        skip: (page - 1) * pageSize, 
+      this.prisma.projectProposal.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
         take: pageSize,
       }),
     ]);
 
-    return { 
-      items: items.map(p => ({
+    return {
+      items: items.map((p) => ({
         ...memberMapper.projectProposal(p),
-        estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : null 
-      })), 
-      total, 
-      page, 
-      pageSize 
+        estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : null,
+      })),
+      total,
+      page,
+      pageSize,
     };
   }
 
-  async listDocuments(userId: string, query: MemberDocumentsQueryDto): Promise<PaginatedResponseDto<any>> {
+  async listDocuments(
+    userId: string,
+    query: MemberDocumentsQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
     const me = await this.getMeOrThrow(userId);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
+    const visibilityOr: Prisma.DocumentWhereInput[] = [
+      {
+        visibility: {
+          in: ['ALL', 'MEMBER'],
+        },
+      },
+    ];
+
+    if (me.antennaId) {
+      visibilityOr.push({
+        antennaId: me.antennaId,
+      });
+    }
+
+    const andFilters: Prisma.DocumentWhereInput[] = [
+      {
+        associationId: me.associationId,
+      },
+      {
+        publishedAt: {
+          not: null,
+        },
+      },
+      {
+        OR: visibilityOr,
+      },
+    ];
+
+    if (query.q) {
+      const documentSearchOr: Prisma.DocumentWhereInput[] = [
+        {
+          title: {
+            contains: query.q,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        },
+        {
+          description: {
+            contains: query.q,
+            mode: Prisma.QueryMode.insensitive,
+          },
+        },
+      ];
+
+      andFilters.push({
+        OR: documentSearchOr,
+      });
+    }
+
     const where: Prisma.DocumentWhereInput = {
-      associationId: me.associationId,
-      publishedAt: { not: null },
-      ...(query.q ? { OR: [{ title: { contains: query.q, mode: 'insensitive' } }, { description: { contains: query.q, mode: 'insensitive' } }] } : {}),
+      AND: andFilters,
     };
 
     const [total, items] = await Promise.all([
@@ -362,30 +536,76 @@ export class MemberService {
         orderBy: [{ createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { file: { select: { id: true, storageKey: true, url: true } } },
+        include: {
+          file: {
+            select: {
+              id: true,
+              storageKey: true,
+              url: true,
+              mimeType: true,
+              sizeBytes: true,
+              originalFilename: true,
+            },
+          },
+        },
       }),
     ]);
 
-    return { items: items.map(memberMapper.documentItem), total, page, pageSize };
+    return {
+      items: items.map(memberMapper.documentItem),
+      total,
+      page,
+      pageSize,
+    };
   }
 
-  async listContents(userId: string, query: MemberContentsQueryDto): Promise<PaginatedResponseDto<any>> {
+  async listContents(
+    userId: string,
+    query: MemberContentsQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
     const me = await this.getMeOrThrow(userId);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
+    const contentSearchOr: Prisma.NewsPostWhereInput[] = query.q
+      ? [
+          {
+            title: {
+              contains: query.q,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+          {
+            content: {
+              contains: query.q,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+        ]
+      : [];
+
     const where: Prisma.NewsPostWhereInput = {
       associationId: me.associationId,
       status: PostStatus.PUBLISHED,
-      ...(query.q ? { OR: [{ title: { contains: query.q, mode: 'insensitive' } }, { content: { contains: query.q, mode: 'insensitive' } }] } : {}),
+      ...(contentSearchOr.length > 0 ? { OR: contentSearchOr } : {}),
     };
 
     const [total, items] = await Promise.all([
       this.prisma.newsPost.count({ where }),
-      this.prisma.newsPost.findMany({ where, orderBy: [{ updatedAt: 'desc' }], skip: (page - 1) * pageSize, take: pageSize }),
+      this.prisma.newsPost.findMany({
+        where,
+        orderBy: [{ updatedAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
     ]);
 
-    return { items: items.map(memberMapper.contentPost), total, page, pageSize };
+    return {
+      items: items.map(memberMapper.contentPost),
+      total,
+      page,
+      pageSize,
+    };
   }
 }
 
@@ -393,5 +613,6 @@ function monthDiff(from: Date, to: Date): number {
   const years = to.getFullYear() - from.getFullYear();
   const months = to.getMonth() - from.getMonth();
   const total = years * 12 + months;
+
   return total < 0 ? 0 : total;
 }

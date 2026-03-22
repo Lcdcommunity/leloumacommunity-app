@@ -19,6 +19,7 @@ export interface DocumentItem {
   associationId: string;
   title: string;
   description?: string | null;
+  visibility?: 'ALL' | 'ADMIN' | 'MEMBER' | null; // Ajout du champ de visibilité
   fileAssetId?: string | null;
   createdAt: string;
   updatedAt: string;
