@@ -302,7 +302,7 @@ export default function MemberProfilePage() {
     setSaving(true);
     setMessage(null);
     try {
-      // On ne garde que les champs autorisés par le backend (DTO)
+      // 💡 CORRECTION : Nettoyage du payload pour ne garder que les champs autorisés
       const payload: Record<string, string | undefined> = {
         firstName:           firstName.trim()           || undefined,
         lastName:            lastName.trim()            || undefined,
@@ -320,7 +320,7 @@ export default function MemberProfilePage() {
       const nextUser = (await api.updateMyProfile(
         payload,
       )) as FullUserProfileWithProfession;
-      
+
       setMe(nextUser);
       populateFields(nextUser);
       setIsEditing(false);
@@ -1036,8 +1036,7 @@ export default function MemberProfilePage() {
                               <input className="mpr-input mpr-email-input" disabled value={me?.email || ''} />
                               <span className="mpr-email-lock">
                                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />                                </svg>
                               </span>
                             </div>
                           </div>

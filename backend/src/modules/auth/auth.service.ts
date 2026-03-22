@@ -1,7 +1,8 @@
-//src/modules/auth/auth.service.ts
+// backend/src/modules/auth/auth.service.ts
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -56,22 +57,39 @@ export class AuthService {
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-        associationId: true,
+      include: {
+        memberships: {
+          include: { antenna: true },
+          orderBy: { createdAt: 'asc' },
+        },
+        adminAssignments: {
+          include: { antenna: true },
+        },
+        profilePhoto: true,
+        virtualCard: true,
       },
     });
 
-    if (!user) {
-      throw new UnauthorizedException('Utilisateur introuvable');
-    }
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
 
-    return user;
+    const photoUrl = (user as any).profilePhoto?.url ?? null;
+
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      status: user.status,
+      associationId: user.associationId,
+      permissions: [],
+      avatarUrl: photoUrl,
+      profilePhotoUrl: photoUrl,
+      antenna:
+        (user as any).memberships?.[0]?.antenna ??
+        (user as any).adminAssignments?.[0]?.antenna ??
+        null,
+    };
   }
 
   async login(

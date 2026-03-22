@@ -44,15 +44,37 @@ export const memberMapper = {
   project(p: any) {
     return {
       id: p.id,
+      associationId: p.associationId ?? null,
+      antennaId: p.antennaId ?? null,
+      
       title: p.title,
+      slug: p.slug ?? null,
+      summary: p.summary ?? null,
       description: p.description ?? null,
       status: p.status,
+      
+      promoterName: p.promoterName ?? null,
+      specificObjectives: p.specificObjectives ?? null,
+      targetBeneficiaries: p.targetBeneficiaries ?? null,
+      populationImpact: p.populationImpact ?? null,
+      environmentalImpact: p.environmentalImpact ?? null,
+      expectedResults: p.expectedResults ?? null,
+      successIndicators: p.successIndicators ?? null,
+      risksAndMitigation: p.risksAndMitigation ?? null,
+      implementationMethod: p.implementationMethod ?? null,
+      
+      locationText: p.locationText ?? null,
+      coverImageFileId: p.coverImageFileId ?? null,
+
       budgetPlanned: p.budgetAmount != null ? Number(p.budgetAmount) : null,
       budgetSpent: p.amountSpent != null ? Number(p.amountSpent) : null,
       startsAt: p.startDate?.toISOString?.() ?? p.startDate ?? null,
       endsAt: p.endDate?.toISOString?.() ?? p.endDate ?? null,
+      targetDate: p.targetDate?.toISOString?.() ?? p.targetDate ?? null,
+      
       createdAt: p.createdAt?.toISOString?.() ?? p.createdAt,
       updatedAt: p.updatedAt?.toISOString?.() ?? p.updatedAt,
+      archivedAt: p.archivedAt?.toISOString?.() ?? p.archivedAt ?? null,
     };
   },
 

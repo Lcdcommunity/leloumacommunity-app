@@ -11,28 +11,28 @@ import { formatCurrency, formatDate } from '../../../../lib/format';
 const PROJ_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
   DRAFT:            { label: 'Brouillon',     color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   PENDING_APPROVAL: { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  APPROVED:         { label: 'Approuv\u00e9',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  APPROVED:         { label: 'Approuvé',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   IN_PROGRESS:      { label: 'En cours',      color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  COMPLETED:        { label: 'Termin\u00e9',   color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  COMPLETED:        { label: 'Terminé',       color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
   SUSPENDED:        { label: 'Suspendu',      color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  CANCELLED:        { label: 'Annul\u00e9',    color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+  CANCELLED:        { label: 'Annulé',        color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
 };
 
 const STATUS_FORM_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'DRAFT',            label: 'Brouillon' },
-  { value: 'PENDING_APPROVAL', label: "En attente d\u2019approbation" },
-  { value: 'APPROVED',         label: 'Approuv\u00e9' },
+  { value: 'PENDING_APPROVAL', label: "En attente d'approbation" },
+  { value: 'APPROVED',         label: 'Approuvé' },
   { value: 'IN_PROGRESS',      label: 'En cours' },
-  { value: 'COMPLETED',        label: 'Termin\u00e9' },
+  { value: 'COMPLETED',        label: 'Terminé' },
   { value: 'SUSPENDED',        label: 'Suspendu' },
-  { value: 'CANCELLED',        label: 'Annul\u00e9' },
+  { value: 'CANCELLED',        label: 'Annulé' },
 ];
 
 const STATUS_LIST_OPTIONS = [
   { value: '',            label: 'Tous les statuts' },
   { value: 'DRAFT',       label: 'Brouillon' },
   { value: 'IN_PROGRESS', label: 'En cours' },
-  { value: 'COMPLETED',   label: 'Termin\u00e9' },
+  { value: 'COMPLETED',   label: 'Terminé' },
 ];
 
 /* ══════════════════════════════════════════════════════ STATUS BADGE */
@@ -67,32 +67,31 @@ function BudgetBar({ planned, spent }: { planned?: number | null; spent?: number
 /* ══════════════════════════════════════════════════════ PROJECT DETAIL DRAWER */
 type Attachment = { url: string; fileName?: string; mimeType?: string | null; sizeBytes?: number | null };
 
-function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+function DetailRow({ icon, label, value, vertical = false }: { icon: React.ReactNode; label: string; value: React.ReactNode; vertical?: boolean }) {
+  if (!value) return null;
   return (
-    <div style={{ display: 'flex', gap: '.75rem', padding: '.7rem 0', borderBottom: '1px solid rgba(37,99,235,.06)' }}>
-      <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(37,99,235,.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#2563EB' }}>{icon}</div>
+    <div style={{ display: 'flex', flexDirection: vertical ? 'column' : 'row', gap: vertical ? '.4rem' : '.75rem', padding: '.7rem 0', borderBottom: '1px solid rgba(37,99,235,.06)' }}>
+      {vertical ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+           <div style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(37,99,235,.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#2563EB' }}>{icon}</div>
+           <div style={{ fontSize: '.65rem', fontWeight: 900, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.08em' }}>{label}</div>
+        </div>
+      ) : (
+        <div style={{ width: 32, height: 32, borderRadius: 9, background: 'rgba(37,99,235,.07)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#2563EB' }}>{icon}</div>
+      )}
+      
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '.63rem', fontWeight: 900, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.2rem' }}>{label}</div>
-        <div style={{ fontSize: '.88rem', fontWeight: 700, color: '#0F172A', lineHeight: 1.5, wordBreak: 'break-word' }}>{value}</div>
+        {!vertical && <div style={{ fontSize: '.63rem', fontWeight: 900, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.2rem' }}>{label}</div>}
+        <div style={{ fontSize: '.84rem', fontWeight: 600, color: '#374151', lineHeight: 1.6, wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{value}</div>
       </div>
     </div>
   );
 }
 
-function formatBytes(b?: number | null): string {
-  if (!b) return '';
-  if (b < 1024) return `${b}\u00a0o`;
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)}\u00a0Ko`;
-  return `${(b / (1024 * 1024)).toFixed(1)}\u00a0Mo`;
-}
-
 function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose: () => void; onEdit: () => void }) {
   const s   = PROJ_STATUS_MAP[project.status] ?? PROJ_STATUS_MAP['DRAFT'];
-  // Project.attachments only carries { id, url } — no mimeType in the API response.
-  // Treat every attachment as a photo; the docs array stays empty.
   const attachments = (project.attachments ?? []) as Attachment[];
-  const images      = attachments; // all treated as images
-  const docs: Attachment[] = [];
+  const images      = attachments; // Traités comme des images pour l'instant
 
   const pct  = project.budgetPlanned
     ? Math.min(100, Math.round(((project.budgetSpent ?? 0) / project.budgetPlanned) * 100))
@@ -100,27 +99,18 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
   const over = (project.budgetSpent ?? 0) > (project.budgetPlanned ?? 0);
   const budgetCol = over ? '#DC2626' : pct > 80 ? '#D97706' : '#2563EB';
 
-  // extract promoter from description if prefixed
-  let description = project.description ?? '';
-  let promoter    = (project as unknown as { promoter?: string }).promoter ?? '';
-  if (!promoter && description.startsWith('**Promoteur')) {
-    const m = description.match(/\*\*Promoteur[^:]*:\*\*\s*([^\n]+)\n/);
-    if (m) { promoter = m[1].trim(); description = description.replace(m[0], '').trim(); }
-  }
-  const locationText = (project as unknown as { locationText?: string }).locationText ?? '';
+  // Fonction utilitaire pour télécharger le PDF
+  const downloadPDF = () => {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+    window.open(`${apiUrl}/admin/projects/${project.id}/export`, '_blank');
+  };
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.35)', backdropFilter: 'blur(3px)', zIndex: 300 }}
-        onClick={onClose}
-      />
-
-      {/* Drawer */}
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.35)', backdropFilter: 'blur(3px)', zIndex: 300 }} onClick={onClose} />
       <div style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 301,
-        width: 'min(480px, 100vw)',
+        width: 'min(520px, 100vw)',
         background: 'rgba(253,253,255,.98)',
         backdropFilter: 'blur(20px)',
         boxShadow: '-8px 0 40px rgba(15,23,42,.18)',
@@ -130,31 +120,30 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
       }}>
 
         {/* Drawer header */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'rgba(253,253,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(37,99,235,.09)', padding: '1rem 1.25rem', display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
+        <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'rgba(253,253,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(37,99,235,.09)', padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.35rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.4rem', flexWrap: 'wrap' }}>
               <StatusBadge status={project.status} />
-              {locationText && (
+              {project.locationText && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.22rem', fontSize: '.67rem', fontWeight: 700, color: '#6B7280' }}>
                   <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  {locationText}
+                  {project.locationText}
                 </span>
               )}
             </div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(1.2rem,3vw,1.55rem)', fontWeight: 700, color: '#0F172A', margin: 0, lineHeight: 1.2 }}>{project.title}</h2>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(1.3rem,4vw,1.7rem)', fontWeight: 700, color: '#0F172A', margin: 0, lineHeight: 1.15 }}>{project.title}</h2>
+            {project.summary && <p style={{ fontSize: '.85rem', color: '#6B7280', margin: '.3rem 0 0', fontWeight: 500, lineHeight: 1.4 }}>{project.summary}</p>}
           </div>
           <div style={{ display: 'flex', gap: '.4rem', flexShrink: 0 }}>
-            <button
-              onClick={onEdit}
-              style={{ height: 34, padding: '0 .85rem', borderRadius: 9, background: '#EFF6FF', border: '1.5px solid rgba(37,99,235,.18)', color: '#1D4ED8', fontFamily: "'DM Sans',sans-serif", fontSize: '.76rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.3rem' }}
-            >
+            <button onClick={downloadPDF} style={{ height: 34, padding: '0 .7rem', borderRadius: 9, background: '#F8FAFC', border: '1.5px solid #E2E8F0', color: '#475569', fontFamily: "'DM Sans',sans-serif", fontSize: '.76rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              PDF
+            </button>
+            <button onClick={onEdit} style={{ height: 34, padding: '0 .85rem', borderRadius: 9, background: '#EFF6FF', border: '1.5px solid rgba(37,99,235,.18)', color: '#1D4ED8', fontFamily: "'DM Sans',sans-serif", fontSize: '.76rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
               <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               Modifier
             </button>
-            <button
-              onClick={onClose}
-              style={{ width: 34, height: 34, borderRadius: 9, background: '#F3F4F6', border: '1px solid #E5E7EB', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
+            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 9, background: '#F3F4F6', border: '1px solid #E5E7EB', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
@@ -167,17 +156,15 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
               Galerie photos ({images.length})
             </div>
-            {/* Featured image */}
             <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: '.5rem', border: '1px solid rgba(37,99,235,.1)', aspectRatio: '16/9', background: '#F8FAFC' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- remote asset URL from API */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={images[0].url} alt={project.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
             </div>
-            {/* Thumbnail strip */}
             {images.length > 1 && (
               <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(images.length - 1, 4)}, 1fr)`, gap: '.4rem' }}>
                 {images.slice(1, 5).map((img, idx) => (
                   <div key={idx} style={{ aspectRatio: '1', borderRadius: 9, overflow: 'hidden', border: '1px solid rgba(37,99,235,.1)', background: '#F8FAFC', position: 'relative' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element -- remote asset URL from API */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
                     {idx === 3 && images.length > 5 && (
                       <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: "'DM Mono',monospace", fontSize: '.88rem', fontWeight: 700 }}>
@@ -191,42 +178,18 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
           </div>
         )}
 
-        {/* Detail rows */}
+        {/* Details Content */}
         <div style={{ padding: '0 1.25rem', flex: 1 }}>
-
-          {description && (
-            <DetailRow
-              icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-              label="Description"
-              value={<span style={{ whiteSpace: 'pre-wrap', fontSize: '.84rem', fontWeight: 600, color: '#374151' }}>{description}</span>}
-            />
-          )}
-
-          {promoter && (
-            <DetailRow
-              icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
-              label="Promoteur"
-              value={promoter}
-            />
-          )}
-
-          {locationText && (
-            <DetailRow
-              icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
-              label="Localisation"
-              value={locationText}
-            />
-          )}
-
+          
           <DetailRow
-            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-            label="Statut"
-            value={<StatusBadge status={project.status} />}
+            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
+            label="Promoteur"
+            value={project.promoterName}
           />
-
+          
           <DetailRow
             icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
-            label="P\u00e9riode"
+            label="Période"
             value={
               <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.84rem' }}>
                 {project.startsAt ? formatDate(project.startsAt) : '—'}&nbsp;&nbsp;&rarr;&nbsp;&nbsp;{project.endsAt ? formatDate(project.endsAt) : '—'}
@@ -234,20 +197,20 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
             }
           />
 
-          {project.budgetPlanned ? (
-            <DetailRow
-              icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-              label="Budget"
-              value={
+          <DetailRow
+            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            label="Budget"
+            value={
+              project.budgetPlanned ? (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.4rem', flexWrap: 'wrap', gap: '.5rem' }}>
                     <div>
-                      <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>Pr\u00e9vu&nbsp;</span>
+                      <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>Prévu&nbsp;</span>
                       <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: '#0F172A' }}>{formatCurrency(project.budgetPlanned)}</span>
                     </div>
                     {project.budgetSpent != null && (
                       <div>
-                        <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>D\u00e9pens\u00e9&nbsp;</span>
+                        <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>Dépensé&nbsp;</span>
                         <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: budgetCol }}>{formatCurrency(project.budgetSpent)}</span>
                       </div>
                     )}
@@ -255,51 +218,40 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
                   <div style={{ height: 7, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${pct}%`, background: budgetCol, borderRadius: 99 }} />
                   </div>
-                  <div style={{ textAlign: 'right', marginTop: '.2rem', fontFamily: "'DM Mono',monospace", fontSize: '.68rem', fontWeight: 700, color: budgetCol }}>{pct}% utilis\u00e9{over ? ' \u2014 D\u00e9passement !' : ''}</div>
+                  <div style={{ textAlign: 'right', marginTop: '.2rem', fontFamily: "'DM Mono',monospace", fontSize: '.68rem', fontWeight: 700, color: budgetCol }}>{pct}% utilisé{over ? ' — Dépassement !' : ''}</div>
                 </div>
-              }
-            />
-          ) : (
-            <DetailRow
-              icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-              label="Budget"
-              value={<span style={{ color: '#D1D5DB' }}>Non d\u00e9fini</span>}
-            />
-          )}
-
-          <DetailRow
-            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-            label="Cr\u00e9\u00e9 le"
-            value={<span style={{ fontFamily: "'DM Mono',monospace" }}>{formatDate(project.createdAt)}</span>}
+              ) : <span style={{ color: '#D1D5DB' }}>Non défini</span>
+            }
           />
 
-          <DetailRow
-            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>}
-            label="Modifi\u00e9 le"
-            value={<span style={{ fontFamily: "'DM Mono',monospace" }}>{formatDate(project.updatedAt)}</span>}
-          />
-
-          {/* Documents / non-image attachments */}
-          {docs.length > 0 && (
-            <DetailRow
-              icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>}
-              label="Pi\u00e8ces jointes"
-              value={
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
-                  {docs.map((d, idx) => (
-                    <a key={idx} href={d.url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', fontSize: '.78rem', fontWeight: 700, color: '#2563EB', textDecoration: 'none' }}>
-                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                      {d.fileName ?? 'T\u00e9l\u00e9charger'}
-                      {d.sizeBytes && <span style={{ color: '#9CA3AF', fontWeight: 600 }}>({formatBytes(d.sizeBytes)})</span>}
-                    </a>
-                  ))}
+          <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
+          
+          {/* Nouveau Bloc : Impacts & Cibles */}
+          {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
+             <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid rgba(37,99,235,.08)' }}>
+                <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  Impact &amp; Cibles
                 </div>
-              }
-            />
+                <DetailRow vertical icon={<span/>} label="Bénéficiaires cibles" value={project.targetBeneficiaries} />
+                <DetailRow vertical icon={<span/>} label="Impact sur la population" value={project.populationImpact} />
+                <DetailRow vertical icon={<span/>} label="Impact environnemental" value={project.environmentalImpact} />
+             </div>
           )}
 
-          {/* ID technique (small, collapsible feel) */}
-          <div style={{ padding: '.65rem 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Nouveau Bloc : Exécution */}
+          {(project.implementationMethod || project.risksAndMitigation) && (
+            <div style={{ marginTop: '1rem', background: '#FFFBEB', padding: '1rem', borderRadius: 12, border: '1px solid #FDE68A' }}>
+                <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#D97706', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  Exécution &amp; Risques
+                </div>
+                <DetailRow vertical icon={<span/>} label="Méthode d&apos;implémentation" value={project.implementationMethod} />
+                <DetailRow vertical icon={<span/>} label="Risques &amp; Mitigations" value={project.risksAndMitigation} />
+            </div>
+          )}
+
+          <div style={{ padding: '1rem 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: '.62rem', fontWeight: 800, color: '#D1D5DB', textTransform: 'uppercase', letterSpacing: '.08em' }}>ID projet</span>
             <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.68rem', fontWeight: 600, color: '#D1D5DB' }}>{project.id}</span>
           </div>
@@ -310,9 +262,6 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
           <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
             <span style={{ fontSize: '.76rem', fontWeight: 800, color: '#374151' }}>{s.label}</span>
-          </div>
-          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '.72rem', fontWeight: 600, color: '#9CA3AF' }}>
-            {attachments.length} fichier{attachments.length !== 1 ? 's' : ''}
           </div>
         </div>
       </div>
@@ -331,7 +280,7 @@ function DeleteModal({ project, onConfirm, onCancel, busy }: { project: Project;
         </div>
         <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.25rem', fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: '.35rem' }}>Supprimer ce projet&nbsp;?</h2>
         <p style={{ fontSize: '.82rem', color: '#6B7280', textAlign: 'center', marginBottom: '1.4rem', fontWeight: 600, lineHeight: 1.55 }}>
-          <strong style={{ color: '#111827' }}>{project.title}</strong> sera supprim&eacute; d&eacute;finitivement.
+          <strong style={{ color: '#111827' }}>{project.title}</strong> sera supprimé définitivement.
         </p>
         <div style={{ display: 'flex', gap: '.55rem', justifyContent: 'center' }}>
           <button onClick={onCancel} disabled={busy} style={{ height: 40, padding: '0 1.2rem', borderRadius: 10, border: '1px solid #D1D5DB', background: '#F9FAFB', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Annuler</button>
@@ -360,8 +309,8 @@ function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p
     setErr(null);
     const arr = Array.from(files); const valid: PhotoFile[] = [];
     for (const f of arr) {
-      if (!ACCEPT.includes(f.type))                  { setErr('Format non accept\u00e9 (PNG, JPG, WEBP).'); continue; }
-      if (f.size > MAX_MB * 1024 * 1024)             { setErr(`Fichier trop lourd \u2014 max ${MAX_MB}\u00a0Mo.`); continue; }
+      if (!ACCEPT.includes(f.type))                  { setErr('Format non accepté (PNG, JPG, WEBP).'); continue; }
+      if (f.size > MAX_MB * 1024 * 1024)             { setErr(`Fichier trop lourd — max ${MAX_MB}\u00a0Mo.`); continue; }
       if (photos.length + valid.length >= MAX_PHOTOS) { setErr(`Maximum ${MAX_PHOTOS} photos.`); break; }
       valid.push({ file: f, preview: URL.createObjectURL(f), id: `${f.name}-${f.size}-${Date.now()}` });
     }
@@ -399,7 +348,7 @@ function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           </div>
           <p style={{ margin: '0 0 .3rem', fontSize: '.82rem', fontWeight: 800, color: '#1D4ED8' }}>Cliquez ou glissez vos photos</p>
-          <p style={{ margin: 0, fontSize: '.72rem', fontWeight: 600, color: '#9CA3AF' }}>PNG, JPG, WEBP &mdash; max&nbsp;{MAX_MB}&nbsp;Mo &mdash; {remaining}&nbsp;emplacement{remaining > 1 ? 's' : ''} restant{remaining > 1 ? 's' : ''}</p>
+          <p style={{ margin: 0, fontSize: '.72rem', fontWeight: 600, color: '#9CA3AF' }}>PNG, JPG, WEBP — max {MAX_MB} Mo — {remaining} emplacement{remaining > 1 ? 's' : ''} restant{remaining > 1 ? 's' : ''}</p>
           <input ref={inputRef} type="file" accept={ACCEPT.join(',')} multiple hidden onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
         </div>
       )}
@@ -408,7 +357,7 @@ function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px, 1fr))', gap: '.5rem' }}>
           {photos.map(p => (
             <div key={p.id} style={{ position: 'relative', aspectRatio: '1', borderRadius: 10, overflow: 'hidden', border: '1px solid rgba(37,99,235,.15)', background: '#F8FAFC' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element -- blob preview URL */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={p.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               <button type="button" onClick={e => { e.stopPropagation(); remove(p.id); }} style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', background: 'rgba(15,23,42,.65)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
                 <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -433,8 +382,22 @@ const IS: React.CSSProperties = { width: '100%', height: 40, borderRadius: 11, b
 const TA: React.CSSProperties = { width: '100%', borderRadius: 11, border: '1px solid rgba(37,99,235,.15)', background: 'rgba(255,255,255,.88)', padding: '.75rem .9rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.84rem', fontWeight: 600, color: '#111827', outline: 'none', resize: 'vertical', minHeight: 80, boxSizing: 'border-box' };
 const SS: React.CSSProperties = { ...IS, appearance: 'none', cursor: 'pointer', backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right .75rem center', paddingRight: '2.2rem' };
 
-interface FormValues { title: string; description: string; location: string; promoter: string; status: ProjectStatus; budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string; }
-const EMPTY: FormValues = { title: '', description: '', location: '', promoter: '', status: 'DRAFT', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '' };
+// Extension de l'interface pour inclure tous les nouveaux champs de la Phase B
+interface FormValues {
+  title: string; summary: string; description: string; locationText: string; promoterName: string; status: ProjectStatus;
+  budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string;
+  targetBeneficiaries: string; populationImpact: string; environmentalImpact: string;
+  risksAndMitigation: string; implementationMethod: string;
+  specificObjectives: string; expectedResults: string; successIndicators: string;
+}
+
+const EMPTY: FormValues = {
+  title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'DRAFT',
+  budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '',
+  targetBeneficiaries: '', populationImpact: '', environmentalImpact: '',
+  risksAndMitigation: '', implementationMethod: '',
+  specificObjectives: '', expectedResults: '', successIndicators: ''
+};
 
 function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploadProgress }: {
   initial?: FormValues; onSave: (v: FormValues, p: File[]) => void; onCancel: () => void;
@@ -443,36 +406,73 @@ function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploa
   const [v, setV]           = useState<FormValues>(initial ?? EMPTY);
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const f = (k: keyof FormValues) => ({ value: v[k], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setV(p => ({ ...p, [k]: e.target.value })) });
+  
   return (
     <form onSubmit={e => { e.preventDefault(); onSave(v, photos.map(p => p.file)); }}>
-      <div style={{ display: 'grid', gap: '.85rem' }}>
-        <div><label style={LS}>Titre <span style={{ color: '#EF4444' }}>*</span></label><input style={IS} placeholder="Nom du projet" required {...f('title')} /></div>
-        <div><label style={LS}>Statut</label>
-          <select style={SS} value={v.status} onChange={e => setV(p => ({ ...p, status: e.target.value as ProjectStatus }))}>
-            {STATUS_FORM_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
-          <div><label style={LS}>Localisation</label><input style={IS} placeholder="Ville, r\u00e9gion\u2026" {...f('location')} /></div>
-          <div><label style={LS}>Promoteur</label><input style={IS} placeholder="Nom du porteur" {...f('promoter')} /></div>
+      <div style={{ display: 'grid', gap: '1.2rem' }}>
+        
+        {/* --- SECTION: INFO GÉNÉRALES --- */}
+        <div className="pp-form-section">
+          <h3 className="pp-form-section-title"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Informations Générales</h3>
+          <div style={{ display: 'grid', gap: '.85rem' }}>
+            <div><label style={LS}>Titre du projet <span style={{ color: '#EF4444' }}>*</span></label><input style={IS} placeholder="Nom officiel du projet" required {...f('title')} /></div>
+            <div><label style={LS}>Résumé court</label><input style={IS} placeholder="Une phrase d&apos;accroche ou résumé rapide" {...f('summary')} /></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+              <div><label style={LS}>Statut</label>
+                <select style={SS} value={v.status} onChange={e => setV(p => ({ ...p, status: e.target.value as ProjectStatus }))}>
+                  {STATUS_FORM_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div><label style={LS}>Promoteur / Porteur</label><input style={IS} placeholder="Nom du responsable" {...f('promoterName')} /></div>
+            </div>
+            <div><label style={LS}>Localisation</label><input style={IS} placeholder="Région, Ville, ou Adresse" {...f('locationText')} /></div>
+            <div><label style={LS}>Description détaillée</label><textarea style={{ ...TA, minHeight: 120 }} placeholder="Contexte, justification et description complète du projet..." {...f('description')} /></div>
+          </div>
         </div>
-        <div><label style={LS}>Description</label><textarea style={TA} placeholder="D\u00e9crivez le projet\u2026" {...f('description')} /></div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
-          <div><label style={LS}>Budget pr\u00e9vu (GNF)</label><input style={IS} type="number" min="0" placeholder="0" {...f('budgetPlanned')} /></div>
-          <div><label style={LS}>Budget d\u00e9pens\u00e9 (GNF)</label><input style={IS} type="number" min="0" placeholder="0" {...f('budgetSpent')} /></div>
+
+        {/* --- SECTION: IMPACT & OBJECTIFS --- */}
+        <div className="pp-form-section">
+          <h3 className="pp-form-section-title"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Impact &amp; Objectifs</h3>
+          <div style={{ display: 'grid', gap: '.85rem' }}>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '.85rem' }}>
+                <div><label style={LS}>Bénéficiaires cibles</label><input style={IS} placeholder="Ex: Étudiants, Agriculteurs..." {...f('targetBeneficiaries')} /></div>
+                <div><label style={LS}>Impact population</label><input style={IS} placeholder="Bénéfices sociaux" {...f('populationImpact')} /></div>
+             </div>
+             <div><label style={LS}>Impact environnemental</label><input style={IS} placeholder="Conséquences sur l'environnement" {...f('environmentalImpact')} /></div>
+             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '.85rem' }}>
+                <div><label style={LS}>Objectifs spécifiques</label><textarea style={TA} placeholder="Liste des objectifs" {...f('specificObjectives')} /></div>
+                <div><label style={LS}>Indicateurs de succès</label><textarea style={TA} placeholder="Comment mesurer la réussite ?" {...f('successIndicators')} /></div>
+             </div>
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
-          <div><label style={LS}>D\u00e9but</label><input style={IS} type="date" {...f('startsAt')} /></div>
-          <div><label style={LS}>Fin</label><input style={IS} type="date" {...f('endsAt')} /></div>
+
+        {/* --- SECTION: EXÉCUTION --- */}
+        <div className="pp-form-section">
+          <h3 className="pp-form-section-title"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> Exécution &amp; Budget</h3>
+          <div style={{ display: 'grid', gap: '.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '.85rem' }}>
+              <div><label style={LS}>Méthode d&apos;implémentation</label><textarea style={TA} placeholder="Étapes de réalisation..." {...f('implementationMethod')} /></div>
+              <div><label style={LS}>Risques &amp; Mitigations</label><textarea style={TA} placeholder="Dangers potentiels et solutions..." {...f('risksAndMitigation')} /></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+              <div><label style={LS}>Début prévu</label><input style={IS} type="date" {...f('startsAt')} /></div>
+              <div><label style={LS}>Fin prévue</label><input style={IS} type="date" {...f('endsAt')} /></div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+              <div><label style={LS}>Budget prévu (GNF)</label><input style={IS} type="number" min="0" placeholder="0" {...f('budgetPlanned')} /></div>
+              <div><label style={LS}>Budget dépensé (GNF)</label><input style={IS} type="number" min="0" placeholder="0" {...f('budgetSpent')} /></div>
+            </div>
+          </div>
         </div>
-        <div style={{ borderTop: '1px solid rgba(37,99,235,.08)' }} />
+
         <PhotoDropZone photos={photos} onChange={setPhotos} />
-        <div style={{ borderTop: '1px solid rgba(37,99,235,.08)' }} />
+        
         {uploadProgress && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '.55rem', padding: '.65rem .9rem', background: 'rgba(239,246,255,.8)', border: '1px solid rgba(37,99,235,.18)', borderRadius: 10, fontSize: '.78rem', fontWeight: 700, color: '#1D4ED8' }}>
             <div style={{ width: 14, height: 14, border: '2px solid rgba(37,99,235,.2)', borderTopColor: '#2563EB', borderRadius: '50%', animation: 'ppspin .7s linear infinite', flexShrink: 0 }} />{uploadProgress}
           </div>
         )}
-        <div style={{ display: 'flex', gap: '.55rem' }}>
+        <div style={{ display: 'flex', gap: '.55rem', marginTop: '.5rem' }}>
           <button type="button" onClick={onCancel} disabled={submitting} style={{ flex: 1, height: 44, borderRadius: 11, border: '1px solid #D1D5DB', background: '#F9FAFB', fontFamily: "'DM Sans',sans-serif", fontSize: '.84rem', fontWeight: 700, color: '#374151', cursor: 'pointer', opacity: submitting ? .5 : 1 }}>Annuler</button>
           <button type="submit" disabled={submitting} style={{ flex: 2, height: 44, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', fontFamily: "'DM Sans',sans-serif", fontSize: '.88rem', fontWeight: 900, color: 'white', cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', boxShadow: '0 4px 14px rgba(37,99,235,.3)', opacity: submitting ? .7 : 1 }}>
             {submitting ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'ppspin .7s linear infinite' }} />Enregistrement&#8230;</> : <><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>{submitLabel}</>}
@@ -530,16 +530,29 @@ export default function AdminProjectsPage() {
         photoIds.push(up.id);
       }
       setUploadProgress('Finalisation\u2026');
-      let desc = values.description || '';
-      if (values.promoter) desc = `**Promoteur\u00a0:** ${values.promoter}\n\n${desc}`;
+
       const payload = {
-        title: values.title, description: desc || undefined,
-        locationText: values.location || undefined, status: values.status,
+        title: values.title, 
+        summary: values.summary || undefined,
+        description: values.description || undefined,
+        locationText: values.locationText || undefined, 
+        status: values.status,
+        promoterName: values.promoterName || undefined,
+        targetBeneficiaries: values.targetBeneficiaries || undefined,
+        populationImpact: values.populationImpact || undefined,
+        environmentalImpact: values.environmentalImpact || undefined,
+        risksAndMitigation: values.risksAndMitigation || undefined,
+        implementationMethod: values.implementationMethod || undefined,
+        specificObjectives: values.specificObjectives || undefined, 
+        expectedResults: values.expectedResults || undefined,
+        successIndicators: values.successIndicators || undefined,
         budgetPlanned: values.budgetPlanned ? Number(values.budgetPlanned) : undefined,
         budgetSpent:   values.budgetSpent   ? Number(values.budgetSpent)   : undefined,
-        startsAt: values.startsAt || null, endsAt: values.endsAt || null,
+        startsAt: values.startsAt || null, 
+        endsAt: values.endsAt || null,
         ...(photoIds.length > 0 && { photoIds }),
       };
+
       if (editing) {
         await api.updateAntennaProject(editing.id, payload as Parameters<typeof api.updateAntennaProject>[1]);
       } else {
@@ -568,13 +581,24 @@ export default function AdminProjectsPage() {
   }
 
   const editingInitial: FormValues | undefined = editing ? {
-    title: editing.title, description: editing.description ?? '',
-    location: (editing as unknown as { locationText?: string }).locationText ?? '',
-    promoter: '',  status: editing.status,
+    title: editing.title, 
+    summary: editing.summary ?? '',
+    description: editing.description ?? '',
+    locationText: editing.locationText ?? '',
+    promoterName: editing.promoterName ?? '',
+    status: editing.status,
     budgetPlanned: editing.budgetPlanned?.toString() ?? '',
     budgetSpent:   editing.budgetSpent?.toString()   ?? '',
     startsAt: editing.startsAt ? new Date(editing.startsAt).toISOString().slice(0, 10) : '',
     endsAt:   editing.endsAt   ? new Date(editing.endsAt).toISOString().slice(0, 10)   : '',
+    targetBeneficiaries: editing.targetBeneficiaries ?? '',
+    populationImpact: editing.populationImpact ?? '',
+    environmentalImpact: editing.environmentalImpact ?? '',
+    risksAndMitigation: editing.risksAndMitigation ?? '',
+    implementationMethod: editing.implementationMethod ?? '',
+    specificObjectives: typeof editing.specificObjectives === 'string' ? editing.specificObjectives : JSON.stringify(editing.specificObjectives ?? ''),
+    expectedResults: typeof editing.expectedResults === 'string' ? editing.expectedResults : JSON.stringify(editing.expectedResults ?? ''),
+    successIndicators: typeof editing.successIndicators === 'string' ? editing.successIndicators : JSON.stringify(editing.successIndicators ?? ''),
   } : undefined;
 
   const draftCount      = items.filter(i => i.status === 'DRAFT').length;
@@ -608,9 +632,13 @@ export default function AdminProjectsPage() {
         .pp-new-btn.open{background:rgba(37,99,235,.08);color:#1D4ED8;border:1.5px solid rgba(37,99,235,.2);box-shadow:none}
 
         .pp-form-panel{overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1),opacity .25s ease;max-height:0;opacity:0}
-        .pp-form-panel.open{max-height:2000px;opacity:1}
-        .pp-form-inner{padding:1.2rem;border-bottom:1px solid rgba(37,99,235,.07);background:rgba(239,246,255,.18)}
-        @media(max-width:560px){.pp-form-inner{padding:.9rem}}
+        .pp-form-panel.open{max-height:3000px;opacity:1}
+        .pp-form-inner{padding:1.5rem 1.2rem;border-bottom:1px solid rgba(37,99,235,.07);background:rgba(239,246,255,.18)}
+        @media(max-width:560px){.pp-form-inner{padding:1.2rem .9rem}}
+        
+        .pp-form-section { background: rgba(255,255,255,.6); border: 1px solid rgba(37,99,235,.1); padding: 1.2rem; border-radius: 14px; margin-bottom: 1rem; }
+        .pp-form-section-title { margin: 0 0 1rem; font-size: .8rem; font-weight: 800; color: #1D4ED8; text-transform: uppercase; letter-spacing: .05em; display: flex; alignItems: center; gap: .4rem; border-bottom: 1px dashed rgba(37,99,235,.15); padding-bottom: .6rem; }
+
         .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
         .pp-edit-dot{width:6px;height:6px;border-radius:50%;background:#2563EB;animation:pppulse 1.5s infinite;flex-shrink:0}
         .pp-save-err{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;color:#B91C1C;font-size:.78rem;font-weight:800;margin-bottom:.7rem}
@@ -708,7 +736,9 @@ export default function AdminProjectsPage() {
               {saveError && (
                 <div className="pp-save-err"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>{saveError}</div>
               )}
-              <ProjectForm key={editing?.id ?? 'new'} initial={editingInitial} onSave={(v, p) => void handleSave(v, p)} onCancel={closeForm} submitting={submitting} submitLabel={formMode === 'edit' ? 'Mettre \u00e0 jour' : 'Cr\u00e9er le projet'} uploadProgress={uploadProgress} />
+              {formOpen && (
+                <ProjectForm key={editing?.id ?? 'new'} initial={editingInitial} onSave={(v, p) => void handleSave(v, p)} onCancel={closeForm} submitting={submitting} submitLabel={formMode === 'edit' ? 'Mettre à jour' : 'Créer le projet'} uploadProgress={uploadProgress} />
+              )}
             </div>
           </div>
 
@@ -717,7 +747,7 @@ export default function AdminProjectsPage() {
             {([
               { label: 'Brouillons', count: draftCount,      color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
               { label: 'En cours',   count: inProgressCount, color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-              { label: 'Termin\u00e9s', count: completedCount, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+              { label: 'Terminés',   count: completedCount,  color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
             ] as const).map(c => (
               <div key={c.label} className="pp-chip" style={{ background: c.bg, borderColor: c.border, color: c.color }}>
                 <span className="pp-chip-dot" style={{ background: c.color }} />
@@ -729,7 +759,7 @@ export default function AdminProjectsPage() {
 
           {/* Filter */}
           <div className="pp-filter-row">
-            <input className="pp-finput" placeholder="Rechercher par titre\u2026" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void load()} />
+            <input className="pp-finput" placeholder="Rechercher par titre…" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void load()} />
             <select className="pp-fselect" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
               {STATUS_LIST_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
@@ -747,8 +777,8 @@ export default function AdminProjectsPage() {
           ) : items.length === 0 ? (
             <div className="pp-empty">
               <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
-              <div className="pp-empty-title">Aucun projet trouv&eacute;</div>
-              <div className="pp-empty-sub">Cliquez sur <strong>Nouveau projet</strong> pour en cr&eacute;er un.</div>
+              <div className="pp-empty-title">Aucun projet trouvé</div>
+              <div className="pp-empty-sub">Cliquez sur <strong>Nouveau projet</strong> pour en créer un.</div>
             </div>
           ) : (
             <>
@@ -776,7 +806,7 @@ export default function AdminProjectsPage() {
                           <div className="pp-proj-dates">{p.startsAt ? formatDate(p.startsAt) : '—'}&nbsp;&rarr;&nbsp;{p.endsAt ? formatDate(p.endsAt) : '—'}</div>
                           <div className="pp-hint">
                             <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                            Voir les d&eacute;tails
+                            Voir les détails
                           </div>
                         </td>
                         <td className="pp-td"><StatusBadge status={p.status} /></td>

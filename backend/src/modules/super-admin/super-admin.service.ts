@@ -1,4 +1,4 @@
-//backend/src/modules/super-admin/super-admin.service.ts
+// backend/src/modules/super-admin/super-admin.service.ts
 import {
   BadRequestException, 
   ConflictException,
@@ -158,6 +158,7 @@ export class SuperAdminService {
         include: {
           memberships: { include: { antenna: true } },
           adminAssignments: { include: { antenna: true } },
+          virtualCard: true // <-- INCLUSION CARTE POUR SUPER ADMIN
         },
       }),
       this.prisma.user.count({ where }),
@@ -526,7 +527,6 @@ export class SuperAdminService {
     });
   }
 
-  // 👇 AJOUT CHIRURGICAL : Inclusion des `attachments` pour le dashboard Super Admin
   async listProjects(page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
     const where: Prisma.ProjectWhereInput = q

@@ -18,7 +18,21 @@ type ExtendedUser = UserSummary & {
   addressLine2?: string | null;
   profilePhotoUrl?: string | null;
   cardNumber?: string | null;
+  function?: string | null; // <-- Ajout du champ Poste Occupé
 };
+
+// Liste des rôles de l'association
+const ASSOCIATION_ROLES = [
+  'Membre (simple)',
+  "Secrétaire à l'organisation",
+  'Secrétaire Général(e)',
+  'Trésorier / Trésorière',
+  'Président(e)',
+  'Vice-président(e)',
+  'Chargé(e) de communication',
+  'Conseiller / Conseillère',
+  'Autre'
+];
 
 /* ══════════════════════════════════════════════════════ BADGES & ICONS */
 const STATUS_MAP: Record<UserStatus, { label: string; color: string; bg: string; border: string }> = {
@@ -27,7 +41,7 @@ const STATUS_MAP: Record<UserStatus, { label: string; color: string; bg: string;
   PENDING_EMAIL_VERIFICATION: { label: 'Email non vérifié',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   SUSPENDED:                  { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
   REJECTED:                   { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  DELETED:                    { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' }, // <-- AJOUTE CETTE LIGNE
+  DELETED:                    { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' }, 
 };
 
 function StatusBadge({ status }: { status: UserStatus }) {
@@ -147,11 +161,36 @@ function MemberDetails({
         <DetailField label="Nom" fieldKey="lastName" isEditing={isEditing} editValue={editValues.lastName as string} origValue={user.lastName} onChange={handleChange} />
         <DetailField label="Email" fieldKey="email" type="email" isEditing={isEditing} editValue={editValues.email as string} origValue={user.email} onChange={handleChange} />
         <DetailField label="Téléphone" fieldKey="phone" placeholder="+33 6..." isEditing={isEditing} editValue={editValues.phone as string} origValue={user.phone} onChange={handleChange} />
-        <DetailField label="Date de naissance" fieldKey="birthDate" type="date" isEditing={isEditing} editValue={editValues.birthDate as string} origValue={user.birthDate} onChange={handleChange} />
+        {/* 💡 CORRECTION DU BONUS ICI (Application du formatage de la date de naissance) */}
+        <DetailField label="Date de naissance" fieldKey="birthDate" type="date" isEditing={isEditing} editValue={editValues.birthDate as string} origValue={user.birthDate ? formatDate(user.birthDate) : null} onChange={handleChange} />
         <DetailField label="Commune d'origine" fieldKey="originSubPrefecture" placeholder="Ex: Lafou" isEditing={isEditing} editValue={editValues.originSubPrefecture as string} origValue={user.originSubPrefecture} onChange={handleChange} />
         <DetailField label="Ville de résidence" fieldKey="city" isEditing={isEditing} editValue={editValues.city as string} origValue={user.city} onChange={handleChange} />
         <DetailField label="Pays" fieldKey="country" isEditing={isEditing} editValue={editValues.country as string} origValue={user.country} onChange={handleChange} />
-        
+
+        {/* 💡 AJOUT : LE POSTE OCCUPÉ (FUNCTION) */}
+        <div className="sm-dp-field">
+          <label>Poste occupé dans l&apos;asso</label>
+          {isEditing ? (
+            <select 
+              className="sm-dp-input" 
+              style={{ cursor: 'pointer', appearance: 'auto' }}
+              value={editValues.function || ''} 
+              onChange={e => handleChange('function', e.target.value)}
+            >
+              <option value="">Sélectionnez un rôle...</option>
+              {ASSOCIATION_ROLES.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          ) : (
+            <div className="sm-dp-value">
+              {user.function ? (
+                <span style={{ color: '#DC2626', fontWeight: 800 }}>{user.function}</span>
+              ) : <span style={{color: '#9CA3AF'}}>Non renseigné</span>}
+            </div>
+          )}
+        </div>
+
         <div className="sm-dp-field" style={{ gridColumn: '1 / -1' }}>
           <label>Adresse postale</label>
           {isEditing ? (
@@ -205,7 +244,7 @@ export default function SuperAdminMembersPage() {
   const [status,  setStatus]  = useState('');
   const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Partial<ExtendedUser>>({});
@@ -295,7 +334,6 @@ export default function SuperAdminMembersPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
         .sm-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1200px;margin:0 auto}
-
         /* Header */
         .sm-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:smin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
         .sm-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}

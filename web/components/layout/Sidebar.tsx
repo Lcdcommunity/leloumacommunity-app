@@ -1,7 +1,7 @@
-// web/components/layout/Sidebar.tsx
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '../../lib/api-client';
@@ -51,7 +51,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/documents',      label: 'Documents',             icon: <Ico d={ICO.doc} /> },
   { href: '/super-admin/notifications',  label: 'Notifications',         icon: <Ico d={ICO.bell} /> },
   { href: '/super-admin/audit',          label: 'Audit',                 icon: <Ico d={ICO.audit} /> },
-  { href: '/super-admin/settings',       label: 'Param\u00e8tres',       icon: <Ico d={ICO.gear} /> },
+  { href: '/super-admin/settings',       label: 'Paramètres',            icon: <Ico d={ICO.gear} /> },
 ];
 
 const adminItems: NavItem[] = [
@@ -68,31 +68,67 @@ const adminItems: NavItem[] = [
   { href: '/admin/notifications',        label: 'Notifications',         icon: <Ico d={ICO.bell} /> },
   { href: '/admin/audit',                label: 'Audit',                 icon: <Ico d={ICO.audit} /> },
   { href: '/admin/profile',              label: 'Mon profil',            icon: <Ico d={ICO.user} /> },
-  { href: '/admin/settings',             label: 'Param\u00e8tres',       icon: <Ico d={ICO.gear} /> },
+  { href: '/admin/settings',             label: 'Paramètres',            icon: <Ico d={ICO.gear} /> },
 ];
 
 const memberItems: NavItem[] = [
-  { href: '/member',                       label: 'Dashboard',             icon: <Ico d={ICO.home} /> },
-  { href: '/member/contributions/new',     label: 'Faire un d\u00e9p\u00f4t', icon: <Ico d={ICO.plus} /> },
-  { href: '/member/contributions/history', label: 'Mes cotisations',       icon: <Ico d={ICO.coin} /> },
-  { href: '/member/projects',              label: 'Projets',               icon: <Ico d={ICO.clip} /> },
-  { href: '/member/projects/propose',      label: 'Proposer un projet',    icon: <Ico d={ICO.edit} /> },
-  { href: '/member/documents',             label: 'Documents & photos',    icon: <Ico d={ICO.doc} /> },
-  { href: '/member/contents',              label: 'Informations',          icon: <Ico d={ICO.news} /> },
-  { href: '/member/late-members',          label: 'Retardataires +3 mois', icon: <Ico d={ICO.clock} /> },
-  { href: '/member/notifications',         label: 'Notifications',         icon: <Ico d={ICO.bell} /> },
-  { href: '/member/profile',               label: 'Mon profil',            icon: <Ico d={ICO.user} /> },
-  { href: '/member/settings',              label: 'Param\u00e8tres',       icon: <Ico d={ICO.gear} /> },
+  { href: '/member',                       label: 'Dashboard',               icon: <Ico d={ICO.home} /> },
+  { href: '/member/contributions/new',     label: 'Faire un dépôt',          icon: <Ico d={ICO.plus} /> },
+  { href: '/member/contributions/history', label: 'Mes cotisations',         icon: <Ico d={ICO.coin} /> },
+  { href: '/member/projects',              label: 'Projets',                 icon: <Ico d={ICO.clip} /> },
+  { href: '/member/projects/propose',      label: 'Proposer un projet',      icon: <Ico d={ICO.edit} /> },
+  { href: '/member/documents',             label: 'Documents & photos',      icon: <Ico d={ICO.doc} /> },
+  { href: '/member/contents',              label: 'Informations',            icon: <Ico d={ICO.news} /> },
+  { href: '/member/late-members',          label: 'Retardataires +3 mois',   icon: <Ico d={ICO.clock} /> },
+  { href: '/member/notifications',         label: 'Notifications',           icon: <Ico d={ICO.bell} /> },
+  { href: '/member/profile',               label: 'Mon profil',              icon: <Ico d={ICO.user} /> },
+  { href: '/member/settings',              label: 'Paramètres',              icon: <Ico d={ICO.gear} /> },
 ];
 
-// Items that go in the "bottom" section, separated by a divider
 const BOTTOM_SLUGS = ['settings', 'profile'];
 
-type RoleColors = { accent: string; dim: string; pillBg: string; pillText: string };
-const ROLE_COLORS: Record<string, RoleColors> = {
-  SUPER_ADMIN:   { accent: '#DC2626', dim: 'rgba(220,38,38,0.1)',  pillBg: '#FEF2F2', pillText: '#B91C1C' },
-  ANTENNA_ADMIN: { accent: '#2563EB', dim: 'rgba(37,99,235,0.1)',  pillBg: '#EFF6FF', pillText: '#1D4ED8' },
-  MEMBER:        { accent: '#2563EB', dim: 'rgba(37,99,235,0.1)',  pillBg: '#EFF6FF', pillText: '#1D4ED8' },
+/**
+ * Couleurs par rôle :
+ *  SUPER_ADMIN   → rouge doux
+ *  ANTENNA_ADMIN → bleu ciel
+ *  MEMBER        → vert
+ */
+const ROLE_COLORS: Record<string, {
+  accent: string;
+  dim: string;
+  pillBg: string;
+  pillText: string;
+  gradient: string;
+  label: string;
+  hoverBg: string;
+}> = {
+  SUPER_ADMIN: {
+    accent: '#C0392B',
+    dim: 'rgba(192,57,43,0.08)',
+    pillBg: '#FDF3F2',
+    pillText: '#C0392B',
+    gradient: 'linear-gradient(135deg,#C0392B,#E74C3C)',
+    label: 'Super Admin',
+    hoverBg: 'rgba(192,57,43,0.05)',
+  },
+  ANTENNA_ADMIN: {
+    accent: '#2980B9',
+    dim: 'rgba(41,128,185,0.10)',
+    pillBg: '#E8F6FD',
+    pillText: '#2980B9',
+    gradient: 'linear-gradient(135deg,#2980B9,#5DADE2)',
+    label: 'Admin antenne',
+    hoverBg: 'rgba(41,128,185,0.05)',
+  },
+  MEMBER: {
+    accent: '#27AE60',
+    dim: 'rgba(39,174,96,0.10)',
+    pillBg: '#E8F8EF',
+    pillText: '#27AE60',
+    gradient: 'linear-gradient(135deg,#27AE60,#52D48A)',
+    label: 'Membre',
+    hoverBg: 'rgba(39,174,96,0.05)',
+  },
 };
 
 export function Sidebar() {
@@ -121,8 +157,7 @@ export function Sidebar() {
   const mainItems   = allItems.filter(i => !BOTTOM_SLUGS.some(s => i.href.endsWith('/' + s)));
   const bottomItems = allItems.filter(i =>  BOTTOM_SLUGS.some(s => i.href.endsWith('/' + s)));
 
-  const colors  = ROLE_COLORS[role ?? ''] ?? ROLE_COLORS['MEMBER'];
-  const roleLabel = role === 'SUPER_ADMIN' ? 'Super Admin' : role === 'ANTENNA_ADMIN' ? 'Admin antenne' : role === 'MEMBER' ? 'Membre' : '';
+  const colors = ROLE_COLORS[role ?? 'ANTENNA_ADMIN'] ?? ROLE_COLORS['ANTENNA_ADMIN'];
 
   async function handleLogout() {
     await logout(false);
@@ -140,48 +175,47 @@ export function Sidebar() {
           display: flex; flex-direction: column;
           background: rgba(255,255,255,0.94);
           backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-          border-right: 1px solid rgba(37,99,235,0.08);
-          box-shadow: 2px 0 18px rgba(37,99,235,0.04);
+          border-right: 1px solid var(--sb-dim);
+          box-shadow: 2px 0 18px var(--sb-dim);
           font-family: 'DM Sans', sans-serif;
           overflow: hidden;
-          /* Hidden on mobile — MobileNav takes over */
         }
         @media (max-width: 768px) { .sidebar { display: none; } }
 
-        /* Brand */
+        /* ── Brand avec logo ── */
         .sb-brand {
-          padding: 1rem 1rem 0.8rem;
-          display: flex; align-items: center; gap: 0.6rem;
-          border-bottom: 1px solid rgba(37,99,235,0.07);
+          padding: 0.85rem 1rem;
+          display: flex; align-items: center; gap: 0.65rem;
+          border-bottom: 1px solid var(--sb-dim);
           flex-shrink: 0;
         }
-        .sb-logo {
-          width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 1.05rem; font-weight: 600; color: white;
-          box-shadow: 0 3px 10px rgba(37,99,235,0.28);
+        .sb-logo-img {
+          width: 36px !important; height: 36px !important;
+          border-radius: 9px; flex-shrink: 0;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+          object-fit: cover; display: block !important;
         }
+        .sb-brand-text { display: flex; flex-direction: column; min-width: 0; }
         .sb-name {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 0.92rem; font-weight: 600; color: #111827;
+          font-size: 0.95rem; font-weight: 600; color: #111827;
           letter-spacing: -0.01em; line-height: 1.2;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .sb-pill {
           font-size: 0.58rem; font-weight: 800; letter-spacing: 0.07em;
-          text-transform: uppercase; padding: 0.12rem 0.42rem;
+          text-transform: uppercase; padding: 0.1rem 0.42rem;
           border-radius: 99px; display: inline-flex;
-          margin-top: 1px;
+          margin-top: 2px; width: fit-content;
         }
 
-        /* Nav scroll */
+        /* ── Nav ── */
         .sb-nav {
           flex: 1; overflow-y: auto; padding: 0.55rem 0.6rem;
           scrollbar-width: none;
         }
         .sb-nav::-webkit-scrollbar { display: none; }
 
-        /* Links */
         .sb-link {
           display: flex; align-items: center; gap: 0.6rem;
           padding: 0.52rem 0.7rem; border-radius: 9px;
@@ -192,8 +226,9 @@ export function Sidebar() {
           white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
         .sb-link:hover {
-          background: rgba(37,99,235,0.055);
-          color: #1D4ED8; transform: translateX(2px);
+          background: var(--sb-hover);
+          color: var(--sb-accent);
+          transform: translateX(2px);
         }
         .sb-link.active {
           background: var(--sb-dim);
@@ -207,15 +242,14 @@ export function Sidebar() {
           background: var(--sb-accent);
         }
         .sb-ico { flex-shrink: 0; opacity: 0.65; transition: opacity 0.14s; }
-        .sb-link:hover .sb-ico, .sb-link.active .sb-ico { opacity: 1; }
+        .sb-link:hover .sb-ico,
+        .sb-link.active .sb-ico { opacity: 1; }
 
-        /* Divider */
-        .sb-div { height: 1px; background: rgba(37,99,235,0.07); margin: 0.4rem 0.7rem; }
+        .sb-bottom {
+          padding: 0.55rem 0.6rem 0;
+          border-top: 1px solid var(--sb-dim);
+        }
 
-        /* Bottom */
-        .sb-bottom { padding: 0.55rem 0.6rem 0; border-top: 1px solid rgba(37,99,235,0.07); }
-
-        /* Logout */
         .sb-footer { padding: 0.5rem 0.6rem 0.7rem; }
         .sb-logout {
           display: flex; align-items: center; gap: 0.55rem;
@@ -230,39 +264,55 @@ export function Sidebar() {
 
       <aside
         className="sidebar"
-        style={{ '--sb-accent': colors.accent, '--sb-dim': colors.dim } as React.CSSProperties}
+        style={{
+          '--sb-accent': colors.accent,
+          '--sb-dim':    colors.dim,
+          '--sb-hover':  colors.hoverBg,
+        } as React.CSSProperties}
       >
-        {/* Brand */}
+        {/* ── Brand : logo + nom + rôle ── */}
         <div className="sb-brand">
-          <div className="sb-logo"
-            style={{ background: `linear-gradient(135deg, ${colors.accent === '#DC2626' ? '#B91C1C' : '#1D4ED8'}, ${colors.accent})` }}>
-            L
-          </div>
-          <div>
-            <div className="sb-name">L&eacute;louma</div>
-            <div className="sb-pill" style={{ background: colors.pillBg, color: colors.pillText }}>
-              {roleLabel}
+          <Image
+            src="/assets/images/logolcd.jpg"
+            alt="Lélouma CD"
+            width={36}
+            height={36}
+            className="sb-logo-img"
+          />
+          <div className="sb-brand-text">
+            <div className="sb-name">Lélouma</div>
+            <div
+              className="sb-pill"
+              style={{ background: colors.pillBg, color: colors.pillText }}
+            >
+              {colors.label}
             </div>
           </div>
         </div>
 
-        {/* Main nav */}
+        {/* ── Nav principale ── */}
         <nav className="sb-nav">
           {mainItems.map(item => (
-            <Link key={item.href} href={item.href}
-              className={`sb-link${pathname === item.href ? ' active' : ''}`}>
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`sb-link${pathname === item.href ? ' active' : ''}`}
+            >
               <span className="sb-ico">{item.icon}</span>
               {item.label}
             </Link>
           ))}
         </nav>
 
-        {/* Bottom nav (profile/settings) */}
+        {/* ── Profil / Paramètres ── */}
         {bottomItems.length > 0 && (
           <div className="sb-bottom">
             {bottomItems.map(item => (
-              <Link key={item.href} href={item.href}
-                className={`sb-link${pathname === item.href ? ' active' : ''}`}>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`sb-link${pathname === item.href ? ' active' : ''}`}
+              >
                 <span className="sb-ico">{item.icon}</span>
                 {item.label}
               </Link>
@@ -270,14 +320,14 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Logout */}
+        {/* ── Déconnexion ── */}
         <div className="sb-footer">
           <button className="sb-logout" onClick={handleLogout}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round"
                 d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
             </svg>
-            D&eacute;connexion
+            Déconnexion
           </button>
         </div>
       </aside>

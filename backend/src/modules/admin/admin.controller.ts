@@ -55,7 +55,7 @@ export class AdminController {
     return this.service.listLateMembers(user.id, +page, +pageSize);
   }
 
-  // 👇 AJOUT CHIRURGICAL : GESTION DU STATUT DES MEMBRES 👇
+  // 👇 GESTION DU STATUT DES MEMBRES 👇
   @Patch('members/:id/suspend')
   suspendMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.suspendUser(id, user.id);
@@ -70,7 +70,13 @@ export class AdminController {
   deleteMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.deleteUser(id, user.id);
   }
-  // 👆 FIN DE L'AJOUT 👇
+
+  // 👇 AJOUT CHIRURGICAL : MISE A JOUR PROFIL MEMBRE PAR L'ADMIN 👇
+  @Patch('members/:id')
+  updateAntennaMember(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: any) {
+    return this.service.updateAntennaMember(id, user.id, body);
+  }
+  // 👆 FIN DE L'AJOUT 👆
 
   // --- GESTION DES COTISATIONS ---
   @Get('contributions')
@@ -110,6 +116,19 @@ export class AdminController {
   ) {
     return this.service.listProjects(user.id, +page, +pageSize, status, q);
   }
+
+  // 👇 NOUVELLE ROUTE EXPORT PDF PROJET 👇
+  @Get('projects/:id/export')
+  async exportProjectPdf(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
+    const pdfBuffer = await this.service.exportProjectPdf(id, user.id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="projet-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
+  }
+  // 👆 FIN NOUVELLE ROUTE 👆
 
   @Post('projects')
   createProject(@CurrentUser() user: AuthUser, @Body() body: any) {

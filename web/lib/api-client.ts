@@ -14,14 +14,11 @@ import type { Association } from '../types/association';
 import type { AntennaDashboardStats, ProjectionResult } from '../types/stats';
 
 import { http } from './http';
+import { getAccessToken, getRefreshToken, setTokens, clearAuthState } from './auth-store';
+import { env } from './env';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VirtualCardData — source de vérité partagée entre :
-//   • web/app/(public)/signup/page.tsx        (collecte des données)
-//   • web/app/(protected)/member/profile/page.tsx (affichage / mise à jour)
-//   • web/components/member/VirtualCardWidget.tsx (rendu de la carte)
-//
-// RÈGLE : tout champ collecté au signup doit être déclaré ici (optionnel OK).
+// VirtualCardData
 // ─────────────────────────────────────────────────────────────────────────────
 export interface VirtualCardData {
   cardNumber: string;
@@ -30,27 +27,18 @@ export interface VirtualCardData {
   qrToken: string;
   antennaName: string;
   user: {
-    // ── Identité ──
     firstName: string;
     lastName: string;
-    function?: string | null;            // profession (champ "Profession" du signup)
-
-    // ── Naissance (signup étape 1 → section "Naissance") ──
+    function?: string | null;
     birthDate?: string | null;
     placeOfBirth?: string | null;
-    birthCountry?: string | null;        // "Pays de naissance" signup
-
-    // ── Origine (signup étape 1 → section "Identité communautaire") ──
-    originSubPrefecture?: string | null; // commune d'origine (obligatoire signup)
-    originCommune?: string | null;       // alias de originSubPrefecture pour le widget
-    originVillage?: string | null;       // village d'origine (optionnel signup)
-
-    // ── Résidence ──
+    birthCountry?: string | null;
+    originSubPrefecture?: string | null;
+    originCommune?: string | null;
+    originVillage?: string | null;
     country?: string | null;
     city?: string | null;
     postalCode?: string | null;
-
-    // ── Photo ──
     profilePhotoUrl?: string | null;
   };
 }
@@ -64,12 +52,14 @@ export interface FullUserProfile extends UserSummary {
   country?: string | null;
   birthDate?: string | null;
   placeOfBirth?: string | null;
-  birthCountry?: string | null;       // pays de naissance (alias de countryOfBirth)
-  countryOfBirth?: string | null;     // alias possible côté backend
+  birthCountry?: string | null;
+  countryOfBirth?: string | null;
   profilePhotoUrl?: string | null;
-  originVillage?: string | null;      // village d'origine (optionnel)
-  originSubPrefecture?: string | null; // commune d'origine (obligatoire)
-  function?: string | null;           // profession
+  /** URL de la photo de profil (alias unifié — même champ que avatarUrl dans UserSummary) */
+  avatarUrl?: string | null;
+  originVillage?: string | null;
+  originSubPrefecture?: string | null;
+  function?: string | null;
   cardNumber?: string | null;
   isCardLocked?: boolean;
   cardExpiresAt?: string | null;
@@ -88,11 +78,10 @@ export interface FullUserProfile extends UserSummary {
     name: string;
     code: string;
     membershipStatus: string;
-    city?: string | null;            // <-- AJOUT POUR L'ADMIN D'ANTENNE
-    country?: string | null;         // <-- AJOUT POUR L'ADMIN D'ANTENNE
-    defaultCurrency?: string | null; // <-- AJOUT POUR L'ADMIN D'ANTENNE
+    city?: string | null;
+    country?: string | null;
+    defaultCurrency?: string | null;
   } | null;
-  // Ajout pour récupérer les assignments d'antenne de l'admin
   adminAssignments?: Array<{
     antenna?: {
       name?: string | null;
@@ -109,33 +98,22 @@ export const api = {
   // AUTH / ENRÔLEMENT MEMBRE
   // ==========================================
   memberSignup: (body: {
-    // ── Identité (étape 0) ──
     firstName: string;
     lastName: string;
     email: string;
     password?: string;
     antennaId: string;
-
-    // ── Contact (étape 1) ──
     phone?: string;
-
-    // ── Origine ──
-    originSubPrefecture?: string;   // commune d'origine (obligatoire)
-    originVillage?: string;         // village d'origine (optionnel)
-
-    // ── Naissance ──
+    originSubPrefecture?: string;
+    originVillage?: string;
     birthDate?: string;
     placeOfBirth?: string;
-    birthCountry?: string;          // pays de naissance
-
-    // ── Résidence ──
+    birthCountry?: string;
     city?: string;
     country?: string;
     postalCode?: string;
     addressLine1?: string;
     addressLine2?: string;
-
-    // ── Profession ──
     function?: string;
   }) =>
     http<{ id: string; message: string }, typeof body>('/public/signup', {
@@ -167,6 +145,66 @@ export const api = {
 
   updateMemberProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
+
+  /**
+   * Upload de la photo de profil (avatar).
+   * Endpoint : POST /users/me/avatar  (multipart/form-data, champ "avatar")
+   * Utilise getAccessToken() exactement comme http() — le token JWT est injecté.
+   * Retourne { message, avatarUrl, profilePhotoUrl, user }
+   */
+  uploadAvatar: async (formData: FormData): Promise<{
+    message: string;
+    avatarUrl: string | null;
+    profilePhotoUrl: string | null;
+    user: FullUserProfile;
+  }> => {
+    const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
+    const accessToken = getAccessToken();
+
+    const headers: Record<string, string> = {};
+    if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+    const res = await fetch(`${baseUrl}/users/me/avatar`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    // Retry une fois si 401 (token expiré) — même logique que http()
+    if (res.status === 401) {
+      const refreshToken = getRefreshToken();
+      if (refreshToken) {
+        const refreshRes = await fetch(`${baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
+        });
+        if (refreshRes.ok) {
+          const data = await refreshRes.json() as { accessToken: string; refreshToken: string; refreshTokenExpiresAt: string };
+          setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken, refreshTokenExpiresAt: data.refreshTokenExpiresAt ?? '' });
+          // Rejouer la requête avec le nouveau token
+          const retryRes = await fetch(`${baseUrl}/users/me/avatar`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${data.accessToken}` },
+            body: formData,
+          });
+          if (!retryRes.ok) {
+            const err = await retryRes.json().catch(() => ({})) as { message?: string };
+            throw new Error(err.message ?? 'Erreur lors du téléchargement de la photo.');
+          }
+          return retryRes.json();
+        } else {
+          clearAuthState();
+        }
+      }
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { message?: string };
+      throw new Error(err.message ?? 'Erreur lors du téléchargement de la photo.');
+    }
+    return res.json();
+  },
 
   uploadProfilePhoto: async (file: File) => {
     const form = new FormData();
@@ -283,12 +321,7 @@ export const api = {
   }) =>
     http<Antenna, typeof body>('/super-admin/antennas', { method: 'POST', body }),
 
-  updateAntenna: (
-    id: string,
-    body: Partial<Antenna> & {
-      defaultCurrency?: string | null;
-    },
-  ) =>
+  updateAntenna: (id: string, body: Partial<Antenna> & { defaultCurrency?: string | null }) =>
     http<Antenna, typeof body>(`/super-admin/antennas/${id}`, { method: 'PATCH', body }),
 
   deleteAntenna: (id: string) => http(`/super-admin/antennas/${id}`, { method: 'DELETE' }),
@@ -300,7 +333,14 @@ export const api = {
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
 
-  createAntennaAdmin: (body: { antennaId: string; firstName: string; lastName: string; email: string; phone?: string; sendInvite?: boolean }) =>
+  createAntennaAdmin: (body: {
+    antennaId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    sendInvite?: boolean;
+  }) =>
     http<UserSummary, typeof body>('/super-admin/admins', { method: 'POST', body }),
 
   // ==========================================
@@ -330,7 +370,9 @@ export const api = {
       }`
     ),
 
-  approveMemberAccount: (userId: string) => http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),
+  approveMemberAccount: (userId: string) =>
+    http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),
+
   rejectMemberAccount: (userId: string, reason?: string) =>
     http(`/super-admin/users/${userId}/reject`, { method: 'PATCH', body: { reason } }),
 
@@ -346,13 +388,20 @@ export const api = {
       `/admin/member-approvals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`
     ),
 
-  approveMemberAccountAntenna: (userId: string) => http(`/admin/member-approvals/${userId}/approve`, { method: 'PATCH' }),
+  approveMemberAccountAntenna: (userId: string) =>
+    http(`/admin/member-approvals/${userId}/approve`, { method: 'PATCH' }),
+
   rejectMemberAccountAntenna: (userId: string, reason?: string) =>
     http(`/admin/member-approvals/${userId}/reject`, { method: 'PATCH', body: { reason } }),
 
-  suspendUser: (id: string) => http(`/admin/members/${id}/suspend`, { method: 'PATCH' }),
-  activateUser: (id: string) => http(`/admin/members/${id}/activate`, { method: 'PATCH' }),
-  deleteUser: (id: string) => http(`/admin/members/${id}`, { method: 'DELETE' }),
+  suspendUser: (id: string) =>
+    http(`/admin/members/${id}/suspend`, { method: 'PATCH' }),
+
+  activateUser: (id: string) =>
+    http(`/admin/members/${id}/activate`, { method: 'PATCH' }),
+
+  deleteUser: (id: string) =>
+    http(`/admin/members/${id}`, { method: 'DELETE' }),
 
   listLateMembersOver3Months: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<UserSummary & { lateMonths?: number; lastValidatedContributionAt?: string | null }>>(
@@ -418,7 +467,12 @@ export const api = {
       }`
     ),
 
-  runContributionProjection: (body: { expectedMembersPaying: number; averageContribution: number; currency?: string; periodLabel?: string }) =>
+  runContributionProjection: (body: {
+    expectedMembersPaying: number;
+    averageContribution: number;
+    currency?: string;
+    periodLabel?: string;
+  }) =>
     http<ProjectionResult, typeof body>('/admin/projections/contributions', { method: 'POST', body }),
 
   // ==========================================
@@ -438,15 +492,26 @@ export const api = {
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
 
-  createAntennaProject: (body: { title: string; description?: string; status?: string; budgetPlanned?: number; budgetSpent?: number; startsAt?: string | null; endsAt?: string | null; photoIds?: string[] }) =>
+  createAntennaProject: (body: {
+    title: string;
+    description?: string;
+    status?: string;
+    budgetPlanned?: number;
+    budgetSpent?: number;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    photoIds?: string[];
+  }) =>
     http<Project, typeof body>('/admin/projects', { method: 'POST', body }),
 
   updateAntennaProject: (id: string, body: Partial<Project> & { photoIds?: string[] }) =>
     http<Project, typeof body>(`/admin/projects/${id}`, { method: 'PATCH', body }),
 
-  deleteAntennaProject: (id: string) => http(`/admin/projects/${id}`, { method: 'DELETE' }),
+  deleteAntennaProject: (id: string) =>
+    http(`/admin/projects/${id}`, { method: 'DELETE' }),
 
-  deleteProject: (id: string) => http(`/super-admin/projects/${id}`, { method: 'DELETE' }),
+  deleteProject: (id: string) =>
+    http(`/super-admin/projects/${id}`, { method: 'DELETE' }),
 
   listProjectsForMembers: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
     http<ApiListResponse<Project>>(
@@ -502,7 +567,8 @@ export const api = {
   createSuperAdminDocument: (body: { title: string; description?: string; fileAssetId: string }) =>
     http<DocumentItem, typeof body>('/super-admin/documents', { method: 'POST', body }),
 
-  deleteDocument: (id: string) => http(`/super-admin/documents/${id}`, { method: 'DELETE' }),
+  deleteDocument: (id: string) =>
+    http(`/super-admin/documents/${id}`, { method: 'DELETE' }),
 
   listAntennaDocuments: (params?: { page?: number; pageSize?: number; q?: string }) =>
     http<ApiListResponse<DocumentItem>>(
@@ -517,7 +583,8 @@ export const api = {
   updateAntennaDocument: (id: string, body: Partial<DocumentItem>) =>
     http<DocumentItem, Partial<DocumentItem>>(`/admin/documents/${id}`, { method: 'PATCH', body }),
 
-  deleteAntennaDocument: (id: string) => http(`/admin/documents/${id}`, { method: 'DELETE' }),
+  deleteAntennaDocument: (id: string) =>
+    http(`/admin/documents/${id}`, { method: 'DELETE' }),
 
   listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
     http<ApiListResponse<DocumentItem>>(
@@ -533,7 +600,13 @@ export const api = {
       }${params?.status ? `&status=${encodeURIComponent(params.status)}` : ''}`
     ),
 
-  createAntennaContent: (body: { title: string; body?: string; content?: string; status?: string; coverImageFileId?: string | null }) =>
+  createAntennaContent: (body: {
+    title: string;
+    body?: string;
+    content?: string;
+    status?: string;
+    coverImageFileId?: string | null;
+  }) =>
     http<ContentPost, typeof body>('/admin/contents', { method: 'POST', body }),
 
   updateAntennaContent: (id: string, body: Partial<ContentPost>) =>
@@ -555,10 +628,9 @@ export const api = {
   uploadFile: async (file: File, body?: { category?: string; folder?: string; description?: string }) => {
     const form = new FormData();
     form.append('file', file);
-    if (body?.category) form.append('category', body.category);
-    if (body?.folder) form.append('folder', body.folder);
+    if (body?.category)    form.append('category',    body.category);
+    if (body?.folder)      form.append('folder',      body.folder);
     if (body?.description) form.append('description', body.description);
-
     return http<{ id: string; url: string; fileName: string }>('/uploads/single', {
       method: 'POST',
       body: form,
@@ -566,7 +638,9 @@ export const api = {
   },
 
   listNotifications: (params?: { page?: number; pageSize?: number }) =>
-    http<ApiListResponse<NotificationItem>>(`/notifications?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
+    http<ApiListResponse<NotificationItem>>(
+      `/notifications?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`
+    ),
 
   listMyNotifications: () =>
     http<ApiListResponse<NotificationItem>>('/member/notifications?page=1&pageSize=100'),

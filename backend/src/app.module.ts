@@ -1,9 +1,11 @@
 //////// backend/src/app.module.ts
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join, isAbsolute } from 'path';
 
 // Config & Guards
 import authConfig from './config/auth.config';
@@ -40,7 +42,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { AssociationsModule } from './modules/associations/associations.module';
 import { AdminModule } from './modules/admin/admin.module';
 
-// 👇 AJOUT CHIRURGICAL : Import du module Users
+// Module Users
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -50,6 +52,28 @@ import { UsersModule } from './modules/users/users.module';
       isGlobal: true,
       validate: validateEnv,
       load: [authConfig, rateLimitConfig, storageConfig, swaggerConfig],
+    }),
+
+    // Exposition publique des fichiers locaux via /static
+    ServeStaticModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => {
+        const configuredUploadDir =
+          config.get<string>('storage.local.uploadDir') ||
+          process.env.LOCAL_UPLOAD_DIR ||
+          './uploads';
+
+        const rootPath = isAbsolute(configuredUploadDir)
+          ? configuredUploadDir
+          : join(process.cwd(), configuredUploadDir);
+
+        return [
+          {
+            rootPath,
+            serveRoot: '/static',
+          },
+        ];
+      },
     }),
 
     // Sécurité & Tâches planifiées
@@ -72,7 +96,7 @@ import { UsersModule } from './modules/users/users.module';
     NotificationsModule,
     JobsModule,
     FileAssetsModule,
-    
+
     // Nouveaux modules intégrés
     PublicModule,
     DashboardModule,
@@ -82,13 +106,11 @@ import { UsersModule } from './modules/users/users.module';
     SuperAdminModule,
     AssociationsModule,
     AdminModule,
-    
-    // 👇 AJOUT CHIRURGICAL : Déclaration du module Users
-    UsersModule, 
+
+    // Module Users
+    UsersModule,
   ],
-  controllers: [
-    AuthMemberController,
-  ],
+  controllers: [AuthMemberController],
   providers: [
     // Guard de sécurité global
     {

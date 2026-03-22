@@ -22,8 +22,8 @@ export interface UserSummary {
   emailVerifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  
-  // 👇 On rajoute officiellement les champs de localisation ici
+
+  // Infos de localisation / profil supplémentaires
   city?: string | null;
   country?: string | null;
   postalCode?: string | null;
@@ -31,6 +31,15 @@ export interface UserSummary {
   addressLine2?: string | null;
   originSubPrefecture?: string | null;
   originVillage?: string | null;
+
+  // Numéro de carte (pour affichage admin au lieu de l'ID technique)
+  cardNumber?: string | null;
+
+  // Date de naissance pour la carte/profil
+  birthDate?: string | null;
+
+  // Photo de profil — URL retournée par le backend après upload
+  avatarUrl?: string | null;
 }
 
 export interface CurrentUser extends UserSummary {

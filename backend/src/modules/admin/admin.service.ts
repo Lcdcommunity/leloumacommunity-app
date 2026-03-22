@@ -1,5 +1,4 @@
 // backend/src/modules/admin/admin.service.ts
-// backend/src/modules/admin/admin.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus } from '@prisma/client';
@@ -87,7 +86,13 @@ export class AdminService {
     }
 
     const [items, total] = await Promise.all([
-      this.prisma.user.findMany({ where, skip, take: pageSize, orderBy: { lastName: 'asc' } }),
+      this.prisma.user.findMany({ 
+        where, 
+        skip, 
+        take: pageSize, 
+        orderBy: { lastName: 'asc' },
+        include: { virtualCard: true } // <-- INCLUSION CARTE POUR L'ADMIN
+      }),
       this.prisma.user.count({ where }),
     ]);
 
@@ -168,6 +173,40 @@ export class AdminService {
       data: { status: UserStatus.DELETED, deletedByUserId: adminId, deletedAt: new Date() } 
     });
   }
+
+  // 👇 AJOUT CHIRURGICAL : MISE A JOUR PROFIL MEMBRE PAR L'ADMIN 👇
+  async updateAntennaMember(userId: string, adminId: string, data: any) {
+    const antennaId = await this.getAdminAntennaId(adminId);
+    
+    // Vérifier que le membre appartient bien à l'antenne gérée par l'admin
+    const user = await this.prisma.user.findFirst({ 
+      where: { 
+        id: userId, 
+        role: UserRole.MEMBER as any, 
+        memberships: { some: { antennaId } } 
+      } 
+    });
+
+    if (!user) throw new NotFoundException("Membre introuvable dans votre antenne.");
+
+    // Mettre à jour uniquement les champs autorisés
+    return this.prisma.user.update({ 
+      where: { id: userId }, 
+      data: { 
+        ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+        ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(data.city !== undefined ? { city: data.city } : {}),
+        ...(data.country !== undefined ? { country: data.country } : {}),
+        ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
+        ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
+        ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
+        ...(data.originSubPrefecture !== undefined ? { originSubPrefecture: data.originSubPrefecture } : {}),
+        ...(data.originVillage !== undefined ? { originVillage: data.originVillage } : {}),
+      } 
+    });
+  }
+  // 👆 FIN DE L'AJOUT 👆
 
   // --- GESTION DES COTISATIONS ---
 
@@ -312,6 +351,108 @@ export class AdminService {
     };
   }
 
+  // 👇 AJOUT CHIRURGICAL : GÉNÉRATION DU PDF PROJET 👇
+  async exportProjectPdf(projectId: string, adminId: string): Promise<Buffer> {
+    const antennaId = await this.getAdminAntennaId(adminId);
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, antennaId },
+      include: { attachments: { include: { file: true } } }
+    });
+
+    if (!project) throw new NotFoundException("Projet introuvable.");
+
+    // Importation conditionnelle pour éviter de crasher NestJS si pdfkit n'est pas encore installé
+    // Assure-toi de lancer `npm install pdfkit`
+    const PDFDocument = require('pdfkit');
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => resolve(Buffer.concat(buffers)));
+        doc.on('error', reject);
+
+        // Helper pour le style
+        const addSection = (title: string, content: string | null | undefined) => {
+          if (!content) return;
+          doc.moveDown();
+          doc.fontSize(14).font('Helvetica-Bold').fillColor('#1D4ED8').text(title);
+          doc.moveDown(0.5);
+          doc.fontSize(11).font('Helvetica').fillColor('#374151').text(content, { align: 'justify' });
+        };
+
+        const safeStringify = (val: any) => typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+
+        // 1. EN-TÊTE
+        doc.fontSize(24).font('Helvetica-Bold').fillColor('#0F172A').text(project.title, { align: 'center' });
+        doc.moveDown();
+        
+        doc.fontSize(12).font('Helvetica').fillColor('#6B7280');
+        if (project.promoterName) doc.text(`Promoteur: ${project.promoterName}`, { align: 'center' });
+        if (project.locationText) doc.text(`Localisation: ${project.locationText}`, { align: 'center' });
+        doc.text(`Statut: ${project.status}`, { align: 'center' });
+        doc.moveDown(2);
+
+        // 2. CONTENU TEXTUEL
+        addSection('Résumé', project.summary);
+        addSection('Description Complète', project.description);
+        
+        addSection('Bénéficiaires Cibles', project.targetBeneficiaries);
+        addSection('Impact sur la Population', project.populationImpact);
+        addSection('Impact Environnemental', project.environmentalImpact);
+        
+        if (project.specificObjectives) addSection('Objectifs Spécifiques', safeStringify(project.specificObjectives));
+        if (project.expectedResults) addSection('Résultats Attendus', safeStringify(project.expectedResults));
+        if (project.successIndicators) addSection('Indicateurs de Succès', safeStringify(project.successIndicators));
+        
+        addSection('Méthode d\'Implémentation', project.implementationMethod);
+        addSection('Risques et Mitigations', project.risksAndMitigation);
+
+        // 3. BUDGET & DATES
+        doc.moveDown();
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#1D4ED8').text('Budget & Exécution');
+        doc.moveDown(0.5);
+        doc.fontSize(11).font('Helvetica').fillColor('#374151');
+        doc.text(`Budget Prévu: ${project.budgetAmount ? project.budgetAmount.toString() : 'Non défini'}`);
+        doc.text(`Budget Dépensé: ${project.amountSpent ? project.amountSpent.toString() : '0'}`);
+        if (project.startDate) doc.text(`Date de début: ${project.startDate.toLocaleDateString('fr-FR')}`);
+        if (project.endDate) doc.text(`Date de fin: ${project.endDate.toLocaleDateString('fr-FR')}`);
+
+        // 4. GALERIE PHOTOS
+        if (project.attachments && project.attachments.length > 0) {
+          doc.addPage();
+          doc.fontSize(18).font('Helvetica-Bold').fillColor('#1D4ED8').text('Galerie Photos', { align: 'center' });
+          doc.moveDown();
+
+          for (const att of project.attachments) {
+            if (att.file && att.file.url) {
+              try {
+                const response = await fetch(att.file.url);
+                if (response.ok) {
+                  const arrayBuffer = await response.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuffer);
+                  
+                  // On vérifie que ce n'est pas trop grand pour la page
+                  doc.moveDown();
+                  doc.image(buffer, { fit: [450, 350], align: 'center' });
+                  doc.moveDown(2);
+                }
+              } catch (e) {
+                console.error('Erreur lors du téléchargement de l\'image pour le PDF:', e);
+              }
+            }
+          }
+        }
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+  // 👆 FIN DE L'AJOUT 👆
+
   async listProjectProposals(adminId: string, page: number, pageSize: number, status?: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const skip = (page - 1) * pageSize;
@@ -359,7 +500,18 @@ export class AdminService {
     return this.prisma.project.create({
       data: { 
         title: data.title,
+        summary: data.summary,
         description: data.description,
+        locationText: data.locationText,
+        promoterName: data.promoterName,
+        targetBeneficiaries: data.targetBeneficiaries,
+        populationImpact: data.populationImpact,
+        environmentalImpact: data.environmentalImpact,
+        implementationMethod: data.implementationMethod,
+        risksAndMitigation: data.risksAndMitigation,
+        specificObjectives: data.specificObjectives,
+        expectedResults: data.expectedResults,
+        successIndicators: data.successIndicators,
         ...(safeStatus ? { status: safeStatus } : {}),
         startDate: data.startsAt ? new Date(data.startsAt) : null,
         endDate: data.endsAt ? new Date(data.endsAt) : null,
@@ -393,7 +545,18 @@ export class AdminService {
       where: { id: projectId }, 
       data: { 
         ...(data.title !== undefined ? { title: data.title } : {}),
+        ...(data.summary !== undefined ? { summary: data.summary } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.locationText !== undefined ? { locationText: data.locationText } : {}),
+        ...(data.promoterName !== undefined ? { promoterName: data.promoterName } : {}),
+        ...(data.targetBeneficiaries !== undefined ? { targetBeneficiaries: data.targetBeneficiaries } : {}),
+        ...(data.populationImpact !== undefined ? { populationImpact: data.populationImpact } : {}),
+        ...(data.environmentalImpact !== undefined ? { environmentalImpact: data.environmentalImpact } : {}),
+        ...(data.implementationMethod !== undefined ? { implementationMethod: data.implementationMethod } : {}),
+        ...(data.risksAndMitigation !== undefined ? { risksAndMitigation: data.risksAndMitigation } : {}),
+        ...(data.specificObjectives !== undefined ? { specificObjectives: data.specificObjectives } : {}),
+        ...(data.expectedResults !== undefined ? { expectedResults: data.expectedResults } : {}),
+        ...(data.successIndicators !== undefined ? { successIndicators: data.successIndicators } : {}),
         ...(safeStatus ? { status: safeStatus } : {}),
         ...(data.startsAt !== undefined ? { startDate: data.startsAt ? new Date(data.startsAt) : null } : {}),
         ...(data.endsAt !== undefined ? { endDate: data.endsAt ? new Date(data.endsAt) : null } : {}),
@@ -410,7 +573,7 @@ export class AdminService {
       } 
     });
   }  
-  
+
   async deleteProject(projectId: string, adminId: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const project = await this.prisma.project.findFirst({ where: { id: projectId, antennaId } });

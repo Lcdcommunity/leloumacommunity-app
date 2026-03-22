@@ -942,10 +942,23 @@ model Project {
   description String
   status      ProjectStatus @default(APPROVED)
 
+  // Nouveau : responsable / promoteur du projet
+  promoterName String?
+
+  // Nouveaux champs structurés (option A, sans créer de nouvelles tables)
+  specificObjectives   Json?
+  targetBeneficiaries  String?
+  populationImpact     String?
+  environmentalImpact  String?
+  expectedResults      Json?
+  successIndicators    Json?
+  risksAndMitigation   String?
+  implementationMethod String?
+
   budgetAmount Decimal?      @db.Decimal(14, 2)
   currency     CurrencyCode? @default(EUR)
-  amountRaised Decimal?      @db.Decimal(14, 2) // optionnel cache
-  amountSpent  Decimal?      @db.Decimal(14, 2) // optionnel cache
+  amountRaised Decimal?      @db.Decimal(14, 2)
+  amountSpent  Decimal?      @db.Decimal(14, 2)
 
   startDate    DateTime?
   endDate      DateTime?
@@ -955,7 +968,7 @@ model Project {
   isPublicToMembers Boolean @default(true)
   coverImageFileId  String?
 
-  managerUserId    String? // admin responsable projet
+  managerUserId    String?
   sourceProposalId String? @unique
 
   createdByUserId String?
@@ -975,7 +988,7 @@ model Project {
   updates       ProjectUpdate[]
   voteSessions  VoteSession[]
   ledgerEntries LedgerEntry[]
-  documents     Document[]          @relation("ProjectDocuments")
+  documents     Document[] @relation("ProjectDocuments")
 
   @@unique([associationId, slug])
   @@index([associationId, status, createdAt])

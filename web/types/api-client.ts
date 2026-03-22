@@ -1,9 +1,9 @@
-//web/types/api-client.ts
+// web/types/api-client.ts
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
 import type { Contribution } from '../types/contribution';
-import type { Project } from '../types/project';
+import type { Project, JsonValue } from '../types/project'; // <-- JsonValue importé ici
 import type { DocumentItem } from '../types/document';
 import type { NotificationItem } from '../types/notification';
 import type { UserSummary } from '../types/user';
@@ -125,7 +125,7 @@ export const api = {
       projectsInProgress: Project[];
       latestContents: ContentPost[];
       lateMembersPreview: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
-      virtualCard?: VirtualCardData | null; // <-- PLUS AUCUN "any" ICI
+      virtualCard?: VirtualCardData | null;
     }>('/dashboard/member'),
 
   getAssociationBalanceSummary: () =>
@@ -285,7 +285,29 @@ export const api = {
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
 
-  createAntennaProject: (body: { title: string; description?: string; status?: string; budgetPlanned?: number; budgetSpent?: number; startsAt?: string | null; endsAt?: string | null; photoIds?: string[]; }) => 
+  createAntennaProject: (body: { 
+    title: string; 
+    summary?: string;
+    description?: string; 
+    status?: string; 
+    promoterName?: string;
+    specificObjectives?: JsonValue;
+    targetBeneficiaries?: string;
+    populationImpact?: string;
+    environmentalImpact?: string;
+    expectedResults?: JsonValue;
+    successIndicators?: JsonValue;
+    risksAndMitigation?: string;
+    implementationMethod?: string;
+    locationText?: string;
+    coverImageFileId?: string;
+    budgetPlanned?: number; 
+    budgetSpent?: number; 
+    startsAt?: string | null; 
+    endsAt?: string | null; 
+    targetDate?: string | null;
+    photoIds?: string[]; 
+  }) => 
     http<Project, typeof body>('/admin/projects', { method: 'POST', body }),
 
   updateAntennaProject: (id: string, body: Partial<Project> & { photoIds?: string[] }) =>
