@@ -1,4 +1,4 @@
-//src/modules/contributions/contributions.service.ts
+// src/modules/contributions/contributions.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -10,6 +10,7 @@ import {
   PaymentMethod,
   Prisma,
   UserRole,
+  NotificationType, // <-- Ajout de l'import
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthUser } from '../../common/types/auth-user.type';
@@ -17,6 +18,7 @@ import { CreateContributionDto } from './dto/create-contribution.dto';
 import { ValidateContributionDto } from './dto/validate-contribution.dto';
 import { RejectContributionDto } from './dto/reject-contribution.dto';
 import { AuditService } from '../audit/audit.service';
+import { NotificationsService } from '../notifications/notifications.service'; // <-- Ajout de l'import
 
 type CreateContributionInputCompat = CreateContributionDto & {
   method?: string;
@@ -31,6 +33,7 @@ export class ContributionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService, // <-- Injection chirurgicale
   ) {}
 
   async createForMember(dto: CreateContributionDto, actor: AuthUser) {
@@ -160,6 +163,14 @@ export class ContributionsService {
       contributionsToCreate.map((data) => this.prisma.contribution.create({ data })),
     );
 
+    // ✅ NOTIFICATION 1 : Alerter les admins de l'antenne d'une nouvelle soumission
+    await this.notifications.notifyAntennaAdmins(
+      dto.antennaId,
+      actor.associationId,
+      `Un nouveau dépôt de ${dto.amount} ${resolvedCurrency} a été soumis par ${actor.firstName} ${actor.lastName}.`,
+      NotificationType.CONTRIBUTION_SUBMITTED,
+    );
+
     await this.audit.log({
       associationId: actor.associationId,
       antennaId: dto.antennaId,
@@ -250,6 +261,14 @@ export class ContributionsService {
       return { updated, ledger };
     });
 
+    // ✅ NOTIFICATION 2 : Alerter le membre que son paiement est validé
+    await this.notifications.createForUser({
+      associationId: contribution.associationId,
+      userId: contribution.memberUserId,
+      message: `Votre versement de ${contribution.amount} ${contribution.currency} a été validé.`,
+      type: NotificationType.CONTRIBUTION_VALIDATED,
+    });
+
     await this.audit.log({
       associationId: contribution.associationId,
       antennaId: contribution.antennaId,
@@ -282,6 +301,14 @@ export class ContributionsService {
         rejectionReason: dto.rejectionReason.trim(),
         adminComment: dto.adminComment?.trim(),
       },
+    });
+
+    // ✅ NOTIFICATION 3 : Alerter le membre que son paiement a été refusé
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.memberUserId,
+      message: `Votre versement de ${updated.amount} ${updated.currency} a été refusé. Motif : ${dto.rejectionReason.trim()}`,
+      type: NotificationType.CONTRIBUTION_REJECTED,
     });
 
     await this.audit.log({

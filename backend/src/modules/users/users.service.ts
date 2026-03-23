@@ -4,11 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditAction, Prisma } from '@prisma/client';
+import { AuditAction, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { CloudinaryService } from '../uploads/cloudinary.service';
+import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
 
 type RequestMeta = {
   ipAddress?: string;
@@ -38,6 +39,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly notifications: NotificationsService, // Injecté chirurgicalement
   ) {}
 
   async getMe(userId: string) {
@@ -77,6 +79,15 @@ export class UsersService {
       include: meUserInclude,
     });
 
+    // ✅ NOTIFICATION : Confirmer à l'utilisateur que son profil est à jour
+    await this.notifications.createForUser({
+      associationId: updatedUser.associationId,
+      userId: updatedUser.id,
+      message: 'Vos informations de profil ont été mises à jour avec succès.',
+      type: NotificationType.SYSTEM_ALERT,
+      title: 'Profil mis à jour',
+    });
+
     await this.auditService.create({
       associationId: updatedUser.associationId,
       actorUserId: updatedUser.id,
@@ -95,8 +106,6 @@ export class UsersService {
 
   /**
    * Upload de la photo de profil vers Cloudinary.
-   * Appelé par POST /users/me/avatar  (champ "avatar")
-   *         et POST /users/me/profile-photo (champ "file")
    */
   async uploadProfilePhoto(
     userId: string,
@@ -145,6 +154,15 @@ export class UsersService {
         return { createdFileAsset, updatedUser };
       });
 
+      // ✅ NOTIFICATION : Confirmer le changement de photo
+      await this.notifications.createForUser({
+        associationId: user.associationId,
+        userId: user.id,
+        message: 'Votre nouvelle photo de profil a été enregistrée.',
+        type: NotificationType.SYSTEM_ALERT,
+        title: 'Photo mise à jour',
+      });
+
       // 3. Audit
       await this.auditService.create({
         associationId: user.associationId,
@@ -167,12 +185,11 @@ export class UsersService {
       return {
         message: 'Photo de profil mise à jour avec succès',
         profilePhotoUrl: result.updatedUser.profilePhoto?.url ?? null,
-        // ← avatarUrl retourné pour que la Topbar et la page profil l'affichent
         avatarUrl: result.updatedUser.profilePhoto?.url ?? null,
         user: profile,
       };
-    } catch (error) {
-      console.error('🚨 ERREUR RÉELLE UPLOAD :', error);
+    } catch {
+      // ✅ ESLint fix : catch sans (error) car non utilisé
       throw new BadRequestException("Échec de l'upload vers Cloudinary.");
     }
   }
@@ -188,12 +205,10 @@ export class UsersService {
     const primaryMembership =
       user.memberships.find((m) => m.isPrimary) ?? user.memberships[0] ?? null;
 
-    // L'antenne peut venir de l'adhésion (MEMBER) ou de l'assignment (ANTENNA_ADMIN)
     const adminAntenna = (user as any).adminAssignments?.[0]?.antenna ?? null;
     const memberAntenna = primaryMembership?.antenna ?? null;
     const antenna = memberAntenna ?? adminAntenna;
 
-    // URL de la photo — champ unifié avatarUrl + alias profilePhotoUrl
     const photoUrl = user.profilePhoto?.url ?? null;
 
     return {
@@ -216,10 +231,7 @@ export class UsersService {
       city: user.city,
       country: user.country,
 
-      // ── Photo ──
-      /** URL principale retournée après upload et dans getMe() */
       avatarUrl: photoUrl,
-      /** Alias conservé pour rétrocompatibilité */
       profilePhotoUrl: photoUrl,
 
       antenna: antenna

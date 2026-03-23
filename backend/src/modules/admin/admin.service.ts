@@ -1,12 +1,16 @@
 // backend/src/modules/admin/admin.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus } from '@prisma/client';
+import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType } from '@prisma/client';
 import { memberMapper } from '../member/member.mapper';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService, // Injecté chirurgicalement
+  ) {}
 
   /**
    * Helper privé pour récupérer l'ID de l'antenne assignée à l'administrateur
@@ -51,10 +55,21 @@ export class AdminService {
     const user = await this.prisma.user.findFirst({ where: { id: userId, role: UserRole.MEMBER as any, memberships: { some: { antennaId } } } });
     if (!user) throw new NotFoundException("Membre introuvable.");
 
-    return this.prisma.user.update({ 
+    const updated = await this.prisma.user.update({ 
       where: { id: userId }, 
       data: { status: UserStatus.ACTIVE, approvedByUserId: adminId, approvedAt: new Date() } 
     });
+
+    // ✅ NOTIFICATION : Informer le membre que son compte est actif
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.id,
+      message: `Félicitations ! Votre compte a été approuvé par l'administrateur de l'antenne.`,
+      type: NotificationType.ACCOUNT_APPROVED,
+      title: 'Compte activé',
+    });
+
+    return updated;
   }
 
   async rejectMember(userId: string, adminId: string, reason: string) {
@@ -62,10 +77,21 @@ export class AdminService {
     const user = await this.prisma.user.findFirst({ where: { id: userId, role: UserRole.MEMBER as any, memberships: { some: { antennaId } } } });
     if (!user) throw new NotFoundException("Membre introuvable.");
 
-    return this.prisma.user.update({ 
+    const updated = await this.prisma.user.update({ 
       where: { id: userId }, 
       data: { status: UserStatus.REJECTED, rejectedByUserId: adminId, rejectedAt: new Date(), rejectionReason: reason } 
     });
+
+    // ✅ NOTIFICATION : Informer le membre du rejet
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.id,
+      message: `Votre demande d'adhésion a été rejetée. Motif : ${reason}`,
+      type: NotificationType.ACCOUNT_REJECTED,
+      title: 'Demande refusée',
+    });
+
+    return updated;
   }
 
   async listMembers(adminId: string, page: number, pageSize: number, q?: string, status?: string) {
@@ -91,7 +117,7 @@ export class AdminService {
         skip, 
         take: pageSize, 
         orderBy: { lastName: 'asc' },
-        include: { virtualCard: true } // <-- INCLUSION CARTE POUR L'ADMIN
+        include: { virtualCard: true }
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -142,10 +168,21 @@ export class AdminService {
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
 
-    return this.prisma.user.update({ 
+    const updated = await this.prisma.user.update({ 
       where: { id: userId }, 
       data: { status: UserStatus.SUSPENDED, suspendedByUserId: adminId, suspendedAt: new Date() } 
     });
+
+    // ✅ NOTIFICATION : Informer le membre de sa suspension
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.id,
+      message: `Votre compte membre a été suspendu par l'administration de l'antenne.`,
+      type: NotificationType.ACCOUNT_SUSPENDED,
+      title: 'Compte suspendu',
+    });
+
+    return updated;
   }
 
   async activateUser(userId: string, adminId: string) {
@@ -155,10 +192,20 @@ export class AdminService {
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
 
-    return this.prisma.user.update({ 
+    const updated = await this.prisma.user.update({ 
       where: { id: userId }, 
       data: { status: UserStatus.ACTIVE, suspendedByUserId: null, suspendedAt: null } 
     });
+
+    // ✅ NOTIFICATION : Informer le membre de sa réactivation
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.id,
+      message: `Votre compte membre a été réactivé. Vous pouvez à nouveau accéder à tous les services.`,
+      type: NotificationType.ACCOUNT_APPROVED,
+    });
+
+    return updated;
   }
 
   async deleteUser(userId: string, adminId: string) {
@@ -174,11 +221,9 @@ export class AdminService {
     });
   }
 
-  // 👇 AJOUT CHIRURGICAL : MISE A JOUR PROFIL MEMBRE PAR L'ADMIN 👇
   async updateAntennaMember(userId: string, adminId: string, data: any) {
     const antennaId = await this.getAdminAntennaId(adminId);
-    
-    // Vérifier que le membre appartient bien à l'antenne gérée par l'admin
+
     const user = await this.prisma.user.findFirst({ 
       where: { 
         id: userId, 
@@ -189,7 +234,6 @@ export class AdminService {
 
     if (!user) throw new NotFoundException("Membre introuvable dans votre antenne.");
 
-    // Mettre à jour uniquement les champs autorisés
     return this.prisma.user.update({ 
       where: { id: userId }, 
       data: { 
@@ -206,7 +250,6 @@ export class AdminService {
       } 
     });
   }
-  // 👆 FIN DE L'AJOUT 👆
 
   // --- GESTION DES COTISATIONS ---
 
@@ -255,6 +298,14 @@ export class AdminService {
       data: { status: ContributionStatus.VALIDATED, validatedAt: new Date(), validatedByUserId: adminId } 
     });
 
+    // ✅ NOTIFICATION : Informer le membre que son versement est validé
+    await this.notifications.createForUser({
+      associationId: contribution.associationId,
+      userId: contribution.memberUserId,
+      message: `Votre versement de ${contribution.amount} ${contribution.currency} a été validé.`,
+      type: NotificationType.CONTRIBUTION_VALIDATED,
+    });
+
     if (contribution.purpose === 'MEMBERSHIP_CARD') {
       const now = new Date();
       const nextYear = new Date();
@@ -278,6 +329,15 @@ export class AdminService {
           isLocked: false,
         }
       });
+
+      // ✅ NOTIFICATION : Carte membre activée
+      await this.notifications.createForUser({
+        associationId: contribution.associationId,
+        userId: contribution.memberUserId,
+        message: `Votre carte membre virtuelle a été générée et activée ! Vous pouvez la consulter dans votre profil.`,
+        type: NotificationType.SYSTEM_ALERT,
+        title: 'Carte membre active',
+      });
     }
 
     return updated;
@@ -288,10 +348,20 @@ export class AdminService {
     const contribution = await this.prisma.contribution.findFirst({ where: { id: contributionId, antennaId } });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
 
-    return this.prisma.contribution.update({ 
+    const updated = await this.prisma.contribution.update({ 
       where: { id: contributionId }, 
       data: { status: ContributionStatus.REJECTED, rejectionReason: reason, validatedAt: new Date(), validatedByUserId: adminId } 
     });
+
+    // ✅ NOTIFICATION : Informer le membre du refus
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.memberUserId,
+      message: `Votre versement de ${updated.amount} ${updated.currency} a été refusé. Motif : ${reason}`,
+      type: NotificationType.CONTRIBUTION_REJECTED,
+    });
+
+    return updated;
   }
 
   async updateContribution(contributionId: string, adminId: string, amount: number) {
@@ -317,7 +387,6 @@ export class AdminService {
         { description: { contains: q, mode: 'insensitive' } }
       ]; 
     }
-
     const [items, total] = await Promise.all([
       this.prisma.project.findMany({ 
         where, 
@@ -351,7 +420,6 @@ export class AdminService {
     };
   }
 
-  // 👇 AJOUT CHIRURGICAL : GÉNÉRATION DU PDF PROJET 👇
   async exportProjectPdf(projectId: string, adminId: string): Promise<Buffer> {
     const antennaId = await this.getAdminAntennaId(adminId);
     const project = await this.prisma.project.findFirst({
@@ -361,8 +429,6 @@ export class AdminService {
 
     if (!project) throw new NotFoundException("Projet introuvable.");
 
-    // Importation conditionnelle pour éviter de crasher NestJS si pdfkit n'est pas encore installé
-    // Assure-toi de lancer `npm install pdfkit`
     const PDFDocument = require('pdfkit');
 
     return new Promise(async (resolve, reject) => {
@@ -373,7 +439,6 @@ export class AdminService {
         doc.on('end', () => resolve(Buffer.concat(buffers)));
         doc.on('error', reject);
 
-        // Helper pour le style
         const addSection = (title: string, content: string | null | undefined) => {
           if (!content) return;
           doc.moveDown();
@@ -384,32 +449,28 @@ export class AdminService {
 
         const safeStringify = (val: any) => typeof val === 'string' ? val : JSON.stringify(val, null, 2);
 
-        // 1. EN-TÊTE
         doc.fontSize(24).font('Helvetica-Bold').fillColor('#0F172A').text(project.title, { align: 'center' });
         doc.moveDown();
-        
+
         doc.fontSize(12).font('Helvetica').fillColor('#6B7280');
         if (project.promoterName) doc.text(`Promoteur: ${project.promoterName}`, { align: 'center' });
         if (project.locationText) doc.text(`Localisation: ${project.locationText}`, { align: 'center' });
         doc.text(`Statut: ${project.status}`, { align: 'center' });
         doc.moveDown(2);
 
-        // 2. CONTENU TEXTUEL
         addSection('Résumé', project.summary);
         addSection('Description Complète', project.description);
-        
         addSection('Bénéficiaires Cibles', project.targetBeneficiaries);
         addSection('Impact sur la Population', project.populationImpact);
         addSection('Impact Environnemental', project.environmentalImpact);
-        
+
         if (project.specificObjectives) addSection('Objectifs Spécifiques', safeStringify(project.specificObjectives));
         if (project.expectedResults) addSection('Résultats Attendus', safeStringify(project.expectedResults));
         if (project.successIndicators) addSection('Indicateurs de Succès', safeStringify(project.successIndicators));
-        
+
         addSection('Méthode d\'Implémentation', project.implementationMethod);
         addSection('Risques et Mitigations', project.risksAndMitigation);
 
-        // 3. BUDGET & DATES
         doc.moveDown();
         doc.fontSize(14).font('Helvetica-Bold').fillColor('#1D4ED8').text('Budget & Exécution');
         doc.moveDown(0.5);
@@ -419,7 +480,6 @@ export class AdminService {
         if (project.startDate) doc.text(`Date de début: ${project.startDate.toLocaleDateString('fr-FR')}`);
         if (project.endDate) doc.text(`Date de fin: ${project.endDate.toLocaleDateString('fr-FR')}`);
 
-        // 4. GALERIE PHOTOS
         if (project.attachments && project.attachments.length > 0) {
           doc.addPage();
           doc.fontSize(18).font('Helvetica-Bold').fillColor('#1D4ED8').text('Galerie Photos', { align: 'center' });
@@ -432,26 +492,22 @@ export class AdminService {
                 if (response.ok) {
                   const arrayBuffer = await response.arrayBuffer();
                   const buffer = Buffer.from(arrayBuffer);
-                  
-                  // On vérifie que ce n'est pas trop grand pour la page
                   doc.moveDown();
                   doc.image(buffer, { fit: [450, 350], align: 'center' });
                   doc.moveDown(2);
                 }
               } catch (e) {
-                console.error('Erreur lors du téléchargement de l\'image pour le PDF:', e);
+                console.error('Erreur image PDF:', e);
               }
             }
           }
         }
-
         doc.end();
       } catch (error) {
         reject(error);
       }
     });
   }
-  // 👆 FIN DE L'AJOUT 👆
 
   async listProjectProposals(adminId: string, page: number, pageSize: number, status?: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
@@ -488,7 +544,7 @@ export class AdminService {
 
   async createProject(adminId: string, data: any) {
     const antennaId = await this.getAdminAntennaId(adminId);
-    const antenna = await this.prisma.antenna.findUnique({ where: { id: antennaId }, select: { associationId: true } });
+    const antenna = await this.prisma.antenna.findUnique({ where: { id: antennaId }, select: { associationId: true, name: true } });
 
     if (!antenna?.associationId) throw new BadRequestException("Antenne non rattachée à une association.");
 
@@ -497,7 +553,7 @@ export class AdminService {
       safeStatus = data.status as ProjectStatus;
     }
 
-    return this.prisma.project.create({
+    const project = await this.prisma.project.create({
       data: { 
         title: data.title,
         summary: data.summary,
@@ -519,16 +575,20 @@ export class AdminService {
         associationId: antenna.associationId, 
         budgetAmount: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : null, 
         amountSpent: data.budgetSpent ? new Prisma.Decimal(data.budgetSpent) : new Prisma.Decimal(0),
-
-        ...(data.photoIds && data.photoIds.length > 0 ? {
-          attachments: {
-            create: data.photoIds.map((fileId: string) => ({
-              fileId: fileId
-            }))
-          }
-        } : {})
+        attachments: {
+          create: (data.photoIds || []).map((fileId: string) => ({ fileId }))
+        }
       }
     });
+
+    // ✅ NOTIFICATION : Informer le Super Admin du nouveau projet d'antenne
+    await this.notifications.notifySuperAdmins(
+      antenna.associationId,
+      `Un nouveau projet "${project.title}" a été créé pour l'antenne "${antenna.name}".`,
+      NotificationType.PROJECT_CREATED
+    );
+
+    return project;
   }
 
   async updateProject(projectId: string, adminId: string, data: any) {
@@ -562,14 +622,9 @@ export class AdminService {
         ...(data.endsAt !== undefined ? { endDate: data.endsAt ? new Date(data.endsAt) : null } : {}),
         ...(data.budgetPlanned !== undefined ? { budgetAmount: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : null } : {}),
         ...(data.budgetSpent !== undefined ? { amountSpent: data.budgetSpent ? new Prisma.Decimal(data.budgetSpent) : null } : {}),
-
-        ...(data.photoIds && data.photoIds.length > 0 ? {
-          attachments: {
-            create: data.photoIds.map((fileId: string) => ({
-              fileId: fileId
-            }))
-          }
-        } : {})
+        attachments: {
+          create: (data.photoIds || []).map((fileId: string) => ({ fileId }))
+        }
       } 
     });
   }  
@@ -621,12 +676,12 @@ export class AdminService {
     const antennaId = await this.getAdminAntennaId(adminId);
     const antenna = await this.prisma.antenna.findUnique({
       where: { id: antennaId },
-      select: { associationId: true }
+      select: { associationId: true, name: true }
     });
 
     if (!antenna?.associationId) throw new BadRequestException("Antenne non rattachée.");
 
-    return this.prisma.document.create({
+    const doc = await this.prisma.document.create({
       data: {
         title: data.title,
         description: data.description,
@@ -635,22 +690,25 @@ export class AdminService {
         associationId: antenna.associationId as string,
         uploadedByUserId: adminId as string, 
         publishedAt: new Date(),
+        visibility: 'ALL' // Par défaut visible par tous les membres de l'antenne
       },
     });
+
+    // ✅ NOTIFICATION : Informer le Super Admin du document d'antenne
+    await this.notifications.notifySuperAdmins(
+      antenna.associationId,
+      `Un nouveau document "${doc.title}" a été ajouté par l'antenne "${antenna.name}".`,
+      NotificationType.DOCUMENT_PUBLISHED
+    );
+
+    return doc;
   }
 
   async deleteDocument(documentId: string, adminId: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
-
-    const doc = await this.prisma.document.findFirst({
-      where: { id: documentId, antennaId },
-    });
-
+    const doc = await this.prisma.document.findFirst({ where: { id: documentId, antennaId } });
     if (!doc) throw new NotFoundException("Document introuvable.");
-
-    return this.prisma.document.delete({
-      where: { id: documentId },
-    });
+    return this.prisma.document.delete({ where: { id: documentId } });
   }
 
   // --- GESTION DES CONTENUS (INFORMATIONS / NEWS) ---
@@ -694,12 +752,12 @@ export class AdminService {
     const antennaId = await this.getAdminAntennaId(adminId);
     const antenna = await this.prisma.antenna.findUnique({
       where: { id: antennaId },
-      select: { associationId: true }
+      select: { associationId: true, name: true }
     });
 
     if (!antenna?.associationId) throw new BadRequestException("Antenne non rattachée à une association.");
 
-    return this.prisma.newsPost.create({
+    const post = await this.prisma.newsPost.create({
       data: {
         title: data.title,
         content: data.content || data.body || '',
@@ -712,6 +770,17 @@ export class AdminService {
         ...(data.status === PostStatus.PUBLISHED ? { publishedAt: new Date(), publishedByUserId: adminId } : {})
       },
     });
+
+    // ✅ NOTIFICATION : Si publié, informer le Super Admin
+    if (post.status === PostStatus.PUBLISHED) {
+      await this.notifications.notifySuperAdmins(
+        antenna.associationId,
+        `Un nouveau contenu "${post.title}" a été publié par l'antenne "${antenna.name}".`,
+        NotificationType.NEWS_PUBLISHED
+      );
+    }
+
+    return post;
   }
 
   async updateContent(contentId: string, adminId: string, data: any) {
@@ -737,9 +806,7 @@ export class AdminService {
   async deleteContent(contentId: string, adminId: string) {
     const antennaId = await this.getAdminAntennaId(adminId);
     const post = await this.prisma.newsPost.findFirst({ where: { id: contentId, antennaId } });
-
     if (!post) throw new NotFoundException("Contenu introuvable.");
-
     return this.prisma.newsPost.delete({ where: { id: contentId } });
   }
 

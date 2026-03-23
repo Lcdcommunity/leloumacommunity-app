@@ -16,6 +16,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { LoginDto } from './dto/login.dto';
+import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
+import { NotificationType } from '@prisma/client'; // Ajouté
 
 @Injectable()
 export class AuthService {
@@ -24,6 +26,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly tokens: AuthTokensService,
     private readonly authMailer: AuthMailerService,
+    private readonly notifications: NotificationsService, // Injecté chirurgicalement
   ) {}
 
   private sha256(input: string): string {
@@ -253,6 +256,15 @@ export class AuthService {
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+    });
+
+    // ✅ NOTIFICATION : Alerter l'utilisateur de la modification de ses accès
+    await this.notifications.createForUser({
+      associationId: record.associationId,
+      userId: record.userId,
+      message: 'Votre mot de passe a été modifié avec succès. Si vous n\'êtes pas à l\'origine de cette action, contactez immédiatement l\'administration.',
+      type: NotificationType.SYSTEM_ALERT,
+      title: 'Sécurité : Mot de passe modifié',
     });
 
     return { success: true };

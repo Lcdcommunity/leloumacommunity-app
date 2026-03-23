@@ -20,6 +20,9 @@ export class AuthMailerService {
     });
   }
 
+  /**
+   * Construit l'adresse d'expéditeur formatée.
+   */
   private getMailFrom(appName: string, fallbackLabel: string): string {
     const smtpUser = this.config.get<string>('SMTP_USER') ?? '';
     return (
@@ -28,12 +31,15 @@ export class AuthMailerService {
     );
   }
 
+  /**
+   * Envoie l'email de réinitialisation de mot de passe.
+   */
   async sendPasswordResetEmail(params: {
     to: string;
     resetUrl: string;
     appName?: string;
   }): Promise<void> {
-    const appName = params.appName || 'Lélouma';
+    const appName = params.appName || this.config.get<string>('APP_NAME') || 'Lélouma Community';
     const mailFrom = this.getMailFrom(appName, 'Support');
 
     try {
@@ -81,12 +87,15 @@ export class AuthMailerService {
     }
   }
 
+  /**
+   * Envoie l'email de vérification lors de l'inscription (Signup).
+   */
   async sendVerificationEmail(params: {
     to: string;
     verifyUrl: string;
     appName?: string;
   }): Promise<void> {
-    const appName = params.appName || 'Lélouma';
+    const appName = params.appName || this.config.get<string>('APP_NAME') || 'Lélouma Community';
     const mailFrom = this.getMailFrom(appName, 'Bienvenue');
 
     try {
@@ -115,6 +124,10 @@ export class AuthMailerService {
             <p style="font-size: 13px; color: #6B7280; line-height: 1.5; padding-top: 20px; border-top: 1px solid #F3F4F6;">
               Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br/>
               <a href="${params.verifyUrl}" style="color: #3B82F6; word-break: break-all;">${params.verifyUrl}</a>
+            </p>
+
+            <p style="font-size: 13px; color: #9CA3AF; margin-top: 15px;">
+              Une fois votre email vérifié, un administrateur devra valider votre compte pour vous donner accès à l'espace membre.
             </p>
           </div>
         `,

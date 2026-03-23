@@ -322,77 +322,48 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-front,
         .vcw-back {
           box-shadow:
-            0 0 0 1px rgba(255, 229, 168, 0.22) inset,
-            0 18px 30px rgba(12, 38, 29, 0.24),
-            0 0 25px rgba(225, 191, 94, 0.12);
+            0 0 0 1px rgba(15, 61, 46, 0.08) inset,
+            0 18px 30px rgba(12, 38, 29, 0.12),
+            0 0 25px rgba(225, 191, 94, 0.05);
           transition: box-shadow 0.35s ease;
         }
 
         .vcw-scene.elevated .vcw-front,
         .vcw-scene.elevated .vcw-back {
           box-shadow:
-            0 0 0 1px rgba(255, 233, 170, 0.32) inset,
-            0 28px 44px rgba(12, 38, 29, 0.30),
-            0 0 34px rgba(225, 191, 94, 0.22);
+            0 0 0 1px rgba(15, 61, 46, 0.12) inset,
+            0 28px 44px rgba(12, 38, 29, 0.18),
+            0 0 34px rgba(225, 191, 94, 0.1);
         }
 
         .vcw-front {
-          background-color: #0f3d2e;
-          background-image:
-            radial-gradient(circle at 12% 18%, rgba(255,255,255,0.34) 0%, transparent 18%),
-            radial-gradient(circle at 84% 16%, rgba(255,233,170,0.34) 0%, transparent 18%),
-            radial-gradient(circle at 72% 66%, rgba(255,213,79,0.18) 0%, transparent 22%),
-            radial-gradient(circle at 22% 78%, rgba(255,255,255,0.12) 0%, transparent 18%),
-            linear-gradient(120deg, rgba(255,255,255,0) 16%, rgba(255,255,255,0.18) 24%, rgba(255,255,255,0.04) 32%, rgba(255,255,255,0) 42%),
-            linear-gradient(135deg, #0a2f24 0%, #14543d 24%, #1f7a53 48%, #c6a03b 78%, #f2d77c 100%);
+          background-color: #ffffff;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
           padding: 1.25rem;
           z-index: 2;
           transform: rotateY(0deg);
+          position: relative;
         }
 
+        /* Vagues au fond du recto (beige, vert clair, vert foncé) */
         .vcw-front::before {
           content: '';
           position: absolute;
-          inset: 0;
-          border-radius: 24px;
-          background:
-            radial-gradient(ellipse at 14% 16%, rgba(255,255,255,0.30) 0%, transparent 26%),
-            radial-gradient(ellipse at 88% 24%, rgba(255,230,150,0.26) 0%, transparent 28%),
-            radial-gradient(ellipse at 62% 72%, rgba(255,255,255,0.10) 0%, transparent 24%),
-            linear-gradient(125deg, rgba(255,255,255,0) 22%, rgba(255,255,255,0.20) 31%, rgba(255,255,255,0.04) 39%, rgba(255,255,255,0) 47%),
-            repeating-linear-gradient(
-              135deg,
-              rgba(255,255,255,0.02) 0px,
-              rgba(255,255,255,0.02) 2px,
-              rgba(255,255,255,0) 2px,
-              rgba(255,255,255,0) 10px
-            );
-          pointer-events: none;
-          mix-blend-mode: screen;
-          opacity: 0.98;
-        }
-
-        .vcw-front::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 24px;
-          background:
-            linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 24%, rgba(255,255,255,0) 76%, rgba(255,215,110,0.08) 100%);
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 38%;
+          background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="%23eaddcd" fill-opacity="1" d="M0,128L48,138.7C96,149,192,171,288,165.3C384,160,480,128,576,133.3C672,139,768,181,864,192C960,203,1056,181,1152,154.7C1248,128,1344,96,1392,80L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path><path fill="%232b6b4f" fill-opacity="1" d="M0,192L48,181.3C96,171,192,149,288,149.3C384,149,480,171,576,181.3C672,192,768,192,864,181.3C960,171,1056,149,1152,144C1248,139,1344,149,1392,154.7L1440,160L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path><path fill="%2311402e" fill-opacity="1" d="M0,256L48,245.3C96,235,192,213,288,208C384,203,480,213,576,229.3C672,245,768,267,864,261.3C960,256,1056,224,1152,208C1248,192,1344,192,1392,192L1440,192L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
+          background-size: cover;
+          z-index: 0;
           pointer-events: none;
         }
 
         .vcw-back {
           transform: rotateY(180deg);
-          background-color: #0d382a;
-          background-image:
-            radial-gradient(circle at 14% 16%, rgba(255,255,255,0.26) 0%, transparent 18%),
-            radial-gradient(circle at 84% 22%, rgba(255,227,142,0.28) 0%, transparent 20%),
-            radial-gradient(circle at 60% 72%, rgba(255,213,79,0.12) 0%, transparent 22%),
-            linear-gradient(135deg, #08261d 0%, #114734 30%, #1b6a4a 58%, #b88f2a 84%, #efd47a 100%);
+          background-color: #ffffff;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -400,17 +371,18 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           z-index: 1;
         }
 
+        /* Vague verte au fond du verso */
         .vcw-back::before {
           content: '';
           position: absolute;
-          inset: 0;
-          border-radius: 24px;
-          background:
-            linear-gradient(125deg, rgba(255,255,255,0) 18%, rgba(255,255,255,0.16) 27%, rgba(255,255,255,0.03) 36%, rgba(255,255,255,0) 45%),
-            radial-gradient(ellipse at 18% 18%, rgba(255,255,255,0.18) 0%, transparent 24%);
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 15%;
+          background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320" preserveAspectRatio="none"><path fill="%230f3d2e" fill-opacity="1" d="M0,288L48,277.3C96,267,192,245,288,250.7C384,256,480,288,576,277.3C672,267,768,213,864,202.7C960,192,1056,224,1152,250.7C1248,277,1344,299,1392,309.3L1440,320L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>') no-repeat bottom;
+          background-size: cover;
+          z-index: 0;
           pointer-events: none;
-          mix-blend-mode: screen;
-          opacity: 0.96;
         }
 
         .vcw-shimmer {
@@ -422,18 +394,20 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           background:
             radial-gradient(
               ellipse at var(--mx, 50%) var(--my, 50%),
-              rgba(255, 255, 255, 0.42) 0%,
-              rgba(255, 240, 188, 0.24) 18%,
-              rgba(255, 228, 141, 0.12) 30%,
+              rgba(255, 255, 255, 0.6) 0%,
+              rgba(255, 255, 255, 0.2) 30%,
               transparent 62%
             );
-          mix-blend-mode: screen;
+          mix-blend-mode: overlay;
           transition: opacity 0.25s ease;
         }
 
-        .vcw-top {
+        .vcw-top, .vcw-mid, .vcw-bottom {
           position: relative;
           z-index: 3;
+        }
+
+        .vcw-top {
           display: flex;
           justify-content: space-between;
           align-items: flex-start;
@@ -451,7 +425,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-back-logo-ring {
           border-radius: 50%;
           overflow: hidden;
-          background: rgba(255,255,255,0.92);
+          background: #ffffff;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -461,10 +435,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-logo-ring {
           width: 38px;
           height: 38px;
-          border: 2px solid rgba(245, 214, 120, 0.92);
-          box-shadow:
-            0 4px 12px rgba(10, 47, 36, 0.22),
-            0 0 16px rgba(244, 214, 120, 0.20);
+          border: 2px solid rgba(15, 61, 46, 0.15);
+          box-shadow: 0 4px 12px rgba(10, 47, 36, 0.08);
         }
 
         .vcw-org {
@@ -473,8 +445,14 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           line-height: 1.12;
           letter-spacing: 0.13em;
           text-transform: uppercase;
-          color: #f7efcf;
-          text-shadow: 0 1px 1px rgba(0,0,0,0.12);
+          color: #0f3d2e;
+        }
+        
+        .vcw-top-actions {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-end;
+          gap: 0.5rem;
         }
 
         .vcw-status {
@@ -487,24 +465,21 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 800;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.05);
           white-space: nowrap;
           flex-shrink: 0;
         }
 
         .vcw-status.valid {
-          background: rgba(255,255,255,0.10);
-          border: 1px solid rgba(154, 255, 195, 0.42);
-          color: #d8ffe7;
-          box-shadow:
-            0 0 10px rgba(111, 255, 167, 0.18),
-            0 0 16px rgba(111, 255, 167, 0.08) inset;
+          background: rgba(27, 94, 66, 0.08);
+          border: 1px solid rgba(27, 94, 66, 0.2);
+          color: #1b5e42;
         }
 
         .vcw-status.invalid {
-          background: rgba(239, 68, 68, 0.14);
-          border: 1px solid rgba(239, 68, 68, 0.4);
-          color: #ffe5e5;
+          background: rgba(239, 68, 68, 0.08);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          color: #ef4444;
         }
 
         .vcw-status-dot {
@@ -521,9 +496,26 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           50% { opacity: 0.35; box-shadow: none; }
         }
 
+        /* Drapeau de la Guinée */
+        .vcw-guinea-flag, .vcw-guinea-flag-recto {
+          width: 34px;
+          height: 24px;
+          display: flex;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+          border-radius: 2px;
+          overflow: hidden;
+        }
+        .vcw-guinea-flag::before, .vcw-guinea-flag-recto::before {
+          content: ''; flex: 1; background-color: #CE1126; /* Rouge */
+        }
+        .vcw-guinea-flag-mid {
+          flex: 1; background-color: #FCD116; /* Jaune */
+        }
+        .vcw-guinea-flag::after, .vcw-guinea-flag-recto::after {
+          content: ''; flex: 1; background-color: #009460; /* Vert */
+        }
+
         .vcw-mid {
-          position: relative;
-          z-index: 3;
           display: grid;
           grid-template-columns: 92px minmax(0, 1fr);
           gap: 1rem;
@@ -534,22 +526,12 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           width: 92px;
           aspect-ratio: 3 / 4;
           border-radius: 12px;
-          border: 2px solid rgba(248, 223, 143, 0.88);
-          box-shadow:
-            0 8px 20px rgba(10, 47, 36, 0.22),
-            0 0 18px rgba(248, 223, 143, 0.20);
+          border: 2px solid #ffffff;
+          box-shadow: 0 6px 16px rgba(10, 47, 36, 0.12);
           overflow: hidden;
-          background: rgba(255,255,255,0.22);
+          background: #f1f5f9;
           position: relative;
           flex-shrink: 0;
-        }
-
-        .vcw-photo-wrap::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 45%, rgba(0,0,0,0.10) 100%);
-          pointer-events: none;
         }
 
         .vcw-photo-wrap img {
@@ -569,10 +551,9 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           margin-bottom: 0.22rem;
           font-size: 0.68rem;
           font-weight: 800;
-          color: #ffe7a1;
+          color: #1b5e42;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          text-shadow: 0 1px 1px rgba(0,0,0,0.18);
         }
 
         .vcw-name {
@@ -582,8 +563,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 700;
           line-height: 0.98;
           letter-spacing: 0.01em;
-          color: #ffffff;
-          text-shadow: 0 2px 10px rgba(0,0,0,0.18);
+          color: #0f172a;
           word-break: break-word;
         }
 
@@ -600,7 +580,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 700;
           letter-spacing: 0.05em;
           text-transform: uppercase;
-          color: rgba(255, 247, 220, 0.82);
+          color: #64748b;
           align-self: start;
           white-space: nowrap;
         }
@@ -609,22 +589,18 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           min-width: 0;
           font-size: 0.86rem;
           font-weight: 700;
-          color: #fff6d7;
+          color: #0f172a;
           line-height: 1.15;
-          text-shadow: 0 1px 6px rgba(0,0,0,0.10);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
         }
 
         .vcw-bottom {
-          position: relative;
-          z-index: 3;
           display: grid;
           grid-template-columns: minmax(0, 1fr) auto;
           gap: 0.8rem;
           align-items: end;
-          border-top: 1px solid rgba(255, 225, 135, 0.26);
           padding-top: 0.65rem;
         }
 
@@ -650,14 +626,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 800;
           letter-spacing: 0.15em;
           text-transform: uppercase;
-        }
-
-        .vcw-card-id-label {
-          color: rgba(255, 244, 205, 0.82);
-        }
-
-        .vcw-exp-label {
-          color: rgba(255, 244, 205, 0.82);
+          color: #0f172a; /* Texte sombre pour visibilité parfaite */
+          text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85); /* Ombre claire pour contraster avec la vague */
         }
 
         .vcw-card-num {
@@ -665,8 +635,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-size: 1rem;
           font-weight: 500;
           letter-spacing: 0.14em;
-          color: #ffffff;
-          text-shadow: 0 1px 8px rgba(0,0,0,0.20);
+          color: #ffffff; /* Valeur en blanc */
+          text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65); /* Ombre foncée pour bien ressortir */
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -677,8 +647,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-size: 0.92rem;
           font-weight: 700;
           letter-spacing: 0.08em;
-          color: #fff1b8;
-          text-shadow: 0 1px 8px rgba(0,0,0,0.18);
+          color: #ffffff;
+          text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
           white-space: nowrap;
         }
 
@@ -699,18 +669,22 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-back-header {
           display: flex;
           align-items: center;
-          justify-content: center;
-          gap: 0.62rem;
+          justify-content: space-between;
           width: 100%;
+          padding: 0 0.5rem;
+        }
+
+        .vcw-back-logo-group {
+          display: flex;
+          align-items: center;
+          gap: 0.62rem;
         }
 
         .vcw-back-logo-ring {
           width: 36px;
           height: 36px;
-          border: 2px solid rgba(248, 223, 143, 0.92);
-          box-shadow:
-            0 4px 12px rgba(10, 47, 36, 0.18),
-            0 0 16px rgba(248, 223, 143, 0.18);
+          border: 2px solid rgba(15, 61, 46, 0.15);
+          box-shadow: 0 2px 8px rgba(10, 47, 36, 0.08);
         }
 
         .vcw-back-org {
@@ -719,14 +693,13 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           line-height: 1.15;
           letter-spacing: 0.14em;
           text-transform: uppercase;
-          color: #fff3ca;
-          text-shadow: 0 1px 8px rgba(0,0,0,0.16);
+          color: #0f3d2e;
         }
 
         .vcw-back-sep {
           width: 100%;
           height: 1px;
-          background: linear-gradient(90deg, transparent, rgba(255, 224, 133, 0.74), transparent);
+          background: linear-gradient(90deg, transparent, #e2e8f0, transparent);
         }
 
         .vcw-back-title {
@@ -734,18 +707,15 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 800;
           letter-spacing: 0.16em;
           text-transform: uppercase;
-          color: #fff8df;
+          color: #1b5e42;
         }
 
         .vcw-qr-card {
           width: fit-content;
-          background: rgba(255,255,255,0.96);
+          background: #ffffff;
           border-radius: 12px;
           padding: 6px;
-          box-shadow:
-            0 10px 24px rgba(10, 47, 36, 0.20),
-            0 0 16px rgba(255, 248, 235, 0.22),
-            0 0 22px rgba(248, 223, 143, 0.16);
+          box-shadow: 0 8px 24px rgba(10, 47, 36, 0.08);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -756,8 +726,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-size: 0.62rem;
           font-weight: 500;
           line-height: 1.4;
-          color: #fff7de;
-          text-shadow: 0 1px 6px rgba(0,0,0,0.10);
+          color: #475569;
         }
 
         .vcw-hint {
@@ -907,9 +876,18 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
             letter-spacing: 0.12em;
           }
 
+          .vcw-top-actions {
+            gap: 0.35rem;
+          }
+
           .vcw-status {
             padding: 0.26rem 0.58rem;
             font-size: 0.54rem;
+          }
+          
+          .vcw-guinea-flag, .vcw-guinea-flag-recto {
+            width: 26px;
+            height: 18px;
           }
 
           .vcw-mid {
@@ -975,6 +953,10 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
 
           .vcw-back-inner {
             gap: 0.25rem;
+          }
+
+          .vcw-back-header {
+            padding: 0 0.2rem;
           }
 
           .vcw-back-logo-ring {
@@ -1128,10 +1110,15 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                       </span>
                     </div>
 
-                    <span className={`vcw-status ${!isExpired ? 'valid' : 'invalid'}`}>
-                      <span className="vcw-status-dot" />
-                      {!isExpired ? 'Actif' : 'Expiré'}
-                    </span>
+                    <div className="vcw-top-actions">
+                      <span className={`vcw-status ${!isExpired ? 'valid' : 'invalid'}`}>
+                        <span className="vcw-status-dot" />
+                        {!isExpired ? 'Actif' : 'Expiré'}
+                      </span>
+                      <div className="vcw-guinea-flag-recto">
+                        <div className="vcw-guinea-flag-mid" />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="vcw-mid">
@@ -1180,17 +1167,22 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                 <div className="vcw-face vcw-back">
                   <div className="vcw-back-inner">
                     <div className="vcw-back-header">
-                      <div className="vcw-back-logo-ring">
-                        <Image
-                          src="/assets/images/logolcd.jpg"
-                          alt="Logo"
-                          width={38}
-                          height={38}
-                          style={{ objectFit: 'cover', borderRadius: '50%' }}
-                        />
+                      <div className="vcw-back-logo-group">
+                        <div className="vcw-back-logo-ring">
+                          <Image
+                            src="/assets/images/logolcd.jpg"
+                            alt="Logo"
+                            width={38}
+                            height={38}
+                            style={{ objectFit: 'cover', borderRadius: '50%' }}
+                          />
+                        </div>
+                        <div className="vcw-back-org">LELOUMA COMMUNAUTE</div>
                       </div>
-
-                      <div className="vcw-back-org">LELOUMA COMMUNAUTE</div>
+                      
+                      <div className="vcw-guinea-flag">
+                        <div className="vcw-guinea-flag-mid" />
+                      </div>
                     </div>
 
                     <div className="vcw-back-sep" />

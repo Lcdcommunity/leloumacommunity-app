@@ -14,6 +14,7 @@ import {
   UserStatus,
   PaymentMethod,
   ContributionPurpose,
+  NotificationType, // Ajouté
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { memberMapper } from './member.mapper';
@@ -28,10 +29,14 @@ import { MemberProjectProposalsQueryDto } from './dto/member-project-proposals-q
 import { MemberDocumentsQueryDto } from './dto/member-documents-query.dto';
 import { MemberContentsQueryDto } from './dto/member-contents-query.dto';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
+import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
 
 @Injectable()
 export class MemberService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService, // Injecté chirurgicalement
+  ) {}
 
   async getMeOrThrow(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -224,6 +229,15 @@ export class MemberService {
         purpose: dto.purpose || ContributionPurpose.REGULAR_QUOTA,
       },
     });
+
+    // ✅ NOTIFICATION : Informer les admins de l'antenne qu'un membre a déclaré un versement
+    await this.notifications.notifyAntennaAdmins(
+      me.antennaId,
+      me.associationId,
+      `Un nouveau versement de ${dto.amount} EUR a été déclaré par ${me.firstName} ${me.lastName}.`,
+      NotificationType.CONTRIBUTION_SUBMITTED,
+      { contributionId: created.id }
+    );
 
     return memberMapper.contribution(created);
   }
@@ -430,6 +444,17 @@ export class MemberService {
           : {}),
       },
     });
+
+    // ✅ NOTIFICATION : Informer les admins d'une nouvelle proposition de projet
+    if (me.antennaId) {
+      await this.notifications.notifyAntennaAdmins(
+        me.antennaId,
+        me.associationId,
+        `Une nouvelle proposition de projet "${dto.title.trim()}" a été soumise par ${me.firstName} ${me.lastName}.`,
+        NotificationType.PROJECT_PROPOSAL_SUBMITTED,
+        { proposalId: created.id }
+      );
+    }
 
     return memberMapper.projectProposal(created);
   }

@@ -1,5 +1,5 @@
-//backend/src/modules/users/dto/approve-member.dto.ts
-import { IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+// backend/src/modules/users/dto/approve-member.dto.ts
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class ApproveMemberDto {
   @IsNotEmpty({ message: 'L\'identifiant de l\'adhésion (membershipId) est requis.' })

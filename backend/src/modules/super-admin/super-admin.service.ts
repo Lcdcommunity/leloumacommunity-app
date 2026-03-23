@@ -10,12 +10,14 @@ import {
   Prisma,
   UserRole,
   UserStatus,
+  NotificationType,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../../common/services/mail.service';
 import { CreateAntennaDto } from './dto/create-antenna.dto';
 import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
 import { memberMapper } from '../member/member.mapper';
+import { NotificationsService } from '../notifications/notifications.service';
 
 type PrismaLike = PrismaService | Prisma.TransactionClient;
 
@@ -54,6 +56,7 @@ export class SuperAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mailService: MailService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /* ── GESTION DES PRIX (PRICING CONFIG) ── */
@@ -135,7 +138,6 @@ export class SuperAdminService {
     };
   }
 
-  // Ajouté depuis ton demi code
   async listAntennasByAssociation(associationId: string) {
     return this.prisma.antenna.findMany({
       where: { associationId },
@@ -245,6 +247,13 @@ export class SuperAdminService {
       return { antenna, createdAdmin };
     });
 
+    // ✅ NOTIFICATION : Informer les autres Super Admins de la nouvelle antenne
+    await this.notifications.notifySuperAdmins(
+      association.id,
+      `Une nouvelle antenne "${created.antenna.name}" a été créée par l'administrateur.`,
+      NotificationType.SYSTEM_ALERT,
+    );
+
     if (created.createdAdmin?.sendInvite !== false) {
       await this.mailService.sendAntennaAdminInvitation({
         to: created.createdAdmin.email,
@@ -326,7 +335,6 @@ export class SuperAdminService {
     };
   }
 
-  // Ajouté depuis ton demi code
   async listUsers(associationId: string, query: ListUsersQuery) {
     const where: Prisma.UserWhereInput = {
       associationId,
@@ -353,7 +361,7 @@ export class SuperAdminService {
   }
 
   async approveUser(userId: string, adminId: string) {
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         status: UserStatus.ACTIVE,
@@ -361,10 +369,21 @@ export class SuperAdminService {
         approvedAt: new Date(),
       },
     });
+
+    // ✅ NOTIFICATION : Informer l'utilisateur que son compte est validé
+    await this.notifications.createForUser({
+      associationId: user.associationId,
+      userId: user.id,
+      message: `Votre compte a été approuvé. Vous avez désormais accès à l'espace membre.`,
+      type: NotificationType.ACCOUNT_APPROVED,
+      title: 'Compte activé',
+    });
+
+    return user;
   }
 
   async rejectUser(userId: string, adminId: string, reason: string) {
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         status: UserStatus.REJECTED,
@@ -373,6 +392,17 @@ export class SuperAdminService {
         rejectionReason: reason,
       },
     });
+
+    // ✅ NOTIFICATION : Informer l'utilisateur du rejet
+    await this.notifications.createForUser({
+      associationId: user.associationId,
+      userId: user.id,
+      message: `Votre demande d'adhésion a été refusée. Motif : ${reason}`,
+      type: NotificationType.ACCOUNT_REJECTED,
+      title: 'Demande refusée',
+    });
+
+    return user;
   }
 
   async updateUser(
@@ -408,7 +438,7 @@ export class SuperAdminService {
   }
 
   async suspendUser(userId: string, actorId: string) {
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         status: UserStatus.SUSPENDED,
@@ -416,10 +446,21 @@ export class SuperAdminService {
         suspendedAt: new Date(),
       },
     });
+
+    // ✅ NOTIFICATION : Informer l'utilisateur de la suspension
+    await this.notifications.createForUser({
+      associationId: user.associationId,
+      userId: user.id,
+      message: `Votre compte a été suspendu par un administrateur. Veuillez contacter le support pour plus d'informations.`,
+      type: NotificationType.ACCOUNT_SUSPENDED,
+      title: 'Compte suspendu',
+    });
+
+    return user;
   }
 
   async activateUser(userId: string, actorId: string) {
-    return this.prisma.user.update({
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         status: UserStatus.ACTIVE,
@@ -429,6 +470,16 @@ export class SuperAdminService {
         suspendedByUserId: null,
       },
     });
+
+    // ✅ NOTIFICATION : Informer l'utilisateur de la réactivation
+    await this.notifications.createForUser({
+      associationId: user.associationId,
+      userId: user.id,
+      message: `Votre compte a été réactivé avec succès.`,
+      type: NotificationType.ACCOUNT_APPROVED,
+    });
+
+    return user;
   }
 
   async deleteUser(userId: string, actorId: string) {
@@ -518,6 +569,15 @@ export class SuperAdminService {
       actorId,
     );
 
+    // ✅ NOTIFICATION : Notifier le nouvel administrateur dans son interface
+    await this.notifications.createForUser({
+      associationId: antenna.associationId,
+      userId: result.user.id,
+      message: `Bienvenue ! Vous avez été nommé administrateur pour l'antenne "${antenna.name}".`,
+      type: NotificationType.SYSTEM_ALERT,
+      title: 'Promotion Admin',
+    });
+
     if (data.sendInvite !== false) {
       await this.mailService.sendAntennaAdminInvitation({
         to: result.user.email,
@@ -550,7 +610,7 @@ export class SuperAdminService {
       throw new NotFoundException('Administrateur introuvable.');
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: {
         status: UserStatus.SUSPENDED,
@@ -558,6 +618,15 @@ export class SuperAdminService {
         suspendedAt: new Date(),
       },
     });
+
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.id,
+      message: `Vos privilèges d'administrateur ont été suspendus temporairement.`,
+      type: NotificationType.ACCOUNT_SUSPENDED,
+    });
+
+    return updated;
   }
 
   async activateAntennaAdmin(userId: string, actorId: string) {
@@ -573,7 +642,7 @@ export class SuperAdminService {
       throw new NotFoundException('Administrateur introuvable.');
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: {
         status: UserStatus.ACTIVE,
@@ -583,6 +652,15 @@ export class SuperAdminService {
         suspendedByUserId: null,
       },
     });
+
+    await this.notifications.createForUser({
+      associationId: updated.associationId,
+      userId: updated.id,
+      message: `Votre compte administrateur a été réactivé.`,
+      type: NotificationType.ACCOUNT_APPROVED,
+    });
+
+    return updated;
   }
 
   async deleteAntennaAdmin(userId: string, actorId: string) {
@@ -691,7 +769,7 @@ export class SuperAdminService {
       throw new BadRequestException('Un fichier est requis.');
     }
 
-    return this.prisma.document.create({
+    const doc = await this.prisma.document.create({
       data: {
         associationId,
         title: data.title,
@@ -705,6 +783,17 @@ export class SuperAdminService {
       },
       include: { file: true },
     });
+
+    // ✅ NOTIFICATION : Informer de la publication du document
+    // Si visibilité = ALL, on pourrait notifier tout le monde (action lourde, à gérer avec modération)
+    // Ici, on envoie au moins une alerte système globale pour traçabilité
+    await this.notifications.notifySuperAdmins(
+      associationId,
+      `Un nouveau document global "${doc.title}" a été publié.`,
+      NotificationType.DOCUMENT_PUBLISHED,
+    );
+
+    return doc;
   }
 
   async listDocuments(page: number, pageSize: number, q?: string) {
@@ -757,7 +846,6 @@ export class SuperAdminService {
     const where: Prisma.ContributionWhereInput = status
       ? { status: status as never }
       : {};
-
     const [items, total] = await Promise.all([
       this.prisma.contribution.findMany({
         where,
@@ -779,7 +867,7 @@ export class SuperAdminService {
   }
 
   /* ── ADMIN ASSIGNMENTS ────────────────────────────────────────────── */
-  // Ajouté depuis ton demi code, sans conflit avec la méthode privée existante
+
   async createAntennaAdminAssignment(data: Prisma.AntennaAdminAssignmentCreateInput) {
     return this.prisma.antennaAdminAssignment.create({ data });
   }

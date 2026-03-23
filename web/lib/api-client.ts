@@ -148,9 +148,6 @@ export const api = {
 
   /**
    * Upload de la photo de profil (avatar).
-   * Endpoint : POST /users/me/avatar  (multipart/form-data, champ "avatar")
-   * Utilise getAccessToken() exactement comme http() — le token JWT est injecté.
-   * Retourne { message, avatarUrl, profilePhotoUrl, user }
    */
   uploadAvatar: async (formData: FormData): Promise<{
     message: string;
@@ -170,7 +167,6 @@ export const api = {
       body: formData,
     });
 
-    // Retry une fois si 401 (token expiré) — même logique que http()
     if (res.status === 401) {
       const refreshToken = getRefreshToken();
       if (refreshToken) {
@@ -182,7 +178,6 @@ export const api = {
         if (refreshRes.ok) {
           const data = await refreshRes.json() as { accessToken: string; refreshToken: string; refreshTokenExpiresAt: string };
           setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken, refreshTokenExpiresAt: data.refreshTokenExpiresAt ?? '' });
-          // Rejouer la requête avec le nouveau token
           const retryRes = await fetch(`${baseUrl}/users/me/avatar`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${data.accessToken}` },
@@ -623,7 +618,7 @@ export const api = {
     ),
 
   // ==========================================
-  // UTILITAIRES & SYSTEME
+  // UTILITAIRES & SYSTEME (FIX ROUTING)
   // ==========================================
   uploadFile: async (file: File, body?: { category?: string; folder?: string; description?: string }) => {
     const form = new FormData();
@@ -642,8 +637,10 @@ export const api = {
       `/notifications?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`
     ),
 
-  listMyNotifications: () =>
-    http<ApiListResponse<NotificationItem>>('/member/notifications?page=1&pageSize=100'),
+  listMyNotifications: (params?: { page?: number; pageSize?: number }) =>
+    http<ApiListResponse<NotificationItem>>(
+      `/notifications?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 100}`
+    ),
 
   markNotificationRead: (id: string) =>
     http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),

@@ -64,7 +64,7 @@ function BudgetBar({ planned, spent }: { planned?: number | null; spent?: number
   );
 }
 
-/* ══════════════════════════════════════════════════════ PROJECT DETAIL DRAWER */
+/* ══════════════════════════════════════════════════════ PROJECT DETAIL MODAL (Centré) */
 type Attachment = { url: string; fileName?: string; mimeType?: string | null; sizeBytes?: number | null };
 
 function DetailRow({ icon, label, value, vertical = false }: { icon: React.ReactNode; label: string; value: React.ReactNode; vertical?: boolean }) {
@@ -88,10 +88,19 @@ function DetailRow({ icon, label, value, vertical = false }: { icon: React.React
   );
 }
 
-function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose: () => void; onEdit: () => void }) {
-  const s   = PROJ_STATUS_MAP[project.status] ?? PROJ_STATUS_MAP['DRAFT'];
-  const attachments = (project.attachments ?? []) as Attachment[];
-  const images      = attachments; // Traités comme des images pour l'instant
+function ProjectModal({ project, onClose, onEdit, onDelete }: { project: Project; onClose: () => void; onEdit: () => void; onDelete: () => void }) {
+  const dedicatedPhotos = ((project as Project & { photos?: Attachment[] }).photos ?? []) as Attachment[];
+  const allAttachments = (project.attachments ?? []) as Attachment[];
+  
+  const attachmentImages = allAttachments.filter(a => a.mimeType?.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(a.fileName ?? a.url ?? ''));
+  const rawImages = [...dedicatedPhotos, ...attachmentImages.filter(ai => !dedicatedPhotos.some(dp => dp.url === ai.url))];
+  const docs = allAttachments.filter(a => !attachmentImages.includes(a));
+
+  // Gestion d'état pour les images qui plantent
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  // Les images valides sont celles qui n'ont pas (encore) échoué au chargement
+  const validImages = rawImages.filter(img => !failedImages.has(img.url));
 
   const pct  = project.budgetPlanned
     ? Math.min(100, Math.round(((project.budgetSpent ?? 0) / project.budgetPlanned) * 100))
@@ -99,169 +108,218 @@ function ProjectDrawer({ project, onClose, onEdit }: { project: Project; onClose
   const over = (project.budgetSpent ?? 0) > (project.budgetPlanned ?? 0);
   const budgetCol = over ? '#DC2626' : pct > 80 ? '#D97706' : '#2563EB';
 
-  // Fonction utilitaire pour télécharger le PDF
   const downloadPDF = () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
     window.open(`${apiUrl}/admin/projects/${project.id}/export`, '_blank');
   };
 
+  function fileIcon(mime?: string | null) {
+    if (mime?.includes('pdf')) return '📄';
+    if (mime?.includes('word') || mime?.includes('document')) return '📝';
+    if (mime?.includes('sheet') || mime?.includes('excel')) return '📊';
+    return '📎';
+  }
+
+  function fmtSize(bytes?: number | null) {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} o`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  }
+
   return (
     <>
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.35)', backdropFilter: 'blur(3px)', zIndex: 300 }} onClick={onClose} />
-      <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 301,
-        width: 'min(520px, 100vw)',
-        background: 'rgba(253,253,255,.98)',
-        backdropFilter: 'blur(20px)',
-        boxShadow: '-8px 0 40px rgba(15,23,42,.18)',
-        display: 'flex', flexDirection: 'column',
-        overflowY: 'auto',
-        animation: 'drawerIn .3s cubic-bezier(.22,1,.36,1)',
-      }}>
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)', backdropFilter: 'blur(5px)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
+        <div style={{
+          width: '100%',
+          maxWidth: 680,
+          background: 'rgba(253,253,255,.98)',
+          borderRadius: 22,
+          maxHeight: '90vh',
+          boxShadow: '0 25px 50px rgba(15,23,42,.2)',
+          display: 'flex', flexDirection: 'column',
+          overflow: 'hidden',
+          animation: 'modalPop .3s cubic-bezier(.22,1,.36,1)',
+        }} onClick={e => e.stopPropagation()}>
 
-        {/* Drawer header */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'rgba(253,253,255,.97)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(37,99,235,.09)', padding: '1.25rem', display: 'flex', alignItems: 'flex-start', gap: '.75rem' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '.4rem', flexWrap: 'wrap' }}>
-              <StatusBadge status={project.status} />
+          {/* Modal header (Centré & épuré) */}
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid rgba(37,99,235,.09)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', background: '#F8FAFC' }}>
+            <div style={{ flex: 1 }}>
               {project.locationText && (
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.22rem', fontSize: '.67rem', fontWeight: 700, color: '#6B7280' }}>
-                  <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.22rem', fontSize: '.65rem', fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.4rem' }}>
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                   {project.locationText}
-                </span>
+                </div>
               )}
+              <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.65rem', fontWeight: 700, color: '#0F172A', margin: 0, lineHeight: 1.15 }}>{project.title}</h2>
+              {project.summary && <p style={{ fontSize: '.85rem', color: '#64748B', margin: '.4rem 0 0', fontWeight: 500, lineHeight: 1.4 }}>{project.summary}</p>}
             </div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 'clamp(1.3rem,4vw,1.7rem)', fontWeight: 700, color: '#0F172A', margin: 0, lineHeight: 1.15 }}>{project.title}</h2>
-            {project.summary && <p style={{ fontSize: '.85rem', color: '#6B7280', margin: '.3rem 0 0', fontWeight: 500, lineHeight: 1.4 }}>{project.summary}</p>}
-          </div>
-          <div style={{ display: 'flex', gap: '.4rem', flexShrink: 0 }}>
-            <button onClick={downloadPDF} style={{ height: 34, padding: '0 .7rem', borderRadius: 9, background: '#F8FAFC', border: '1.5px solid #E2E8F0', color: '#475569', fontFamily: "'DM Sans',sans-serif", fontSize: '.76rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              PDF
-            </button>
-            <button onClick={onEdit} style={{ height: 34, padding: '0 .85rem', borderRadius: 9, background: '#EFF6FF', border: '1.5px solid rgba(37,99,235,.18)', color: '#1D4ED8', fontFamily: "'DM Sans',sans-serif", fontSize: '.76rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
-              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              Modifier
-            </button>
-            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: 9, background: '#F3F4F6', border: '1px solid #E5E7EB', color: '#6B7280', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: '50%', background: 'white', border: '1px solid #E2E8F0', color: '#64748B', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
           </div>
-        </div>
 
-        {/* Photo gallery */}
-        {images.length > 0 && (
-          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid rgba(37,99,235,.08)' }}>
-            <div style={{ fontSize: '.65rem', fontWeight: 900, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
-              Galerie photos ({images.length})
-            </div>
-            <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: '.5rem', border: '1px solid rgba(37,99,235,.1)', aspectRatio: '16/9', background: '#F8FAFC' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={images[0].url} alt={project.title} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            </div>
-            {images.length > 1 && (
-              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(images.length - 1, 4)}, 1fr)`, gap: '.4rem' }}>
-                {images.slice(1, 5).map((img, idx) => (
-                  <div key={idx} style={{ aspectRatio: '1', borderRadius: 9, overflow: 'hidden', border: '1px solid rgba(37,99,235,.1)', background: '#F8FAFC', position: 'relative' }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    {idx === 3 && images.length > 5 && (
-                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: "'DM Mono',monospace", fontSize: '.88rem', fontWeight: 700 }}>
-                        +{images.length - 5}
+          {/* Corps scrollable */}
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            
+            {/* Galerie photos */}
+            {/* Galerie photos */}
+            {validImages.length > 0 && (
+              <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(37,99,235,.08)' }}>
+                <div style={{ fontSize: '.65rem', fontWeight: 900, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+                  Galerie photos ({validImages.length})
+                </div>
+                
+                {/* Image principale (Taille maîtrisée et ajustement 'contain' pour les logos) */}
+                <div style={{ borderRadius: 14, overflow: 'hidden', marginBottom: '.5rem', border: '1px solid rgba(37,99,235,.1)', height: 220, background: '#F8FAFC' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img 
+                    src={validImages[0].url} 
+                    alt={project.title} 
+                    style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} 
+                    onError={() => setFailedImages(prev => new Set(prev).add(validImages[0].url))} 
+                  />
+                </div>
+                
+                {/* Miniatures (Taille fixe pour éviter l'étirement géant) */}
+                {validImages.length > 1 && (
+                  <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
+                    {validImages.slice(1, 5).map((img, idx) => (
+                      <div key={idx} style={{ width: 72, height: 72, borderRadius: 9, overflow: 'hidden', border: '1px solid rgba(37,99,235,.1)', background: '#F8FAFC', position: 'relative' }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img 
+                          src={img.url} 
+                          alt="" 
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} 
+                          onError={() => setFailedImages(prev => new Set(prev).add(img.url))} 
+                        />
+                        {idx === 3 && validImages.length > 5 && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(15,23,42,.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: "'DM Mono',monospace", fontSize: '.88rem', fontWeight: 700 }}>
+                            +{validImages.length - 5}
+                          </div>
+                        )}
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             )}
-          </div>
-        )}
 
-        {/* Details Content */}
-        <div style={{ padding: '0 1.25rem', flex: 1 }}>
-          
-          <DetailRow
-            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
-            label="Promoteur"
-            value={project.promoterName}
-          />
-          
-          <DetailRow
-            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
-            label="Période"
-            value={
-              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.84rem' }}>
-                {project.startsAt ? formatDate(project.startsAt) : '—'}&nbsp;&nbsp;&rarr;&nbsp;&nbsp;{project.endsAt ? formatDate(project.endsAt) : '—'}
-              </span>
-            }
-          />
+            {/* Details Content */}
+            <div style={{ padding: '1.25rem' }}>
+              
+              <DetailRow
+                icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
+                label="Promoteur"
+                value={project.promoterName}
+              />
+              
+              <DetailRow
+                icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+                label="Période"
+                value={
+                  <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.84rem' }}>
+                    {project.startsAt ? formatDate(project.startsAt) : '—'}&nbsp;&nbsp;&rarr;&nbsp;&nbsp;{project.endsAt ? formatDate(project.endsAt) : '—'}
+                  </span>
+                }
+              />
 
-          <DetailRow
-            icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-            label="Budget"
-            value={
-              project.budgetPlanned ? (
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.4rem', flexWrap: 'wrap', gap: '.5rem' }}>
+              <DetailRow
+                icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                label="Budget"
+                value={
+                  project.budgetPlanned ? (
                     <div>
-                      <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>Prévu&nbsp;</span>
-                      <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: '#0F172A' }}>{formatCurrency(project.budgetPlanned)}</span>
-                    </div>
-                    {project.budgetSpent != null && (
-                      <div>
-                        <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>Dépensé&nbsp;</span>
-                        <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: budgetCol }}>{formatCurrency(project.budgetSpent)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.4rem', flexWrap: 'wrap', gap: '.5rem' }}>
+                        <div>
+                          <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>Prévu&nbsp;</span>
+                          <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: '#0F172A' }}>{formatCurrency(project.budgetPlanned)}</span>
+                        </div>
+                        {project.budgetSpent != null && (
+                          <div>
+                            <span style={{ fontSize: '.68rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.06em' }}>Dépensé&nbsp;</span>
+                            <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: budgetCol }}>{formatCurrency(project.budgetSpent)}</span>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  <div style={{ height: 7, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: budgetCol, borderRadius: 99 }} />
-                  </div>
-                  <div style={{ textAlign: 'right', marginTop: '.2rem', fontFamily: "'DM Mono',monospace", fontSize: '.68rem', fontWeight: 700, color: budgetCol }}>{pct}% utilisé{over ? ' — Dépassement !' : ''}</div>
-                </div>
-              ) : <span style={{ color: '#D1D5DB' }}>Non défini</span>
-            }
-          />
+                      <div style={{ height: 7, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: budgetCol, borderRadius: 99 }} />
+                      </div>
+                      <div style={{ textAlign: 'right', marginTop: '.2rem', fontFamily: "'DM Mono',monospace", fontSize: '.68rem', fontWeight: 700, color: budgetCol }}>{pct}% utilisé{over ? ' — Dépassement !' : ''}</div>
+                    </div>
+                  ) : <span style={{ color: '#D1D5DB' }}>Non défini</span>
+                }
+              />
 
-          <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
-          
-          {/* Nouveau Bloc : Impacts & Cibles */}
-          {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
-             <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid rgba(37,99,235,.08)' }}>
-                <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                  Impact &amp; Cibles
-                </div>
-                <DetailRow vertical icon={<span/>} label="Bénéficiaires cibles" value={project.targetBeneficiaries} />
-                <DetailRow vertical icon={<span/>} label="Impact sur la population" value={project.populationImpact} />
-                <DetailRow vertical icon={<span/>} label="Impact environnemental" value={project.environmentalImpact} />
-             </div>
-          )}
+              <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
+              
+              {/* Impacts & Cibles */}
+              {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
+                 <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid rgba(37,99,235,.08)' }}>
+                    <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      Impact &amp; Cibles
+                    </div>
+                    <DetailRow vertical icon={<span/>} label="Bénéficiaires cibles" value={project.targetBeneficiaries} />
+                    <DetailRow vertical icon={<span/>} label="Impact sur la population" value={project.populationImpact} />
+                    <DetailRow vertical icon={<span/>} label="Impact environnemental" value={project.environmentalImpact} />
+                 </div>
+              )}
 
-          {/* Nouveau Bloc : Exécution */}
-          {(project.implementationMethod || project.risksAndMitigation) && (
-            <div style={{ marginTop: '1rem', background: '#FFFBEB', padding: '1rem', borderRadius: 12, border: '1px solid #FDE68A' }}>
-                <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#D97706', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                  Exécution &amp; Risques
+              {/* Exécution */}
+              {(project.implementationMethod || project.risksAndMitigation) && (
+                <div style={{ marginTop: '1rem', background: '#FFFBEB', padding: '1rem', borderRadius: 12, border: '1px solid #FDE68A' }}>
+                    <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#D97706', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                      Exécution &amp; Risques
+                    </div>
+                    <DetailRow vertical icon={<span/>} label="Méthode d'implémentation" value={project.implementationMethod} />
+                    <DetailRow vertical icon={<span/>} label="Risques &amp; Mitigations" value={project.risksAndMitigation} />
                 </div>
-                <DetailRow vertical icon={<span/>} label="Méthode d&apos;implémentation" value={project.implementationMethod} />
-                <DetailRow vertical icon={<span/>} label="Risques &amp; Mitigations" value={project.risksAndMitigation} />
+              )}
+
+              {/* Documents non-images */}
+              {docs.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <div style={{ fontSize: '.65rem', fontWeight: 900, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.65rem', display: 'flex', alignItems: 'center', gap: '.35rem' }}>
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                    Documents ({docs.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                    {docs.map((doc, i) => (
+                      <a key={i} href={doc.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '.6rem', padding: '.6rem', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0', textDecoration: 'none' }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '.9rem' }}>{fileIcon(doc.mimeType)}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fileName ?? `Document ${i + 1}`}</div>
+                          {doc.sizeBytes != null && <div style={{ fontSize: '.64rem', color: '#94A3B8' }}>{fmtSize(doc.sizeBytes)}</div>}
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
-          )}
-
-          <div style={{ padding: '1rem 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: '.62rem', fontWeight: 800, color: '#D1D5DB', textTransform: 'uppercase', letterSpacing: '.08em' }}>ID projet</span>
-            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.68rem', fontWeight: 600, color: '#D1D5DB' }}>{project.id}</span>
           </div>
-        </div>
 
-        {/* Sticky bottom status bar */}
-        <div style={{ position: 'sticky', bottom: 0, background: 'rgba(253,253,255,.97)', borderTop: '1px solid rgba(37,99,235,.08)', padding: '.85rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.color }} />
-            <span style={{ fontSize: '.76rem', fontWeight: 800, color: '#374151' }}>{s.label}</span>
+          {/* Sticky Footer avec les Boutons d'Action */}
+          <div style={{ background: 'white', borderTop: '1px solid #E5E7EB', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+            <StatusBadge status={project.status} />
+            <div style={{ display: 'flex', gap: '.5rem' }}>
+              <button onClick={onDelete} style={{ height: 38, padding: '0 1rem', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', fontFamily: "'DM Sans',sans-serif", fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', transition: 'all .2s' }}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Supprimer
+              </button>
+              <button onClick={downloadPDF} style={{ height: 38, padding: '0 1rem', borderRadius: 10, background: '#F8FAFC', border: '1px solid #CBD5E1', color: '#374151', fontFamily: "'DM Sans',sans-serif", fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4" /></svg>
+                PDF
+              </button>
+              <button onClick={onEdit} style={{ height: 38, padding: '0 1.2rem', borderRadius: 10, background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', border: 'none', color: 'white', fontFamily: "'DM Sans',sans-serif", fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', boxShadow: '0 4px 12px rgba(37,99,235,.25)' }}>
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Modifier
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -672,12 +730,6 @@ export default function AdminProjectsPage() {
         .pp-proj-dates{font-family:'DM Mono',monospace;font-size:.68rem;font-weight:600;color:#9CA3AF}
         .pp-hint{display:inline-flex;align-items:center;gap:.22rem;font-size:.67rem;font-weight:700;color:#93C5FD;margin-top:.18rem}
 
-        .pp-btn-edit{height:28px;padding:0 .65rem;border-radius:7px;background:#EFF6FF;border:1.5px solid rgba(37,99,235,.18);color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:.22rem;transition:all .15s;white-space:nowrap}
-        .pp-btn-edit:hover{background:#DBEAFE;border-color:#2563EB;transform:translateY(-1px)}
-        .pp-btn-del{height:28px;padding:0 .65rem;border-radius:7px;background:rgba(254,242,242,.7);border:1.5px solid rgba(220,38,38,.18);color:#DC2626;font-family:'DM Sans',sans-serif;font-size:.72rem;font-weight:800;cursor:pointer;display:inline-flex;align-items:center;gap:.22rem;transition:all .15s;white-space:nowrap}
-        .pp-btn-del:hover:not(:disabled){background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
-        .pp-btn-del:disabled{opacity:.45;cursor:not-allowed}
-
         /* Mobile cards */
         .pp-mob{display:none;flex-direction:column}
         @media(max-width:600px){.pp-tw{display:none}.pp-mob{display:flex}}
@@ -686,8 +738,7 @@ export default function AdminProjectsPage() {
         .pp-mc:hover{background:rgba(239,246,255,.55)}
         .pp-mc-top{display:flex;align-items:flex-start;gap:.65rem;margin-bottom:.5rem}
         .pp-mc-info{flex:1;min-width:0}
-        .pp-mc-footer{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem}
-
+        
         .pp-loader{display:flex;align-items:center;justify-content:center;padding:2.5rem;gap:.7rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .pp-ring{width:22px;height:22px;border:2.5px solid rgba(37,99,235,.1);border-top-color:#2563EB;border-radius:50%;animation:ppspin .8s linear infinite}
         .pp-error{display:flex;align-items:center;gap:.6rem;padding:.85rem 1.1rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.8rem;font-weight:800;margin:1rem}
@@ -698,6 +749,9 @@ export default function AdminProjectsPage() {
         @keyframes ppin{to{opacity:1;transform:translateY(0)}}
         @keyframes ppspin{to{transform:rotate(360deg)}}
         @keyframes drawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
+        
+        /* ✅ Ajouté pour le nouveau design de Modale */
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       `}</style>
 
       <div className="pp-wrap">
@@ -790,7 +844,6 @@ export default function AdminProjectsPage() {
                       <th style={thStyle}>Projet</th>
                       <th style={thStyle}>Statut</th>
                       <th style={thStyle}>Budget</th>
-                      <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -811,18 +864,6 @@ export default function AdminProjectsPage() {
                         </td>
                         <td className="pp-td"><StatusBadge status={p.status} /></td>
                         <td className="pp-td"><BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} /></td>
-                        <td className="pp-td" style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', gap: '.4rem', justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
-                            <button className="pp-btn-edit" onClick={() => openEdit(p)}>
-                              <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                              Modifier
-                            </button>
-                            <button className="pp-btn-del" disabled={busyId === p.id} onClick={() => setDeleteTarget(p)}>
-                              {busyId === p.id ? <div style={{ width: 11, height: 11, border: '2px solid rgba(220,38,38,.3)', borderTopColor: '#DC2626', borderRadius: '50%', animation: 'ppspin .7s linear infinite' }} /> : <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>}
-                              Supprimer
-                            </button>
-                          </div>
-                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -841,16 +882,6 @@ export default function AdminProjectsPage() {
                       <StatusBadge status={p.status} />
                     </div>
                     <BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} />
-                    <div className="pp-mc-footer" onClick={e => e.stopPropagation()}>
-                      <button className="pp-btn-edit" onClick={() => openEdit(p)}>
-                        <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        Modifier
-                      </button>
-                      <button className="pp-btn-del" disabled={busyId === p.id} onClick={() => setDeleteTarget(p)}>
-                        <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        Supprimer
-                      </button>
-                    </div>
                   </div>
                 ))}
               </div>
@@ -859,12 +890,13 @@ export default function AdminProjectsPage() {
         </div>
       </div>
 
-      {/* Detail drawer */}
+      {/* Detail drawer (Maintenant un Modale Centré !) */}
       {detailProject && (
-        <ProjectDrawer
+        <ProjectModal
           project={detailProject}
           onClose={() => setDetailProject(null)}
           onEdit={() => { openEdit(detailProject); setDetailProject(null); }}
+          onDelete={() => setDeleteTarget(detailProject)}
         />
       )}
 

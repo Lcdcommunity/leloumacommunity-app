@@ -1,11 +1,11 @@
 // backend/src/modules/public/public.service.ts
-// backend/src/modules/public/public.service.ts
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthMailerService } from '../auth/auth.mailer.service';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
-import { UserStatus } from '@prisma/client'; // 👈 Ajout de UserStatus
+import { UserStatus, NotificationType } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
 
 export interface SignupDto {
   firstName: string;
@@ -18,7 +18,6 @@ export interface SignupDto {
   country?: string;
   addressLine1?: string;
   addressLine2?: string;
-  // 👇 AJOUT CHIRURGICAL : Nouveaux champs d'origine et de naissance
   originSubPrefecture?: string; 
   placeOfBirth?: string;
 }
@@ -28,6 +27,7 @@ export class PublicService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authMailer: AuthMailerService,
+    private readonly notifications: NotificationsService, // Injecté chirurgicalement
   ) {}
 
   async signup(dto: SignupDto) {
@@ -69,11 +69,8 @@ export class PublicService {
         country: dto.country,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2,
-        
-        // 👇 AJOUT CHIRURGICAL : Enregistrement en base
         originSubPrefecture: dto.originSubPrefecture,
         placeOfBirth: dto.placeOfBirth,
-        
         role: 'MEMBER',
         status: 'EMAIL_UNVERIFIED', 
         associationId: antenna.associationId, 
@@ -82,15 +79,23 @@ export class PublicService {
           create: {
             antennaId: antenna.id,
             associationId: antenna.associationId,
+            isPrimary: true,
           },
         },
       },
     });
 
+    // ✅ NOTIFICATION : Informer le Super Admin d'une nouvelle inscription (pour suivi)
+    await this.notifications.notifySuperAdmins(
+      antenna.associationId,
+      `Nouvelle inscription en attente de vérification email : ${user.firstName} ${user.lastName} (${emailLower}).`,
+      NotificationType.SYSTEM_ALERT,
+    );
+
     // 5. Générer un token sécurisé pour la vérification
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Le lien expire dans 24 heures
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 heures
 
     // 6. Sauvegarder le token dans la table AuthToken
     await this.prisma.authToken.create({
@@ -119,7 +124,6 @@ export class PublicService {
     };
   }
 
-  // 👇 AJOUT CHIRURGICAL : Méthode pour valider le token
   async verifyEmailToken(rawToken: string) {
     if (!rawToken) {
       throw new BadRequestException('Token manquant.');
@@ -134,11 +138,21 @@ export class PublicService {
         consumedAt: null,
         expiresAt: { gt: new Date() },
       },
+      include: {
+        user: {
+          include: {
+            memberships: { where: { isPrimary: true }, include: { antenna: true } }
+          }
+        }
+      }
     });
 
-    if (!authToken || !authToken.userId) {
+    if (!authToken || !authToken.user) {
       throw new BadRequestException('Le lien de vérification est invalide ou a expiré.');
     }
+
+    const user = authToken.user;
+    const primaryAntenna = user.memberships[0]?.antenna;
 
     // On invalide le token et on passe le membre en attente de validation admin
     await this.prisma.$transaction([
@@ -147,7 +161,7 @@ export class PublicService {
         data: { consumedAt: new Date() },
       }),
       this.prisma.user.update({
-        where: { id: authToken.userId },
+        where: { id: user.id },
         data: {
           emailVerifiedAt: new Date(),
           status: UserStatus.PENDING_APPROVAL,
@@ -155,7 +169,16 @@ export class PublicService {
       })
     ]);
 
-    // On renvoie un objet avec `emailVerified: true` comme attendu par le Frontend
+    // ✅ NOTIFICATION : Notifier les admins de l'antenne qu'un membre a validé son email et attend son approbation
+    if (primaryAntenna) {
+      await this.notifications.notifyAntennaAdmins(
+        primaryAntenna.id,
+        user.associationId,
+        `Nouveau membre en attente d'approbation : ${user.firstName} ${user.lastName} a vérifié son adresse email.`,
+        NotificationType.SYSTEM_ALERT,
+      );
+    }
+
     return { emailVerified: true };
   }
 }

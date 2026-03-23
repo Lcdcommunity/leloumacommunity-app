@@ -1,4 +1,4 @@
-//////// backend/src/app.module.ts
+// backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -25,10 +25,13 @@ import { PermissionsModule } from './modules/permissions/permissions.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 
-// Modules récemment créés
+// Modules récemment créés ou mis à jour
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { FileAssetsModule } from './modules/file-assets/file-assets.module';
+import { LedgerModule } from './modules/ledger/ledger.module';           // ✅ Ajouté
+import { ContributionsModule } from './modules/contributions/contributions.module'; // ✅ Ajouté
+import { ProjectsModule } from './modules/projects/projects.module';     // ✅ Ajouté (Nouveau Module)
 
 // Nouveaux Modules & Auth Member
 import { PublicModule } from './modules/public/public.module';
@@ -96,6 +99,9 @@ import { UsersModule } from './modules/users/users.module';
     NotificationsModule,
     JobsModule,
     FileAssetsModule,
+    LedgerModule,        // ✅ Connecté
+    ContributionsModule, // ✅ Connecté
+    ProjectsModule,      // ✅ Connecté (Centralise propositions et projets)
 
     // Nouveaux modules intégrés
     PublicModule,
