@@ -480,6 +480,32 @@ export const api = {
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
 
+  createProject: (body: {
+    title: string;
+    summary?: string;
+    description?: string;
+    locationText?: string;
+    promoterName?: string;
+    status?: string;
+    budgetPlanned?: number;
+    budgetSpent?: number;
+    startsAt?: string | null;
+    endsAt?: string | null;
+    targetBeneficiaries?: string;
+    populationImpact?: string;
+    environmentalImpact?: string;
+    risksAndMitigation?: string;
+    implementationMethod?: string;
+    specificObjectives?: string;
+    expectedResults?: string;
+    successIndicators?: string;
+    photoIds?: string[];
+  }) =>
+    http<Project, typeof body>('/super-admin/projects', { method: 'POST', body }),
+
+  updateProject: (id: string, body: Partial<Project> & { photoIds?: string[] }) =>
+    http<Project, typeof body>(`/super-admin/projects/${id}`, { method: 'PATCH', body }),
+
   listAntennaProjects: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
     http<ApiListResponse<Project>>(
       `/admin/projects?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
@@ -623,8 +649,8 @@ export const api = {
   uploadFile: async (file: File, body?: { category?: string; folder?: string; description?: string }) => {
     const form = new FormData();
     form.append('file', file);
-    if (body?.category)    form.append('category',    body.category);
-    if (body?.folder)      form.append('folder',      body.folder);
+    if (body?.category) form.append('category', body.category);
+    if (body?.folder) form.append('folder', body.folder);
     if (body?.description) form.append('description', body.description);
     return http<{ id: string; url: string; fileName: string }>('/uploads/single', {
       method: 'POST',
