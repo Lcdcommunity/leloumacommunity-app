@@ -1,3 +1,4 @@
+//web/components/layout/Sidebar.tsx
 'use client';
 
 import Link from 'next/link';
@@ -51,6 +52,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/documents',      label: 'Documents',             icon: <Ico d={ICO.doc} /> },
   { href: '/super-admin/notifications',  label: 'Notifications',         icon: <Ico d={ICO.bell} /> },
   { href: '/super-admin/audit',          label: 'Audit',                 icon: <Ico d={ICO.audit} /> },
+  { href: '/super-admin/profile',        label: 'Mon profil',            icon: <Ico d={ICO.user} /> },
   { href: '/super-admin/settings',       label: 'Paramètres',            icon: <Ico d={ICO.gear} /> },
 ];
 
@@ -89,9 +91,9 @@ const BOTTOM_SLUGS = ['settings', 'profile'];
 
 /**
  * Couleurs par rôle :
- *  SUPER_ADMIN   → rouge doux
- *  ANTENNA_ADMIN → bleu ciel
- *  MEMBER        → vert
+ * SUPER_ADMIN   → rouge doux
+ * ANTENNA_ADMIN → bleu ciel
+ * MEMBER        → vert
  */
 const ROLE_COLORS: Record<string, {
   accent: string;

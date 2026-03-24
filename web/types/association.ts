@@ -4,6 +4,22 @@ export interface Association {
   code: string;
   name: string;
   isActive: boolean;
+  
+  // Champs optionnels ajoutés pour correspondre au backend
+  legalName?: string | null;
+  registrationNumber?: string | null;
+  description?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  websiteUrl?: string | null;
+  country?: string | null;
+  city?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  postalCode?: string | null;
+  defaultCurrency?: string | null;
+  logoFileId?: string | null;
+
   createdAt: string;
   updatedAt: string;
 }

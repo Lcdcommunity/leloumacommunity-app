@@ -52,6 +52,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/documents',      label: 'Documents',           ico: ICO.doc,     section: 'Gestion' },
   { href: '/super-admin/notifications',  label: 'Notifications',       ico: ICO.bell,    section: 'Outils' },
   { href: '/super-admin/audit',          label: 'Audit',               ico: ICO.audit,   section: 'Outils' },
+  { href: '/super-admin/profile',        label: 'Mon profil',          ico: ICO.user,    section: 'Outils' },
   { href: '/super-admin/settings',       label: 'Paramètres',          ico: ICO.gear,    section: 'Outils' },
 ];
 
@@ -90,7 +91,7 @@ const quickTabs: Record<string, { href: string; label: string; ico: string }[]> 
     { href: '/super-admin',           label: 'Accueil', ico: ICO.home  },
     { href: '/super-admin/members',   label: 'Membres', ico: ICO.group },
     { href: '/super-admin/approvals', label: 'Comptes', ico: ICO.check },
-    { href: '/super-admin/settings',  label: 'Profil',  ico: ICO.user  },
+    { href: '/super-admin/profile',   label: 'Profil',  ico: ICO.user  },
   ],
   ANTENNA_ADMIN: [
     { href: '/admin',               label: 'Accueil', ico: ICO.home },

@@ -247,7 +247,6 @@ export class SuperAdminService {
       return { antenna, createdAdmin };
     });
 
-    // ✅ NOTIFICATION : Informer les autres Super Admins de la nouvelle antenne
     await this.notifications.notifySuperAdmins(
       association.id,
       `Une nouvelle antenne "${created.antenna.name}" a été créée par l'administrateur.`,
@@ -370,7 +369,6 @@ export class SuperAdminService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer l'utilisateur que son compte est validé
     await this.notifications.createForUser({
       associationId: user.associationId,
       userId: user.id,
@@ -393,7 +391,6 @@ export class SuperAdminService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer l'utilisateur du rejet
     await this.notifications.createForUser({
       associationId: user.associationId,
       userId: user.id,
@@ -447,7 +444,6 @@ export class SuperAdminService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer l'utilisateur de la suspension
     await this.notifications.createForUser({
       associationId: user.associationId,
       userId: user.id,
@@ -471,7 +467,6 @@ export class SuperAdminService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer l'utilisateur de la réactivation
     await this.notifications.createForUser({
       associationId: user.associationId,
       userId: user.id,
@@ -519,7 +514,6 @@ export class SuperAdminService {
     if (!admin) {
       throw new NotFoundException('Administrateur introuvable.');
     }
-
     const updateData: Prisma.UserUpdateInput = {};
 
     if (data.firstName !== undefined) updateData.firstName = data.firstName;
@@ -569,7 +563,6 @@ export class SuperAdminService {
       actorId,
     );
 
-    // ✅ NOTIFICATION : Notifier le nouvel administrateur dans son interface
     await this.notifications.createForUser({
       associationId: antenna.associationId,
       userId: result.user.id,
@@ -749,6 +742,36 @@ export class SuperAdminService {
     };
   }
 
+  // AJOUT DE LA MÉTHODE MANQUANTE
+  async updateProject(id: string, data: any) {
+    const project = await this.prisma.project.findUnique({ where: { id } });
+    if (!project) {
+      throw new NotFoundException('Projet introuvable.');
+    }
+
+    // Extraction des champs pour correspondre au schéma Prisma (Original names)
+    return this.prisma.project.update({
+      where: { id },
+      data: {
+        title: data.title,
+        summary: data.summary,
+        description: data.description,
+        status: data.status,
+        locationText: data.locationText,
+        promoterName: data.promoterName,
+        budgetAmount: data.budgetAmount, // Nom original Prisma
+        amountSpent: data.amountSpent,   // Nom original Prisma
+        startDate: data.startDate ? new Date(data.startDate) : undefined, // Nom original Prisma
+        endDate: data.endDate ? new Date(data.endDate) : undefined,     // Nom original Prisma
+        targetBeneficiaries: data.targetBeneficiaries,
+        populationImpact: data.populationImpact,
+        environmentalImpact: data.environmentalImpact,
+        implementationMethod: data.implementationMethod,
+        risksAndMitigation: data.risksAndMitigation,
+      },
+    });
+  }
+
   async deleteProject(id: string) {
     const project = await this.prisma.project.findUnique({ where: { id } });
     if (!project) {
@@ -784,9 +807,6 @@ export class SuperAdminService {
       include: { file: true },
     });
 
-    // ✅ NOTIFICATION : Informer de la publication du document
-    // Si visibilité = ALL, on pourrait notifier tout le monde (action lourde, à gérer avec modération)
-    // Ici, on envoie au moins une alerte système globale pour traçabilité
     await this.notifications.notifySuperAdmins(
       associationId,
       `Un nouveau document global "${doc.title}" a été publié.`,

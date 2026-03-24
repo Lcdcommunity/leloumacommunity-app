@@ -122,7 +122,7 @@ export class SuperAdminController {
     return this.service.deleteUser(id, actor.id);
   }
 
-  /* ── ANTENNES, PROJETS, ETC. ── */
+  /* ── ANTENNES ── */
   @Get('antennas')
   listAntennas(@Query() query: ListAntennasQueryDto) {
     return this.service.listAntennas(
@@ -153,9 +153,16 @@ export class SuperAdminController {
     return this.service.deleteAntenna(id);
   }
 
+  /* ── PROJETS ── */
   @Get('projects')
   listProjects(@Query() query: PaginationQueryDto) {
     return this.service.listProjects(query.page, query.pageSize, query.q);
+  }
+
+  // AJOUT DE LA ROUTE MANQUANTE ICI
+  @Patch('projects/:id')
+  updateProject(@Param('id') id: string, @Body() body: any) {
+    return this.service.updateProject(id, body);
   }
 
   @Delete('projects/:id')
@@ -163,6 +170,7 @@ export class SuperAdminController {
     return this.service.deleteProject(id);
   }
 
+  /* ── DOCUMENTS ── */
   @Post('documents')
   createDocument(@Body() body: { title: string; description?: string; fileAssetId: string }, @CurrentUser() actor: AuthUser) {
     return this.service.createDocument(body, actor.id, actor.associationId);
@@ -178,6 +186,7 @@ export class SuperAdminController {
     return this.service.deleteDocument(id);
   }
 
+  /* ── CONTRIBUTIONS ── */
   @Get('contributions')
   listContributions(@Query() query: PaginationQueryDto) {
     return this.service.listAllContributions(query.page, query.pageSize, query.status);

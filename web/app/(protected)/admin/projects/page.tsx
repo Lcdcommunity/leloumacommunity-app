@@ -331,20 +331,9 @@ function ProjectModal({
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const validImages = rawImages.filter((img) => !failedImages.has(img.url)).slice(0, MAX_PHOTOS);
-
-  useEffect(() => {
-    setFailedImages(new Set());
-    setSelectedIndex(0);
-  }, [project.id]);
-
-  useEffect(() => {
-    if (selectedIndex > Math.max(validImages.length - 1, 0)) {
-      setSelectedIndex(0);
-    }
-  }, [selectedIndex, validImages.length]);
-
-  const selectedImage = validImages[selectedIndex] ?? null;
-
+  const maxImageIndex = Math.max(validImages.length - 1, 0);
+  const effectiveSelectedIndex = Math.min(selectedIndex, maxImageIndex);
+  const selectedImage = validImages[effectiveSelectedIndex] ?? null;
   const pct = project.budgetPlanned
     ? Math.min(100, Math.round(((project.budgetSpent ?? 0) / project.budgetPlanned) * 100))
     : 0;
