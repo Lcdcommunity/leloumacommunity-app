@@ -18,7 +18,7 @@ import { getAccessToken, getRefreshToken, setTokens, clearAuthState } from './au
 import { env } from './env';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// VirtualCardData
+// TYPES & INTERFACES
 // ─────────────────────────────────────────────────────────────────────────────
 export interface VirtualCardData {
   cardNumber: string;
@@ -92,6 +92,9 @@ export interface FullUserProfile extends UserSummary {
   }> | null;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// API CLIENT
+// ─────────────────────────────────────────────────────────────────────────────
 export const api = {
   // ==========================================
   // AUTH / ENRÔLEMENT MEMBRE
@@ -467,7 +470,7 @@ export const api = {
     http<ProjectionResult, typeof body>('/admin/projections/contributions', { method: 'POST', body }),
 
   // ==========================================
-  // PROJETS
+  // PROJETS & PROPOSITIONS
   // ==========================================
   listProjects: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
     http<ApiListResponse<Project>>(
@@ -499,11 +502,6 @@ export const api = {
   }) =>
     http<Project, typeof body>('/super-admin/projects', { method: 'POST', body }),
 
-  // CORRECTION ICI : Si l'erreur persiste, essayez d'enlever le premier "/" si votre base URL le gère déjà
-  // ... (reste du fichier identique au précédent)
-
-  // ... (reste du fichier identique au précédent)
-
   updateProject: (id: string, body: Partial<Project> & {
     photoIds?: string[];
     budgetAmount?: number;
@@ -511,12 +509,7 @@ export const api = {
     startDate?: string;
     endDate?: string;
   }) =>
-    // Note : Si PATCH échoue toujours, essayez de changer 'PATCH' par 'PUT' ci-dessous
     http<Project, typeof body>(`/super-admin/projects/${id}`, { method: 'PATCH', body }),
-
-// ... (reste du fichier identique)
-
-// ... (reste du fichier identique)
 
   listAntennaProjects: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
     http<ApiListResponse<Project>>(
@@ -552,6 +545,41 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
+
+  // --- PROPOSITIONS DE PROJETS (Membres & Admin) ---
+  createProjectProposalMember: (body: {
+    title: string;
+    description: string;
+    expectedBudget?: number;
+    attachmentFileAssetId?: string | null;
+  }) =>
+    http<ProjectProposal, typeof body>('/member/project-proposals', { method: 'POST', body }),
+
+  listMyProjectProposals: (params?: { page?: number; pageSize?: number; status?: string }) =>
+    http<ApiListResponse<ProjectProposal>>(
+      `/member/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }`
+    ),
+
+  listProjectProposals: (params?: { page?: number; pageSize?: number; status?: string }) =>
+    http<ApiListResponse<ProjectProposal>>(
+      `/admin/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }`
+    ),
+
+  approveProjectProposal: (id: string, body?: { reviewComment?: string }) =>
+    http<ProjectProposal, { reviewComment?: string }>(`/admin/project-proposals/${id}/approve`, {
+      method: 'PATCH',
+      body: body ?? {},
+    }),
+
+  rejectProjectProposal: (id: string, body?: { reviewComment?: string }) =>
+    http<ProjectProposal, { reviewComment?: string }>(`/admin/project-proposals/${id}/reject`, {
+      method: 'PATCH',
+      body: body ?? {},
+    }),
 
   // ==========================================
   // DOCUMENTS & CONTENUS
