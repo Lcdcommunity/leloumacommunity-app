@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback, useRef, DragEvent } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
+import { getAccessToken } from '../../../../lib/auth-store';
 import type { Project, ProjectStatus } from '../../../../types/project';
 import { formatCurrency, formatDate } from '../../../../lib/format';
 
@@ -329,6 +330,7 @@ function ProjectModal({
 
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isExporting, setIsExporting] = useState(false);
 
   const validImages = rawImages.filter((img) => !failedImages.has(img.url)).slice(0, MAX_PHOTOS);
   const maxImageIndex = Math.max(validImages.length - 1, 0);
@@ -340,9 +342,40 @@ function ProjectModal({
   const over = (project.budgetSpent ?? 0) > (project.budgetPlanned ?? 0);
   const budgetCol = over ? '#DC2626' : pct > 80 ? '#D97706' : '#2563EB';
 
-  const downloadPDF = () => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
-    window.open(`${apiUrl}/admin/projects/${project.id}/export`, '_blank');
+  const downloadPDF = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+      const token = getAccessToken(); // On récupère ton token de connexion !
+      
+      const response = await fetch(`${apiUrl}/admin/projects/${project.id}/export`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`, // Authentification transmise
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Projet_${project.title.replace(/\s+/g, '_')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Erreur d'exportation:", error);
+      alert("Impossible de télécharger le PDF. Vérifiez votre connexion.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const mainImageFit = selectedImage && looksLikeLogo(selectedImage) ? 'contain' : 'contain';
@@ -575,7 +608,7 @@ function ProjectModal({
               <DetailRow
                 icon={
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 }
                 label="Budget"
@@ -842,6 +875,7 @@ function ProjectModal({
               </button>
               <button
                 onClick={downloadPDF}
+                disabled={isExporting}
                 style={{
                   height: 38,
                   padding: '0 1rem',
@@ -852,16 +886,21 @@ function ProjectModal({
                   fontFamily: "'DM Sans',sans-serif",
                   fontSize: '.8rem',
                   fontWeight: 800,
-                  cursor: 'pointer',
+                  cursor: isExporting ? 'wait' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '.4rem',
                   boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+                  opacity: isExporting ? 0.7 : 1,
                 }}
               >
-                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4" />
-                </svg>
+                {isExporting ? (
+                  <div style={{ width: 14, height: 14, border: '2px solid rgba(55,65,81,.3)', borderTopColor: '#374151', borderRadius: '50%', animation: 'ppspin .7s linear infinite' }} />
+                ) : (
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4" />
+                  </svg>
+                )}
                 PDF
               </button>
               <button

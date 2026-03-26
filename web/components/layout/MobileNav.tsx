@@ -1,4 +1,4 @@
-//web/components/layout/MobileNav.tsx
+// web/components/layout/MobileNav.tsx
 'use client';
 
 import Link from 'next/link';
@@ -43,9 +43,9 @@ type NavItem = { href: string; label: string; ico: string; section?: string };
 
 const superAdminItems: NavItem[] = [
   { href: '/super-admin',               label: 'Dashboard',           ico: ICO.home,    section: 'Principal' },
-  { href: '/super-admin/antennas',       label: 'Antennes',            ico: ICO.pin,     section: 'Principal' },
-  { href: '/super-admin/admins',         label: 'Admins antenne',      ico: ICO.users,   section: 'Principal' },
-  { href: '/super-admin/members',        label: 'Membres',             ico: ICO.group,   section: 'Principal' },
+  { href: '/super-admin/antennas',      label: 'Antennes',            ico: ICO.pin,     section: 'Principal' },
+  { href: '/super-admin/admins',        label: 'Admins antenne',      ico: ICO.users,   section: 'Principal' },
+  { href: '/super-admin/members',       label: 'Membres',             ico: ICO.group,   section: 'Principal' },
   { href: '/super-admin/approvals',      label: 'Validations comptes', ico: ICO.check,   section: 'Gestion' },
   { href: '/super-admin/contributions',  label: 'Cotisations',         ico: ICO.coin,    section: 'Gestion' },
   { href: '/super-admin/projects',       label: 'Projets',             ico: ICO.clip,    section: 'Gestion' },
@@ -57,19 +57,19 @@ const superAdminItems: NavItem[] = [
 ];
 
 const adminItems: NavItem[] = [
-  { href: '/admin',                       label: 'Dashboard',              ico: ICO.home,    section: 'Principal' },
-  { href: '/admin/approvals',             label: 'Validations comptes',    ico: ICO.check,   section: 'Principal' },
-  { href: '/admin/members',               label: 'Membres',                ico: ICO.group,   section: 'Principal' },
-  { href: '/admin/contributions',         label: 'Cotisations',            ico: ICO.coin,    section: 'Finances' },
+  { href: '/admin',                      label: 'Dashboard',             ico: ICO.home,    section: 'Principal' },
+  { href: '/admin/approvals',            label: 'Validations comptes',    ico: ICO.check,   section: 'Principal' },
+  { href: '/admin/members',              label: 'Membres',                ico: ICO.group,   section: 'Principal' },
+  { href: '/admin/contributions',        label: 'Cotisations',            ico: ICO.coin,    section: 'Finances' },
   { href: '/admin/contributions/history', label: 'Historique cotisations', ico: ICO.history, section: 'Finances' },
-  { href: '/admin/projections',           label: 'Projections',            ico: ICO.chart,   section: 'Finances' },
-  { href: '/admin/projects',              label: 'Projets',                ico: ICO.clip,    section: 'Contenu' },
-  { href: '/admin/documents',             label: 'Documents & photos',     ico: ICO.doc,     section: 'Contenu' },
-  { href: '/admin/contents',              label: 'Informations',           ico: ICO.news,    section: 'Contenu' },
-  { href: '/admin/late-members',          label: 'Retardataires +3 mois',  ico: ICO.clock,   section: 'Contenu' },
-  { href: '/admin/notifications',         label: 'Notifications',          ico: ICO.bell,    section: 'Outils' },
-  { href: '/admin/audit',                 label: 'Audit',                  ico: ICO.audit,   section: 'Outils' },
-  { href: '/admin/settings',              label: 'Paramètres & Profil',    ico: ICO.gear,    section: 'Outils' },
+  { href: '/admin/projections',          label: 'Projections',            ico: ICO.chart,   section: 'Finances' },
+  { href: '/admin/projects',             label: 'Projets',                ico: ICO.clip,    section: 'Contenu' },
+  { href: '/admin/documents',            label: 'Documents & photos',     ico: ICO.doc,     section: 'Contenu' },
+  { href: '/admin/contents',             label: 'Informations',           ico: ICO.news,    section: 'Contenu' },
+  { href: '/admin/late-members',         label: 'Retardataires +3 mois',  ico: ICO.clock,   section: 'Contenu' },
+  { href: '/admin/notifications',        label: 'Notifications',          ico: ICO.bell,    section: 'Outils' },
+  { href: '/admin/audit',                label: 'Audit',                  ico: ICO.audit,   section: 'Outils' },
+  { href: '/admin/settings',             label: 'Paramètres & Profil',    ico: ICO.gear,    section: 'Outils' },
 ];
 
 const memberItems: NavItem[] = [
@@ -97,7 +97,7 @@ const quickTabs: Record<string, { href: string; label: string; ico: string }[]> 
     { href: '/admin',               label: 'Accueil', ico: ICO.home },
     { href: '/admin/contributions', label: 'Cotis.',  ico: ICO.coin },
     { href: '/admin/projects',      label: 'Projets', ico: ICO.clip },
-    { href: '/admin/settings',      label: 'Profil',  ico: ICO.user },
+    { href: '/admin/settings',      label: 'Paramètres',  ico: ICO.gear }, // Correction ici
   ],
   MEMBER: [
     { href: '/member',                   label: 'Accueil', ico: ICO.home },

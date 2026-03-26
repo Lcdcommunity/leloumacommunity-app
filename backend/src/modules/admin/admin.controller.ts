@@ -55,7 +55,6 @@ export class AdminController {
     return this.service.listLateMembers(user.id, +page, +pageSize);
   }
 
-  // 👇 GESTION DU STATUT DES MEMBRES 👇
   @Patch('members/:id/suspend')
   suspendMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.suspendUser(id, user.id);
@@ -71,12 +70,10 @@ export class AdminController {
     return this.service.deleteUser(id, user.id);
   }
 
-  // 👇 AJOUT CHIRURGICAL : MISE A JOUR PROFIL MEMBRE PAR L'ADMIN 👇
   @Patch('members/:id')
   updateAntennaMember(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body() body: any) {
     return this.service.updateAntennaMember(id, user.id, body);
   }
-  // 👆 FIN DE L'AJOUT 👆
 
   // --- GESTION DES COTISATIONS ---
   @Get('contributions')
@@ -117,7 +114,6 @@ export class AdminController {
     return this.service.listProjects(user.id, +page, +pageSize, status, q);
   }
 
-  // 👇 NOUVELLE ROUTE EXPORT PDF PROJET 👇
   @Get('projects/:id/export')
   async exportProjectPdf(@Param('id') id: string, @CurrentUser() user: AuthUser, @Res() res: Response) {
     const pdfBuffer = await this.service.exportProjectPdf(id, user.id);
@@ -128,7 +124,6 @@ export class AdminController {
     });
     res.end(pdfBuffer);
   }
-  // 👆 FIN NOUVELLE ROUTE 👆
 
   @Post('projects')
   createProject(@CurrentUser() user: AuthUser, @Body() body: any) {
@@ -168,6 +163,10 @@ export class AdminController {
 
   @Post('documents')
   createDocument(@CurrentUser() user: AuthUser, @Body() body: any) {
+    // Correction chirurgicale : Adapter la payload du front pour correspondre à ce que le service (Prisma) attend
+    if (body.fileAssetId && !body.fileId) {
+      body.fileId = body.fileAssetId;
+    }
     return this.service.createDocument(user.id, body);
   }
 

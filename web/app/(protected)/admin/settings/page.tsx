@@ -116,6 +116,7 @@ export default function AdminSettingsPage() {
   const [prefMsg, setPrefMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   // Security states
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [secLoading, setSecLoading] = useState(false);
@@ -150,11 +151,22 @@ export default function AdminSettingsPage() {
       setSecMsg({ type: 'success', text: 'Mot de passe mis à jour avec succès.' });
       setPassword('');
       setConfirmPassword('');
+      setTimeout(() => {
+        setIsChangingPassword(false);
+        setSecMsg(null);
+      }, 3000);
     } catch {
       setSecMsg({ type: 'error', text: 'Erreur lors de la mise à jour.' });
     } finally {
       setSecLoading(false);
     }
+  };
+
+  const cancelPasswordChange = () => {
+    setIsChangingPassword(false);
+    setPassword('');
+    setConfirmPassword('');
+    setSecMsg(null);
   };
 
   const isPasswordDirty = password.length > 0 || confirmPassword.length > 0;
@@ -211,7 +223,7 @@ export default function AdminSettingsPage() {
         .ast-toggle-ico { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .ast-toggle-name { font-size: 0.83rem; font-weight: 600; color: #111827; }
         .ast-toggle-desc { font-size: 0.68rem; color: #9CA3AF; margin-top: 1px; }
-
+        
         .ast-switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
         .ast-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
         .ast-switch-track { position: absolute; inset: 0; border-radius: 99px; background: #E2E8F0; transition: background 0.2s; cursor: pointer; }
@@ -245,6 +257,9 @@ export default function AdminSettingsPage() {
         .ast-submit-btn { height: 42px; padding: 0 1.4rem; border-radius: 11px; background: linear-gradient(135deg,#1D4ED8,#3B82F6); border: none; color: white; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: .84rem; font-weight: 800; display: flex; align-items: center; gap: .45rem; box-shadow: 0 4px 14px rgba(37,99,235,.32); transition: all .18s; white-space: nowrap; }
         .ast-submit-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,.42); }
         .ast-submit-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+        .ast-cancel-btn { height: 42px; padding: 0 1.4rem; border-radius: 11px; background: white; border: 1.5px solid #E5E7EB; color: #4B5563; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: .84rem; font-weight: 800; transition: all .18s; white-space: nowrap; }
+        .ast-cancel-btn:hover { background: #F9FAFB; border-color: #D1D5DB; }
 
         /* Status steps */
         .ast-steps { display: flex; flex-direction: column; }
@@ -399,50 +414,74 @@ export default function AdminSettingsPage() {
                 <span className="ast-panel-title">Sécurité du compte</span>
               </div>
               
-              <div className="ast-panel-body">
-                <form onSubmit={handlePasswordSubmit} className="ast-form-stack">
-                  <Field
-                    label="Nouveau mot de passe"
-                    type="password"
-                    value={password}
-                    onChange={setPassword}
-                    placeholder="Entrez votre nouveau mot de passe"
-                    required
-                    hint="Utilisez au moins 8 caractères."
-                  />
-                  <Field
-                    label="Confirmer nouveau mot de passe"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={setConfirmPassword}
-                    placeholder="Retapez le mot de passe"
-                    required
-                  />
-
-                  <div className="ast-form-footer" style={{ padding: '1.2rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>
-                    <div>
-                      {secMsg?.type === 'success' && (
-                        <div className="ast-msg-success">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          {secMsg.text}
-                        </div>
-                      )}
-                      {secMsg?.type === 'error' && (
-                        <div className="ast-msg-error">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
-                          {secMsg.text}
-                        </div>
-                      )}
+              {!isChangingPassword ? (
+                <div className="ast-panel-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2.5rem 1.5rem' }}>
+                  {secMsg?.type === 'success' && (
+                    <div className="ast-toast ok" style={{ marginBottom: '1.5rem' }}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      {secMsg.text}
                     </div>
-                    <button type="submit" className="ast-submit-btn" disabled={secLoading || !isPasswordDirty}>
-                      {secLoading
-                        ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'astspin .7s linear infinite' }} />Mise à jour...</>
-                        : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>Mettre à jour</>
-                      }
-                    </button>
-                  </div>
-                </form>
-              </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsChangingPassword(true)}
+                    className="ast-cancel-btn"
+                    style={{ color: '#2563EB', borderColor: '#BFDBFE', display: 'flex', alignItems: 'center', gap: '.4rem' }}
+                  >
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                    Modifier mon mot de passe
+                  </button>
+                  <p style={{ fontSize: '.75rem', color: '#9CA3AF', marginTop: '1rem' }}>
+                    Votre mot de passe est sécurisé. Vous pouvez le changer à tout moment.
+                  </p>
+                </div>
+              ) : (
+                <div className="ast-panel-body">
+                  <form onSubmit={handlePasswordSubmit} className="ast-form-stack">
+                    <Field
+                      label="Nouveau mot de passe"
+                      type="password"
+                      value={password}
+                      onChange={setPassword}
+                      placeholder="Entrez votre nouveau mot de passe"
+                      required
+                      hint="Utilisez au moins 8 caractères."
+                    />
+                    <Field
+                      label="Confirmer nouveau mot de passe"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      placeholder="Retapez le mot de passe"
+                      required
+                    />
+
+                    <div className="ast-form-footer" style={{ padding: '1.2rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>
+                      <div style={{ flex: 1 }}>
+                        {secMsg?.type === 'error' && (
+                          <div className="ast-msg-error">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+                            {secMsg.text}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '.7rem' }}>
+                        <button type="button" onClick={cancelPasswordChange} className="ast-cancel-btn">
+                          Annuler
+                        </button>
+                        <button type="submit" className="ast-submit-btn" disabled={secLoading || !isPasswordDirty}>
+                          {secLoading
+                            ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'astspin .7s linear infinite' }} />Mise à jour...</>
+                            : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>Mettre à jour</>
+                          }
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              )}
             </div>
             
           </div>

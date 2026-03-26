@@ -10,21 +10,23 @@ import { formatDate } from '../../../../lib/format';
 type ModalType = 'validate' | 'reject' | 'edit' | null;
 interface ModalState { type: ModalType; contribution: Contribution | null }
 
+type ExtendedContribution = Contribution & {
+  currency?: string;
+};
+
 function memberName(c: Contribution): string {
   return c.member ? `${c.member.firstName} ${c.member.lastName}`.trim() : c.memberId;
 }
 
 function StatusBadge({ status }: { status: ContributionStatus | string }) {
-  // 👇 AJOUT CHIRURGICAL : 'PENDING_VALIDATION' (le vrai statut en base)
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    VALIDATED: { label: 'Valid\u00e9e',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    REJECTED:  { label: 'Rejet\u00e9e', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    VALIDATED: { label: 'Validée',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    REJECTED:  { label: 'Rejetée', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
     PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-    PENDING:   { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' }, // Conservé au cas où
-    CANCELLED: { label: 'Annul\u00e9e', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    PENDING:   { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    CANCELLED: { label: 'Annulée', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   };
   
-  // Sécurité supplémentaire : valeur par défaut si le statut est inconnu
   const s = map[status] || map['PENDING_VALIDATION'];
   
   return (
@@ -34,10 +36,10 @@ function StatusBadge({ status }: { status: ContributionStatus | string }) {
   );
 }
 
-function AmountPill({ amount }: { amount: number }) {
+function AmountPill({ amount, currency = 'EURO' }: { amount: number, currency?: string }) {
   return (
     <span style={{ display:'inline-block', fontFamily:"'DM Mono',monospace", fontSize:'0.84rem', fontWeight:700, color:'#0F172A', background:'#F0F9FF', border:'1px solid #BAE6FD', borderRadius:8, padding:'0.18rem 0.55rem' }}>
-      {amount.toLocaleString('fr-FR', { minimumFractionDigits:0 })}{' '}<span style={{ fontSize:'0.7rem', color:'#0369A1', fontWeight:600 }}>GNF</span>
+      {amount.toLocaleString('fr-FR', { minimumFractionDigits:0 })}{' '}<span style={{ fontSize:'0.7rem', color:'#0369A1', fontWeight:600 }}>{currency}</span>
     </span>
   );
 }
@@ -50,9 +52,9 @@ function Modal({ modal, onClose, onConfirm, busy }: { modal: ModalState; onClose
   if (!modal.type || !modal.contribution) return null;
 
   const configs = {
-    validate: { title:'Valider la cotisation', icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>, iconBg:'#ECFDF5', label:'Note interne', placeholder:'Note de validation (optionnel)\u2026', cta:'Confirmer la validation', ctaGrad:'linear-gradient(135deg,#059669,#10B981)', ctaShadow:'rgba(5,150,105,0.3)', ib:'rgba(5,150,105,0.25)', ibg:'rgba(236,253,245,0.5)' },
-    reject:   { title:'Rejeter la cotisation',  icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>, iconBg:'#FEF2F2', label:'Motif du rejet', placeholder:'Motif du rejet (obligatoire)\u2026', cta:'Confirmer le rejet', ctaGrad:'linear-gradient(135deg,#B91C1C,#DC2626)', ctaShadow:'rgba(220,38,38,0.3)', ib:'rgba(220,38,38,0.25)', ibg:'rgba(254,242,242,0.5)' },
-    edit:     { title:'Modifier le montant',    icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>, iconBg:'#EFF6FF', label:'Nouveau montant (GNF)', placeholder:'', cta:'Enregistrer', ctaGrad:'linear-gradient(135deg,#1D4ED8,#2563EB)', ctaShadow:'rgba(37,99,235,0.3)', ib:'rgba(37,99,235,0.25)', ibg:'rgba(239,246,255,0.5)' },
+    validate: { title:'Valider la cotisation', icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>, iconBg:'#ECFDF5', label:'Note interne', placeholder:'Note de validation (optionnel)…', cta:'Confirmer la validation', ctaGrad:'linear-gradient(135deg,#059669,#10B981)', ctaShadow:'rgba(5,150,105,0.3)', ib:'rgba(5,150,105,0.25)', ibg:'rgba(236,253,245,0.5)' },
+    reject:   { title:'Rejeter la cotisation',  icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>, iconBg:'#FEF2F2', label:'Motif du rejet', placeholder:'Motif du rejet (obligatoire)…', cta:'Confirmer le rejet', ctaGrad:'linear-gradient(135deg,#B91C1C,#DC2626)', ctaShadow:'rgba(220,38,38,0.3)', ib:'rgba(220,38,38,0.25)', ibg:'rgba(254,242,242,0.5)' },
+    edit:     { title:'Modifier le montant',    icon:<svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>, iconBg:'#EFF6FF', label:`Nouveau montant (${(modal.contribution as ExtendedContribution)?.currency || 'EURO'})`, placeholder:'', cta:'Enregistrer', ctaGrad:'linear-gradient(135deg,#1D4ED8,#2563EB)', ctaShadow:'rgba(37,99,235,0.3)', ib:'rgba(37,99,235,0.25)', ibg:'rgba(239,246,255,0.5)' },
   } as const;
 
   const cfg = configs[modal.type];
@@ -70,7 +72,7 @@ function Modal({ modal, onClose, onConfirm, busy }: { modal: ModalState; onClose
           <span style={{ fontSize:'0.75rem', fontWeight:700, color:'#6B7280' }}>Membre :</span>
           <span style={{ fontSize:'0.82rem', fontWeight:700, color:'#111827', marginLeft:'0.4rem' }}>{memberName(modal.contribution)}</span>
           <span style={{ marginLeft:'0.75rem', fontSize:'0.75rem', fontWeight:700, color:'#6B7280' }}>Montant :</span>
-          <span style={{ marginLeft:'0.4rem' }}><AmountPill amount={modal.contribution.amount} /></span>
+          <span style={{ marginLeft:'0.4rem' }}><AmountPill amount={modal.contribution.amount} currency={(modal.contribution as ExtendedContribution).currency} /></span>
         </div>
         <label style={{ fontSize:'0.73rem', fontWeight:700, color:'#374151', display:'block', marginBottom:'0.35rem', letterSpacing:'0.04em', textTransform:'uppercase' }}>{cfg.label}</label>
         {modal.type === 'edit'
@@ -92,7 +94,6 @@ function Modal({ modal, onClose, onConfirm, busy }: { modal: ModalState; onClose
 
 export default function AdminContributionsPage() {
   const [items,   setItems]   = useState<Contribution[]>([]);
-  // 👇 AJOUT CHIRURGICAL : Sélectionner le bon filtre par défaut 'PENDING_VALIDATION'
   const [status,  setStatus]  = useState('PENDING_VALIDATION');
   const [q,       setQ]       = useState('');
   const [busyId,  setBusyId]  = useState<string | null>(null);
@@ -128,16 +129,15 @@ export default function AdminContributionsPage() {
     } finally { setBusyId(null); }
   }
 
-  // 👇 AJOUT CHIRURGICAL : Compter les "PENDING_VALIDATION"
   const pendingCount = items.filter(i => i.status === 'PENDING_VALIDATION' || i.status === 'PENDING').length;
   const totalPending = items.filter(i => i.status === 'PENDING_VALIDATION' || i.status === 'PENDING').reduce((s, i) => s + (i.amount ?? 0), 0);
+  const mainCurrency = (items[0] as ExtendedContribution)?.currency || 'EURO';
 
   const BtnIcon = ({ d }: { d: string }) => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d={d}/></svg>;
   const Spinner = () => <div style={{ width:12, height:12, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', animation:'acvspin 0.7s linear infinite' }} />;
 
   const ActionButtons = ({ c, flex }: { c: Contribution; flex?: boolean }) => (
     <div style={{ display:'flex', gap:'0.35rem', justifyContent: flex ? undefined : 'flex-end', flexWrap:'wrap' }}>
-      {/* 👇 AJOUT CHIRURGICAL : Afficher les boutons pour PENDING_VALIDATION */}
       {(c.status === 'PENDING_VALIDATION' || c.status === 'PENDING') && (
         <>
           <button className="acv-btn acv-btn-green" style={ flex ? { flex:1, justifyContent:'center' } : undefined } disabled={busyId===c.id} onClick={() => setModal({ type:'validate', contribution:c })}>
@@ -234,7 +234,7 @@ export default function AdminContributionsPage() {
                 <div className="acv-banner-sub">Action requise &mdash; ces membres attendent votre confirmation</div>
               </div>
             </div>
-            <span className="acv-banner-amt">{totalPending.toLocaleString('fr-FR')} GNF</span>
+            <span className="acv-banner-amt">{totalPending.toLocaleString('fr-FR')} {mainCurrency}</span>
           </div>
         )}
 
@@ -243,15 +243,14 @@ export default function AdminContributionsPage() {
         <div className="acv-toolbar">
           <div className="acv-sw">
             <span className="acv-si"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/></svg></span>
-            <input className="acv-search" type="text" placeholder="Recherche membre / r\u00e9f\u00e9rence\u2026" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void load()} />
+            <input className="acv-search" type="text" placeholder="Recherche membre / référence…" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void load()} />
           </div>
-          {/* 👇 AJOUT CHIRURGICAL : 'PENDING_VALIDATION' */}
           <select className="acv-select" value={status} onChange={e => setStatus(e.target.value)}>
             <option value="PENDING_VALIDATION">En attente</option>
             <option value="">Tous statuts</option>
-            <option value="VALIDATED">Valid\u00e9e</option>
-            <option value="REJECTED">Rejet\u00e9e</option>
-            <option value="CANCELLED">Annul\u00e9e</option>
+            <option value="VALIDATED">Validée</option>
+            <option value="REJECTED">Rejetée</option>
+            <option value="CANCELLED">Annulée</option>
           </select>
           <button className="acv-fbtn" onClick={() => void load()}>
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/></svg>Filtrer
@@ -275,9 +274,9 @@ export default function AdminContributionsPage() {
                     {items.map((c, i) => (
                       <tr key={c.id} style={{ animationDelay:`${i * 0.03}s` }}>
                         <td><div className="acv-name">{memberName(c)}</div><div className="acv-ref">{c.id.slice(0,8)}</div></td>
-                        <td><AmountPill amount={c.amount} /></td>
+                        <td><AmountPill amount={c.amount} currency={(c as ExtendedContribution).currency} /></td>
                         <td><StatusBadge status={c.status} /></td>
-                        <td><span className="acv-note">{c.note ?? <span style={{ color:'#D1D5DB' }}>—</span>}</span></td>
+                        <td><span className="acv-note">{(c as ExtendedContribution).note ?? <span style={{ color:'#D1D5DB' }}>—</span>}</span></td>
                         <td><span className="acv-date">{formatDate(c.createdAt)}</span></td>
                         <td><ActionButtons c={c} /></td>
                       </tr>
@@ -289,8 +288,8 @@ export default function AdminContributionsPage() {
                 {items.map((c, i) => (
                   <div key={c.id} className="acv-mc" style={{ animationDelay:`${i * 0.03}s` }}>
                     <div className="acv-mc-row"><div><div className="acv-name">{memberName(c)}</div><div className="acv-ref">{c.id.slice(0,8)}</div></div><StatusBadge status={c.status} /></div>
-                    <div className="acv-mc-meta"><AmountPill amount={c.amount} /><span>{formatDate(c.createdAt)}</span></div>
-                    {c.note && <p className="acv-note" style={{ marginBottom:'.6rem' }}>{c.note}</p>}
+                    <div className="acv-mc-meta"><AmountPill amount={c.amount} currency={(c as ExtendedContribution).currency} /><span>{formatDate(c.createdAt)}</span></div>
+                    {(c as ExtendedContribution).note && <p className="acv-note" style={{ marginBottom:'.6rem' }}>{(c as ExtendedContribution).note}</p>}
                     <ActionButtons c={c} flex />
                   </div>
                 ))}

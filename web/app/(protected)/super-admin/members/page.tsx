@@ -18,10 +18,9 @@ type ExtendedUser = UserSummary & {
   addressLine2?: string | null;
   profilePhotoUrl?: string | null;
   cardNumber?: string | null;
-  function?: string | null; // <-- Ajout du champ Poste Occupé
+  function?: string | null;
 };
 
-// Liste des rôles de l'association
 const ASSOCIATION_ROLES = [
   'Membre (simple)',
   "Secrétaire à l'organisation",
@@ -31,17 +30,17 @@ const ASSOCIATION_ROLES = [
   'Vice-président(e)',
   'Chargé(e) de communication',
   'Conseiller / Conseillère',
-  'Autre'
+  'Autre',
 ];
 
-/* ══════════════════════════════════════════════════════ BADGES & ICONS */
+/* ══════════════════════════════════════════════════════ BADGES */
 const STATUS_MAP: Record<UserStatus, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:                     { label: 'Actif',              color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  PENDING_APPROVAL:           { label: 'En attente',         color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  PENDING_EMAIL_VERIFICATION: { label: 'Email non vérifié',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  SUSPENDED:                  { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  REJECTED:                   { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  DELETED:                    { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' }, 
+  ACTIVE:                     { label: 'Actif',             color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  PENDING_APPROVAL:           { label: 'En attente',        color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  PENDING_EMAIL_VERIFICATION: { label: 'Email non vérifié', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  SUSPENDED:                  { label: 'Suspendu',          color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  REJECTED:                   { label: 'Rejeté',            color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  DELETED:                    { label: 'Supprimé',          color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
 };
 
 function StatusBadge({ status }: { status: UserStatus }) {
@@ -71,10 +70,8 @@ function RoleBadge({ role }: { role: UserRole }) {
 
 function Initials({ name, url }: { name: string; url?: string | null }) {
   if (url) {
-    return (
-      /* eslint-disable-next-line @next/next/no-img-element */
-      <img src={url} alt={name} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(0,0,0,0.1)' }} />
-    );
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={name} style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(0,0,0,0.1)' }} />;
   }
   const parts = name.trim().split(' ');
   const txt = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
@@ -85,9 +82,119 @@ function Initials({ name, url }: { name: string; url?: string | null }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════ SUB-COMPONENT */
+/* ══════════════════════════════════════════════════════ ICON BUTTONS */
+
+/** Bouton icône générique avec tooltip */
+function IconBtn({
+  onClick, disabled, title, color, bg, border, hoverBg, children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  title: string;
+  color: string;
+  bg: string;
+  border: string;
+  hoverBg: string;
+  children: React.ReactNode;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        type="button"
+        title={title}
+        aria-label={title}
+        onClick={onClick}
+        disabled={disabled}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 9,
+          border: `1.5px solid ${border}`,
+          background: hovered && !disabled ? hoverBg : bg,
+          color,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transition: 'all .17s',
+          opacity: disabled ? 0.45 : 1,
+          flexShrink: 0,
+          transform: hovered && !disabled ? 'translateY(-1px)' : 'none',
+          boxShadow: hovered && !disabled ? `0 3px 8px ${color}22` : 'none',
+        }}
+      >
+        {children}
+      </button>
+      {/* Tooltip */}
+      {hovered && (
+        <div style={{
+          position: 'absolute',
+          bottom: 'calc(100% + 6px)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#1E293B',
+          color: 'white',
+          fontSize: '.6rem',
+          fontWeight: 700,
+          padding: '.22rem .55rem',
+          borderRadius: 6,
+          whiteSpace: 'nowrap',
+          pointerEvents: 'none',
+          zIndex: 10,
+          letterSpacing: '.03em',
+          fontFamily: "'DM Sans',sans-serif",
+        }}>
+          {title}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════ SVG ICONS */
+const IconEdit = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+  </svg>
+);
+const IconApprove = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+const IconSuspend = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+const IconReactivate = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+const IconDelete = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+const IconSave = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+const IconCancel = () => (
+  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+/* ══════════════════════════════════════════════════════ DETAIL FIELD */
 function DetailField({
-  label, fieldKey, type = 'text', placeholder = '', isEditing, editValue, origValue, onChange
+  label, fieldKey, type = 'text', placeholder = '', isEditing, editValue, origValue, onChange,
 }: {
   label: string;
   fieldKey: keyof ExtendedUser;
@@ -102,25 +209,18 @@ function DetailField({
     <div className="sm-dp-field">
       <label>{label}</label>
       {isEditing ? (
-        <input 
-          type={type} 
-          className="sm-dp-input" 
-          value={editValue || ''} 
-          onChange={(e) => onChange(fieldKey, e.target.value)}
-          placeholder={placeholder}
-        />
+        <input type={type} className="sm-dp-input" value={editValue || ''} onChange={(e) => onChange(fieldKey, e.target.value)} placeholder={placeholder} />
       ) : (
-        <div className="sm-dp-value">
-          {origValue || <span style={{color: '#9CA3AF'}}>Non renseigné</span>}
-        </div>
+        <div className="sm-dp-value">{origValue || <span style={{ color: '#9CA3AF' }}>Non renseigné</span>}</div>
       )}
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════ DETAILS COMPONENT */
+/* ══════════════════════════════════════════════════════ MEMBER DETAILS */
 function MemberDetails({
-  user, isEditing, editValues, setEditValues, onSave, onCancel, onEdit, onToggleSuspend, onDelete, busy
+  user, isEditing, editValues, setEditValues, onSave, onCancel, onEdit,
+  onToggleSuspend, onDelete, onApprove, busy,
 }: {
   user: ExtendedUser;
   isEditing: boolean;
@@ -131,108 +231,134 @@ function MemberDetails({
   onEdit: () => void;
   onToggleSuspend: () => void;
   onDelete: () => void;
+  onApprove: () => void;
   busy: boolean;
 }) {
   const handleChange = (field: keyof ExtendedUser, value: string) => {
     setEditValues((prev) => ({ ...prev, [field]: value }));
   };
 
+  const canApprove = user.status === 'PENDING_APPROVAL' || user.status === 'PENDING_EMAIL_VERIFICATION';
+
   return (
     <div className="sm-dp-container">
+      {/* Header */}
       <div className="sm-dp-header">
         <div className="sm-dp-photo-lg">
           {user.profilePhotoUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={user.profilePhotoUrl} alt="Profil" />
           ) : (
             <span>{user.firstName[0]}{user.lastName[0]}</span>
           )}
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="sm-dp-name">{fullName(user)}</div>
           <div className="sm-dp-id">
-            Adhérent N° <span className="sm-dp-mono">{user.cardNumber || user.id.slice(0,8).toUpperCase()}</span>
+            Adhérent N° <span className="sm-dp-mono">{user.cardNumber || user.id.slice(0, 8).toUpperCase()}</span>
           </div>
+          <div style={{ marginTop: '.35rem' }}>
+            <StatusBadge status={user.status} />
+          </div>
+        </div>
+
+        {/* ── ACTION ICONS — always visible, all on one row ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
+          {isEditing ? (
+            <>
+              <IconBtn onClick={onSave} disabled={busy} title="Enregistrer" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5">
+                <IconSave />
+              </IconBtn>
+              <IconBtn onClick={onCancel} disabled={busy} title="Annuler" color="#6B7280" bg="#F9FAFB" border="#E5E7EB" hoverBg="#F3F4F6">
+                <IconCancel />
+              </IconBtn>
+            </>
+          ) : (
+            <>{/* Modifier */}
+              <IconBtn onClick={onEdit} title="Modifier" color="#2563EB" bg="#EFF6FF" border="#BFDBFE" hoverBg="#DBEAFE">
+                <IconEdit />
+              </IconBtn>
+
+              {/* Valider le compte — visible seulement si pertinent */}
+              {canApprove && (
+                <IconBtn onClick={onApprove} disabled={busy} title="Valider le compte" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5">
+                  <IconApprove />
+                </IconBtn>
+              )}
+
+              {/* Suspendre / Réactiver */}
+              {user.status === 'SUSPENDED' ? (
+                <IconBtn onClick={onToggleSuspend} disabled={busy} title="Réactiver le compte" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5">
+                  <IconReactivate />
+                </IconBtn>
+              ) : (
+                <IconBtn onClick={onToggleSuspend} disabled={busy} title="Suspendre le compte" color="#D97706" bg="#FFFBEB" border="#FDE68A" hoverBg="#FEF3C7">
+                  <IconSuspend />
+                </IconBtn>
+              )}
+
+              {/* Supprimer */}
+              <IconBtn onClick={onDelete} disabled={busy} title="Supprimer le compte" color="#DC2626" bg="#FEF2F2" border="#FECACA" hoverBg="#FEE2E2">
+                <IconDelete />
+              </IconBtn>
+            </>
+          )}
         </div>
       </div>
 
+      {/* Fields grid */}
       <div className="sm-dp-grid">
         <DetailField label="Prénom" fieldKey="firstName" isEditing={isEditing} editValue={editValues.firstName as string} origValue={user.firstName} onChange={handleChange} />
         <DetailField label="Nom" fieldKey="lastName" isEditing={isEditing} editValue={editValues.lastName as string} origValue={user.lastName} onChange={handleChange} />
         <DetailField label="Email" fieldKey="email" type="email" isEditing={isEditing} editValue={editValues.email as string} origValue={user.email} onChange={handleChange} />
-        <DetailField label="Téléphone" fieldKey="phone" placeholder="+33 6..." isEditing={isEditing} editValue={editValues.phone as string} origValue={user.phone} onChange={handleChange} />
-        {/* 💡 CORRECTION DU BONUS ICI (Application du formatage de la date de naissance) */}
+        <DetailField label="Téléphone" fieldKey="phone" placeholder="+33 6…" isEditing={isEditing} editValue={editValues.phone as string} origValue={user.phone} onChange={handleChange} />
         <DetailField label="Date de naissance" fieldKey="birthDate" type="date" isEditing={isEditing} editValue={editValues.birthDate as string} origValue={user.birthDate ? formatDate(user.birthDate) : null} onChange={handleChange} />
         <DetailField label="Commune d'origine" fieldKey="originSubPrefecture" placeholder="Ex: Lafou" isEditing={isEditing} editValue={editValues.originSubPrefecture as string} origValue={user.originSubPrefecture} onChange={handleChange} />
         <DetailField label="Ville de résidence" fieldKey="city" isEditing={isEditing} editValue={editValues.city as string} origValue={user.city} onChange={handleChange} />
         <DetailField label="Pays" fieldKey="country" isEditing={isEditing} editValue={editValues.country as string} origValue={user.country} onChange={handleChange} />
 
-        {/* 💡 AJOUT : LE POSTE OCCUPÉ (FUNCTION) */}
+        {/* Poste occupé */}
         <div className="sm-dp-field">
           <label>Poste occupé dans l&apos;asso</label>
           {isEditing ? (
-            <select 
-              className="sm-dp-input" 
-              style={{ cursor: 'pointer', appearance: 'auto' }}
-              value={editValues.function || ''} 
-              onChange={e => handleChange('function', e.target.value)}
-            >
-              <option value="">Sélectionnez un rôle...</option>
-              {ASSOCIATION_ROLES.map(r => (
-                <option key={r} value={r}>{r}</option>
-              ))}
+            <select className="sm-dp-input" style={{ cursor: 'pointer', appearance: 'auto' }} value={editValues.function || ''} onChange={(e) => handleChange('function', e.target.value)}>
+              <option value="">Sélectionnez un rôle…</option>
+              {ASSOCIATION_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           ) : (
             <div className="sm-dp-value">
-              {user.function ? (
-                <span style={{ color: '#DC2626', fontWeight: 800 }}>{user.function}</span>
-              ) : <span style={{color: '#9CA3AF'}}>Non renseigné</span>}
+              {user.function
+                ? <span style={{ color: '#DC2626', fontWeight: 800 }}>{user.function}</span>
+                : <span style={{ color: '#9CA3AF' }}>Non renseigné</span>}
             </div>
           )}
         </div>
 
+        {/* Adresse */}
         <div className="sm-dp-field" style={{ gridColumn: '1 / -1' }}>
           <label>Adresse postale</label>
           {isEditing ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              <input className="sm-dp-input" value={editValues.addressLine1 || ''} onChange={e => handleChange('addressLine1', e.target.value)} placeholder="Adresse 1" />
-              <input className="sm-dp-input" value={editValues.addressLine2 || ''} onChange={e => handleChange('addressLine2', e.target.value)} placeholder="Adresse 2 (Optionnel)" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+              <input className="sm-dp-input" value={editValues.addressLine1 || ''} onChange={(e) => handleChange('addressLine1', e.target.value)} placeholder="Adresse 1" />
+              <input className="sm-dp-input" value={editValues.addressLine2 || ''} onChange={(e) => handleChange('addressLine2', e.target.value)} placeholder="Adresse 2 (Optionnel)" />
             </div>
           ) : (
             <div className="sm-dp-value">
               {user.addressLine1 ? (
-                <>
-                  {user.addressLine1}
-                  {user.addressLine2 && <><br/>{user.addressLine2}</>}
-                </>
-              ) : <span style={{color: '#9CA3AF'}}>Non renseignée</span>}
+                <>{user.addressLine1}{user.addressLine2 && <><br />{user.addressLine2}</>}</>
+              ) : <span style={{ color: '#9CA3AF' }}>Non renseignée</span>}
             </div>
           )}
         </div>
       </div>
 
-      <div className="sm-dp-actions">
-        {isEditing ? (
-          <>
-            <button className="sm-btn-cancel" onClick={onCancel} disabled={busy}>Annuler</button>
-            <button className="sm-btn-save" onClick={onSave} disabled={busy}>
-              {busy ? 'Enregistrement...' : 'Enregistrer les modifications'}
-            </button>
-          </>
-        ) : (
-          <>
-            <button className="sm-btn-edit" onClick={onEdit}>
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-              Modifier
-            </button>
-            <div style={{ flex: 1 }} />
-            <button className="sm-btn-suspend" onClick={onToggleSuspend} disabled={busy}>
-              {user.status === 'SUSPENDED' ? 'Réactiver le compte' : 'Suspendre le compte'}
-            </button>
-            <button className="sm-btn-delete" onClick={onDelete} disabled={busy}>Supprimer</button>
-          </>
-        )}
-      </div>
+      {/* Busy spinner */}
+      {busy && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.75rem', color: '#6B7280', fontWeight: 600, fontFamily: "'DM Sans',sans-serif", padding: '.5rem 0 0' }}>
+          <div style={{ width: 12, height: 12, border: '2px solid #E5E7EB', borderTopColor: '#DC2626', borderRadius: '50%', animation: 'smspin .7s linear infinite' }} />
+          Traitement en cours…
+        </div>
+      )}
     </div>
   );
 }
@@ -245,19 +371,15 @@ export default function SuperAdminMembersPage() {
   const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [editingId, setEditingId]   = useState<string | null>(null);
-  const [editValues, setEditValues] = useState<Partial<ExtendedUser>>({});
-  const [actionBusy, setActionBusy] = useState(false);
+  const [expandedId,  setExpandedId]  = useState<string | null>(null);
+  const [editingId,   setEditingId]   = useState<string | null>(null);
+  const [editValues,  setEditValues]  = useState<Partial<ExtendedUser>>({});
+  const [actionBusy,  setActionBusy]  = useState(false);
 
   const load = useCallback(async (qVal?: string, sVal?: string) => {
     setError(null); setLoading(true);
     try {
-      const res = await api.listMembers({
-        page: 1, pageSize: 100,
-        q:      (qVal ?? q)      || undefined,
-        status: (sVal ?? status) || undefined,
-      });
+      const res = await api.listMembers({ page: 1, pageSize: 100, q: (qVal ?? q) || undefined, status: (sVal ?? status) || undefined });
       setItems(res.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement membres');
@@ -269,62 +391,45 @@ export default function SuperAdminMembersPage() {
   useEffect(() => { void load('', ''); }, [load]);
 
   const toggleExpand = (user: ExtendedUser) => {
-    if (expandedId === user.id) {
-      setExpandedId(null);
-      setEditingId(null);
-    } else {
-      setExpandedId(user.id);
-      setEditingId(null);
-      setEditValues(user);
-    }
+    if (expandedId === user.id) { setExpandedId(null); setEditingId(null); }
+    else { setExpandedId(user.id); setEditingId(null); setEditValues(user); }
   };
 
   const handleSaveEdit = async (id: string) => {
     setActionBusy(true);
-    try {
-      await api.updateUserSuperAdmin(id, editValues);
-      setEditingId(null);
-      await load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erreur de modification');
-    } finally {
-      setActionBusy(false);
-    }
+    try { await api.updateUserSuperAdmin(id, editValues); setEditingId(null); await load(); }
+    catch (err) { alert(err instanceof Error ? err.message : 'Erreur de modification'); }
+    finally { setActionBusy(false); }
   };
 
   const handleToggleSuspend = async (user: ExtendedUser) => {
     setActionBusy(true);
     try {
-      if (user.status === 'SUSPENDED') {
-        await api.activateUserSuperAdmin(user.id);
-      } else {
-        await api.suspendUserSuperAdmin(user.id);
-      }
+      if (user.status === 'SUSPENDED') await api.activateUserSuperAdmin(user.id);
+      else await api.suspendUserSuperAdmin(user.id);
       await load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erreur lors du changement de statut');
-    } finally {
-      setActionBusy(false);
-    }
+    } catch (err) { alert(err instanceof Error ? err.message : 'Erreur changement statut'); }
+    finally { setActionBusy(false); }
+  };
+
+  const handleApprove = async (user: ExtendedUser) => {
+    setActionBusy(true);
+    try { await api.approveMemberAccount(user.id); await load(); }
+    catch (err) { alert(err instanceof Error ? err.message : 'Erreur validation compte'); }
+    finally { setActionBusy(false); }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer définitivement ce compte ?")) return;
+    if (!confirm('Êtes-vous sûr de vouloir supprimer définitivement ce compte ?')) return;
     setActionBusy(true);
-    try {
-      await api.deleteUserSuperAdmin(id);
-      setExpandedId(null);
-      await load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erreur de suppression');
-    } finally {
-      setActionBusy(false);
-    }
+    try { await api.deleteUserSuperAdmin(id); setExpandedId(null); await load(); }
+    catch (err) { alert(err instanceof Error ? err.message : 'Erreur suppression'); }
+    finally { setActionBusy(false); }
   };
 
-  const activeCount  = items.filter(u => u.status === 'ACTIVE').length;
-  const pendingCount = items.filter(u => u.status === 'PENDING_APPROVAL').length;
-  const suspCount    = items.filter(u => u.status === 'SUSPENDED').length;
+  const activeCount  = items.filter((u) => u.status === 'ACTIVE').length;
+  const pendingCount = items.filter((u) => u.status === 'PENDING_APPROVAL').length;
+  const suspCount    = items.filter((u) => u.status === 'SUSPENDED').length;
 
   const thStyle: React.CSSProperties = { padding: '.75rem 1.2rem', fontSize: '.63rem', fontWeight: 900, letterSpacing: '.11em', textTransform: 'uppercase', color: '#374151', background: 'rgba(254,242,242,.35)', textAlign: 'left', whiteSpace: 'nowrap' };
   const tdStyle: React.CSSProperties = { padding: '.9rem 1.2rem', fontSize: '.84rem', color: '#111827', verticalAlign: 'middle', cursor: 'pointer' };
@@ -334,7 +439,7 @@ export default function SuperAdminMembersPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
         .sm-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1200px;margin:0 auto}
-        /* Header */
+
         .sm-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:smin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
         .sm-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
         .sm-dot{width:6px;height:6px;background:#EF4444;border-radius:50%;animation:smpulse 2s ease-in-out infinite}
@@ -342,14 +447,12 @@ export default function SuperAdminMembersPage() {
         .sm-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .sm-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
-        /* Stats */
         .sm-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:smin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
         @media(max-width:700px){.sm-stats{grid-template-columns:repeat(2,1fr)}}
         .sm-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.8rem 1rem}
         .sm-stat-val{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:700;line-height:1;margin-bottom:.2rem}
         .sm-stat-lbl{font-size:.64rem;font-weight:900;color:#6B7280;text-transform:uppercase;letter-spacing:.07em}
 
-        /* Panel */
         .sm-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:smin .5s .14s cubic-bezier(.22,1,.36,1) forwards}
         .sm-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
         .sm-panel-titlerow{display:flex;align-items:center;gap:.55rem}
@@ -357,7 +460,6 @@ export default function SuperAdminMembersPage() {
         .sm-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
         .sm-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
 
-        /* Toolbar */
         .sm-toolbar{display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;padding:.9rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07)}
         .sm-field{display:flex;flex-direction:column;gap:.35rem}
         .sm-field-grow{flex:1;min-width:180px}
@@ -373,63 +475,50 @@ export default function SuperAdminMembersPage() {
         .sm-filter-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(220,38,38,.42)}
         .sm-filter-btn:disabled{opacity:.6;cursor:not-allowed}
 
-        /* Table */
         .sm-tw{overflow-x:auto}
         .sm-table{width:100%;border-collapse:collapse;min-width:640px}
         .sm-table thead tr{border-bottom:2px solid rgba(220,38,38,.1)}
         .sm-table tbody tr.sm-main-row{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:smin .4s cubic-bezier(.22,1,.36,1) both}
         .sm-table tbody tr.sm-main-row:hover{background:rgba(220,38,38,.02)}
-        .sm-table tbody tr.expanded-active { background: #FEF2F2 !important; border-bottom: none; }
-        
+        .sm-table tbody tr.expanded-active{background:#FEF2F2 !important;border-bottom:none}
         .sm-member-name{font-weight:900;font-size:.9rem;color:#0F172A}
         .sm-member-email{font-size:.74rem;font-weight:600;color:#6B7280;margin-top:2px}
         .sm-member-id{font-family:'DM Mono',monospace;font-size:.68rem;font-weight:600;color:#9CA3AF;margin-top:1px}
         .sm-date{font-size:.75rem;font-weight:700;color:#6B7280;font-family:'DM Mono',monospace}
-        .sm-chevron { color: #9CA3AF; transition: transform 0.3s cubic-bezier(.22,1,.36,1); }
-        .sm-chevron.open { transform: rotate(180deg); color: #DC2626; }
+        .sm-chevron{color:#9CA3AF;transition:transform .3s cubic-bezier(.22,1,.36,1)}
+        .sm-chevron.open{transform:rotate(180deg);color:#DC2626}
 
-        /* Mobile cards */
         .sm-mob{display:none;flex-direction:column}
         @media(max-width:680px){.sm-tw{display:none}.sm-mob{display:flex}}
-        .sm-mc{padding:1.1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:smin .4s cubic-bezier(.22,1,.36,1) both; transition: background 0.2s; cursor: pointer;}
-        .sm-mc.expanded-active { background: #FEF2F2; }
+        .sm-mc{padding:1.1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:smin .4s cubic-bezier(.22,1,.36,1) both;transition:background .2s;cursor:pointer}
+        .sm-mc.expanded-active{background:#FEF2F2}
         .sm-mc:last-child{border-bottom:none}
         .sm-mc-top{display:flex;align-items:center;gap:.65rem;margin-bottom:.55rem}
         .sm-mc-info{flex:1;min-width:0}
         .sm-mc-badges{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem}
         .sm-mc-footer{font-size:.72rem;font-weight:600;color:#9CA3AF;font-family:'DM Mono',monospace}
 
-        /* Expanded Details Panel */
-        .sm-dp-row { background: #FEF2F2; border-bottom: 1px solid rgba(220,38,38,.1); }
-        .sm-dp-container { padding: 1.5rem 2rem; border-radius: 16px; background: white; margin: 0 1.2rem 1.5rem 1.2rem; border: 1px solid rgba(220,38,38,0.1); box-shadow: 0 4px 20px rgba(220,38,38,0.06); animation: smin 0.3s forwards; }
-        @media(max-width:680px){ .sm-dp-container { margin: 1rem 0 0 0; padding: 1.2rem 1rem; } }
-        
-        .sm-dp-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #F3F4F6; }
-        .sm-dp-photo-lg { width: 56px; height: 56px; border-radius: 50%; background: linear-gradient(135deg,#991B1B,#DC2626); color: white; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; font-weight: 700; flex-shrink: 0; box-shadow: 0 4px 10px rgba(220,38,38,.2); overflow: hidden; }
-        .sm-dp-photo-lg img { width: 100%; height: 100%; object-fit: cover; }
-        .sm-dp-name { font-size: 1.1rem; font-weight: 800; color: #111827; }
-        .sm-dp-id { font-size: 0.75rem; font-weight: 600; color: #6B7280; margin-top: 0.2rem; }
-        .sm-dp-mono { font-family: 'DM Mono', monospace; color: #DC2626; font-weight: 700; background: #FEF2F2; padding: 0.1rem 0.4rem; border-radius: 4px; }
+        /* Detail panel */
+        .sm-dp-row{background:#FEF2F2;border-bottom:1px solid rgba(220,38,38,.1)}
+        .sm-dp-container{padding:1.5rem 1.5rem 1.2rem;border-radius:16px;background:white;margin:.8rem 1.2rem 1.2rem;border:1px solid rgba(220,38,38,.1);box-shadow:0 4px 20px rgba(220,38,38,.06);animation:smin .3s forwards}
+        @media(max-width:680px){.sm-dp-container{margin:.8rem 0 0;padding:1.2rem 1rem}}
+        .sm-dp-header{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid #F3F4F6}
+        .sm-dp-photo-lg{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#991B1B,#DC2626);color:white;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;flex-shrink:0;box-shadow:0 4px 10px rgba(220,38,38,.2);overflow:hidden}
+        .sm-dp-photo-lg img{width:100%;height:100%;object-fit:cover}
+        .sm-dp-name{font-size:1rem;font-weight:800;color:#111827}
+        .sm-dp-id{font-size:.72rem;font-weight:600;color:#6B7280;margin-top:.15rem}
+        .sm-dp-mono{font-family:'DM Mono',monospace;color:#DC2626;font-weight:700;background:#FEF2F2;padding:.1rem .4rem;border-radius:4px}
+        .sm-dp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:.5rem}
+        @media(max-width:540px){.sm-dp-grid{grid-template-columns:1fr}}
+        .sm-dp-field{display:flex;flex-direction:column;gap:.3rem}
+        .sm-dp-field label{font-size:.63rem;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.05em}
+        .sm-dp-value{font-size:.85rem;font-weight:600;color:#111827}
+        .sm-dp-input{height:38px;border-radius:8px;border:1px solid #D1D5DB;padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;color:#111827;width:100%;outline:none;transition:border .2s;box-sizing:border-box}
+        .sm-dp-input:focus{border-color:#DC2626;box-shadow:0 0 0 3px rgba(220,38,38,.1)}
 
-        .sm-dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
-        @media(max-width:540px){ .sm-dp-grid { grid-template-columns: 1fr; } }
-        .sm-dp-field { display: flex; flex-direction: column; gap: 0.3rem; }
-        .sm-dp-field label { font-size: 0.65rem; font-weight: 800; color: #6B7280; text-transform: uppercase; letter-spacing: 0.05em; }
-        .sm-dp-value { font-size: 0.85rem; font-weight: 600; color: #111827; }
-        .sm-dp-input { height: 38px; border-radius: 8px; border: 1px solid #D1D5DB; padding: 0 0.8rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; color: #111827; width: 100%; outline: none; transition: border 0.2s; }
-        .sm-dp-input:focus { border-color: #DC2626; box-shadow: 0 0 0 3px rgba(220,38,38,0.1); }
+        /* Separator between icon groups */
+        .sm-icon-sep{width:1px;height:20px;background:#E5E7EB;margin:0 .1rem;flex-shrink:0}
 
-        .sm-dp-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; padding-top: 1rem; border-top: 1px solid #F3F4F6; }
-        .sm-btn-edit { height: 36px; padding: 0 1rem; border-radius: 8px; background: #F3F4F6; border: 1px solid #E5E7EB; color: #374151; font-size: 0.78rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s; font-family: 'DM Sans'; }
-        .sm-btn-edit:hover { background: #E5E7EB; color: #111827; }
-        .sm-btn-suspend { height: 36px; padding: 0 1rem; border-radius: 8px; background: #FFFBEB; border: 1px solid #FDE68A; color: #D97706; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans'; }
-        .sm-btn-suspend:hover { background: #FEF3C7; }
-        .sm-btn-delete { height: 36px; padding: 0 1rem; border-radius: 8px; background: white; border: 1px solid #FECACA; color: #DC2626; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans'; }
-        .sm-btn-delete:hover { background: #FEF2F2; }
-        .sm-btn-save { height: 36px; padding: 0 1rem; border-radius: 8px; background: linear-gradient(135deg,#991B1B,#DC2626); border: none; color: white; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans'; box-shadow: 0 3px 8px rgba(220,38,38,.3); }
-        .sm-btn-cancel { height: 36px; padding: 0 1rem; border-radius: 8px; background: transparent; border: 1px solid #E5E7EB; color: #6B7280; font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'DM Sans'; }
-
-        /* States */
         .sm-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .sm-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:smspin .8s linear infinite}
         .sm-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
@@ -442,21 +531,18 @@ export default function SuperAdminMembersPage() {
       `}</style>
 
       <div className="sm-wrap">
-
-        {/* Header */}
         <div className="sm-header">
           <div className="sm-eyebrow"><div className="sm-dot" />Super Admin</div>
           <h1 className="sm-title">Membres — <span>vue globale</span></h1>
         </div>
 
-        {/* Stats */}
         <div className="sm-stats">
           {([
-            { label: 'Total membres', value: items.length,  color: '#DC2626' },
-            { label: 'Actifs',        value: activeCount,   color: '#059669' },
-            { label: 'En attente',    value: pendingCount,  color: '#D97706' },
-            { label: 'Suspendus',     value: suspCount,     color: '#7C3AED' },
-          ] as const).map(s => (
+            { label: 'Total membres', value: items.length, color: '#DC2626' },
+            { label: 'Actifs',        value: activeCount,  color: '#059669' },
+            { label: 'En attente',    value: pendingCount, color: '#D97706' },
+            { label: 'Suspendus',     value: suspCount,    color: '#7C3AED' },
+          ] as const).map((s) => (
             <div key={s.label} className="sm-stat" style={{ borderTopColor: s.color }}>
               <div className="sm-stat-val" style={{ color: s.color }}>{s.value}</div>
               <div className="sm-stat-lbl">{s.label}</div>
@@ -464,7 +550,6 @@ export default function SuperAdminMembersPage() {
           ))}
         </div>
 
-        {/* Panel */}
         <div className="sm-panel">
           <div className="sm-panel-head">
             <div className="sm-panel-titlerow">
@@ -486,88 +571,60 @@ export default function SuperAdminMembersPage() {
                 <span className="sm-si">
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
                 </span>
-                <input
-                  className="sm-input"
-                  type="text"
-                  placeholder="Nom, email&#8230;"
-                  value={q}
-                  onChange={e => setQ(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && void load(q, status)}
-                />
+                <input className="sm-input" type="text" placeholder="Nom, email…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(q, status)} />
               </div>
             </div>
-
             <div className="sm-field">
               <label className="sm-label">Statut</label>
-              <select
-                className="sm-select"
-                value={status}
-                onChange={e => setStatus(e.target.value)}
-              >
+              <select className="sm-select" value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="">Tous les statuts</option>
-                <option value="PENDING_EMAIL_VERIFICATION">Email non v&eacute;rifi&eacute;</option>
+                <option value="PENDING_EMAIL_VERIFICATION">Email non vérifié</option>
                 <option value="PENDING_APPROVAL">En attente d&apos;approbation</option>
                 <option value="ACTIVE">Actif</option>
                 <option value="SUSPENDED">Suspendu</option>
-                <option value="REJECTED">Rejet&eacute;</option>
+                <option value="REJECTED">Rejeté</option>
               </select>
             </div>
-
-            <button
-              className="sm-filter-btn"
-              disabled={loading}
-              onClick={() => void load(q, status)}
-            >
+            <button className="sm-filter-btn" disabled={loading} onClick={() => void load(q, status)}>
               {loading
-                ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'smspin .7s linear infinite' }} />Chargement&#8230;</>
+                ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'smspin .7s linear infinite' }} />Chargement…</>
                 : <><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg>Filtrer</>
               }
             </button>
           </div>
 
-          {/* Error */}
           {error && (
             <div className="sm-error">
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-              </svg>
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
               {error}
             </div>
           )}
 
-          {/* Content */}
           {loading ? (
-            <div className="sm-loader"><div className="sm-ring" />Chargement&#8230;</div>
+            <div className="sm-loader"><div className="sm-ring" />Chargement…</div>
           ) : !error && items.length === 0 ? (
             <div className="sm-empty">
-              <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
-                <path strokeLinecap="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <div className="sm-empty-title">Aucun membre trouv&eacute;</div>
+              <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3"><path strokeLinecap="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              <div className="sm-empty-title">Aucun membre trouvé</div>
               <div className="sm-empty-sub">Essayez de modifier la recherche ou le filtre de statut.</div>
             </div>
           ) : !error ? (
-            <>
-              {/* ── Desktop table ── */}
+            <> {/* ── DESKTOP ── */}
               <div className="sm-tw">
                 <table className="sm-table">
                   <thead>
                     <tr>
                       <th style={thStyle}>Membre</th>
-                      <th style={thStyle}>R&ocirc;le</th>
+                      <th style={thStyle}>Rôle</th>
                       <th style={thStyle}>Statut</th>
-                      <th style={thStyle}>Cr&eacute;&eacute; le</th>
-                      <th style={{...thStyle, width: '40px'}}></th>
+                      <th style={thStyle}>Créé le</th>
+                      <th style={{ ...thStyle, width: 40 }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {items.map((u, i) => (
                       <React.Fragment key={u.id}>
-                        <tr 
-                          className={`sm-main-row ${expandedId === u.id ? 'expanded-active' : ''}`} 
-                          style={{ animationDelay: `${i * 0.035}s` }}
-                          onClick={() => toggleExpand(u)}
-                        >
+                        <tr className={`sm-main-row ${expandedId === u.id ? 'expanded-active' : ''}`} style={{ animationDelay: `${i * 0.035}s` }} onClick={() => toggleExpand(u)}>
                           <td style={tdStyle}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '.65rem' }}>
                               <Initials name={fullName(u)} url={u.profilePhotoUrl} />
@@ -581,7 +638,7 @@ export default function SuperAdminMembersPage() {
                           <td style={tdStyle}><RoleBadge role={u.role} /></td>
                           <td style={tdStyle}><StatusBadge status={u.status} /></td>
                           <td style={tdStyle}><span className="sm-date">{formatDate(u.createdAt)}</span></td>
-                          <td style={{...tdStyle, textAlign: 'right'}}>
+                          <td style={{ ...tdStyle, textAlign: 'right' }}>
                             <svg className={`sm-chevron ${expandedId === u.id ? 'open' : ''}`} width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                             </svg>
@@ -590,7 +647,7 @@ export default function SuperAdminMembersPage() {
                         {expandedId === u.id && (
                           <tr className="sm-dp-row">
                             <td colSpan={5} style={{ padding: 0 }}>
-                              <MemberDetails 
+                              <MemberDetails
                                 user={u}
                                 isEditing={editingId === u.id}
                                 editValues={editValues}
@@ -598,9 +655,10 @@ export default function SuperAdminMembersPage() {
                                 busy={actionBusy}
                                 onEdit={() => setEditingId(u.id)}
                                 onCancel={() => setEditingId(null)}
-                                onSave={() => handleSaveEdit(u.id)}
-                                onToggleSuspend={() => handleToggleSuspend(u)}
-                                onDelete={() => handleDelete(u.id)}
+                                onSave={() => void handleSaveEdit(u.id)}
+                                onToggleSuspend={() => void handleToggleSuspend(u)}
+                                onApprove={() => void handleApprove(u)}
+                                onDelete={() => void handleDelete(u.id)}
                               />
                             </td>
                           </tr>
@@ -611,15 +669,11 @@ export default function SuperAdminMembersPage() {
                 </table>
               </div>
 
-              {/* ── Mobile cards ── */}
+              {/* ── MOBILE ── */}
               <div className="sm-mob">
                 {items.map((u, i) => (
                   <div key={u.id} style={{ display: 'flex', flexDirection: 'column' }}>
-                    <div 
-                      className={`sm-mc ${expandedId === u.id ? 'expanded-active' : ''}`} 
-                      style={{ animationDelay: `${i * 0.035}s` }}
-                      onClick={() => toggleExpand(u)}
-                    >
+                    <div className={`sm-mc ${expandedId === u.id ? 'expanded-active' : ''}`} style={{ animationDelay: `${i * 0.035}s` }} onClick={() => toggleExpand(u)}>
                       <div className="sm-mc-top">
                         <Initials name={fullName(u)} url={u.profilePhotoUrl} />
                         <div className="sm-mc-info">
@@ -630,15 +684,12 @@ export default function SuperAdminMembersPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
-                      <div className="sm-mc-badges">
-                        <RoleBadge role={u.role} />
-                        <StatusBadge status={u.status} />
-                      </div>
+                      <div className="sm-mc-badges"><RoleBadge role={u.role} /><StatusBadge status={u.status} /></div>
                       <div className="sm-mc-footer">{formatDate(u.createdAt)}</div>
                     </div>
                     {expandedId === u.id && (
                       <div style={{ background: '#FEF2F2', borderBottom: '1px solid rgba(220,38,38,.07)' }}>
-                        <MemberDetails 
+                        <MemberDetails
                           user={u}
                           isEditing={editingId === u.id}
                           editValues={editValues}
@@ -646,9 +697,10 @@ export default function SuperAdminMembersPage() {
                           busy={actionBusy}
                           onEdit={() => setEditingId(u.id)}
                           onCancel={() => setEditingId(null)}
-                          onSave={() => handleSaveEdit(u.id)}
-                          onToggleSuspend={() => handleToggleSuspend(u)}
-                          onDelete={() => handleDelete(u.id)}
+                          onSave={() => void handleSaveEdit(u.id)}
+                          onToggleSuspend={() => void handleToggleSuspend(u)}
+                          onApprove={() => void handleApprove(u)}
+                          onDelete={() => void handleDelete(u.id)}
                         />
                       </div>
                     )}

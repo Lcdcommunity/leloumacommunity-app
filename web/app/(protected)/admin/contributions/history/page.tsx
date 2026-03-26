@@ -82,7 +82,7 @@ function StatusBadge({ status }: { status: ContributionStatus | string }) {
   );
 }
 
-function AmountPill({ amount, currency = 'GNF' }: { amount: number; currency?: string }) {
+function AmountPill({ amount, currency = 'EURO' }: { amount: number; currency?: string }) {
   return (
     <span style={{
       display: 'inline-block', fontFamily: "'DM Mono', monospace",
@@ -209,7 +209,7 @@ function Modal({
       title: 'Modifier le montant',
       icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>,
       iconBg: '#EFF6FF',
-      label: `Nouveau montant (${(modal.contribution as ExtendedContribution)?.currency || 'GNF'})`,
+      label: `Nouveau montant (${(modal.contribution as ExtendedContribution)?.currency || 'EURO'})`,
       placeholder: '',
       cta: 'Enregistrer',
       ctaGrad: 'linear-gradient(135deg,#1D4ED8,#2563EB)',
@@ -222,7 +222,6 @@ function Modal({
       icon: <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>,
       iconBg: '#FEF2F2',
       label: 'Confirmation de sécurité',
-      // ✅ FIX 1 : guillemets droits retirés du placeholder (étaient col 117 et 127)
       placeholder: 'Tapez SUPPRIMER pour confirmer',
       cta: 'Supprimer définitivement',
       ctaGrad: 'linear-gradient(135deg,#991B1B,#DC2626)',
@@ -272,7 +271,7 @@ function Modal({
               style={{ width: '100%', height: 44, borderRadius: 11, padding: '0 3.5rem 0 1rem', border: `1px solid ${cfg.ib}`, background: cfg.ibg, fontFamily: "'DM Mono',monospace", fontSize: '0.9rem', fontWeight: 600, color: '#0F172A', outline: 'none' }}
             />
             <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#6B7280', fontSize: '0.8rem', fontWeight: 700 }}>
-              {(modal.contribution as ExtendedContribution).currency || 'GNF'}
+              {(modal.contribution as ExtendedContribution).currency || 'EURO'}
             </span>
           </div>
         ) : (
@@ -292,7 +291,6 @@ function Modal({
         )}
         {modal.type === 'delete' && value !== 'SUPPRIMER' && (
           <p style={{ fontSize: '0.69rem', color: '#DC2626', fontWeight: 600, marginTop: '0.3rem' }}>
-            {/* ✅ FIX 2 : &ldquo; et &rdquo; remplacent les " non échappés */}
             Veuillez taper &ldquo;SUPPRIMER&rdquo; pour confirmer.
           </p>
         )}
@@ -371,7 +369,7 @@ export default function AdminContributionsHistoryPage() {
   const pending   = items.filter((i) => isPendingStatus(i.status)).length;
   const rejected  = items.filter((i) => i.status === 'REJECTED').length;
   const total     = items.reduce((sum, item) => sum + (item.amount ?? 0), 0);
-  const mainCurrency = (items[0] as ExtendedContribution)?.currency || 'GNF';
+  const mainCurrency = (items[0] as ExtendedContribution)?.currency || 'EURO';
 
   const BtnIcon = ({ d }: { d: string }) => (
     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">

@@ -18,30 +18,42 @@ import { UploadsService } from './uploads.service';
 import { InitUploadDto } from './dto/init-upload.dto';
 
 @Controller('uploads')
-@UseGuards(JwtAuthGuard, RolesGuard) // Retrait de PermissionsGuard ici pour simplifier l'accès
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post('single')
   @Roles(UserRole.MEMBER, UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
-  // 👇 SUPPRESSION DU @Permissions() ICI pour que les MEMBER puissent uploader
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
     }),
   )
-  uploadSingle(
+  async uploadSingle(
     @CurrentUser() actor: AuthUser,
     @UploadedFile() file: Express.Multer.File,
     @Body() dto: InitUploadDto,
   ) {
-    return this.uploadsService.uploadAndCreateFileAsset({
+    // Correction chirurgicale : Mapping de la catégorie pour éviter le crash de l'enum Prisma
+    let safeCategory = dto.category as any;
+    if (safeCategory === 'DOCUMENT') {
+      safeCategory = 'ANTENNA_DOCUMENT';
+    }
+
+    const fileAsset = await this.uploadsService.uploadAndCreateFileAsset({
       actor,
       file,
-      category: dto.category as any, // "any" pour ignorer le typage strict si l'enum Frontend/Backend diffère
+      category: safeCategory,
       folder: dto.folder,
       description: dto.description,
       isPublic: false,
     });
+
+    // Correction chirurgicale : Renvoyer "fileName" pour correspondre exactement à ce qu'attend le Front
+    return {
+      id: fileAsset.id,
+      url: fileAsset.url,
+      fileName: fileAsset.originalFilename, 
+    };
   }
 }
