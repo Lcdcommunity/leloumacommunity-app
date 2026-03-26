@@ -1,4 +1,4 @@
-//web/app/(protected)/admin/late-members/page.tsx
+// web/app/(protected)/admin/late-members/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -47,7 +47,11 @@ export default function AdminLateMembersPage() {
     void (async () => {
       try {
         const res = await api.listLateMembersOver3Months({ page:1, pageSize:100 });
-        setItems(res.items);
+        
+        // Amélioration chirurgicale : Tri décroissant pour avoir les retards les plus graves en haut
+        const sortedItems = (res.items as LateMember[]).sort((a, b) => (b.lateMonths ?? 0) - (a.lateMonths ?? 0));
+        
+        setItems(sortedItems);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur de chargement');
       } finally {

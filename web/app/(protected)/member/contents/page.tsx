@@ -7,6 +7,7 @@ import { api } from '../../../../lib/api-client';
 import type { ContentPost } from '../../../../types/content';
 import { formatDate } from '../../../../lib/format';
 
+/* ══════════════════════════════════════════════════════ HELPERS */
 function getTypeCfg(type?: string) {
   const map: Record<string, { label: string; color: string; bg: string; border: string; icon: React.ReactNode }> = {
     ANNOUNCEMENT: {
@@ -26,25 +27,83 @@ function getTypeCfg(type?: string) {
     },
   };
   return map[type ?? ''] ?? {
-    label: type ?? 'Info',
+    label: type ?? 'Information',
     color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB',
     icon: <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>,
   };
 }
 
+/* ══════════════════════════════════════════════════════ MODAL DETAILS */
+function ContentDetailModal({ content, onClose }: { content: ContentPost; onClose: () => void }) {
+  const typeCfg = getTypeCfg((content as ContentPost & { type?: string }).type);
+  const imageUrl = (content as unknown as { coverImageFile?: { url: string } }).coverImageFile?.url;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', animation: 'mbin2 0.2s ease' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 580, background: '#fff', borderRadius: 24, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 72px rgba(0,0,0,0.18)', animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ height: 4, background: typeCfg.color, borderRadius: '24px 24px 0 0' }} />
+        
+        <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.65rem', fontWeight: 700, color: typeCfg.color, background: typeCfg.bg, border: `1px solid ${typeCfg.border}`, borderRadius: 99, padding: '0.2rem 0.6rem', marginBottom: '0.5rem' }}>
+              {typeCfg.icon} {typeCfg.label}
+            </span>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 600, color: '#111827', margin: 0, lineHeight: 1.25 }}>{content.title}</h2>
+            <div style={{ fontSize: '0.75rem', color: '#9CA3AF', fontWeight: 500, marginTop: '0.4rem' }}>Publié le {formatDate(content.createdAt)}</div>
+          </div>
+          <button onClick={onClose} style={{ width: 34, height: 34, borderRadius: '50%', background: '#F3F4F6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280', flexShrink: 0, transition: 'all 0.15s' }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        
+        <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+          {imageUrl && (
+            <div style={{ marginBottom: '1.5rem', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', background: 'linear-gradient(135deg, #F8FAFC, #F1F5F9)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageUrl} alt={content.title} style={{ width: '100%', maxHeight: 350, objectFit: 'contain', display: 'block' }} />
+            </div>
+          )}
+          {content.body ? (
+            <div style={{ fontSize: '0.95rem', color: '#374151', lineHeight: 1.7, whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', sans-serif" }}>{content.body}</div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.85rem' }}>Aucun texte additionnel.</div>
+          )}
+        </div>
+
+        {/* Bouton de téléchargement */}
+        {imageUrl && (
+          <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #F3F4F6', background: '#F8FAFC', borderRadius: '0 0 24px 24px', display: 'flex', justifyContent: 'flex-end' }}>
+            <a 
+              href={imageUrl}
+              target="_blank"
+              rel="noreferrer"
+              download
+              style={{ height: 40, padding: '0 1.25rem', borderRadius: 10, border: '1px solid rgba(37,99,235,0.15)', background: 'rgba(239,246,255,0.8)', color: '#1D4ED8', fontFamily: "'DM Sans',sans-serif", fontSize: '0.82rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none', transition: 'all .2s', boxShadow: '0 2px 4px rgba(37,99,235,0.05)' }}
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"/></svg>
+              Télécharger le document
+            </a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════ PAGE */
 export default function MemberContentsPage() {
   const [items, setItems] = useState<ContentPost[]>([]);
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
 
   const loadData = async (query?: string) => {
     setLoading(true);
     setError(null);
     try {
       const res = await api.listContentsForMembers({ page: 1, pageSize: 100, q: query || undefined });
-      setItems(res.items);
+      setItems(res.items as ContentPost[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement contenus');
     } finally {
@@ -57,7 +116,7 @@ export default function MemberContentsPage() {
     async function init() {
       try {
         const res = await api.listContentsForMembers({ page: 1, pageSize: 100 });
-        if (isMounted) { setItems(res.items); setLoading(false); }
+        if (isMounted) { setItems(res.items as ContentPost[]); setLoading(false); }
       } catch (err) {
         if (isMounted) {
           setError(err instanceof Error ? err.message : 'Erreur chargement contenus');
@@ -176,6 +235,12 @@ export default function MemberContentsPage() {
           animation: mcspin 0.8s linear infinite;
         }
         @keyframes mcspin { to { transform: rotate(360deg); } }
+        
+        @keyframes mbin2 { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes mbscale2 {
+          from { opacity: 0; transform: scale(0.94); }
+          to   { opacity: 1; transform: scale(1); }
+        }
 
         /* ── Empty ── */
         .mc-empty {
@@ -203,10 +268,12 @@ export default function MemberContentsPage() {
           border: 1px solid rgba(37,99,235,0.09);
           box-shadow: 0 2px 10px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.85) inset;
           overflow: hidden;
-          transition: transform 0.2s, box-shadow 0.2s;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
         }
         .mc-article:hover {
           transform: translateY(-2px);
+          background: #ffffff;
           box-shadow: 0 8px 22px rgba(37,99,235,0.1), 0 0 0 1px rgba(255,255,255,0.9) inset;
         }
 
@@ -233,7 +300,7 @@ export default function MemberContentsPage() {
           font-family: 'Cormorant Garamond', serif;
           font-size: clamp(1rem, 2.5vw, 1.2rem); font-weight: 600;
           color: #111827; line-height: 1.3;
-          flex: 1; min-width: 0;
+          flex: 1; min-width: 0; margin: 0;
         }
 
         .mc-type-badge {
@@ -255,21 +322,16 @@ export default function MemberContentsPage() {
         /* Body preview */
         .mc-art-preview {
           font-size: 0.82rem; color: #374151; line-height: 1.65;
-          white-space: pre-wrap; word-break: break-word;
-        }
-        .mc-art-preview.collapsed {
-          display: -webkit-box; -webkit-line-clamp: 3;
+          margin: 0; display: -webkit-box; -webkit-line-clamp: 2;
           -webkit-box-orient: vertical; overflow: hidden;
         }
 
-        .mc-read-more {
-          background: none; border: none; cursor: pointer;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.75rem; font-weight: 700; color: #2563EB;
-          padding: 0; display: flex; align-items: center; gap: 0.25rem;
-          transition: gap 0.2s; width: fit-content;
+        .mc-click-hint {
+          display: inline-flex; align-items: center; gap: 0.3rem;
+          font-size: 0.72rem; font-weight: 700; color: #2563EB;
+          margin-top: 0.4rem; opacity: 0.8; transition: opacity 0.2s;
         }
-        .mc-read-more:hover { gap: 0.4rem; }
+        .mc-article:hover .mc-click-hint { opacity: 1; }
 
         @keyframes mcin { to { opacity: 1; transform: translateY(0); } }
       `}</style>
@@ -341,14 +403,14 @@ export default function MemberContentsPage() {
           <div className="mc-feed">
             {filtered.map((c, i) => {
               const typeCfg = getTypeCfg((c as ContentPost & { type?: string }).type);
-              const isExpanded = expanded === c.id;
-              const hasLongBody = (c.body?.length ?? 0) > 220;
+              const imageUrl = (c as unknown as { coverImageFile?: { url: string } }).coverImageFile?.url;
 
               return (
                 <article
                   key={c.id}
                   className="mc-article"
                   style={{ animationDelay: `${0.04 * i}s` }}
+                  onClick={() => setSelectedContent(c)}
                 >
                   <div className="mc-article-inner">
                     {/* Left colored accent bar */}
@@ -375,38 +437,27 @@ export default function MemberContentsPage() {
                           </svg>
                           {formatDate(c.updatedAt)}
                         </span>
+                        {imageUrl && (
+                          <span style={{ fontSize: '0.68rem', color: '#059669', display: 'flex', alignItems: 'center', gap: '0.2rem', fontWeight: 600 }}>
+                            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            Image jointe
+                          </span>
+                        )}
                       </div>
 
-                      {/* Body */}
+                      {/* Body preview (truncated to 2 lines max) */}
                       {c.body && (
-                        <>
-                          <p className={`mc-art-preview${hasLongBody && !isExpanded ? ' collapsed' : ''}`}>
-                            {c.body}
-                          </p>
-                          {hasLongBody && (
-                            <button
-                              className="mc-read-more"
-                              onClick={() => setExpanded(isExpanded ? null : c.id)}
-                            >
-                              {isExpanded ? (
-                                <>
-                                  R&eacute;duire
-                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/>
-                                  </svg>
-                                </>
-                              ) : (
-                                <>
-                                  Lire la suite
-                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
-                                  </svg>
-                                </>
-                              )}
-                            </button>
-                          )}
-                        </>
+                        <p className="mc-art-preview">
+                          {c.body}
+                        </p>
                       )}
+
+                      <div className="mc-click-hint">
+                        Voir les détails
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
+                        </svg>
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -415,6 +466,13 @@ export default function MemberContentsPage() {
           </div>
         )}
       </div>
+
+      {selectedContent && (
+        <ContentDetailModal 
+          content={selectedContent} 
+          onClose={() => setSelectedContent(null)} 
+        />
+      )}
     </AppShell>
   );
 }

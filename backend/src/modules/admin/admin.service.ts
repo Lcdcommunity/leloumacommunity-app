@@ -1,4 +1,3 @@
-// backend/src/modules/admin/admin.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType } from '@prisma/client';
@@ -139,25 +138,58 @@ export class AdminService {
 
   async listLateMembers(adminId: string, page: number, pageSize: number) {
     const antennaId = await this.getAdminAntennaId(adminId);
+    
+    // 1. Récupérer tous les membres actifs de l'antenne avec leur DERNIÈRE cotisation validée
+    const users = await this.prisma.user.findMany({ 
+      where: { 
+        memberships: { some: { antennaId } }, 
+        status: UserStatus.ACTIVE, 
+        role: UserRole.MEMBER 
+      },
+      orderBy: { lastName: 'asc' },
+      include: {
+        contributions: {
+          where: { status: ContributionStatus.VALIDATED },
+          orderBy: { validatedAt: 'desc' },
+          take: 1 // On ne prend que la plus récente
+        }
+      }
+    });
+
+    const lateMembers = [];
+    const now = new Date();
+
+    // 2. Calculer le retard réel pour chaque membre
+    for (const u of users) {
+      const lastContrib = u.contributions[0];
+      
+      // S'il n'a jamais cotisé, le compteur démarre à la date d'approbation de son compte (ou sa création)
+      const referenceDate = lastContrib?.validatedAt || u.approvedAt || u.createdAt;
+      
+      // Calcul du retard en mois (environ 30.44 jours par mois)
+      const diffTime = now.getTime() - referenceDate.getTime();
+      const diffMonths = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30.44));
+
+      // 3. Ne garder que ceux qui ont 3 mois ou plus de retard
+      if (diffMonths >= 3) {
+        lateMembers.push({
+          ...memberMapper.userSummary(u),
+          lateMonths: diffMonths, // Le nom exact attendu par ton Frontend
+          lastValidatedContributionAt: lastContrib ? lastContrib.validatedAt : null // Le nom exact attendu par ton Frontend
+        });
+      }
+    }
+
+    // 4. Pagination manuelle (car on a filtré en JavaScript après la requête)
     const skip = (page - 1) * pageSize;
-
-    const where: any = { memberships: { some: { antennaId } }, status: UserStatus.ACTIVE, role: UserRole.MEMBER };
-
-    const [items, total] = await Promise.all([
-      this.prisma.user.findMany({ where, skip, take: pageSize, orderBy: { lastName: 'asc' } }),
-      this.prisma.user.count({ where }),
-    ]);
+    const paginatedItems = lateMembers.slice(skip, skip + pageSize);
 
     return { 
-      items: items.map(u => ({
-        ...memberMapper.userSummary(u),
-        delayMonths: 3,
-        lastContributionDate: null 
-      })), 
-      total, 
+      items: paginatedItems, 
+      total: lateMembers.length, 
       page, 
       pageSize,
-      totalPages: Math.ceil(total / pageSize)
+      totalPages: Math.ceil(lateMembers.length / pageSize)
     };
   }
 
@@ -735,12 +767,22 @@ export class AdminService {
         skip,
         take: pageSize,
         orderBy: { createdAt: 'desc' },
+        // CORRECTION CHIRURGICALE : Inclure l'image de couverture
+        include: { coverImageFile: true } 
       }),
       this.prisma.newsPost.count({ where }),
     ]);
 
     return {
-      items: items.map(c => memberMapper.contentPost({ ...c, body: c.content })),
+      items: items.map(c => {
+        // Nettoyage via le mapper
+        const mapped = memberMapper.contentPost({ ...c, body: c.content });
+        // Forçage chirurgical de l'image (si présente) pour qu'elle parvienne au front
+        return {
+          ...mapped,
+          coverImageFile: c.coverImageFile ? { url: c.coverImageFile.url } : null
+        };
+      }),
       total,
       page,
       pageSize,

@@ -426,10 +426,13 @@ export default function MemberHomePage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [dashRes, balanceRes, contribRes] = await Promise.allSettled([
+        const [dashRes, balanceRes, contribRes, projectsRes, contentsRes, lateRes] = await Promise.allSettled([
           api.dashboardMember(),
           api.getAssociationBalanceSummary(),
           api.listMyContributions({ page: 1, pageSize: 10 }),
+          api.listProjectsForMembers({ page: 1, pageSize: 5 }),
+          api.listContentsForMembers({ page: 1, pageSize: 5 }), 
+          api.listLateMembersVisible({ page: 1, pageSize: 5 })
         ]);
 
         if (dashRes.status === 'fulfilled') {
@@ -438,6 +441,22 @@ export default function MemberHomePage() {
             const u = res.virtualCard.user as { profilePhotoUrl?: string | null };
             if (u.profilePhotoUrl === null) u.profilePhotoUrl = undefined;
           }
+
+          if (projectsRes.status === 'fulfilled') {
+            // CORRECTION CHIRURGICALE TYPE: On évite les erreurs TS sur les string literals
+            res.projectsInProgress = (projectsRes.value.items as Project[])
+              .filter(p => !['DRAFT', 'CANCELLED', 'ARCHIVED'].includes(p.status as string))
+              .slice(0, 5);
+            if (res.stats) res.stats.activeProjects = res.projectsInProgress.length;
+          }
+          if (contentsRes.status === 'fulfilled') {
+            res.latestContents = (contentsRes.value.items as ContentPost[]).slice(0, 5);
+          }
+          if (lateRes.status === 'fulfilled') {
+            // CORRECTION CHIRURGICALE TYPE: On type correctement pour éviter le "any"
+            res.lateMembersPreview = lateRes.value.items as Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
+          }
+
           setData(res as DashboardData);
         } else {
           setError(dashRes.reason instanceof Error ? dashRes.reason.message : 'Erreur chargement dashboard');

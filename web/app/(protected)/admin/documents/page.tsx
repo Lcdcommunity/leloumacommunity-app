@@ -1,4 +1,4 @@
-//web/app/(protected)/admin/documents/page.tsx
+// web/app/(protected)/admin/documents/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -34,20 +34,20 @@ function formatSize(bytes?: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-/* ══════════════════════════════════════════════════════ DELETE MODAL */
+/* ══════════════════════════════════════════════════════ MODALS */
 function DeleteModal({ title, onConfirm, onCancel }: { title: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <>
-      <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', zIndex:100 }} onClick={onCancel} />
-      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:101, background:'rgba(255,255,255,0.97)', backdropFilter:'blur(18px)', borderRadius:20, padding:'clamp(1.5rem,4vw,2rem)', width:'min(420px,calc(100vw - 2rem))', border:'1px solid rgba(37,99,235,0.1)', boxShadow:'0 24px 60px rgba(37,99,235,0.14)' }}>
+      <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(4px)', zIndex:400 }} onClick={onCancel} />
+      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:401, background:'rgba(255,255,255,0.97)', backdropFilter:'blur(18px)', borderRadius:20, padding:'clamp(1.5rem,4vw,2rem)', width:'min(420px,calc(100vw - 2rem))', border:'1px solid rgba(37,99,235,0.1)', boxShadow:'0 24px 60px rgba(37,99,235,0.14)' }}>
         <div style={{ width:48, height:48, borderRadius:'50%', background:'#FEF2F2', border:'1px solid #FECACA', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 1rem' }}>
           <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2">
             <path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
           </svg>
         </div>
-        <h2 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:'1.3rem', fontWeight:600, color:'#111827', textAlign:'center', marginBottom:'0.4rem' }}>Supprimer ce document&nbsp;?</h2>
+        <h2 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:'1.3rem', fontWeight:600, color:'#111827', textAlign:'center', marginBottom:'0.4rem' }}>Supprimer ce document ?</h2>
         <p style={{ fontSize:'0.82rem', color:'#6B7280', textAlign:'center', marginBottom:'1.5rem', fontWeight:500 }}>
-          <strong style={{ color:'#111827' }}>&laquo;&nbsp;{title}&nbsp;&raquo;</strong> sera supprim&eacute; d&eacute;finitivement.
+          <strong style={{ color:'#111827' }}>&laquo; {title} &raquo;</strong> sera supprimé définitivement.
         </p>
         <div style={{ display:'flex', gap:'0.6rem', justifyContent:'center' }}>
           <button onClick={onCancel} style={{ height:40, padding:'0 1.2rem', borderRadius:10, border:'1px solid rgba(37,99,235,0.15)', background:'rgba(249,250,251,0.9)', fontFamily:"'DM Sans',sans-serif", fontSize:'0.8rem', fontWeight:600, color:'#374151', cursor:'pointer' }}>Annuler</button>
@@ -58,13 +58,92 @@ function DeleteModal({ title, onConfirm, onCancel }: { title: string; onConfirm:
   );
 }
 
+function DetailModal({ 
+  document, 
+  onClose, 
+  onDelete,
+  busy 
+}: { 
+  document: DocumentItem; 
+  onClose: () => void;
+  onDelete: () => void;
+  busy: boolean;
+}) {
+  const isImage = document.fileAsset?.mimeType?.includes('image');
+
+  return (
+    <>
+      <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', backdropFilter:'blur(5px)', zIndex:300 }} onClick={onClose} />
+      <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:301, background:'rgba(253,253,255,0.98)', borderRadius:22, width:'100%', maxWidth:580, maxHeight:'90vh', display:'flex', flexDirection:'column', boxShadow:'0 25px 50px rgba(15,23,42,0.2)', animation:'modalPop .3s cubic-bezier(.22,1,.36,1)' }}>
+        
+        <div style={{ padding:'1.5rem', borderBottom:'1px solid rgba(37,99,235,0.09)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'1rem', background:'#F8FAFC', borderRadius:'22px 22px 0 0' }}>
+          <div>
+            <div style={{ display:'flex', alignItems:'center', gap:'.5rem', marginBottom:'.6rem' }}>
+              <FileTypeBadge mimeType={document.fileAsset?.mimeType} fileName={document.fileAsset?.fileName} />
+              <span style={{ fontSize:'.75rem', fontWeight:600, color:'#64748B', fontFamily:"'DM Mono',monospace" }}>
+                {formatSize(document.fileAsset?.sizeBytes)} • Modifié le {formatDate(document.createdAt)}
+              </span>
+            </div>
+            <h2 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:'1.65rem', fontWeight:700, color:'#0F172A', margin:0, lineHeight:1.15 }}>
+              {document.title}
+            </h2>
+          </div>
+          <button onClick={onClose} style={{ width:34, height:34, borderRadius:'50%', background:'white', border:'1px solid #E2E8F0', color:'#64748B', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div style={{ overflowY:'auto', padding:'1.5rem', flex:1 }}>
+          {isImage && document.fileAsset?.url && (
+            <div style={{ width:'100%', borderRadius:14, overflow:'hidden', marginBottom:'1.5rem', background:'linear-gradient(135deg, #F1F5F9, #E2E8F0)', border:'1px solid rgba(0,0,0,0.05)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={document.fileAsset.url} alt={document.title} style={{ width:'100%', maxHeight:300, objectFit:'contain', display:'block' }} />
+            </div>
+          )}
+
+          <div style={{ fontSize:'.95rem', color:'#374151', lineHeight:1.7, fontWeight:500, whiteSpace:'pre-wrap' }}>
+            {document.description || <span style={{ color:'#9CA3AF', fontStyle:'italic' }}>Aucune description fournie.</span>}
+          </div>
+        </div>
+
+        <div style={{ padding:'1rem 1.5rem', borderTop:'1px solid rgba(37,99,235,0.09)', background:'white', borderRadius:'0 0 22px 22px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <button 
+            disabled={busy} 
+            onClick={onDelete} 
+            style={{ height:36, padding:'0 1rem', borderRadius:8, border:'1.5px solid rgba(220,38,38,.2)', background:'rgba(254,242,242,.6)', color:'#DC2626', fontFamily:"'DM Sans',sans-serif", fontSize:'.8rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:'.4rem', transition:'all .18s' }}
+          >
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Supprimer
+          </button>
+          
+          {document.fileAsset?.url ? (
+            <a 
+              href={document.fileAsset.url} 
+              target="_blank" 
+              rel="noreferrer"
+              style={{ height:36, padding:'0 1rem', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1D4ED8,#2563EB)', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:'.8rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', gap:'.4rem', boxShadow:'0 4px 12px rgba(37,99,235,.25)', textDecoration:'none' }}
+            >
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"/></svg>
+              Télécharger
+            </a>
+          ) : (
+            <span style={{ fontSize:'.8rem', color:'#9CA3AF', fontWeight:600 }}>Fichier indisponible</span>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 /* ══════════════════════════════════════════════════════ PAGE */
 export default function AdminDocumentsPage() {
   const [items,        setItems]        = useState<DocumentItem[]>([]);
   const [q,            setQ]            = useState('');
+  const [formOpen,     setFormOpen]     = useState(false);
   const [busyId,       setBusyId]       = useState<string | null>(null);
   const [error,        setError]        = useState<string | null>(null);
   const [loading,      setLoading]      = useState(true);
+  const [detailDoc,    setDetailDoc]    = useState<DocumentItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DocumentItem | null>(null);
 
   const load = useCallback(async (query?: string) => {
@@ -82,13 +161,12 @@ export default function AdminDocumentsPage() {
   async function handleDelete(d: DocumentItem) {
     setBusyId(d.id);
     setDeleteTarget(null);
+    if (detailDoc?.id === d.id) setDetailDoc(null);
     try {
       await api.deleteAntennaDocument(d.id);
       await load();
     } finally { setBusyId(null); }
   }
-
-  const Spinner = () => <div style={{ width:13, height:13, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', animation:'adspin .7s linear infinite' }} />;
 
   return (
     <AppShell title="Documents &amp; m&eacute;dias">
@@ -105,7 +183,11 @@ export default function AdminDocumentsPage() {
         .ad-title span{background:linear-gradient(135deg,#1D4ED8,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
         /* Layout */
-        .ad-layout{display:grid;grid-template-columns:360px 1fr;gap:1.5rem;align-items:start}
+        .ad-layout{display:grid; gap:1.5rem; align-items:start; transition: grid-template-columns 0.3s ease;}
+        @media(min-width:1025px){
+          .ad-layout.form-open { grid-template-columns: 380px 1fr; }
+          .ad-layout.form-closed { grid-template-columns: 1fr; }
+        }
         @media(max-width:1024px){.ad-layout{grid-template-columns:1fr}}
 
         /* Panel */
@@ -116,6 +198,9 @@ export default function AdminDocumentsPage() {
         .ad-panel-title{font-size:.73rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#1F2937;display:flex;align-items:center;gap:.5rem}
         .ad-panel-ico{width:26px;height:26px;border-radius:7px;background:#EFF6FF;color:#2563EB;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .ad-count-chip{font-size:.68rem;font-weight:800;padding:.18rem .55rem;border-radius:99px;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+        
+        .ad-form-wrapper { max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease; }
+        .ad-form-wrapper.open { max-height: 1500px; opacity: 1; overflow: visible; }
         .ad-form-body{padding:1.25rem 1.3rem}
 
         /* Toolbar */
@@ -133,33 +218,25 @@ export default function AdminDocumentsPage() {
         .ad-table{width:100%;border-collapse:collapse;min-width:500px}
         .ad-table thead tr{border-bottom:1px solid rgba(37,99,235,.09)}
         .ad-table thead th{padding:.75rem 1.2rem;font-size:.65rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#374151;text-align:left;background:rgba(248,250,252,.6);white-space:nowrap}
-        .ad-table tbody tr{border-bottom:1px solid rgba(37,99,235,.055);transition:background .15s;animation:adin .4s cubic-bezier(.22,1,.36,1) both}
+        .ad-table tbody tr{border-bottom:1px solid rgba(37,99,235,.055);transition:background .15s;animation:adin .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
         .ad-table tbody tr:last-child{border-bottom:none}
-        .ad-table tbody tr:hover{background:rgba(37,99,235,.025)}
+        .ad-table tbody tr:hover{background:rgba(239,246,255,.6)}
+        .ad-table tbody tr:hover .ad-doc-title{color:#1D4ED8}
         .ad-table td{padding:.85rem 1.2rem;vertical-align:middle}
 
-        .ad-doc-title{font-size:.86rem;font-weight:800;color:#0F172A;margin-bottom:2px}
-        .ad-doc-desc{font-size:.71rem;color:#6B7280;font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .ad-doc-title{font-size:.86rem;font-weight:800;color:#0F172A;margin-bottom:2px;transition:color .15s}
+        .ad-doc-desc{font-size:.71rem;color:#6B7280;font-weight:500;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .ad-date{font-size:.72rem;color:#6B7280;font-weight:600;white-space:nowrap}
         .ad-size{font-family:'DM Mono',monospace;font-size:.69rem;color:#9CA3AF;font-weight:500}
-
-        /* Download link */
-        .ad-dl{display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;font-weight:700;color:#2563EB;text-decoration:none;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:7px;padding:.22rem .6rem;transition:all .15s;white-space:nowrap}
-        .ad-dl:hover{background:#DBEAFE;border-color:#93C5FD}
-
-        /* Delete btn */
-        .ad-del-btn{height:32px;padding:0 .75rem;border-radius:8px;border:1.5px solid rgba(220,38,38,.2);background:rgba(254,242,242,.6);color:#DC2626;font-family:'DM Sans',sans-serif;font-size:.71rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:all .18s;white-space:nowrap}
-        .ad-del-btn:hover:not(:disabled){background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
-        .ad-del-btn:disabled{opacity:.5;cursor:not-allowed}
 
         /* Mobile cards */
         .ad-mob{display:none}
         @media(max-width:600px){.ad-tw{display:none}.ad-mob{display:flex;flex-direction:column}}
-        .ad-mc{padding:.9rem 1.2rem;border-bottom:1px solid rgba(37,99,235,.07);animation:adin .4s cubic-bezier(.22,1,.36,1) both}
+        .ad-mc{padding:.9rem 1.2rem;border-bottom:1px solid rgba(37,99,235,.07);animation:adin .4s cubic-bezier(.22,1,.36,1) both;cursor:pointer;transition:background .15s}
         .ad-mc:last-child{border-bottom:none}
+        .ad-mc:hover{background:rgba(239,246,255,.6)}
         .ad-mc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.5rem}
         .ad-mc-meta{display:flex;gap:.65rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem}
-        .ad-mc-actions{display:flex;gap:.4rem;flex-wrap:wrap}
 
         /* Loader / empty / error */
         .ad-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.82rem;font-weight:600}
@@ -170,6 +247,7 @@ export default function AdminDocumentsPage() {
 
         @keyframes adin{to{opacity:1;transform:translateY(0)}}
         @keyframes adspin{to{transform:rotate(360deg)}}
+        @keyframes modalPop { from { opacity: 0; transform: scale(0.95) translate(-50%, -50%); } to { opacity: 1; transform: scale(1) translate(-50%, -50%); } }
       `}</style>
 
       <div className="ad-wrap">
@@ -180,20 +258,37 @@ export default function AdminDocumentsPage() {
           <h1 className="ad-title">Documents <span>&amp; m&eacute;dias</span></h1>
         </div>
 
-        <div className="ad-layout">
+        <div className={`ad-layout ${formOpen ? 'form-open' : 'form-closed'}`}>
 
-          {/* LEFT — Upload form */}
+          {/* LEFT — Form Toggleable */}
           <div className="ad-panel ad-panel-left">
-            <div className="ad-panel-head">
+            <div 
+              className="ad-panel-head" 
+              onClick={() => setFormOpen(!formOpen)} 
+              style={{ cursor: 'pointer', background: formOpen ? 'rgba(239,246,255,0.4)' : 'transparent' }}
+            >
               <div className="ad-panel-title">
                 <div className="ad-panel-ico">
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    {formOpen ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                    )}
+                  </svg>
                 </div>
-                Ajouter un fichier
+                {formOpen ? 'Fermer le formulaire' : 'Ajouter un fichier'}
               </div>
+              {!formOpen && (
+                <button style={{ background:'none', border:'none', color:'#2563EB', fontWeight:800, fontSize:'.7rem', cursor:'pointer' }}>
+                  Ouvrir
+                </button>
+              )}
             </div>
-            <div className="ad-form-body">
-              <DocumentForm onCreated={() => void load()} />
+            <div className={`ad-form-wrapper ${formOpen ? 'open' : ''}`}>
+              <div className="ad-form-body">
+                <DocumentForm onCreated={() => { void load(); setFormOpen(false); }} />
+              </div>
             </div>
           </div>
 
@@ -254,13 +349,11 @@ export default function AdminDocumentsPage() {
                         <th>Type</th>
                         <th>Taille</th>
                         <th>Date</th>
-                        <th>Fichier</th>
-                        <th style={{ textAlign:'right' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {items.map((d, i) => (
-                        <tr key={d.id} style={{ animationDelay:`${i * 0.03}s` }}>
+                        <tr key={d.id} style={{ animationDelay:`${i * 0.03}s` }} onClick={() => setDetailDoc(d)}>
                           <td>
                             <div className="ad-doc-title">{d.title}</div>
                             {d.description && <div className="ad-doc-desc">{d.description}</div>}
@@ -270,30 +363,6 @@ export default function AdminDocumentsPage() {
                           </td>
                           <td><span className="ad-size">{formatSize(d.fileAsset?.sizeBytes)}</span></td>
                           <td><span className="ad-date">{formatDate(d.createdAt)}</span></td>
-                          <td>
-                            {d.fileAsset?.url
-                              ? <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="ad-dl">
-                                  <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                                  {d.fileAsset.fileName ?? 'T\u00e9l\u00e9charger'}
-                                </a>
-                              : <span style={{ color:'#D1D5DB', fontSize:'.75rem' }}>—</span>
-                            }
-                          </td>
-                          <td>
-                            <div style={{ display:'flex', justifyContent:'flex-end' }}>
-                              <button
-                                className="ad-del-btn"
-                                disabled={busyId === d.id}
-                                onClick={() => setDeleteTarget(d)}
-                              >
-                                {busyId === d.id
-                                  ? <Spinner />
-                                  : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                }
-                                Supprimer
-                              </button>
-                            </div>
-                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -303,7 +372,7 @@ export default function AdminDocumentsPage() {
                 {/* Mobile cards */}
                 <div className="ad-mob">
                   {items.map((d, i) => (
-                    <div key={d.id} className="ad-mc" style={{ animationDelay:`${i * 0.03}s` }}>
+                    <div key={d.id} className="ad-mc" style={{ animationDelay:`${i * 0.03}s` }} onClick={() => setDetailDoc(d)}>
                       <div className="ad-mc-row">
                         <div>
                           <div className="ad-doc-title">{d.title}</div>
@@ -315,23 +384,6 @@ export default function AdminDocumentsPage() {
                         <span className="ad-size">{formatSize(d.fileAsset?.sizeBytes)}</span>
                         <span className="ad-date">{formatDate(d.createdAt)}</span>
                       </div>
-                      <div className="ad-mc-actions">
-                        {d.fileAsset?.url && (
-                          <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="ad-dl" style={{ flex:1, justifyContent:'center' }}>
-                            <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-                            T&eacute;l&eacute;charger
-                          </a>
-                        )}
-                        <button
-                          className="ad-del-btn"
-                          style={{ flex:1, justifyContent:'center' }}
-                          disabled={busyId === d.id}
-                          onClick={() => setDeleteTarget(d)}
-                        >
-                          {busyId === d.id ? <Spinner /> : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>}
-                          Supprimer
-                        </button>
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -341,7 +393,16 @@ export default function AdminDocumentsPage() {
         </div>
       </div>
 
-      {/* Delete modal */}
+      {/* Modals */}
+      {detailDoc && (
+        <DetailModal 
+          document={detailDoc} 
+          onClose={() => setDetailDoc(null)} 
+          onDelete={() => setDeleteTarget(detailDoc)}
+          busy={busyId === detailDoc.id}
+        />
+      )}
+
       {deleteTarget && (
         <DeleteModal
           title={deleteTarget.title}

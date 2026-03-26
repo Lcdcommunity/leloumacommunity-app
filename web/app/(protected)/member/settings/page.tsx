@@ -61,9 +61,9 @@ function Field({
             }}
           >
             {showPassword ? (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
             ) : (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.543 7-1.275 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.543 7-1.275 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             )}
           </button>
         )}
@@ -126,6 +126,7 @@ export default function MemberSettingsPage() {
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   // Security states
+  const [showSecurityFields, setShowSecurityFields] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [secLoading, setSecLoading] = useState(false);
@@ -154,11 +155,11 @@ export default function MemberSettingsPage() {
     }
     setSecLoading(true);
     try {
-      // Simulation API
       await new Promise(resolve => setTimeout(resolve, 1000));
       setSecMsg({ type: 'success', text: 'Mot de passe mis à jour avec succès.' });
       setPassword('');
       setConfirmPassword('');
+      setShowSecurityFields(false);
     } catch {
       setSecMsg({ type: 'error', text: 'Erreur lors de la mise à jour.' });
     } finally {
@@ -179,7 +180,6 @@ export default function MemberSettingsPage() {
           max-width: 1050px; margin: 0 auto;
         }
 
-        /* Header */
         .ms-header {
           margin-bottom: 1.75rem;
           opacity: 0; transform: translateY(10px);
@@ -191,12 +191,10 @@ export default function MemberSettingsPage() {
         .ms-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 500; color: #111827; letter-spacing: -0.02em; line-height: 1.15; }
         .ms-title span { background: linear-gradient(135deg,#1D4ED8,#3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-        /* Layout */
         .ms-layout { display: grid; grid-template-columns: 1fr 380px; gap: 1.4rem; align-items: start; }
         .ms-left-col { display: flex; flex-direction: column; gap: 1.4rem; }
         @media (max-width: 900px) { .ms-layout { grid-template-columns: 1fr; } }
 
-        /* Panel */
         .ms-panel {
           background: rgba(253,253,255,0.92);
           backdrop-filter: blur(12px);
@@ -213,12 +211,10 @@ export default function MemberSettingsPage() {
         .ms-panel-title { font-size: 0.73rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #374151; }
         .ms-panel-body { padding: 1.3rem; }
 
-        /* Section inside panel */
         .ms-section { padding: 1.2rem 1.3rem; border-bottom: 1px solid rgba(37,99,235,0.06); }
         .ms-section:last-child { border-bottom: none; }
         .ms-section-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.85rem; }
 
-        /* Toggle switch row */
         .ms-toggle-row {
           display: flex; align-items: center; justify-content: space-between;
           padding: 0.7rem 0.85rem; border-radius: 12px;
@@ -237,7 +233,6 @@ export default function MemberSettingsPage() {
         .ms-toggle-name { font-size: 0.83rem; font-weight: 600; color: #111827; }
         .ms-toggle-desc { font-size: 0.68rem; color: #9CA3AF; margin-top: 1px; }
 
-        /* Custom toggle pill */
         .ms-switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
         .ms-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
         .ms-switch-track { position: absolute; inset: 0; border-radius: 99px; background: #E2E8F0; transition: background 0.2s; cursor: pointer; }
@@ -245,7 +240,6 @@ export default function MemberSettingsPage() {
         .ms-switch-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform 0.2s cubic-bezier(.22,1,.36,1); box-shadow: 0 1px 4px rgba(0,0,0,0.15); pointer-events: none; }
         .ms-switch input:checked ~ .ms-switch-thumb { transform: translateX(18px); }
 
-        /* Select field */
         .ms-field { display: flex; flex-direction: column; gap: 0.38rem; margin-bottom: 0.7rem; }
         .ms-field:last-child { margin-bottom: 0; }
         .ms-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #2563EB; }
@@ -254,13 +248,11 @@ export default function MemberSettingsPage() {
         .ms-select:focus { border-color: rgba(37,99,235,0.5); box-shadow: 0 0 0 3px rgba(37,99,235,0.09); background: white; }
         .ms-select-chevron { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
 
-        /* Theme pills */
         .ms-theme-row { display: flex; gap: 0.5rem; }
         .ms-theme-pill { flex: 1; height: 38px; border-radius: 10px; border: 1.5px solid rgba(37,99,235,0.13); background: rgba(255,255,255,0.8); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 600; color: #374151; display: flex; align-items: center; justify-content: center; gap: 0.35rem; transition: all 0.2s; }
         .ms-theme-pill:hover { border-color: rgba(37,99,235,0.35); background: #EFF6FF; color: #1D4ED8; }
         .ms-theme-pill.active { border-color: #2563EB; background: #EFF6FF; color: #1D4ED8; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
 
-        /* Buttons & Footer */
         .ms-form-stack { display: flex; flex-direction: column; gap: 1.1rem; }
         .ms-footer { padding: 1.1rem 1.3rem; border-top: 1px solid rgba(37,99,235,0.07); display: flex; align-items: center; justify-content: space-between; gap: 0.85rem; flex-wrap: wrap; }
         .ms-footer-left { display: flex; align-items: center; gap: 0.85rem; flex-wrap: wrap; }
@@ -276,7 +268,6 @@ export default function MemberSettingsPage() {
         .ms-msg-success { display: flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 800; color: #059669; }
         .ms-msg-error { display: flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 800; color: #DC2626; }
 
-        /* Status steps */
         .ms-steps { display: flex; flex-direction: column; }
         .ms-step { display: flex; gap: 0.75rem; padding: 0.9rem 1.3rem; border-bottom: 1px solid rgba(37,99,235,0.05); transition: background 0.15s; }
         .ms-step:last-child { border-bottom: none; }
@@ -285,28 +276,30 @@ export default function MemberSettingsPage() {
         .ms-step-title { font-size: 0.82rem; font-weight: 700; color: #111827; margin-bottom: 2px; }
         .ms-step-desc { font-size: 0.72rem; color: #6B7280; line-height: 1.55; }
 
+        .ms-unlock-btn {
+          width: 100%; padding: 1rem; border-radius: 12px; border: 1.5px dashed rgba(37,99,235,0.25);
+          background: rgba(37,99,235,0.02); color: #2563EB; font-weight: 700; font-size: 0.85rem;
+          cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+        }
+        .ms-unlock-btn:hover { background: rgba(37,99,235,0.06); border-color: #2563EB; }
+
         @keyframes msspin { to { transform: rotate(360deg); } }
         @keyframes msin { to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       <div className="ms-wrap">
-
-        {/* Header */}
         <div className="ms-header">
           <div className="ms-eyebrow"><div className="ms-eyebrow-dot" />Espace membre</div>
           <h1 className="ms-title">Param&egrave;tres <span>&amp; pr&eacute;f&eacute;rences</span></h1>
         </div>
 
         <div className="ms-layout">
-
-          {/* LEFT COLUMN */}
           <div className="ms-left-col">
             
             {/* Panel 1 : Préférences */}
             <div className="ms-panel-left">
               <form onSubmit={handleSubmit}>
                 <div className="ms-panel">
-                  {/* Notifications */}
                   <div className="ms-panel-head">
                     <div className="ms-panel-ico" style={{ background: '#EFF6FF', color: '#2563EB' }}>
                       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -359,7 +352,6 @@ export default function MemberSettingsPage() {
                     ))}
                   </div>
 
-                  {/* Language & Display */}
                   <div className="ms-section">
                     <div className="ms-section-label">Langue &amp; affichage</div>
                     <div className="ms-field">
@@ -428,7 +420,7 @@ export default function MemberSettingsPage() {
               </form>
             </div>
 
-            {/* Panel 2 : Sécurité (Nouveau) */}
+            {/* Panel 2 : Sécurité (Masqué par défaut) */}
             <div className="ms-panel-left" style={{ animationDelay: '.15s' }}>
               <div className="ms-panel">
                 <div className="ms-panel-head">
@@ -441,48 +433,70 @@ export default function MemberSettingsPage() {
                 </div>
                 
                 <div className="ms-panel-body">
-                  <form onSubmit={handlePasswordSubmit} className="ms-form-stack">
-                    <Field
-                      label="Nouveau mot de passe"
-                      type="password"
-                      value={password}
-                      onChange={setPassword}
-                      placeholder="Entrez votre nouveau mot de passe"
-                      required
-                      hint="Utilisez au moins 8 caractères."
-                    />
-                    <Field
-                      label="Confirmer nouveau mot de passe"
-                      type="password"
-                      value={confirmPassword}
-                      onChange={setConfirmPassword}
-                      placeholder="Retapez le mot de passe"
-                      required
-                    />
+                  {!showSecurityFields ? (
+                    <button 
+                      type="button" 
+                      className="ms-unlock-btn"
+                      onClick={() => setShowSecurityFields(true)}
+                    >
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      Modifier le mot de passe
+                    </button>
+                  ) : (
+                    <form onSubmit={handlePasswordSubmit} className="ms-form-stack" style={{ animation: 'msin 0.3s ease-out' }}>
+                      <Field
+                        label="Nouveau mot de passe"
+                        type="password"
+                        value={password}
+                        onChange={setPassword}
+                        placeholder="Entrez votre nouveau mot de passe"
+                        required
+                        hint="Utilisez au moins 8 caractères."
+                      />
+                      <Field
+                        label="Confirmer nouveau mot de passe"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={setConfirmPassword}
+                        placeholder="Retapez le mot de passe"
+                        required
+                      />
 
-                    <div className="ms-footer" style={{ padding: '1rem 0 0 0', marginTop: '.25rem' }}>
-                      <div className="ms-footer-left">
-                        {secMsg?.type === 'success' && (
-                          <div className="ms-msg-success">
-                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            {secMsg.text}
-                          </div>
-                        )}
-                        {secMsg?.type === 'error' && (
-                          <div className="ms-msg-error">
-                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
-                            {secMsg.text}
-                          </div>
-                        )}
+                      <div className="ms-footer" style={{ padding: '1rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>
+                        <div className="ms-footer-left">
+                          {secMsg?.type === 'success' && (
+                            <div className="ms-msg-success">
+                              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                              {secMsg.text}
+                            </div>
+                          )}
+                          {secMsg?.type === 'error' && (
+                            <div className="ms-msg-error">
+                              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+                              {secMsg.text}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.75rem' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => { setShowSecurityFields(false); setSecMsg(null); }}
+                            style={{ background: 'none', border: 'none', fontSize: '0.8rem', fontWeight: 700, color: '#6B7280', cursor: 'pointer' }}
+                          >
+                            Annuler
+                          </button>
+                          <button type="submit" className="ms-submit" disabled={secLoading || !isPasswordDirty}>
+                            {secLoading
+                              ? <><div className="ms-spinner" />Mise à jour...</>
+                              : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>Mettre à jour</>
+                            }
+                          </button>
+                        </div>
                       </div>
-                      <button type="submit" className="ms-submit" disabled={secLoading || !isPasswordDirty}>
-                        {secLoading
-                          ? <><div className="ms-spinner" />Mise à jour...</>
-                          : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>Mettre à jour</>
-                        }
-                      </button>
-                    </div>
-                  </form>
+                    </form>
+                  )}
                 </div>
               </div>
             </div>

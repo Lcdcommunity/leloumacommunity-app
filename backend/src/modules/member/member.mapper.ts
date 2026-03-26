@@ -1,8 +1,85 @@
 // backend/src/modules/member/member.mapper.ts
 
+function toIso(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'string') return value;
+  return null;
+}
+
+function toNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'bigint') return Number(value);
+  if (typeof value === 'object' && value !== null && 'toNumber' in value) {
+    const maybeDecimal = value as { toNumber?: () => number };
+    if (typeof maybeDecimal.toNumber === 'function') {
+      return maybeDecimal.toNumber();
+    }
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeFile(file: any) {
+  if (!file || !file.url) return null;
+
+  return {
+    id: file.id ?? null,
+    url: file.url ?? null,
+    fileName: file.originalFilename ?? file.fileName ?? null,
+    mimeType: file.mimeType ?? null,
+    sizeBytes: toNumberOrNull(file.sizeBytes),
+  };
+}
+
+function isImageLike(file: {
+  mimeType?: string | null;
+  fileName?: string | null;
+  url?: string | null;
+}): boolean {
+  const mimeType = file.mimeType ?? '';
+  const probe = `${file.fileName ?? ''} ${file.url ?? ''}`;
+  return (
+    mimeType.startsWith('image/') ||
+    /\.(jpg|jpeg|png|webp|gif|bmp|svg|avif)$/i.test(probe)
+  );
+}
+
+function normalizeMaybeJsonText(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => {
+        if (typeof item === 'string') return item.trim();
+        if (item === null || item === undefined) return '';
+        return String(item).trim();
+      })
+      .filter(Boolean);
+
+    return parts.length > 0 ? parts.join('\n') : null;
+  }
+
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return null;
+    }
+  }
+
+  return String(value);
+}
+
 export const memberMapper = {
   userSummary(u: any) {
     const photoUrl = u.profilePhoto?.url ?? u.profilePhotoUrl ?? null;
+
     return {
       id: u.id,
       firstName: u.firstName ?? null,
@@ -21,31 +98,66 @@ export const memberMapper = {
       addressLine2: u.addressLine2 ?? null,
       postalCode: u.postalCode ?? null,
       originSubPrefecture: u.originSubPrefecture ?? null,
-      originVillage: u.originVillage ?? null,
-      profilePhotoUrl: photoUrl, // ✅ Ajouté pour l'affichage de l'avatar
-      avatarUrl: photoUrl,       // ✅ Alias pour cohérence Topbar
-      createdAt: u.createdAt?.toISOString?.() ?? u.createdAt,
-      updatedAt: u.updatedAt?.toISOString?.() ?? u.updatedAt,
+      originVillage: u.originVillage ?? u.originSubPrefecture ?? null,
+      profilePhotoUrl: photoUrl,
+      avatarUrl: photoUrl,
+      createdAt: toIso(u.createdAt),
+      updatedAt: toIso(u.updatedAt),
     };
   },
 
   contribution(c: any) {
     return {
       id: c.id,
-      amount: Number(c.amount),
+      amount: toNumberOrNull(c.amount) ?? 0,
       currency: c.currency ?? 'EUR',
       method: c.paymentMethod ?? null,
       reference: c.externalReference ?? null,
       status: c.status,
-      depositedAt: c.contributionDate?.toISOString?.() ?? c.contributionDate ?? null,
-      createdAt: c.createdAt?.toISOString?.() ?? c.createdAt,
-      validatedAt: c.validatedAt?.toISOString?.() ?? c.validatedAt ?? null,
+      depositedAt: toIso(c.contributionDate),
+      createdAt: toIso(c.createdAt),
+      validatedAt: toIso(c.validatedAt),
       note: c.memberComment ?? null,
       purpose: c.purpose ?? 'REGULAR_QUOTA',
     };
   },
 
   project(p: any) {
+    const coverImage = normalizeFile(p.coverImageFile);
+
+    const normalizedAttachments = Array.isArray(p.attachments)
+      ? p.attachments
+          .map((attachment: any) => {
+            const normalized = normalizeFile(attachment?.file);
+            if (!normalized) return null;
+
+            return {
+              ...normalized,
+              caption: attachment?.caption ?? null,
+              sortOrder: attachment?.sortOrder ?? 0,
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    const attachmentImages = normalizedAttachments.filter((file: any) =>
+      isImageLike(file),
+    );
+
+    const imageMap = new Map<string, any>();
+
+    if (coverImage?.url) {
+      imageMap.set(coverImage.url, coverImage);
+    }
+
+    for (const file of attachmentImages) {
+      if (file?.url && !imageMap.has(file.url)) {
+        imageMap.set(file.url, file);
+      }
+    }
+
+    const photos = Array.from(imageMap.values());
+
     return {
       id: p.id,
       associationId: p.associationId ?? null,
@@ -58,46 +170,33 @@ export const memberMapper = {
       status: p.status,
 
       promoterName: p.promoterName ?? null,
-      specificObjectives: p.specificObjectives ?? null,
+
+      specificObjectives: normalizeMaybeJsonText(p.specificObjectives),
       targetBeneficiaries: p.targetBeneficiaries ?? null,
       populationImpact: p.populationImpact ?? null,
       environmentalImpact: p.environmentalImpact ?? null,
-      expectedResults: p.expectedResults ?? null,
-      successIndicators: p.successIndicators ?? null,
+      expectedResults: normalizeMaybeJsonText(p.expectedResults),
+      successIndicators: normalizeMaybeJsonText(p.successIndicators),
       risksAndMitigation: p.risksAndMitigation ?? null,
       implementationMethod: p.implementationMethod ?? null,
 
       locationText: p.locationText ?? null,
+
       coverImageFileId: p.coverImageFileId ?? null,
+      coverImageFile: coverImage,
 
-      budgetPlanned: p.budgetAmount != null ? Number(p.budgetAmount) : null,
-      budgetSpent: p.amountSpent != null ? Number(p.amountSpent) : null,
-      startsAt: p.startDate?.toISOString?.() ?? p.startDate ?? null,
-      endsAt: p.endDate?.toISOString?.() ?? p.endDate ?? null,
-      targetDate: p.targetDate?.toISOString?.() ?? p.targetDate ?? null,
+      budgetPlanned: toNumberOrNull(p.budgetAmount),
+      budgetSpent: toNumberOrNull(p.amountSpent),
+      startsAt: toIso(p.startDate),
+      endsAt: toIso(p.endDate),
+      targetDate: toIso(p.targetDate),
 
-      createdAt: p.createdAt?.toISOString?.() ?? p.createdAt,
-      updatedAt: p.updatedAt?.toISOString?.() ?? p.updatedAt,
-      archivedAt: p.archivedAt?.toISOString?.() ?? p.archivedAt ?? null,
+      createdAt: toIso(p.createdAt),
+      updatedAt: toIso(p.updatedAt),
+      archivedAt: toIso(p.archivedAt),
 
-      // ✅ LA CORRECTION EST ICI : 
-      // On inclut les attachments (qui contiennent les photos et les documents)
-      attachments: p.attachments?.map((a: any) => ({
-        id: a.file?.id,
-        url: a.file?.url,
-        fileName: a.file?.originalFilename ?? a.file?.fileName ?? null,
-        mimeType: a.file?.mimeType ?? null,
-        sizeBytes: a.file?.sizeBytes != null ? Number(a.file.sizeBytes) : null
-      })) || [],
-
-      // On map également les `photos` s'ils sont gérés séparément dans ton modèle Prisma
-      photos: p.photos?.map((ph: any) => ({
-        id: ph.file?.id,
-        url: ph.file?.url,
-        fileName: ph.file?.originalFilename ?? ph.file?.fileName ?? null,
-        mimeType: ph.file?.mimeType ?? null,
-        sizeBytes: ph.file?.sizeBytes != null ? Number(ph.file.sizeBytes) : null
-      })) || [],
+      attachments: normalizedAttachments,
+      photos,
     };
   },
 
@@ -109,11 +208,16 @@ export const memberMapper = {
       memberId: x.authorUserId ?? x.memberId,
       title: x.title,
       description: x.description,
-      expectedBudget: x.estimatedBudget != null ? Number(x.estimatedBudget) : (x.expectedBudget != null ? Number(x.expectedBudget) : null),
+      expectedBudget:
+        x.estimatedBudget != null
+          ? toNumberOrNull(x.estimatedBudget)
+          : x.expectedBudget != null
+            ? toNumberOrNull(x.expectedBudget)
+            : null,
       status: x.status,
       attachmentFileAssetId: x.attachmentFileAssetId ?? null,
-      createdAt: x.createdAt?.toISOString?.() ?? x.createdAt,
-      updatedAt: x.updatedAt?.toISOString?.() ?? x.updatedAt,
+      createdAt: toIso(x.createdAt),
+      updatedAt: toIso(x.updatedAt),
     };
   },
 
@@ -122,40 +226,42 @@ export const memberMapper = {
       id: d.id,
       title: d.title,
       description: d.description ?? null,
-      visibility: d.visibility ?? 'ALL', // ✅ Inclus pour le filtrage frontend
+      visibility: d.visibility ?? 'ALL',
       scope: d.scope ?? 'GLOBAL',
-      createdAt: d.createdAt?.toISOString?.() ?? d.createdAt,
-      updatedAt: d.updatedAt?.toISOString?.() ?? d.updatedAt,
-      fileAsset: d.file ? { 
-        id: d.file.id, 
-        fileName: d.file.originalFilename ?? d.file.fileName ?? null, // ✅ Fix originalFilename
-        url: d.file.url ?? null,
-        mimeType: d.file.mimeType ?? null,
-        sizeBytes: d.file.sizeBytes != null ? Number(d.file.sizeBytes) : null
-      } : null,
+      createdAt: toIso(d.createdAt),
+      updatedAt: toIso(d.updatedAt),
+      fileAsset: d.file
+        ? {
+            id: d.file.id,
+            fileName: d.file.originalFilename ?? d.file.fileName ?? null,
+            url: d.file.url ?? null,
+            mimeType: d.file.mimeType ?? null,
+            sizeBytes: toNumberOrNull(d.file.sizeBytes),
+          }
+        : null,
     };
   },
 
   contentPost(c: any) {
-    return { 
-      id: c.id, 
-      title: c.title, 
-      body: c.content ?? c.body ?? null, 
-      status: c.status, 
-      createdAt: c.createdAt?.toISOString?.() ?? c.createdAt, 
-      updatedAt: c.updatedAt?.toISOString?.() ?? c.updatedAt 
+    return {
+      id: c.id,
+      title: c.title,
+      body: c.content ?? c.body ?? null,
+      status: c.status,
+      createdAt: toIso(c.createdAt),
+      updatedAt: toIso(c.updatedAt),
     };
   },
 
   notification(n: any) {
-    return { 
-      id: n.id, 
-      message: n.message, 
-      isRead: Boolean(n.isRead || n.readAt), // ✅ Gère les deux formats possibles
-      createdAt: n.createdAt?.toISOString?.() ?? n.createdAt, 
-      updatedAt: n.updatedAt?.toISOString?.() ?? n.updatedAt, 
-      type: n.type ?? null, 
-      metadata: n.payload ?? n.metadata ?? null 
+    return {
+      id: n.id,
+      message: n.message,
+      isRead: Boolean(n.isRead || n.readAt),
+      createdAt: toIso(n.createdAt),
+      updatedAt: toIso(n.updatedAt),
+      type: n.type ?? null,
+      metadata: n.payload ?? n.metadata ?? null,
     };
   },
 };

@@ -14,7 +14,7 @@ import {
   UserStatus,
   PaymentMethod,
   ContributionPurpose,
-  NotificationType, // Ajouté
+  NotificationType,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { memberMapper } from './member.mapper';
@@ -29,13 +29,13 @@ import { MemberProjectProposalsQueryDto } from './dto/member-project-proposals-q
 import { MemberDocumentsQueryDto } from './dto/member-documents-query.dto';
 import { MemberContentsQueryDto } from './dto/member-contents-query.dto';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
-import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class MemberService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService, // Injecté chirurgicalement
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getMeOrThrow(userId: string) {
@@ -60,8 +60,15 @@ export class MemberService {
         country: true,
         addressLine1: true,
         addressLine2: true,
+        postalCode: true,
+        originSubPrefecture: true,
         createdAt: true,
         updatedAt: true,
+        profilePhoto: {
+          select: {
+            url: true,
+          },
+        },
       },
     });
 
@@ -230,13 +237,12 @@ export class MemberService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer les admins de l'antenne qu'un membre a déclaré un versement
     await this.notifications.notifyAntennaAdmins(
       me.antennaId,
       me.associationId,
       `Un nouveau versement de ${dto.amount} EUR a été déclaré par ${me.firstName} ${me.lastName}.`,
       NotificationType.CONTRIBUTION_SUBMITTED,
-      { contributionId: created.id }
+      { contributionId: created.id },
     );
 
     return memberMapper.contribution(created);
@@ -321,6 +327,7 @@ export class MemberService {
         id: true,
         firstName: true,
         lastName: true,
+        createdAt: true,
         memberships: {
           include: {
             antenna: true,
@@ -342,18 +349,17 @@ export class MemberService {
 
     const computed = members
       .map((m) => {
-        const last =
-          m.contributions[0]?.validatedAt ?? m.contributions[0]?.createdAt ?? null;
+        const last = m.contributions[0]?.validatedAt ?? m.createdAt;
 
         return {
           id: m.id,
           firstName: m.firstName,
           lastName: m.lastName,
           antennaName: m.memberships[0]?.antenna?.name ?? null,
-          lateMonths: last ? monthDiff(last, now) : 999,
+          lateMonths: monthDiff(last, now),
         };
       })
-      .filter((x) => x.lateMonths > 3)
+      .filter((x) => x.lateMonths >= 3)
       .sort((a, b) => b.lateMonths - a.lateMonths);
 
     const start = (page - 1) * pageSize;
@@ -388,11 +394,30 @@ export class MemberService {
               mode: Prisma.QueryMode.insensitive,
             },
           },
+          {
+            summary: {
+              contains: query.q,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+          {
+            locationText: {
+              contains: query.q,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
+          {
+            promoterName: {
+              contains: query.q,
+              mode: Prisma.QueryMode.insensitive,
+            },
+          },
         ]
       : [];
 
     const where: Prisma.ProjectWhereInput = {
       associationId: me.associationId,
+      isPublicToMembers: true,
       ...(query.status ? { status: query.status as ProjectStatus } : {}),
       ...(projectSearchOr.length > 0 ? { OR: projectSearchOr } : {}),
     };
@@ -404,6 +429,31 @@ export class MemberService {
         orderBy: [{ createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: {
+          coverImageFile: {
+            select: {
+              id: true,
+              url: true,
+              originalFilename: true,
+              mimeType: true,
+              sizeBytes: true,
+            },
+          },
+          attachments: {
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+            include: {
+              file: {
+                select: {
+                  id: true,
+                  url: true,
+                  originalFilename: true,
+                  mimeType: true,
+                  sizeBytes: true,
+                },
+              },
+            },
+          },
+        },
       }),
     ]);
 
@@ -445,14 +495,13 @@ export class MemberService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer les admins d'une nouvelle proposition de projet
     if (me.antennaId) {
       await this.notifications.notifyAntennaAdmins(
         me.antennaId,
         me.associationId,
         `Une nouvelle proposition de projet "${dto.title.trim()}" a été soumise par ${me.firstName} ${me.lastName}.`,
         NotificationType.PROJECT_PROPOSAL_SUBMITTED,
-        { proposalId: created.id }
+        { proposalId: created.id },
       );
     }
 
@@ -622,11 +671,18 @@ export class MemberService {
         orderBy: [{ updatedAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: { coverImageFile: true },
       }),
     ]);
 
     return {
-      items: items.map(memberMapper.contentPost),
+      items: items.map((c) => {
+        const mapped = memberMapper.contentPost({ ...c, body: c.content });
+        return {
+          ...mapped,
+          coverImageFile: c.coverImageFile ? { url: c.coverImageFile.url } : null,
+        };
+      }),
       total,
       page,
       pageSize,

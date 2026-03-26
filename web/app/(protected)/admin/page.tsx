@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
 import { api } from '../../../lib/api-client';
 import { formatCurrency } from '../../../lib/format';
@@ -197,6 +198,7 @@ function AccountDetailModal({ user, onClose }: { user: PendingAccount; onClose: 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function AntennaAdminDashboard() {
+  const router = useRouter(); // Injection du routeur pour les liens cliquables
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
@@ -235,7 +237,7 @@ export default function AntennaAdminDashboard() {
       label,
       value: formatCurrency(group.total, cur),
       icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
         </svg>
       ),
@@ -254,7 +256,7 @@ export default function AntennaAdminDashboard() {
       label: "Membres de l'antenne",
       value: data.stats.members,
       icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       ),
@@ -264,7 +266,7 @@ export default function AntennaAdminDashboard() {
       label: "Adhésions en attente",
       value: data.stats.pendingApprovals,
       icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
       ),
@@ -275,7 +277,7 @@ export default function AntennaAdminDashboard() {
       label: "Cotisations à valider",
       value: data.stats.pendingContributions,
       icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
         </svg>
       ),
@@ -286,7 +288,7 @@ export default function AntennaAdminDashboard() {
       label: "Projets actifs",
       value: data.stats.activeProjects,
       icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       ),
@@ -298,7 +300,7 @@ export default function AntennaAdminDashboard() {
         ? `${Math.round(((data.stats.members - (data.stats.pendingApprovals ?? 0)) / data.stats.members) * 100)}%`
         : "—",
       icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
           <path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
           <path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
         </svg>
@@ -320,46 +322,66 @@ export default function AntennaAdminDashboard() {
         .ad-page-title span{background:linear-gradient(135deg,#1D4ED8,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         .ad-date{font-size:.78rem;font-weight:600;color:#6B7280;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.12);border-radius:8px;padding:.45rem .85rem;white-space:nowrap}
 
-        /* ── Stats Grids (Remplacement du Flex) ── */
-        .ad-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.75rem; }
-        .ad-stats-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.75rem; }
-        .ad-stats-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1.75rem; }
+        /* ── Stats Grids ── */
+        .ad-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin-bottom: 1.75rem; }
+        .ad-stats-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem; margin-bottom: 1.75rem; }
+        .ad-stats-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem; margin-bottom: 1.75rem; }
 
         .ad-section-label{font-size:.65rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF;margin:0 0 .65rem;display:flex;align-items:center;gap:.5rem;width:100%}
         .ad-section-label::after{content:'';flex:1;height:1px;background:rgba(0,0,0,.06)}
 
-        .ad-stat-card{background:rgba(253,253,255,.9);backdrop-filter:blur(12px);border-radius:18px;padding:1.1rem 1.15rem;border:1px solid rgba(37,99,235,.10);box-shadow:0 2px 12px rgba(37,99,235,.05),0 0 0 1px rgba(255,255,255,.8) inset;position:relative;overflow:hidden;opacity:0;transform:translateY(16px);animation:fadein .5s cubic-bezier(.22,1,.36,1) forwards;transition:transform .2s,box-shadow .2s}
+        /* CARTES CENTRÉES */
+        .ad-stat-card {
+            background:rgba(253,253,255,.9); backdrop-filter:blur(12px); border-radius:18px; padding:1.4rem 1.15rem;
+            border:1px solid rgba(37,99,235,.10); box-shadow:0 2px 12px rgba(37,99,235,.05),0 0 0 1px rgba(255,255,255,.8) inset;
+            position:relative; overflow:hidden; opacity:0; transform:translateY(16px);
+            animation:fadein .5s cubic-bezier(.22,1,.36,1) forwards; transition:transform .2s,box-shadow .2s;
+            display: flex; flex-direction: column; align-items: center; text-align: center;
+        }
         .ad-stat-clickable{cursor:pointer}
         .ad-stat-clickable:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 12px 24px rgba(37,99,235,.12),0 0 0 1px rgba(255,255,255,.9) inset}
         .ad-stat-card:not(.ad-stat-clickable):hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(37,99,235,.10),0 0 0 1px rgba(255,255,255,.9) inset}
         .ad-stat-card.urgent::after{content:'';position:absolute;inset:0;border-radius:18px;border:1.5px solid currentColor;pointer-events:none;animation:urgentborder 2s ease-in-out infinite}
         @keyframes urgentborder{0%,100%{opacity:.4}50%{opacity:1}}
 
-        /* Cartes devise : style vert distinctif */
         .ad-stat-currency{border-color:rgba(5,150,105,.15);background:linear-gradient(135deg,rgba(240,253,244,.9),rgba(253,253,255,.9))}
 
-        .ad-stat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.7rem}
-        .ad-stat-label{font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#6B7280;line-height:1.4;max-width:120px}
-        .ad-stat-icon{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .ad-stat-value{font-family:'Cormorant Garamond',serif;font-size:1.75rem;font-weight:700;color:#111827;letter-spacing:-.03em;line-height:1;margin-bottom:.35rem;word-break:break-word}
-        .ad-stat-sub{font-size:.66rem;font-weight:600;color:#6B7280;display:flex;align-items:center;gap:.25rem}
+        /* NOUVEAU LAYOUT CENTRÉ POUR LE HAUT DE CARTE */
+        .ad-stat-top {
+            display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin-bottom: 0.8rem; width: 100%;
+        }
+        .ad-stat-label {
+            font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+            color:#6B7280; line-height:1.4; max-width:100%; text-align: center;
+        }
+        .ad-stat-icon {
+            width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+            margin-bottom: 0.2rem;
+        }
+        .ad-stat-value {
+            font-family:'Cormorant Garamond',serif; font-size:2rem; font-weight:700; color:#111827;
+            letter-spacing:-.03em; line-height:1; margin-bottom:.4rem; word-break:break-word; text-align: center;
+        }
+        .ad-stat-sub {
+            font-size:.7rem; font-weight:600; color:#6B7280; display:flex; align-items:center; justify-content: center; gap:.3rem;
+        }
         .ad-stat-sub.up{color:#059669}
 
         @media(max-width:900px){
           .ad-stats-4 { grid-template-columns: repeat(2, 1fr); }
         }
 
-        /* ── Mobile stat cards : 3 columns ── */
+        /* Responsive Mobile Centré */
         @media(max-width:768px){
-          .ad-stats, .ad-stats-4 { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-          .ad-stats-2 { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; }
-          .ad-stat-card { padding: 0.6rem 0.5rem !important; border-radius: 12px !important; }
-          .ad-stat-value { font-size: 1.1rem !important; word-break: break-word; }
-          .ad-stat-label { font-size: 0.52rem !important; max-width: 100% !important; }
-          .ad-stat-sub   { font-size: 0.5rem !important; }
-          .ad-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
-          .ad-stat-icon svg { width: 12px; height: 12px; }
-          .ad-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
+          .ad-stats, .ad-stats-4 { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+          .ad-stats-2 { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+          .ad-stat-card { padding: 1.2rem 0.6rem !important; border-radius: 14px !important; }
+          .ad-stat-value { font-size: 1.5rem !important; }
+          .ad-stat-label { font-size: 0.6rem !important; }
+          .ad-stat-sub   { font-size: 0.6rem !important; }
+          .ad-stat-icon  { width: 32px !important; height: 32px !important; border-radius: 8px !important; }
+          .ad-stat-icon svg { width: 16px; height: 16px; }
+          .ad-stat-top { gap: 0.4rem !important; margin-bottom: 0.6rem !important; }
         }
 
         .ad-bottom{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
@@ -455,8 +477,9 @@ export default function AntennaAdminDashboard() {
               <div key={s.label} className={`ad-stat-card${s.urgent ? " urgent" : ""}${s.clickable ? " ad-stat-clickable" : ""}`} style={{ animationDelay: `${0.08 + i * 0.06}s` }} onClick={s.onClick}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${s.color},${s.color}55)`, borderRadius: "18px 18px 0 0" }} />
                 <div className="ad-stat-top">
-                  <span className="ad-stat-label">{s.label}</span>
+                  {/* Icône placée au-dessus du label pour le centrage */}
                   <div className="ad-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                  <span className="ad-stat-label">{s.label}</span>
                 </div>
                 <div className="ad-stat-value" style={{ color: s.urgent ? s.color : "#111827" }}>{s.value}</div>
                 <div className={`ad-stat-sub${s.trendUp === true ? " up" : ""}`}>{s.sub}</div>
@@ -471,8 +494,8 @@ export default function AntennaAdminDashboard() {
               <div key={s.label} className={`ad-stat-card ad-stat-currency ad-stat-clickable`} style={{ animationDelay: `${0.28 + i * 0.07}s` }} onClick={s.onClick} role="button" tabIndex={0}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${s.color},${s.color}55)`, borderRadius: "18px 18px 0 0" }} />
                 <div className="ad-stat-top">
-                  <span className="ad-stat-label">{s.label}</span>
                   <div className="ad-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                  <span className="ad-stat-label">{s.label}</span>
                 </div>
                 <div className="ad-stat-value" style={{ color: s.color }}>{s.value}</div>
                 <div className="ad-stat-sub">{s.sub}</div>
@@ -486,8 +509,8 @@ export default function AntennaAdminDashboard() {
               <div key={s.label} className={`ad-stat-card${s.urgent ? " urgent" : ""}`} style={{ animationDelay: `${0.56 + i * 0.06}s` }}>
                 <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${s.color},${s.color}55)`, borderRadius: "18px 18px 0 0" }} />
                 <div className="ad-stat-top">
-                  <span className="ad-stat-label">{s.label}</span>
                   <div className="ad-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                  <span className="ad-stat-label">{s.label}</span>
                 </div>
                 <div className="ad-stat-value">{s.value}</div>
                 <div className="ad-stat-sub">{s.sub}</div>
@@ -564,30 +587,52 @@ export default function AntennaAdminDashboard() {
                 </div>
               </div>
               <div>
+                {/* Alerte Retardataires : REDIRECTION */}
                 <div className="ad-alert-item">
                   <div className="ad-alert-dot" style={{ background: "#F59E0B" }} />
                   <div>
                     <div className="ad-alert-title">Membres en retard de cotisation</div>
                     <div className="ad-alert-desc">Certains membres n&apos;ont pas cotisé depuis plus de 3 mois.</div>
-                    <button className="ad-alert-action">Voir la liste <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg></button>
+                    <button 
+                      className="ad-alert-action" 
+                      onClick={() => router.push('/admin/late-members')}
+                    >
+                      Voir la liste <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
                   </div>
                 </div>
+
+                {/* Alerte Cotisations : REDIRECTION */}
                 {data.stats.pendingContributions > 0 && (
                   <div className="ad-alert-item">
                     <div className="ad-alert-dot" style={{ background: "#7C3AED" }} />
                     <div>
                       <div className="ad-alert-title">{data.stats.pendingContributions} cotisation{data.stats.pendingContributions > 1 ? "s" : ""} à valider</div>
                       <div className="ad-alert-desc">Des paiements soumis par les membres attendent votre validation.</div>
-                      <button className="ad-alert-action" style={{ color: "#7C3AED" }}>Valider maintenant <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg></button>
+                      <button 
+                        className="ad-alert-action" 
+                        style={{ color: "#7C3AED" }}
+                        onClick={() => router.push('/admin/contributions')}
+                      >
+                        Valider maintenant <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                      </button>
                     </div>
                   </div>
                 )}
+
+                {/* Alerte Projets : REDIRECTION */}
                 <div className="ad-alert-item">
                   <div className="ad-alert-dot" style={{ background: "#059669" }} />
                   <div>
                     <div className="ad-alert-title">Projets actifs</div>
                     <div className="ad-alert-desc">{data.stats.activeProjects} projet{data.stats.activeProjects !== 1 ? "s" : ""} en cours nécessite{data.stats.activeProjects === 1 ? "" : "nt"} un suivi.</div>
-                    <button className="ad-alert-action" style={{ color: "#059669" }}>Suivre les projets <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg></button>
+                    <button 
+                      className="ad-alert-action" 
+                      style={{ color: "#059669" }}
+                      onClick={() => router.push('/admin/projects')}
+                    >
+                      Suivre les projets <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
                   </div>
                 </div>
               </div>
