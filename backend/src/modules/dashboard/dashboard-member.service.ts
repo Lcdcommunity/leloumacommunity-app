@@ -1,4 +1,4 @@
-//backend/src/modules/dashboard/dashboard-member.service.ts
+// backend/src/modules/dashboard/dashboard-member.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { 
@@ -67,7 +67,7 @@ export class DashboardMemberService {
         }),
       ]);
 
-    // 👇 2.5 AJOUT CHIRURGICAL : Récupération des soldes de toutes les antennes
+    // 👇 2.5 CORRECTION CHIRURGICALE : Récupération correcte des soldes de TOUTES les antennes
     const allAntennas = await this.prisma.antenna.findMany({
       where: { associationId: me.associationId, isActive: true },
       select: { id: true, name: true, defaultCurrency: true }
@@ -83,7 +83,7 @@ export class DashboardMemberService {
           id: ant.id,
           name: ant.name,
           balance: Number(agg._sum.amount ?? 0),
-          currency: ant.defaultCurrency || 'GNF'
+          currency: ant.defaultCurrency || 'EUR' // Fallback sécurisé
         };
       })
     );
@@ -206,7 +206,7 @@ export class DashboardMemberService {
         associationId: me.associationId,
         antennaId: primaryAntennaId,
       },
-      antennaBalances, // <-- INJECTION DU TABLEAU DES SOLDES
+      antennaBalances, // <-- Le tableau contenant les soldes (GNF, XOF, EUR, etc.) est maintenant correctement assigné
       recentContributions: recentContributions.map((x) => ({
         ...x,
         amount: Number(x.amount),

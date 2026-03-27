@@ -16,7 +16,6 @@ type PublicAntenna = {
 
 const STEPS = ['Identité', 'Contact', 'Photo', 'Sécurité'];
 
-// ── Liste des rôles au sein de l'association ──
 export const ASSOCIATION_ROLES = [
   'Membre (simple)',
   "Secrétaire à l'organisation",
@@ -44,23 +43,19 @@ export default function MemberSignupPage() {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
-  // Origine
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
   const [originVillage, setOriginVillage] = useState('');
 
-  // Naissance
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
   const [birthCountry, setBirthCountry] = useState('');
 
-  // Résidence
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
 
-  // Profession / Rôle
   const [profession, setProfession] = useState('');
 
   // ── Étape 2 : Photo ──
@@ -163,6 +158,7 @@ export default function MemberSignupPage() {
     if (err) { setError(err); return; }
     setError(null);
     setSubmitting(true);
+
     try {
       await api.memberSignup({
         firstName,
@@ -171,20 +167,16 @@ export default function MemberSignupPage() {
         phone: phone || undefined,
         password,
         antennaId,
-        // Origine
         originSubPrefecture: originSubPrefecture.trim(),
         originVillage: originVillage || undefined,
-        // Naissance
         birthDate: birthDate || undefined,
         placeOfBirth: placeOfBirth || undefined,
         birthCountry: birthCountry || undefined,
-        // Résidence
         city: city || undefined,
         country: country || undefined,
         postalCode: postalCode || undefined,
         addressLine1: addressLine1 || undefined,
         addressLine2: addressLine2 || undefined,
-        // Rôle/Profession
         function: profession || undefined,
       });
       if (selectedPhotoFile) {
@@ -209,112 +201,105 @@ export default function MemberSignupPage() {
   })();
 
   const strengthLabel = ['', 'Faible', 'Moyen', 'Bon', 'Fort'][pwdStrength];
-  const strengthColor = ['', '#E05050', '#E09030', '#2d7a4f', '#1a5c38'][pwdStrength];
+  const strengthColor = ['', '#E05050', '#E09030', '#059669', '#047857'][pwdStrength];
 
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-          --g-deep:   #1A4731;
-          --g-mid:    #2D6A4F;
-          --g-light:  #4a9e6a;
-          --g-pale:   #c8e6d4;
-          --g-faint:  #e8f5ee;
-          --g-border: rgba(45,106,79,0.14);
-          --g-accent: rgba(45,106,79,0.08);
-          --a-deep:   #92400E;
-          --a-pale:   #FEF3C7;
-          --a-border: #FDE68A;
-          --s-dark:   #0F2318;
-          --s-muted:  #52796A;
-          --err:      #B91C1C;
+          --theme-blue: #2563EB;
+          --theme-blue-dark: #1D4ED8;
+          --theme-green: #059669;
+          --theme-green-light: #10B981;
+          --bg-color: #F8FAFC;
+          --err: #B91C1C;
         }
 
         .sp-root {
           font-family: 'DM Sans', sans-serif;
           min-height: 100svh;
-          background: linear-gradient(150deg, #E8F0EC 0%, #F0F7F3 40%, #E4EFE9 100%);
+          background: linear-gradient(150deg, #F0F4F8 0%, #E2E8F0 40%, #DBEAFE 100%);
           display: flex; align-items: flex-start; justify-content: center;
           position: relative; overflow: hidden;
           padding: 2rem 1.25rem 3rem;
         }
+        
         .sp-orb {
           position: fixed; border-radius: 50%;
           filter: blur(100px); pointer-events: none;
         }
         .sp-orb-1 {
           width: 500px; height: 500px;
-          background: radial-gradient(circle, rgba(26,71,49,0.14) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(37,99,235,0.15) 0%, transparent 70%);
           top: -150px; right: -100px;
           animation: oa 16s ease-in-out infinite alternate;
         }
         .sp-orb-2 {
           width: 360px; height: 360px;
-          background: radial-gradient(circle, rgba(74,158,106,0.10) 0%, transparent 70%);
+          background: radial-gradient(circle, rgba(5,150,105,0.12) 0%, transparent 70%);
           bottom: -80px; left: -80px;
           animation: ob 20s ease-in-out infinite alternate;
         }
         @keyframes oa { from{transform:translate(0,0)} to{transform:translate(-40px,40px)} }
         @keyframes ob { from{transform:translate(0,0)} to{transform:translate(30px,-30px)} }
+        
         .sp-bg-grid {
           position: fixed; inset: 0;
           background-image:
-            linear-gradient(rgba(26,71,49,0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(26,71,49,0.05) 1px, transparent 1px);
+            linear-gradient(rgba(37,99,235,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(37,99,235,0.03) 1px, transparent 1px);
           background-size: 56px 56px; pointer-events: none;
         }
 
-        /* ── Card ── */
         .sp-card {
           position: relative; z-index: 10;
-          width: 100%; max-width: 560px;
-          background: rgba(247,253,249,0.95);
+          width: 100%; max-width: 600px;
+          background: rgba(255,255,255,0.95);
           backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-          border: 1px solid var(--g-border); border-radius: 28px;
+          border: 1px solid rgba(37,99,235,0.1); border-radius: 28px;
           padding: clamp(1.5rem, 5vw, 2.75rem);
           box-shadow:
             0 0 0 1px rgba(255,255,255,0.85) inset,
-            0 24px 64px rgba(26,71,49,0.10),
-            0 4px 16px rgba(26,71,49,0.06);
+            0 24px 64px rgba(37,99,235,0.08),
+            0 4px 16px rgba(37,99,235,0.05);
           opacity: 0; transform: translateY(28px);
           transition: opacity 0.65s cubic-bezier(.22,1,.36,1), transform 0.65s cubic-bezier(.22,1,.36,1);
           margin-top: 0.5rem;
         }
         .sp-card.visible { opacity: 1; transform: translateY(0); }
 
-        /* ── Header ── */
         .sp-header { text-align: center; margin-bottom: 1.75rem; }
         .sp-badge {
           display: inline-flex; align-items: center; gap: 0.4rem;
-          background: var(--g-faint); border: 1px solid var(--g-pale);
+          background: #EFF6FF; border: 1px solid #BFDBFE;
           border-radius: 99px; padding: 0.3rem 0.85rem;
-          font-size: 0.72rem; font-weight: 600; color: var(--g-deep);
+          font-size: 0.72rem; font-weight: 700; color: var(--theme-blue-dark);
           letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.9rem;
         }
         .sp-badge-dot {
-          width: 6px; height: 6px; background: var(--g-light);
+          width: 6px; height: 6px; background: var(--theme-blue);
           border-radius: 50%; animation: blink 2s ease-in-out infinite;
         }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        
         .sp-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(1.6rem, 4.5vw, 2.1rem); font-weight: 500;
-          color: var(--s-dark); letter-spacing: -0.02em; line-height: 1.15;
+          font-size: clamp(1.6rem, 4.5vw, 2.3rem); font-weight: 600;
+          color: #1E3A8A; letter-spacing: -0.02em; line-height: 1.15;
         }
         .sp-title span {
-          background: linear-gradient(135deg, var(--g-deep), var(--g-light));
+          background: linear-gradient(135deg, var(--theme-blue-dark), var(--theme-blue));
           -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
-        .sp-subtitle { font-size: 0.8rem; color: var(--s-muted); margin-top: 0.45rem; line-height: 1.6; }
+        .sp-subtitle { font-size: 0.82rem; color: #64748B; margin-top: 0.45rem; line-height: 1.6; font-weight: 500; }
 
-        /* ── Stepper ── */
         .sp-stepper {
           display: flex; align-items: center; justify-content: center;
-          gap: 0; margin-bottom: 1.5rem;
+          gap: 0; margin-bottom: 1.75rem;
         }
         .sp-step-item {
           display: flex; flex-direction: column; align-items: center;
@@ -323,242 +308,215 @@ export default function MemberSignupPage() {
         .sp-step-item:not(:last-child)::after {
           content: ''; position: absolute; top: 13px;
           left: calc(50% + 14px); width: calc(100% - 28px); height: 1px;
-          background: rgba(26,71,49,0.15); transition: background 0.4s;
+          background: #E2E8F0; transition: background 0.4s;
         }
-        .sp-step-item.done:not(:last-child)::after { background: var(--g-light); }
+        .sp-step-item.done:not(:last-child)::after { background: var(--theme-green); }
         .sp-step-circle {
           width: 26px; height: 26px; border-radius: 50%;
-          border: 2px solid rgba(26,71,49,0.2); background: white;
+          border: 2px solid #CBD5E1; background: white;
           display: flex; align-items: center; justify-content: center;
-          font-size: 0.65rem; font-weight: 700; color: var(--s-muted);
+          font-size: 0.65rem; font-weight: 800; color: #94A3B8;
           transition: all 0.3s cubic-bezier(.22,1,.36,1); position: relative; z-index: 1;
         }
         .sp-step-item.active .sp-step-circle {
-          border-color: var(--g-deep); background: var(--g-deep); color: white;
-          box-shadow: 0 0 0 4px rgba(26,71,49,0.12);
+          border-color: var(--theme-blue); background: var(--theme-blue); color: white;
+          box-shadow: 0 0 0 4px rgba(37,99,235,0.15);
         }
         .sp-step-item.done .sp-step-circle {
-          border-color: var(--g-light); background: var(--g-faint); color: var(--g-deep);
+          border-color: var(--theme-green); background: #ECFDF5; color: var(--theme-green);
         }
         .sp-step-label {
-          font-size: 0.6rem; font-weight: 600; letter-spacing: 0.06em;
-          text-transform: uppercase; color: var(--s-muted); transition: color 0.3s;
+          font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em;
+          text-transform: uppercase; color: #94A3B8; transition: color 0.3s;
         }
-        .sp-step-item.active .sp-step-label { color: var(--g-deep); }
-        .sp-step-item.done .sp-step-label { color: var(--g-light); }
+        .sp-step-item.active .sp-step-label { color: var(--theme-blue-dark); }
+        .sp-step-item.done .sp-step-label { color: var(--theme-green); }
 
-        /* ── Section title ── */
         .sp-section-title {
-          font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
-          text-transform: uppercase; color: var(--g-mid);
-          margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.5rem;
+          font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em;
+          text-transform: uppercase; color: var(--theme-green);
+          margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;
         }
         .sp-section-title::after {
           content: ''; flex: 1; height: 1px;
-          background: linear-gradient(90deg, var(--g-pale), transparent);
+          background: linear-gradient(90deg, #A7F3D0, transparent);
         }
 
-        /* ── Layouts ── */
-        .sp-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
-        .sp-stack { display: flex; flex-direction: column; gap: 0.75rem; }
+        .sp-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; }
+        .sp-stack { display: flex; flex-direction: column; gap: 0.2rem; }
 
-        /* ── Fields ── */
-        .sp-field { display: flex; flex-direction: column; gap: 0.3rem; }
+        .sp-field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+        .sp-grid-2 .sp-field { margin-bottom: 0; }
+        
         .sp-label {
-          font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em;
-          text-transform: uppercase; color: var(--g-mid);
+          font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em;
+          text-transform: uppercase; color: var(--theme-green);
         }
         .sp-label .sp-opt {
-          font-weight: 400; color: var(--s-muted); text-transform: none;
+          font-weight: 500; color: #94A3B8; text-transform: none;
           letter-spacing: 0; font-size: 0.65rem; margin-left: 0.3rem;
         }
         .sp-input-wrap { position: relative; }
         .sp-input, .sp-select {
-          width: 100%; min-height: 46px; border-radius: 11px;
-          border: 1px solid rgba(45,106,79,0.16); background: rgba(255,255,255,0.88);
-          padding: 0 0.9rem; color: var(--s-dark);
+          width: 100%; min-height: 48px; border-radius: 12px;
+          border: 1.5px solid #E2E8F0; background: #FFFFFF;
+          padding: 0 1rem; color: #111827; font-weight: 500;
           font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline: none;
-          transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+          transition: border-color 0.2s, box-shadow 0.2s;
           -webkit-appearance: none; appearance: none;
         }
-        .sp-input::placeholder { color: rgba(82,121,106,0.4); }
+        .sp-input::placeholder { color: #9CA3AF; }
         .sp-input:focus, .sp-select:focus {
-          border-color: var(--g-mid); background: white;
-          box-shadow: 0 0 0 3px rgba(45,106,79,0.10);
+          border-color: var(--theme-blue);
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
         }
         .sp-input.has-icon { padding-right: 2.8rem; }
         .sp-select {
           cursor: pointer;
-          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%231A4731' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-          background-repeat: no-repeat; background-position: right 0.85rem center; padding-right: 2rem;
+          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat: no-repeat; background-position: right 1rem center; padding-right: 2rem;
         }
         .sp-eye-btn {
           position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%);
-          background: none; border: none; color: var(--s-muted); cursor: pointer;
+          background: none; border: none; color: #94A3B8; cursor: pointer;
           padding: 4px; display: flex; align-items: center; transition: color 0.2s;
         }
-        .sp-eye-btn:hover { color: var(--g-mid); }
+        .sp-eye-btn:hover { color: var(--theme-blue); }
 
-        /* ── Password strength ── */
-        .sp-pwd-strength { display: flex; gap: 3px; margin-top: 0.4rem; align-items: center; }
+        .sp-pwd-strength { display: flex; gap: 4px; margin-top: 0.4rem; align-items: center; }
         .sp-pwd-bar {
-          flex: 1; height: 3px; border-radius: 99px;
-          background: rgba(26,71,49,0.1); overflow: hidden;
+          flex: 1; height: 4px; border-radius: 99px;
+          background: #E2E8F0; overflow: hidden;
         }
         .sp-pwd-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.4s; }
-        .sp-pwd-label { font-size: 0.65rem; font-weight: 600; margin-left: 0.4rem; min-width: 32px; }
+        .sp-pwd-label { font-size: 0.65rem; font-weight: 700; margin-left: 0.4rem; min-width: 36px; }
 
-        /* ── Notice ── */
         .sp-notice {
-          background: var(--g-faint); border: 1px solid var(--g-pale); border-radius: 12px;
-          padding: 0.75rem 0.85rem; font-size: 0.75rem; color: var(--g-deep);
+          background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px;
+          padding: 0.85rem 1rem; font-size: 0.78rem; color: var(--theme-blue-dark); font-weight: 500;
           line-height: 1.5; margin-bottom: 1.2rem; display: flex; gap: 0.6rem; align-items: flex-start;
         }
 
-        /* ── Error / Toasts ── */
         .sp-error {
-          display: flex; align-items: center; gap: 0.55rem;
-          padding: 0.8rem 1rem;
-          background: rgba(185,28,28,0.06); border: 1px solid rgba(185,28,28,0.18);
-          border-radius: 12px; color: var(--err); font-size: 0.8rem; line-height: 1.45;
+          display: flex; align-items: center; gap: 0.55rem; padding: 0.8rem 1rem;
+          background: #FEF2F2; border: 1px solid #FECACA;
+          border-radius: 12px; color: var(--err); font-size: 0.8rem; font-weight: 600; line-height: 1.45;
         }
         .sp-toast-ok {
           display: inline-flex; align-items: center; gap: 0.45rem;
-          padding: 0.45rem 0.9rem; border-radius: 99px;
-          font-size: 0.74rem; font-weight: 700;
+          padding: 0.45rem 1rem; border-radius: 99px;
+          font-size: 0.75rem; font-weight: 700;
           background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0;
         }
 
-        /* ── Success ── */
-        .sp-success { text-align: center; padding: 0.5rem 0; }
+        .sp-success { text-align: center; padding: 1rem 0; }
         .sp-success-icon {
-          width: 56px; height: 56px;
-          background: linear-gradient(135deg, #DCFCE7, #BBF7D0); border-radius: 50%;
+          width: 64px; height: 64px;
+          background: linear-gradient(135deg, #DCFCE7, #86EFAC); border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
-          margin: 0.75rem auto 1rem; box-shadow: 0 0 0 6px rgba(21,128,61,0.08);
+          margin: 0.75rem auto 1.2rem; box-shadow: 0 0 0 6px rgba(21,128,61,0.08);
           animation: popin 0.5s cubic-bezier(.22,1,.36,1);
         }
         @keyframes popin { from{opacity:0;transform:scale(0.5)} to{opacity:1;transform:scale(1)} }
         .sp-success-title {
-          font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 500;
-          color: var(--s-dark); margin-bottom: 0.5rem;
+          font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 700;
+          color: #111827; margin-bottom: 0.5rem;
         }
-        .sp-success-text { font-size: 0.8rem; color: var(--s-muted); line-height: 1.6; }
+        .sp-success-text { font-size: 0.85rem; color: #64748B; line-height: 1.6; font-weight: 500; }
 
-        /* ── Buttons ── */
-        .sp-nav { display: flex; gap: 0.6rem; margin-top: 1.5rem; }
+        .sp-nav { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
         .sp-btn-back {
-          flex: 0 0 auto; min-height: 46px; padding: 0 1rem;
-          background: transparent; border: 1px solid rgba(26,71,49,0.22); border-radius: 11px;
-          color: var(--g-mid); font-family: 'DM Sans', sans-serif;
-          font-size: 0.82rem; font-weight: 700; cursor: pointer;
+          flex: 0 0 auto; min-height: 48px; padding: 0 1.25rem;
+          background: white; border: 1.5px solid #CBD5E1; border-radius: 12px;
+          color: #475569; font-family: 'DM Sans', sans-serif;
+          font-size: 0.85rem; font-weight: 700; cursor: pointer;
           display: flex; align-items: center; gap: 0.4rem;
-          transition: background 0.18s, border-color 0.18s, transform 0.15s;
+          transition: background 0.2s, border-color 0.2s, color 0.2s;
         }
-        .sp-btn-back:hover { background: var(--g-faint); border-color: rgba(26,71,49,0.4); transform: translateY(-1px); }
+        .sp-btn-back:hover { background: #F8FAFC; border-color: #94A3B8; color: #1E293B; }
+        
         .sp-btn-next, .sp-btn-submit {
-          flex: 1; min-height: 46px;
-          background: linear-gradient(135deg, var(--g-deep) 0%, var(--g-mid) 50%, var(--g-light) 100%);
-          background-size: 200% 100%; background-position: 0% 0%;
-          border: none; border-radius: 11px; color: white;
-          font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700;
+          flex: 1; min-height: 48px;
+          background: linear-gradient(135deg, var(--theme-blue-dark), var(--theme-blue));
+          border: none; border-radius: 12px; color: white;
+          font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 800;
           letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer;
           display: flex; align-items: center; justify-content: center; gap: 0.45rem;
-          transition: background-position 0.4s, transform 0.15s, box-shadow 0.3s;
-          box-shadow: 0 4px 14px rgba(26,71,49,0.25);
+          box-shadow: 0 4px 14px rgba(37,99,235,0.25); transition: transform 0.15s, box-shadow 0.2s;
         }
         .sp-btn-next:hover:not(:disabled), .sp-btn-submit:hover:not(:disabled) {
-          background-position: 100% 0%; box-shadow: 0 6px 20px rgba(26,71,49,0.35); transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(37,99,235,0.35); transform: translateY(-1px);
         }
         .sp-btn-next:disabled, .sp-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+        
         .sp-spinner {
           width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3);
           border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── Footer ── */
         .sp-footer {
-          margin-top: 1.5rem; padding-top: 1.2rem;
-          border-top: 1px solid rgba(26,71,49,0.09);
-          text-align: center; font-size: 0.78rem; color: var(--s-muted);
+          margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid #E2E8F0;
+          text-align: center; font-size: 0.8rem; color: #64748B; font-weight: 500;
           display: flex; flex-direction: column; gap: 0.6rem;
         }
-        .sp-footer a { color: var(--g-mid); font-weight: 600; text-decoration: none; transition: color 0.2s; }
-        .sp-footer a:hover { color: var(--g-light); }
-        .sp-footer-sublink { font-size: 0.72rem; font-weight: 400 !important; color: var(--s-muted) !important; }
-        .sp-footer-sublink:hover { color: var(--g-mid) !important; }
-
+        .sp-footer a { color: var(--theme-blue); font-weight: 700; text-decoration: none; transition: color 0.2s; }
+        .sp-footer a:hover { color: var(--theme-blue-dark); }
+        .sp-footer-sublink { font-size: 0.75rem; font-weight: 500 !important; color: #94A3B8 !important; }
+        .sp-footer-sublink:hover { color: var(--theme-blue) !important; }
+        
         .sp-panel { animation: fadeup 0.35s cubic-bezier(.22,1,.36,1); }
         @keyframes fadeup { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 
-        /* ── Photo step ── */
         .sp-photo-avatar {
-          width: 96px; height: 96px; border-radius: 50%; margin: 0 auto 1rem;
-          background: linear-gradient(135deg, var(--g-deep), var(--g-mid));
+          width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 1.2rem;
+          background: linear-gradient(135deg, var(--theme-blue-dark), var(--theme-blue));
           display: flex; align-items: center; justify-content: center;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 2rem; font-weight: 600; color: white; letter-spacing: 0.04em;
-          box-shadow: 0 6px 20px rgba(26,71,49,0.25);
-          overflow: hidden; transition: all 0.3s;
+          font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 700; color: white;
+          box-shadow: 0 6px 20px rgba(37,99,235,0.25); overflow: hidden;
         }
         .sp-photo-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .sp-photo-box {
-          border: 1.5px dashed rgba(45,106,79,0.22);
-          border-radius: 16px; padding: 1.25rem 1rem;
-          background: rgba(255,255,255,0.75); text-align: center;
+          border: 1.5px dashed #CBD5E1; border-radius: 16px; padding: 1.5rem 1rem;
+          background: #F8FAFC; text-align: center;
         }
-        .sp-photo-box-title { font-size: 0.88rem; font-weight: 700; color: var(--s-dark); margin-bottom: 0.2rem; }
-        .sp-photo-box-sub { font-size: 0.74rem; color: var(--s-muted); line-height: 1.55; margin-bottom: 1rem; }
+        .sp-photo-box-title { font-size: 0.9rem; font-weight: 800; color: #1E293B; margin-bottom: 0.3rem; }
+        .sp-photo-box-sub { font-size: 0.76rem; color: #64748B; line-height: 1.55; margin-bottom: 1rem; font-weight: 500; }
         .sp-photo-actions {
-          display: flex; gap: 0.65rem; flex-wrap: wrap;
-          align-items: center; justify-content: center; margin-top: 0.85rem;
+          display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; justify-content: center; margin-top: 1rem;
         }
         .sp-file-label {
-          min-height: 44px; padding: 0.65rem 1.1rem;
-          border-radius: 11px; border: 1px solid var(--g-border);
-          background: white; color: var(--g-deep);
-          font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700;
-          display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
-          cursor: pointer; transition: border-color 0.18s, box-shadow 0.18s;
+          min-height: 46px; padding: 0 1.25rem; border-radius: 12px; border: 1.5px solid #CBD5E1;
+          background: white; color: var(--theme-blue-dark); font-family: 'DM Sans', sans-serif;
+          font-size: 0.85rem; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem;
+          cursor: pointer; transition: all 0.2s;
         }
-        .sp-file-label:hover { border-color: var(--g-mid); box-shadow: 0 0 0 3px var(--g-accent); }
+        .sp-file-label:hover { border-color: var(--theme-blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         .sp-file-input { display: none; }
         .sp-photo-remove-btn {
-          min-height: 44px; padding: 0.65rem 0.95rem;
-          border-radius: 11px; border: 1px solid rgba(185,28,28,0.22);
-          background: rgba(185,28,28,0.04); color: #B91C1C;
-          font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700;
-          cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;
-          transition: all 0.18s;
+          min-height: 46px; padding: 0 1rem; border-radius: 12px; border: 1.5px solid rgba(220,38,38,0.2);
+          background: rgba(254,242,242,0.6); color: #DC2626; font-family: 'DM Sans', sans-serif;
+          font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem;
+          transition: all 0.2s;
         }
-        .sp-photo-remove-btn:hover { background: rgba(185,28,28,0.08); border-color: rgba(185,28,28,0.35); }
-        .sp-photo-help { font-size: 0.7rem; color: var(--s-muted); margin-top: 0.6rem; line-height: 1.5; }
-        .sp-photo-filename { font-size: 0.73rem; color: var(--s-muted); margin-top: 0.4rem; word-break: break-word; }
-        .sp-photo-meta {
-          display: flex; align-items: center; justify-content: space-between;
-          flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem;
-        }
+        .sp-photo-remove-btn:hover { background: #FEE2E2; border-color: #F87171; }
+        .sp-photo-help { font-size: 0.72rem; color: #94A3B8; margin-top: 0.75rem; font-weight: 600; }
+        
+        .sp-photo-meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
         .sp-photo-hint {
-          display: inline-flex; align-items: center; gap: 0.38rem;
-          font-size: 0.67rem; font-weight: 700; color: var(--a-deep);
-          background: var(--a-pale); border: 1px solid var(--a-border);
-          border-radius: 99px; padding: 0.18rem 0.6rem;
+          display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.68rem; font-weight: 800;
+          color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 99px; padding: 0.25rem 0.7rem;
         }
         .sp-photo-skip {
-          background: none; border: none; padding: 0; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 0.77rem; font-weight: 500;
-          color: var(--s-muted); display: inline-flex; align-items: center; gap: 0.35rem;
-          transition: color 0.2s;
+          background: none; border: none; padding: 0; cursor: pointer; font-family: 'DM Sans', sans-serif;
+          font-size: 0.8rem; font-weight: 700; color: #64748B; display: inline-flex; align-items: center; gap: 0.35rem; transition: color 0.2s;
         }
-        .sp-photo-skip:hover { color: var(--g-mid); }
+        .sp-photo-skip:hover { color: var(--theme-blue); }
 
-        /* ── Responsive ── */
-        @media (max-width: 520px) {
-          .sp-grid-2 { grid-template-columns: 1fr; gap: 0.6rem; }
+        @media (max-width: 540px) {
+          .sp-grid-2 { grid-template-columns: 1fr; gap: 0.85rem; }
           .sp-root { padding: 1rem 0.5rem 2rem; }
-          .sp-card { border-radius: 20px; padding: 1.25rem; }
-          .sp-btn-back { padding: 0 0.8rem; }
+          .sp-card { border-radius: 20px; padding: 1.5rem; }
           .sp-photo-actions { flex-direction: column; align-items: stretch; }
           .sp-file-label, .sp-photo-remove-btn { width: 100%; }
         }
@@ -588,7 +546,7 @@ export default function MemberSignupPage() {
                 <div key={label} className={`sp-step-item ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
                   <div className="sp-step-circle">
                     {i < step ? (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
                         <polyline points="20 6 9 17 4 12"/>
                       </svg>
                     ) : (i + 1)}
@@ -602,13 +560,13 @@ export default function MemberSignupPage() {
           {/* ── SUCCESS ── */}
           {success ? (
             <div className="sp-success sp-panel">
-              <div className="sp-photo-avatar" style={{width:'80px',height:'80px',fontSize:'1.7rem'}}>
+              <div className="sp-photo-avatar" style={{width:'88px',height:'88px',fontSize:'1.8rem'}}>
                 {photoPreviewUrl
-                  ? <Image src={photoPreviewUrl} alt="Photo profil" width={80} height={80} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} unoptimized />
+                  ? <Image src={photoPreviewUrl} alt="Photo profil" width={88} height={88} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} unoptimized />
                   : (initials || '?')}
               </div>
               <div className="sp-success-icon">
-                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#15803D" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#15803D" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
               </div>
@@ -617,13 +575,13 @@ export default function MemberSignupPage() {
                 Vérifiez votre email pour activer votre compte,<br/>
                 puis attendez la validation par l&apos;administrateur<br/>de votre antenne.
               </p>
-              <div style={{marginTop:'1.5rem'}}>
+              <div style={{marginTop:'1.75rem'}}>
                 <Link href="/login" style={{
                   display:'inline-flex', alignItems:'center', gap:'0.4rem',
-                  color:'var(--g-mid)', fontWeight:600, fontSize:'0.85rem', textDecoration:'none'
+                  color:'var(--theme-blue-dark)', fontWeight:800, fontSize:'0.9rem', textDecoration:'none'
                 }}>
                   Se connecter
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                   </svg>
                 </Link>
@@ -636,7 +594,7 @@ export default function MemberSignupPage() {
               {step === 0 && (
                 <div className="sp-panel sp-stack">
                   <div className="sp-notice">
-                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{flexShrink:0,marginTop:'2px'}}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{flexShrink:0,marginTop:'1px'}}>
                       <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
                     </svg>
                     Le compte sera activé après vérification email et validation par l&apos;administrateur de votre antenne.
@@ -686,7 +644,7 @@ export default function MemberSignupPage() {
                   </div>
 
                   {/* Naissance */}
-                  <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Naissance &amp; Origine</p>
+                  <p className="sp-section-title" style={{marginTop:'0.25rem'}}>Naissance &amp; Origine</p>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
@@ -699,13 +657,13 @@ export default function MemberSignupPage() {
                     </div>
                   </div>
 
-                  <div className="sp-field">
+                  <div className="sp-field" style={{marginBottom: '1rem'}}>
                     <label className="sp-label">Pays de naissance <span className="sp-opt">(optionnel)</span></label>
                     <input className="sp-input" value={birthCountry} onChange={e => setBirthCountry(e.target.value)} placeholder="Ex : Guinée" />
                   </div>
 
                   {/* Coordonnées */}
-                  <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Coordonnées</p>
+                  <p className="sp-section-title">Coordonnées</p>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
@@ -718,7 +676,7 @@ export default function MemberSignupPage() {
                     </div>
                   </div>
 
-                  <div className="sp-field">
+                  <div className="sp-field" style={{marginBottom: '1rem'}}>
                     <label className="sp-label">Poste occupé <span className="sp-opt">(optionnel)</span></label>
                     <select className="sp-select" value={profession} onChange={e => setProfession(e.target.value)}>
                       <option value="">Sélectionnez un rôle dans l&apos;association</option>
@@ -729,7 +687,7 @@ export default function MemberSignupPage() {
                   </div>
 
                   {/* Résidence */}
-                  <p className="sp-section-title" style={{marginTop:'0.2rem'}}>Lieu de résidence actuelle</p>
+                  <p className="sp-section-title">Lieu de résidence actuelle</p>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
@@ -742,8 +700,8 @@ export default function MemberSignupPage() {
                     </div>
                   </div>
 
-                  <div className="sp-field">
-                    <label className="sp-label">Pays <span className="sp-opt">(optionnel)</span></label>
+                  <div className="sp-field" style={{marginBottom: '1rem'}}>
+                    <label className="sp-label">Pays <span className="sp-opt">(Sert à déterminer la devise)</span></label>
                     <input className="sp-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="France" />
                   </div>
 
@@ -768,9 +726,9 @@ export default function MemberSignupPage() {
                   <div className="sp-photo-box">
                     <div className="sp-photo-avatar">
                       {photoPreviewUrl
-                        ? <Image src={photoPreviewUrl} alt="Aperçu" width={96} height={96} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} unoptimized />
+                        ? <Image src={photoPreviewUrl} alt="Aperçu" width={100} height={100} style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:'50%'}} unoptimized />
                         : (initials || (
-                          <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="rgba(255,255,255,0.65)" strokeWidth="1.5">
+                          <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                           </svg>
                         ))
@@ -778,9 +736,9 @@ export default function MemberSignupPage() {
                     </div>
 
                     {photoPreviewUrl ? (
-                      <div style={{marginBottom:'0.15rem'}}>
+                      <div style={{marginBottom:'0.2rem'}}>
                         <span className="sp-toast-ok">
-                          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
                           </svg>
                           Photo sélectionnée
@@ -798,7 +756,7 @@ export default function MemberSignupPage() {
 
                     <div className="sp-photo-actions">
                       <label className="sp-file-label" htmlFor="signup-photo-input">
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                         </svg>
                         {photoPreviewUrl ? 'Changer la photo' : 'Choisir une photo'}
@@ -813,7 +771,7 @@ export default function MemberSignupPage() {
                       />
                       {photoPreviewUrl && (
                         <button type="button" className="sp-photo-remove-btn" onClick={removePhoto}>
-                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
                           </svg>
                           Supprimer
@@ -827,8 +785,8 @@ export default function MemberSignupPage() {
                     <p className="sp-photo-help">Max 5 Mo · JPG, PNG, WEBP</p>
 
                     {photoError && (
-                      <div className="sp-error" style={{marginTop:'0.7rem', textAlign:'left'}}>
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{flexShrink:0}}>
+                      <div className="sp-error" style={{marginTop:'0.8rem', textAlign:'left'}}>
+                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{flexShrink:0}}>
                           <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
                         </svg>
                         {photoError}
@@ -838,14 +796,14 @@ export default function MemberSignupPage() {
 
                   <div className="sp-photo-meta">
                     <span className="sp-photo-hint">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
                       </svg>
                       Requis pour la carte membre
                     </span>
                     <button type="button" className="sp-photo-skip" onClick={nextStep}>
                       Passer cette étape
-                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                       </svg>
                     </button>
@@ -869,8 +827,8 @@ export default function MemberSignupPage() {
                       />
                       <button type="button" className="sp-eye-btn" onClick={() => setShowPwd(v => !v)} tabIndex={-1}>
                         {showPwd
-                          ? <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-                          : <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                          ? <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                          : <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                         }
                       </button>
                     </div>
@@ -897,14 +855,14 @@ export default function MemberSignupPage() {
                       />
                       <button type="button" className="sp-eye-btn" onClick={() => setShowPwd2(v => !v)} tabIndex={-1}>
                         {showPwd2
-                          ? <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
-                          : <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                          ? <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88L6.59 6.59m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                          : <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                         }
                       </button>
                     </div>
                     {passwordConfirm && (
-                      <p style={{fontSize:'0.65rem', marginTop:'0.3rem', fontWeight:600,
-                        color: password === passwordConfirm ? '#15803D' : '#B91C1C'}}>
+                      <p style={{fontSize:'0.68rem', marginTop:'0.35rem', fontWeight:700,
+                        color: password === passwordConfirm ? '#059669' : '#B91C1C'}}>
                         {password === passwordConfirm ? '✓ Les mots de passe correspondent' : '✗ Les mots de passe ne correspondent pas'}
                       </p>
                     )}
@@ -914,8 +872,8 @@ export default function MemberSignupPage() {
 
               {/* Error */}
               {error && (
-                <div className="sp-error" style={{marginTop:'1rem'}}>
-                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{flexShrink:0}}>
+                <div className="sp-error" style={{marginTop:'1.25rem'}}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{flexShrink:0}}>
                     <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
                   </svg>
                   {error}
@@ -926,7 +884,7 @@ export default function MemberSignupPage() {
               <div className="sp-nav">
                 {step > 0 && (
                   <button type="button" className="sp-btn-back" onClick={prevStep}>
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                     </svg>
                     Retour
@@ -935,21 +893,21 @@ export default function MemberSignupPage() {
                 {step < STEPS.length - 1 ? (
                   <button type="button" className="sp-btn-next" onClick={nextStep} disabled={step === 2 && !!photoError}>
                     {step === 2
-                      ? (photoPreviewUrl ? 'Continuer avec cette photo' : 'Continuer sans photo')
+                      ? (photoPreviewUrl ? 'Continuer avec la photo' : 'Continuer sans photo')
                       : 'Continuer'
                     }
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                     </svg>
                   </button>
                 ) : (
                   <button type="submit" className="sp-btn-submit" disabled={submitting || loadingAntennas}>
                     {submitting ? (
-                      <><div className="sp-spinner"/>Inscription…</>
+                      <><div className="sp-spinner"/>Inscription en cours…</>
                     ) : (
                       <>
                         Créer mon compte
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
                         </svg>
                       </>

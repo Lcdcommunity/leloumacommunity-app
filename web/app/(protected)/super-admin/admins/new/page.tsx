@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/admins/new/page.tsx
+// web/app/(protected)/super-admin/admins/new/page.tsx
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -17,23 +17,33 @@ export default function NewAntennaAdminPage() {
     <AppShell title="Créer un admin d'antenne">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
-        .sadn-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:900px;margin:0 auto}
-        .sadn-back{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:700;color:#1D4ED8;text-decoration:none;margin-bottom:1.25rem;opacity:0;transform:translateY(8px);animation:sadnin .45s .02s cubic-bezier(.22,1,.36,1) forwards;transition:color .15s}
-        .sadn-back:hover{color:#1E3A8A}
-        .sadn-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:sadnin .5s .06s cubic-bezier(.22,1,.36,1) forwards}
-        .sadn-eyebrow{font-size:.67rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#2563EB;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
-        .sadn-dot{width:6px;height:6px;background:#3B82F6;border-radius:50%;animation:sadnpulse 2s ease-in-out infinite}
-        @keyframes sadnpulse{0%,100%{opacity:1}50%{opacity:.3}}
-        .sadn-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
-        .sadn-title span{background:linear-gradient(135deg,#1D4ED8,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .sadn-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(37,99,235,.09);box-shadow:0 2px 18px rgba(37,99,235,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:sadnin .5s .12s cubic-bezier(.22,1,.36,1) forwards}
-        .sadn-panel-head{padding:1rem 1.5rem;border-bottom:1px solid rgba(37,99,235,.08);display:flex;align-items:center;gap:.55rem}
-        .sadn-panel-ico{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#1D4ED8,#2563EB);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 10px rgba(37,99,235,.3)}
-        .sadn-panel-title{font-size:.76rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
-        .sadn-panel-body{padding:1.75rem 1.5rem}
-        @media(max-width:540px){.sadn-panel-body{padding:1.25rem 1.1rem}}
-        .sadn-error{display:flex;align-items:flex-start;gap:.6rem;padding:.9rem 1.1rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin-bottom:1.5rem;line-height:1.5}
-        @keyframes sadnin{to{opacity:1;transform:translateY(0)}}
+        
+        .sadn-wrap { font-family:'DM Sans',sans-serif; padding:clamp(1.25rem,3vw,2rem); max-width:900px; margin:0 auto; }
+        
+        .sadn-back { display:inline-flex; align-items:center; gap:.4rem; font-size:.78rem; font-weight:700; color:#DC2626; text-decoration:none; margin-bottom:1.25rem; opacity:0; transform:translateY(8px); animation:sadnin .45s .02s cubic-bezier(.22,1,.36,1) forwards; transition:color .15s; }
+        .sadn-back:hover { color:#991B1B; }
+        
+        .sadn-header { margin-bottom:1.5rem; opacity:0; transform:translateY(10px); animation:sadnin .5s .06s cubic-bezier(.22,1,.36,1) forwards; }
+        
+        .sadn-eyebrow { font-size:.67rem; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#DC2626; margin-bottom:.35rem; display:flex; align-items:center; gap:.4rem; }
+        .sadn-dot { width:6px; height:6px; background:#EF4444; border-radius:50%; animation:sadnpulse 2s ease-in-out infinite; }
+        @keyframes sadnpulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+        
+        .sadn-title { font-family:'Cormorant Garamond',serif; font-size:clamp(1.45rem,3vw,1.9rem); font-weight:700; color:#111827; letter-spacing:-.02em; line-height:1.15; }
+        .sadn-title span { background:linear-gradient(135deg,#991B1B,#DC2626); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+        
+        .sadn-panel { background:rgba(253,253,255,.94); backdrop-filter:blur(14px); border-radius:22px; border:1px solid rgba(220,38,38,.1); box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset; overflow:hidden; opacity:0; transform:translateY(10px); animation:sadnin .5s .12s cubic-bezier(.22,1,.36,1) forwards; }
+        
+        .sadn-panel-head { padding:1rem 1.5rem; border-bottom:1px solid rgba(220,38,38,.08); display:flex; align-items:center; gap:.55rem; background:rgba(254,242,242,.3); }
+        .sadn-panel-ico { width:30px; height:30px; border-radius:9px; background:linear-gradient(135deg,#991B1B,#DC2626); display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 3px 10px rgba(220,38,38,.3); }
+        .sadn-panel-title { font-size:.76rem; font-weight:900; letter-spacing:.09em; text-transform:uppercase; color:#B91C1C; }
+        
+        .sadn-panel-body { padding:1.75rem 1.5rem; }
+        @media(max-width:540px){ .sadn-panel-body { padding:1.25rem 1.1rem; } }
+        
+        .sadn-error { display:flex; align-items:flex-start; gap:.6rem; padding:.9rem 1.1rem; background:#FEF2F2; border:1px solid #FECACA; border-radius:12px; color:#B91C1C; font-size:.82rem; font-weight:800; margin-bottom:1.5rem; line-height:1.5; }
+        
+        @keyframes sadnin { to{opacity:1;transform:translateY(0)} }
       `}</style>
 
       <div className="sadn-wrap">

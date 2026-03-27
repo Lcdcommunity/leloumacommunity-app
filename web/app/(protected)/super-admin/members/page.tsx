@@ -83,8 +83,6 @@ function Initials({ name, url }: { name: string; url?: string | null }) {
 }
 
 /* ══════════════════════════════════════════════════════ ICON BUTTONS */
-
-/** Bouton icône générique avec tooltip */
 function IconBtn({
   onClick, disabled, title, color, bg, border, hoverBg, children,
 }: {
@@ -128,7 +126,6 @@ function IconBtn({
       >
         {children}
       </button>
-      {/* Tooltip */}
       {hovered && (
         <div style={{
           position: 'absolute',
@@ -155,42 +152,13 @@ function IconBtn({
 }
 
 /* ══════════════════════════════════════════════════════ SVG ICONS */
-const IconEdit = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-  </svg>
-);
-const IconApprove = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-const IconSuspend = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-const IconReactivate = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
-const IconDelete = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>
-);
-const IconSave = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-  </svg>
-);
-const IconCancel = () => (
-  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
+const IconEdit = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
+const IconApprove = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const IconSuspend = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const IconReactivate = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const IconDelete = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+const IconSave = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>;
+const IconCancel = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
 
 /* ══════════════════════════════════════════════════════ DETAIL FIELD */
 function DetailField({
@@ -262,62 +230,46 @@ function MemberDetails({
           </div>
         </div>
 
-        {/* ── ACTION ICONS — always visible, all on one row ── */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', flexShrink: 0 }}>
           {isEditing ? (
             <>
-              <IconBtn onClick={onSave} disabled={busy} title="Enregistrer" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5">
-                <IconSave />
-              </IconBtn>
-              <IconBtn onClick={onCancel} disabled={busy} title="Annuler" color="#6B7280" bg="#F9FAFB" border="#E5E7EB" hoverBg="#F3F4F6">
-                <IconCancel />
-              </IconBtn>
+              <IconBtn onClick={onSave} disabled={busy} title="Enregistrer" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5"><IconSave /></IconBtn>
+              <IconBtn onClick={onCancel} disabled={busy} title="Annuler" color="#6B7280" bg="#F9FAFB" border="#E5E7EB" hoverBg="#F3F4F6"><IconCancel /></IconBtn>
             </>
           ) : (
-            <>{/* Modifier */}
-              <IconBtn onClick={onEdit} title="Modifier" color="#2563EB" bg="#EFF6FF" border="#BFDBFE" hoverBg="#DBEAFE">
-                <IconEdit />
-              </IconBtn>
-
-              {/* Valider le compte — visible seulement si pertinent */}
+            <>
+              <IconBtn onClick={onEdit} title="Modifier" color="#2563EB" bg="#EFF6FF" border="#BFDBFE" hoverBg="#DBEAFE"><IconEdit /></IconBtn>
               {canApprove && (
-                <IconBtn onClick={onApprove} disabled={busy} title="Valider le compte" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5">
-                  <IconApprove />
-                </IconBtn>
+                <IconBtn onClick={onApprove} disabled={busy} title="Valider le compte" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5"><IconApprove /></IconBtn>
               )}
-
-              {/* Suspendre / Réactiver */}
               {user.status === 'SUSPENDED' ? (
-                <IconBtn onClick={onToggleSuspend} disabled={busy} title="Réactiver le compte" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5">
-                  <IconReactivate />
-                </IconBtn>
+                <IconBtn onClick={onToggleSuspend} disabled={busy} title="Réactiver le compte" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5"><IconReactivate /></IconBtn>
               ) : (
-                <IconBtn onClick={onToggleSuspend} disabled={busy} title="Suspendre le compte" color="#D97706" bg="#FFFBEB" border="#FDE68A" hoverBg="#FEF3C7">
-                  <IconSuspend />
-                </IconBtn>
-              )}
-
-              {/* Supprimer */}
-              <IconBtn onClick={onDelete} disabled={busy} title="Supprimer le compte" color="#DC2626" bg="#FEF2F2" border="#FECACA" hoverBg="#FEE2E2">
-                <IconDelete />
-              </IconBtn>
+                <IconBtn onClick={onToggleSuspend} disabled={busy} title="Suspendre le compte" color="#D97706" bg="#FFFBEB" border="#FDE68A" hoverBg="#FEF3C7"><IconSuspend /></IconBtn>
+              )}              
+              <IconBtn onClick={onDelete} disabled={busy} title="Supprimer le compte" color="#DC2626" bg="#FEF2F2" border="#FECACA" hoverBg="#FEE2E2"><IconDelete /></IconBtn>
             </>
           )}
         </div>
       </div>
 
-      {/* Fields grid */}
+      {/* Fields grid - Structuré sur 2 colonnes avec des rangées complètes pour Email et Adresse */}
       <div className="sm-dp-grid">
         <DetailField label="Prénom" fieldKey="firstName" isEditing={isEditing} editValue={editValues.firstName as string} origValue={user.firstName} onChange={handleChange} />
         <DetailField label="Nom" fieldKey="lastName" isEditing={isEditing} editValue={editValues.lastName as string} origValue={user.lastName} onChange={handleChange} />
-        <DetailField label="Email" fieldKey="email" type="email" isEditing={isEditing} editValue={editValues.email as string} origValue={user.email} onChange={handleChange} />
+        
+        <div className="col-span-2">
+          <DetailField label="Email" fieldKey="email" type="email" isEditing={isEditing} editValue={editValues.email as string} origValue={user.email} onChange={handleChange} />
+        </div>
+
         <DetailField label="Téléphone" fieldKey="phone" placeholder="+33 6…" isEditing={isEditing} editValue={editValues.phone as string} origValue={user.phone} onChange={handleChange} />
         <DetailField label="Date de naissance" fieldKey="birthDate" type="date" isEditing={isEditing} editValue={editValues.birthDate as string} origValue={user.birthDate ? formatDate(user.birthDate) : null} onChange={handleChange} />
+        
         <DetailField label="Commune d'origine" fieldKey="originSubPrefecture" placeholder="Ex: Lafou" isEditing={isEditing} editValue={editValues.originSubPrefecture as string} origValue={user.originSubPrefecture} onChange={handleChange} />
         <DetailField label="Ville de résidence" fieldKey="city" isEditing={isEditing} editValue={editValues.city as string} origValue={user.city} onChange={handleChange} />
+        
         <DetailField label="Pays" fieldKey="country" isEditing={isEditing} editValue={editValues.country as string} origValue={user.country} onChange={handleChange} />
 
-        {/* Poste occupé */}
         <div className="sm-dp-field">
           <label>Poste occupé dans l&apos;asso</label>
           {isEditing ? (
@@ -334,8 +286,7 @@ function MemberDetails({
           )}
         </div>
 
-        {/* Adresse */}
-        <div className="sm-dp-field" style={{ gridColumn: '1 / -1' }}>
+        <div className="sm-dp-field col-span-2">
           <label>Adresse postale</label>
           {isEditing ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
@@ -352,7 +303,6 @@ function MemberDetails({
         </div>
       </div>
 
-      {/* Busy spinner */}
       {busy && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.75rem', color: '#6B7280', fontWeight: 600, fontFamily: "'DM Sans',sans-serif", padding: '.5rem 0 0' }}>
           <div style={{ width: 12, height: 12, border: '2px solid #E5E7EB', borderTopColor: '#DC2626', borderRadius: '50%', animation: 'smspin .7s linear infinite' }} />
@@ -379,7 +329,7 @@ export default function SuperAdminMembersPage() {
   const load = useCallback(async (qVal?: string, sVal?: string) => {
     setError(null); setLoading(true);
     try {
-      const res = await api.listMembers({ page: 1, pageSize: 100, q: (qVal ?? q) || undefined, status: (sVal ?? status) || undefined });
+      const res = await api.listMembers({ page: 1, pageSize: 100, q: qVal ?? q, status: sVal ?? status });
       setItems(res.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement membres');
@@ -397,7 +347,7 @@ export default function SuperAdminMembersPage() {
 
   const handleSaveEdit = async (id: string) => {
     setActionBusy(true);
-    try { await api.updateUserSuperAdmin(id, editValues); setEditingId(null); await load(); }
+    try { await api.updateUserSuperAdmin(id, editValues); setEditingId(null); await load(q, status); }
     catch (err) { alert(err instanceof Error ? err.message : 'Erreur de modification'); }
     finally { setActionBusy(false); }
   };
@@ -407,14 +357,14 @@ export default function SuperAdminMembersPage() {
     try {
       if (user.status === 'SUSPENDED') await api.activateUserSuperAdmin(user.id);
       else await api.suspendUserSuperAdmin(user.id);
-      await load();
+      await load(q, status);
     } catch (err) { alert(err instanceof Error ? err.message : 'Erreur changement statut'); }
     finally { setActionBusy(false); }
   };
 
   const handleApprove = async (user: ExtendedUser) => {
     setActionBusy(true);
-    try { await api.approveMemberAccount(user.id); await load(); }
+    try { await api.approveMemberAccount(user.id); await load(q, status); }
     catch (err) { alert(err instanceof Error ? err.message : 'Erreur validation compte'); }
     finally { setActionBusy(false); }
   };
@@ -422,7 +372,7 @@ export default function SuperAdminMembersPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer définitivement ce compte ?')) return;
     setActionBusy(true);
-    try { await api.deleteUserSuperAdmin(id); setExpandedId(null); await load(); }
+    try { await api.deleteUserSuperAdmin(id); setExpandedId(null); await load(q, status); }
     catch (err) { alert(err instanceof Error ? err.message : 'Erreur suppression'); }
     finally { setActionBusy(false); }
   };
@@ -498,26 +448,32 @@ export default function SuperAdminMembersPage() {
         .sm-mc-badges{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem}
         .sm-mc-footer{font-size:.72rem;font-weight:600;color:#9CA3AF;font-family:'DM Mono',monospace}
 
-        /* Detail panel */
+        /* Detail panel - Nouvelle Grille */
         .sm-dp-row{background:#FEF2F2;border-bottom:1px solid rgba(220,38,38,.1)}
         .sm-dp-container{padding:1.5rem 1.5rem 1.2rem;border-radius:16px;background:white;margin:.8rem 1.2rem 1.2rem;border:1px solid rgba(220,38,38,.1);box-shadow:0 4px 20px rgba(220,38,38,.06);animation:smin .3s forwards}
         @media(max-width:680px){.sm-dp-container{margin:.8rem 0 0;padding:1.2rem 1rem}}
+        
         .sm-dp-header{display:flex;align-items:flex-start;gap:1rem;margin-bottom:1.25rem;padding-bottom:1rem;border-bottom:1px solid #F3F4F6}
         .sm-dp-photo-lg{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#991B1B,#DC2626);color:white;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;flex-shrink:0;box-shadow:0 4px 10px rgba(220,38,38,.2);overflow:hidden}
         .sm-dp-photo-lg img{width:100%;height:100%;object-fit:cover}
         .sm-dp-name{font-size:1rem;font-weight:800;color:#111827}
         .sm-dp-id{font-size:.72rem;font-weight:600;color:#6B7280;margin-top:.15rem}
         .sm-dp-mono{font-family:'DM Mono',monospace;color:#DC2626;font-weight:700;background:#FEF2F2;padding:.1rem .4rem;border-radius:4px}
+        
+        /* Grille à 2 colonnes par défaut */
         .sm-dp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem;margin-bottom:.5rem}
-        @media(max-width:540px){.sm-dp-grid{grid-template-columns:1fr}}
+        /* Classe pour prendre toute la ligne (Email, Adresse) */
+        .col-span-2 { grid-column: span 2; }
+        @media(max-width:540px){
+          .sm-dp-grid { grid-template-columns: 1fr; }
+          .col-span-2 { grid-column: span 1; }
+        }
+
         .sm-dp-field{display:flex;flex-direction:column;gap:.3rem}
         .sm-dp-field label{font-size:.63rem;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.05em}
         .sm-dp-value{font-size:.85rem;font-weight:600;color:#111827}
         .sm-dp-input{height:38px;border-radius:8px;border:1px solid #D1D5DB;padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;color:#111827;width:100%;outline:none;transition:border .2s;box-sizing:border-box}
         .sm-dp-input:focus{border-color:#DC2626;box-shadow:0 0 0 3px rgba(220,38,38,.1)}
-
-        /* Separator between icon groups */
-        .sm-icon-sep{width:1px;height:20px;background:#E5E7EB;margin:0 .1rem;flex-shrink:0}
 
         .sm-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .sm-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:smspin .8s linear infinite}
@@ -563,7 +519,7 @@ export default function SuperAdminMembersPage() {
             </div>
           </div>
 
-          {/* Toolbar */}
+          {/* Toolbar avec Filtre et Recherche */}
           <div className="sm-toolbar">
             <div className="sm-field sm-field-grow">
               <label className="sm-label">Recherche</label>
@@ -571,12 +527,28 @@ export default function SuperAdminMembersPage() {
                 <span className="sm-si">
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
                 </span>
-                <input className="sm-input" type="text" placeholder="Nom, email…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void load(q, status)} />
+                <input 
+                  className="sm-input" 
+                  type="text" 
+                  placeholder="Nom, email…" 
+                  value={q} 
+                  onChange={(e) => setQ(e.target.value)} 
+                  onKeyDown={(e) => e.key === 'Enter' && void load(q, status)} 
+                />
               </div>
             </div>
+            
             <div className="sm-field">
               <label className="sm-label">Statut</label>
-              <select className="sm-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <select 
+                className="sm-select" 
+                value={status} 
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setStatus(val);
+                  void load(q, val); // Le filtre se déclenche instantanément au changement !
+                }}
+              >
                 <option value="">Tous les statuts</option>
                 <option value="PENDING_EMAIL_VERIFICATION">Email non vérifié</option>
                 <option value="PENDING_APPROVAL">En attente d&apos;approbation</option>
@@ -585,6 +557,7 @@ export default function SuperAdminMembersPage() {
                 <option value="REJECTED">Rejeté</option>
               </select>
             </div>
+            
             <button className="sm-filter-btn" disabled={loading} onClick={() => void load(q, status)}>
               {loading
                 ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'smspin .7s linear infinite' }} />Chargement…</>

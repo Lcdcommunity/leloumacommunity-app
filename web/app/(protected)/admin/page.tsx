@@ -323,9 +323,7 @@ export default function AntennaAdminDashboard() {
         .ad-date{font-size:.78rem;font-weight:600;color:#6B7280;background:rgba(37,99,235,.05);border:1px solid rgba(37,99,235,.12);border-radius:8px;padding:.45rem .85rem;white-space:nowrap}
 
         /* ── Stats Grids ── */
-        .ad-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin-bottom: 1.75rem; }
-        .ad-stats-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.85rem; margin-bottom: 1.75rem; }
-        .ad-stats-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem; margin-bottom: 1.75rem; }
+        .ad-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem; margin-bottom: 1.75rem; }
 
         .ad-section-label{font-size:.65rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9CA3AF;margin:0 0 .65rem;display:flex;align-items:center;gap:.5rem;width:100%}
         .ad-section-label::after{content:'';flex:1;height:1px;background:rgba(0,0,0,.06)}
@@ -368,20 +366,19 @@ export default function AntennaAdminDashboard() {
         .ad-stat-sub.up{color:#059669}
 
         @media(max-width:900px){
-          .ad-stats-4 { grid-template-columns: repeat(2, 1fr); }
+          .ad-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.7rem; }
         }
 
-        /* Responsive Mobile Centré */
+        /* Responsive Mobile Centré avec 3 colonnes forcées */
         @media(max-width:768px){
-          .ad-stats, .ad-stats-4 { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
-          .ad-stats-2 { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
-          .ad-stat-card { padding: 1.2rem 0.6rem !important; border-radius: 14px !important; }
-          .ad-stat-value { font-size: 1.5rem !important; }
-          .ad-stat-label { font-size: 0.6rem !important; }
-          .ad-stat-sub   { font-size: 0.6rem !important; }
-          .ad-stat-icon  { width: 32px !important; height: 32px !important; border-radius: 8px !important; }
-          .ad-stat-icon svg { width: 16px; height: 16px; }
-          .ad-stat-top { gap: 0.4rem !important; margin-bottom: 0.6rem !important; }
+          .ad-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+          .ad-stat-card { padding: 0.85rem 0.3rem !important; border-radius: 12px !important; }
+          .ad-stat-value { font-size: 1.15rem !important; margin-bottom: 0.2rem !important; }
+          .ad-stat-label { font-size: 0.5rem !important; letter-spacing: 0 !important; line-height: 1.2 !important; }
+          .ad-stat-sub   { font-size: 0.55rem !important; gap: 0.15rem !important; }
+          .ad-stat-icon  { width: 28px !important; height: 28px !important; border-radius: 7px !important; }
+          .ad-stat-icon svg { width: 14px; height: 14px; }
+          .ad-stat-top { gap: 0.25rem !important; margin-bottom: 0.4rem !important; }
         }
 
         .ad-bottom{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
@@ -470,52 +467,29 @@ export default function AntennaAdminDashboard() {
             </div>
           </div>
 
-          {/* Stats générales */}
-          <span className="ad-section-label">Indicateurs de l&apos;antenne</span>
-          <div className="ad-stats">
-            {stats.slice(0, 3).map((s, i) => (
-              <div key={s.label} className={`ad-stat-card${s.urgent ? " urgent" : ""}${s.clickable ? " ad-stat-clickable" : ""}`} style={{ animationDelay: `${0.08 + i * 0.06}s` }} onClick={s.onClick}>
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${s.color},${s.color}55)`, borderRadius: "18px 18px 0 0" }} />
-                <div className="ad-stat-top">
-                  {/* Icône placée au-dessus du label pour le centrage */}
-                  <div className="ad-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                  <span className="ad-stat-label">{s.label}</span>
+          {/* Toutes les statistiques regroupées dans une grille unique de 3 par ligne */}
+          <div className="ad-stats-grid">
+            {stats.map((s, i) => {
+              const isCurrency = FIXED_CURRENCIES.some((c) => c.label === s.label);
+              return (
+                <div 
+                  key={s.label} 
+                  className={`ad-stat-card${s.urgent ? " urgent" : ""}${s.clickable ? " ad-stat-clickable" : ""}${isCurrency ? " ad-stat-currency" : ""}`} 
+                  style={{ animationDelay: `${0.08 + i * 0.06}s` }} 
+                  onClick={s.onClick}
+                  role={s.clickable ? "button" : undefined}
+                  tabIndex={s.clickable ? 0 : undefined}
+                >
+                  <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${s.color},${s.color}55)`, borderRadius: "18px 18px 0 0" }} />
+                  <div className="ad-stat-top">
+                    <div className="ad-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                    <span className="ad-stat-label">{s.label}</span>
+                  </div>
+                  <div className="ad-stat-value" style={{ color: s.urgent || isCurrency ? s.color : "#111827" }}>{s.value}</div>
+                  <div className={`ad-stat-sub${s.trendUp === true ? " up" : ""}`}>{s.sub}</div>
                 </div>
-                <div className="ad-stat-value" style={{ color: s.urgent ? s.color : "#111827" }}>{s.value}</div>
-                <div className={`ad-stat-sub${s.trendUp === true ? " up" : ""}`}>{s.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* 4 cartes de soldes fixes */}
-          <span className="ad-section-label">Soldes par devise</span>
-          <div className="ad-stats-4">
-            {stats.slice(3, 7).map((s, i) => (
-              <div key={s.label} className={`ad-stat-card ad-stat-currency ad-stat-clickable`} style={{ animationDelay: `${0.28 + i * 0.07}s` }} onClick={s.onClick} role="button" tabIndex={0}>
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${s.color},${s.color}55)`, borderRadius: "18px 18px 0 0" }} />
-                <div className="ad-stat-top">
-                  <div className="ad-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                  <span className="ad-stat-label">{s.label}</span>
-                </div>
-                <div className="ad-stat-value" style={{ color: s.color }}>{s.value}</div>
-                <div className="ad-stat-sub">{s.sub}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Stats fin : projets + taux */}
-          <div className="ad-stats-2" style={{ marginBottom: "1.75rem" }}>
-            {stats.slice(7).map((s, i) => (
-              <div key={s.label} className={`ad-stat-card${s.urgent ? " urgent" : ""}`} style={{ animationDelay: `${0.56 + i * 0.06}s` }}>
-                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${s.color},${s.color}55)`, borderRadius: "18px 18px 0 0" }} />
-                <div className="ad-stat-top">
-                  <div className="ad-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                  <span className="ad-stat-label">{s.label}</span>
-                </div>
-                <div className="ad-stat-value">{s.value}</div>
-                <div className="ad-stat-sub">{s.sub}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="ad-bottom">

@@ -85,7 +85,7 @@ export class MemberService {
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
-    const [totalMyContributions, activeProjects, virtualCard] = await Promise.all([
+    const [totalMyContributions, activeProjects, virtualCard, allAntennas] = await Promise.all([
       this.prisma.contribution.aggregate({
         where: {
           memberUserId: userId,
@@ -114,7 +114,28 @@ export class MemberService {
           },
         },
       }),
+      // 👇 AJOUT CHIRURGICAL : On récupère toutes les antennes de l'association pour la transparence
+      this.prisma.antenna.findMany({
+        where: { associationId: me.associationId, isActive: true },
+        select: { id: true, name: true, defaultCurrency: true }
+      })
     ]);
+
+    // 👇 AJOUT CHIRURGICAL : On calcule le solde de chaque antenne
+    const antennaBalances = await Promise.all(
+      allAntennas.map(async (ant) => {
+        const agg = await this.prisma.contribution.aggregate({
+          where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
+          _sum: { amount: true }
+        });
+        return {
+          id: ant.id,
+          name: ant.name,
+          balance: Number(agg._sum.amount ?? 0),
+          currency: ant.defaultCurrency || 'EUR' // Fallback
+        };
+      })
+    );
 
     let cardData = null;
 
@@ -147,6 +168,7 @@ export class MemberService {
         activeProjects,
       },
       virtualCard: cardData,
+      antennaBalances, // 👇 AJOUT CHIRURGICAL : Le front va enfin recevoir ce tableau pour remplir les cartes !
     };
   }
 
@@ -226,7 +248,7 @@ export class MemberService {
         antennaId: me.antennaId,
         memberUserId: me.id,
         amount: new Prisma.Decimal(dto.amount),
-        currency: 'EUR',
+        currency: 'EUR', // Note : Ici la devise est encore forcée, vous pourrez dynamiser cela plus tard si besoin
         paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
         externalReference: autoReference,
         contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
