@@ -37,11 +37,11 @@ const METHOD_MAP: Record<string, string> = {
 
 function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('OTHER'); // Valeur par défaut
+  const [category, setCategory] = useState('OTHER');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState('CASH'); // Valeur par défaut
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -344,20 +344,28 @@ export default function AntennaAdminExpensesPage() {
         .ae-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: 0.75rem; color: #6B7280; font-size: 0.85rem; font-weight: 700; }
         .ae-ring { width: 24px; height: 24px; border: 2.5px solid rgba(37,99,235,0.12); border-top-color: #2563EB; border-radius: 50%; animation: aespin 0.8s linear infinite; }
 
-        /* ── CORRECTIONS MOBILE (Zéro scroll, cartes alignées) ── */
+        /* ── CORRECTIONS MOBILE (Zéro scroll, cartes alignées, filtres alignés) ── */
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
           .ae-grid-2 { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
           
           /* Cartes sur la même ligne */
-          .ae-stats { gap: 0.4rem; }
-          .ae-stat { padding: 0.6rem 0.5rem; border-radius: 12px; text-align: center; }
+          .ae-stats { gap: 0.4rem; grid-template-columns: repeat(3, 1fr); }
+          .ae-stat { padding: 0.6rem 0.3rem; border-radius: 12px; text-align: center; }
           .ae-stat-val { font-size: 1.1rem; }
           .ae-stat-lbl { font-size: 0.55rem; }
 
+          /* Filtres sur la même ligne avec scroll horizontal doux si besoin */
+          .ae-toolbar { flex-wrap: nowrap; gap: 0.4rem; padding: 0.8rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
+          .ae-toolbar::-webkit-scrollbar { display: none; }
+          .ae-filter-field { min-width: 0; flex: 1; }
+          .ae-filter-lbl { font-size: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+          .ae-filter-input, .ae-filter-select { height: 36px; font-size: 0.75rem; padding: 0 0.4rem; }
+          .ae-filter-select { padding-right: 1.2rem; background-position: right 0.3rem center; background-size: 10px; }
+
           /* Pas de scroll horizontal tableau */
           .ae-table th, .ae-table td { padding: 0.6rem 0.4rem; }
-          .ae-td-title { max-width: 120px; font-size: 0.8rem; }
+          .ae-td-title { max-width: 130px; font-size: 0.8rem; }
           .ae-td-cat { font-size: 0.65rem; }
           .ae-td-amount { font-size: 0.75rem; }
           .ae-status { font-size: 0.55rem !important; padding: 0.15rem 0.3rem !important; }
@@ -396,7 +404,7 @@ export default function AntennaAdminExpensesPage() {
               <div className="ae-panel-ico">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
               </div>
-              <span className="ae-panel-title">Historique des dépenses</span>
+              <span className="ae-panel-title">Historique</span>
             </div>
             <button className="ae-new-btn" onClick={() => setIsCreateOpen(true)}>
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
