@@ -19,10 +19,10 @@ const CATEGORY_MAP: Record<string, string> = {
 };
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  PENDING_VALIDATION: { label: 'En attente (Super Admin)', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  VALIDATED:          { label: 'Validée (Débitée)',        color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  REJECTED:           { label: 'Rejetée',                  color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  CANCELLED:          { label: 'Annulée',                  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  VALIDATED:          { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  REJECTED:           { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  CANCELLED:          { label: 'Annulée',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
 };
 
 const METHOD_MAP: Record<string, string> = {
@@ -37,11 +37,11 @@ const METHOD_MAP: Record<string, string> = {
 
 function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState('OTHER'); // Valeur par défaut
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('CASH'); // Valeur par défaut
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,7 +103,6 @@ function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuc
             <div className="ae-field">
               <label>Catégorie <span>*</span></label>
               <select className="ae-select" value={category} onChange={(e) => setCategory(e.target.value)} required>
-                <option value="" disabled>Sélectionnez une catégorie</option>
                 {Object.entries(CATEGORY_MAP).map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
                 ))}
@@ -119,7 +118,6 @@ function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuc
             <div className="ae-field">
               <label>Méthode de paiement</label>
               <select className="ae-select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
-                <option value="">Sélectionnez une méthode</option>
                 {Object.entries(METHOD_MAP).map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
                 ))}
@@ -279,7 +277,6 @@ export default function AntennaAdminExpensesPage() {
         .ae-title span { background: linear-gradient(135deg, #1D4ED8, #3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
         .ae-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards; }
-        @media (max-width: 768px) { .ae-stats { grid-template-columns: 1fr; } }
         .ae-stat { background: rgba(253,253,255,0.9); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(37,99,235,0.09); border-top: 3px solid; padding: 1.1rem 1.25rem; box-shadow: 0 4px 12px rgba(37,99,235,0.04); }
         .ae-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.85rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
         .ae-stat-lbl { font-size: 0.65rem; font-weight: 800; color: #6B7280; text-transform: uppercase; letter-spacing: 0.08em; }
@@ -307,7 +304,7 @@ export default function AntennaAdminExpensesPage() {
         .ae-row:hover { background: rgba(37,99,235,0.03); }
         .ae-row:last-child { border-bottom: none; }
         .ae-table td { padding: 0.95rem 1.4rem; font-size: 0.84rem; color: #1F2937; vertical-align: middle; }
-        .ae-td-title { font-weight: 800; color: #111827; max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ae-td-title { font-weight: 800; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
         .ae-td-cat { font-size: 0.72rem; color: #6B7280; font-weight: 600; margin-top: 0.2rem; }
         .ae-td-amount { font-family: 'DM Mono', monospace; font-weight: 800; font-size: 0.9rem; }
         .ae-td-date { font-size: 0.78rem; font-weight: 600; color: #6B7280; }
@@ -321,8 +318,7 @@ export default function AntennaAdminExpensesPage() {
         .ae-modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
 
         .ae-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; margin-bottom: 1.25rem; }
-        @media (max-width: 540px) { .ae-grid-2 { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; } }
-
+        
         .ae-field { display: flex; flex-direction: column; gap: 0.35rem; }
         .ae-field label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #1D4ED8; }
         .ae-field label span { color: #9CA3AF; text-transform: none; font-weight: 500; font-size: 0.6rem; margin-left: 0.2rem; }
@@ -348,9 +344,23 @@ export default function AntennaAdminExpensesPage() {
         .ae-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: 0.75rem; color: #6B7280; font-size: 0.85rem; font-weight: 700; }
         .ae-ring { width: 24px; height: 24px; border: 2.5px solid rgba(37,99,235,0.12); border-top-color: #2563EB; border-radius: 50%; animation: aespin 0.8s linear infinite; }
 
+        /* ── CORRECTIONS MOBILE (Zéro scroll, cartes alignées) ── */
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
-          .ae-table th, .ae-table td { padding: 0.8rem 0.6rem; }
+          .ae-grid-2 { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
+          
+          /* Cartes sur la même ligne */
+          .ae-stats { gap: 0.4rem; }
+          .ae-stat { padding: 0.6rem 0.5rem; border-radius: 12px; text-align: center; }
+          .ae-stat-val { font-size: 1.1rem; }
+          .ae-stat-lbl { font-size: 0.55rem; }
+
+          /* Pas de scroll horizontal tableau */
+          .ae-table th, .ae-table td { padding: 0.6rem 0.4rem; }
+          .ae-td-title { max-width: 120px; font-size: 0.8rem; }
+          .ae-td-cat { font-size: 0.65rem; }
+          .ae-td-amount { font-size: 0.75rem; }
+          .ae-status { font-size: 0.55rem !important; padding: 0.15rem 0.3rem !important; }
         }
 
         @keyframes aein { to { opacity: 1; transform: translateY(0); } }
@@ -368,15 +378,15 @@ export default function AntennaAdminExpensesPage() {
         <div className="ae-stats">
           <div className="ae-stat" style={{ borderTopColor: '#2563EB' }}>
             <div className="ae-stat-val" style={{ color: '#1E3A8A' }}>{items.length}</div>
-            <div className="ae-stat-lbl">Dépenses enregistrées</div>
+            <div className="ae-stat-lbl">Enregistrées</div>
           </div>
           <div className="ae-stat" style={{ borderTopColor: '#059669' }}>
             <div className="ae-stat-val" style={{ color: '#047857' }}>{formatCurrency(totalAmount, items[0]?.currency || 'EUR')}</div>
-            <div className="ae-stat-lbl">Total Validé (Débité)</div>
+            <div className="ae-stat-lbl">Total Validé</div>
           </div>
           <div className="ae-stat" style={{ borderTopColor: '#D97706' }}>
             <div className="ae-stat-val" style={{ color: '#B45309' }}>{pendingCount}</div>
-            <div className="ae-stat-lbl">En attente (Super Admin)</div>
+            <div className="ae-stat-lbl">En attente</div>
           </div>
         </div>
 
@@ -390,7 +400,7 @@ export default function AntennaAdminExpensesPage() {
             </div>
             <button className="ae-new-btn" onClick={() => setIsCreateOpen(true)}>
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-              Nouvelle dépense
+              <span className="hide-mobile" style={{ marginLeft: 4 }}>Nouvelle dépense</span>
             </button>
           </div>
 
@@ -434,39 +444,37 @@ export default function AntennaAdminExpensesPage() {
               <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#4B5563' }}>Aucune dépense trouvée</div>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="ae-table">
-                <thead>
-                  <tr>
-                    <th>Motif</th>
-                    <th className="hide-mobile">Date</th>
-                    <th>Montant</th>
-                    <th>Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((expense) => {
-                    const s = STATUS_MAP[expense.status] || { label: expense.status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
-                    return (
-                      <tr key={expense.id} className="ae-row" onClick={() => setSelectedExpense(expense)}>
-                        <td>
-                          <div className="ae-td-title">{expense.title}</div>
-                          <div className="ae-td-cat">{CATEGORY_MAP[expense.category] ?? expense.category}</div>
-                        </td>
-                        <td className="hide-mobile"><span className="ae-td-date">{formatDate(expense.expenseDate)}</span></td>
-                        <td><span className="ae-td-amount" style={{ color: s.color }}>{formatCurrency(expense.amount, expense.currency)}</span></td>
-                        <td>
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.62rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.15rem 0.5rem', whiteSpace: 'nowrap' }}>
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }} />
-                            {s.label}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <table className="ae-table">
+              <thead>
+                <tr>
+                  <th>Motif</th>
+                  <th className="hide-mobile">Date</th>
+                  <th>Montant</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((expense) => {
+                  const s = STATUS_MAP[expense.status] || { label: expense.status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
+                  return (
+                    <tr key={expense.id} className="ae-row" onClick={() => setSelectedExpense(expense)}>
+                      <td>
+                        <div className="ae-td-title">{expense.title}</div>
+                        <div className="ae-td-cat">{CATEGORY_MAP[expense.category] ?? expense.category}</div>
+                      </td>
+                      <td className="hide-mobile"><span className="ae-td-date">{formatDate(expense.expenseDate)}</span></td>
+                      <td><span className="ae-td-amount" style={{ color: s.color }}>{formatCurrency(expense.amount, expense.currency)}</span></td>
+                      <td>
+                        <span className="ae-status" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.62rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.15rem 0.5rem', whiteSpace: 'nowrap' }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }} />
+                          {s.label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </div>
