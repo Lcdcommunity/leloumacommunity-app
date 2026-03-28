@@ -6,7 +6,8 @@ import {
   ProjectStatus, 
   PostStatus, 
   UserRole, 
-  UserStatus 
+  UserStatus,
+  ExpenseStatus // <-- Requis pour lire les dépenses !
 } from '@prisma/client';
 
 @Injectable()
@@ -39,8 +40,8 @@ export class DashboardMemberService {
 
     const primaryAntennaId = me.memberships[0]?.antennaId ?? null;
 
-    // 2. Agrégations des contributions
-    const [aggAll, aggValidated, pendingCount, lastContribution, associationAgg] =
+    // 2. Agrégations des contributions du membre
+    const [aggAll, aggValidated, pendingCount, lastContribution] =
       await Promise.all([
         this.prisma.contribution.aggregate({
           where: { memberUserId: userId },
@@ -58,32 +59,39 @@ export class DashboardMemberService {
           orderBy: [{ createdAt: 'desc' }],
           select: { createdAt: true },
         }),
-        this.prisma.contribution.aggregate({
-          where: {
-            associationId: me.associationId,
-            status: ContributionStatus.VALIDATED,
-          },
-          _sum: { amount: true },
-        }),
       ]);
 
-    // 👇 2.5 CORRECTION CHIRURGICALE : Récupération correcte des soldes de TOUTES les antennes
+    // 👇 CORRECTION DÉFINITIVE : VRAI SOLDE (Cotisations historiques - Dépenses historiques)
     const allAntennas = await this.prisma.antenna.findMany({
       where: { associationId: me.associationId, isActive: true },
       select: { id: true, name: true, defaultCurrency: true }
     });
 
+    let totalAssociationBalance = 0;
+
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        const agg = await this.prisma.contribution.aggregate({
-          where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
-          _sum: { amount: true }
-        });
+        const [aggC, aggE] = await Promise.all([
+          // Toutes les entrées d'argent
+          this.prisma.contribution.aggregate({
+            where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
+            _sum: { amount: true }
+          }),
+          // Toutes les sorties d'argent (dépenses)
+          this.prisma.expense.aggregate({
+            where: { antennaId: ant.id, status: ExpenseStatus.VALIDATED },
+            _sum: { amount: true }
+          })
+        ]);
+        
+        const localBalance = Number(aggC._sum.amount ?? 0) - Number(aggE._sum.amount ?? 0);
+        totalAssociationBalance += localBalance;
+
         return {
           id: ant.id,
           name: ant.name,
-          balance: Number(agg._sum.amount ?? 0),
-          currency: ant.defaultCurrency || 'EUR' // Fallback sécurisé
+          balance: localBalance, // Le solde parfait !
+          currency: ant.defaultCurrency || 'EUR' 
         };
       })
     );
@@ -187,7 +195,7 @@ export class DashboardMemberService {
         myContributionsValidatedTotal: Number(aggValidated._sum.amount ?? 0),
         myPendingContributionsCount: pendingCount,
         myLastContributionAt: lastContribution?.createdAt?.toISOString() ?? null,
-        associationTotalBalance: Number(associationAgg._sum.amount ?? 0),
+        associationTotalBalance: totalAssociationBalance, 
         currency: 'EUR',
         lateMonths: (() => {
           const mine = recentContributions[0]?.createdAt ?? null;
@@ -206,7 +214,7 @@ export class DashboardMemberService {
         associationId: me.associationId,
         antennaId: primaryAntennaId,
       },
-      antennaBalances, // <-- Le tableau contenant les soldes (GNF, XOF, EUR, etc.) est maintenant correctement assigné
+      antennaBalances, 
       recentContributions: recentContributions.map((x) => ({
         ...x,
         amount: Number(x.amount),

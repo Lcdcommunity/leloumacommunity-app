@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/settings/page.tsx
+// web/app/(protected)/super-admin/settings/page.tsx
 'use client';
 
 import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
@@ -8,7 +8,8 @@ import { formatDate } from '../../../../lib/format';
 import type { Association } from '../../../../types/association';
 
 type Theme = 'light' | 'dark' | 'system';
-type PricingMap = Record<string, { monthlyQuota: string; membershipCard: string }>;
+// NOUVEAU: Ajout de expenseValidationThreshold dans la map de pricing
+type PricingMap = Record<string, { monthlyQuota: string; membershipCard: string; expenseValidationThreshold: string }>;
 const SUPPORTED_CURRENCIES = ['EUR', 'GNF', 'USD', 'XOF'];
 
 /* ══════════════════════════════════════════════════════ INFO ROW */
@@ -53,7 +54,7 @@ function StatusToggle({ checked, onChange, disabled = false }: { checked: boolea
   );
 }
 
-/* ══════════════════════════════════════════════════════ FIELD COMPONENT (Thème Rouge) */
+/* ══════════════════════════════════════════════════════ FIELD COMPONENT */
 function Field({
   label, value, onChange, placeholder, required = false, mono = false, hint, type = 'text', step, disabled = false
 }: {
@@ -149,6 +150,7 @@ export default function SuperAdminSettingsPage() {
   const [prefMsg, setPrefMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Settings Security
+  const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [secLoading, setSecLoading] = useState(false);
@@ -159,7 +161,8 @@ export default function SuperAdminSettingsPage() {
       try {
         const [a, pricingData] = await Promise.all([
           api.getAssociation(),
-          api.getPricingSuperAdmin().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)),
+          // On s'attend à recevoir expenseValidationThreshold dans l'objet par devise depuis l'API
+          api.getPricingSuperAdmin().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold?: number }>)),
         ]);
         
         setAssociation(a);
@@ -169,10 +172,11 @@ export default function SuperAdminSettingsPage() {
         
         const formattedMap: PricingMap = {};
         SUPPORTED_CURRENCIES.forEach(cur => {
-          const apiPrices = pricingData[cur] || { monthlyQuota: 0, membershipCard: 0 };
+          const apiPrices = pricingData[cur] || { monthlyQuota: 0, membershipCard: 0, expenseValidationThreshold: null };
           formattedMap[cur] = {
             monthlyQuota: apiPrices.monthlyQuota ? apiPrices.monthlyQuota.toString() : '',
             membershipCard: apiPrices.membershipCard ? apiPrices.membershipCard.toString() : '',
+            expenseValidationThreshold: apiPrices.expenseValidationThreshold ? apiPrices.expenseValidationThreshold.toString() : '',
           };
         });
 
@@ -186,7 +190,7 @@ export default function SuperAdminSettingsPage() {
     })();
   }, []);
 
-  const handlePricingChange = (field: 'monthlyQuota' | 'membershipCard', value: string) => {
+  const handlePricingChange = (field: keyof PricingMap[string], value: string) => {
     setPricingMap(prev => ({ ...prev, [activeCurrency]: { ...prev[activeCurrency], [field]: value } }));
   };
 
@@ -205,17 +209,18 @@ export default function SuperAdminSettingsPage() {
     e.preventDefault();
     setMsg(null); setLoading(true);
     try {
-      const payload: Record<string, { monthlyQuota: number; membershipCard: number }> = {};
+      const payload: Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold: number | null }> = {};
       SUPPORTED_CURRENCIES.forEach(cur => {
         payload[cur] = {
           monthlyQuota: Number(pricingMap[cur]?.monthlyQuota) || 0,
           membershipCard: Number(pricingMap[cur]?.membershipCard) || 0,
+          expenseValidationThreshold: pricingMap[cur]?.expenseValidationThreshold ? Number(pricingMap[cur]?.expenseValidationThreshold) : null,
         };
       });
 
       await Promise.all([
         api.updateAssociation({ name, code, isActive }),
-        api.updatePricingSuperAdmin(payload),
+        api.updatePricingSuperAdmin(payload), // Envoie le nouveau seuil avec les prix
       ]);
       
       const updated = await api.getAssociation();
@@ -235,7 +240,6 @@ export default function SuperAdminSettingsPage() {
     setPrefLoading(true);
     setPrefMsg(null);
     try {
-      // Simulation API pour les préférences Super Admin
       await new Promise(resolve => setTimeout(resolve, 1000));
       setPrefMsg({ type: 'success', text: 'Préférences enregistrées avec succès.' });
     } catch {
@@ -254,11 +258,11 @@ export default function SuperAdminSettingsPage() {
     }
     setSecLoading(true);
     try {
-      // Simulation API pour le password
       await new Promise(resolve => setTimeout(resolve, 1000));
       setSecMsg({ type: 'success', text: 'Mot de passe mis à jour avec succès.' });
       setPassword('');
       setConfirmPassword('');
+      setIsEditingPassword(false);
     } catch {
       setSecMsg({ type: 'error', text: 'Erreur lors de la mise à jour du mot de passe.' });
     } finally {
@@ -479,7 +483,7 @@ export default function SuperAdminSettingsPage() {
                         ))}
                       </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.25rem' }}>
                         <Field
                           label={`Cotisation (${activeCurrency})`}
                           value={pricingMap[activeCurrency]?.monthlyQuota || ''}
@@ -498,7 +502,18 @@ export default function SuperAdminSettingsPage() {
                           type="number"
                           step="0.01"
                           disabled={!isEditing}
-                          hint="Prix pour la carte annuelle."
+                          hint="Prix de la carte annuelle."
+                        />
+                        {/* NOUVEAU: Le champ seuil de validation intégré ici */}
+                        <Field
+                          label={`Seuil dépenses (${activeCurrency})`}
+                          value={pricingMap[activeCurrency]?.expenseValidationThreshold || ''}
+                          onChange={(val) => handlePricingChange('expenseValidationThreshold', val)}
+                          placeholder="Ex: 500"
+                          type="number"
+                          step="0.01"
+                          disabled={!isEditing}
+                          hint="Approbation requise au-delà."
                         />
                       </div>
 
@@ -681,50 +696,70 @@ export default function SuperAdminSettingsPage() {
                   </div>
                   <span className="ss-panel-title">Sécurité du compte</span>
                 </div>
+                {!isEditingPassword && (
+                  <button type="button" className="ss-edit-btn" onClick={() => setIsEditingPassword(true)}>
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    Modifier
+                  </button>
+                )}
               </div>
               <div className="ss-panel-body">
-                <form onSubmit={handlePasswordSubmit} className="ss-form-stack">
-                  <Field
-                    label="Nouveau mot de passe"
-                    type="password"
-                    value={password}
-                    onChange={setPassword}
-                    placeholder="Entrez votre nouveau mot de passe"
-                    required
-                    hint="Utilisez au moins 8 caractères."
-                  />
-                  <Field
-                    label="Confirmer nouveau mot de passe"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={setConfirmPassword}
-                    placeholder="Retapez le mot de passe"
-                    required
-                  />
+                {isEditingPassword ? (
+                  <form onSubmit={handlePasswordSubmit} className="ss-form-stack">
+                    <Field
+                      label="Nouveau mot de passe"
+                      type="password"
+                      value={password}
+                      onChange={setPassword}
+                      placeholder="Entrez votre nouveau mot de passe"
+                      required
+                      hint="Utilisez au moins 8 caractères."
+                    />
+                    <Field
+                      label="Confirmer nouveau mot de passe"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={setConfirmPassword}
+                      placeholder="Retapez le mot de passe"
+                      required
+                    />
 
-                  <div className="ss-form-footer" style={{ padding: '1rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>
-                    <div>
-                      {secMsg?.type === 'success' && (
-                        <div className="ss-msg-success">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          {secMsg.text}
-                        </div>
-                      )}
-                      {secMsg?.type === 'error' && (
-                        <div className="ss-msg-error">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
-                          {secMsg.text}
-                        </div>
-                      )}
+                    <div className="ss-form-footer" style={{ padding: '1rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>
+                      <div>
+                        {secMsg?.type === 'error' && (
+                          <div className="ss-msg-error">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+                            {secMsg.text}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.65rem' }}>
+                        <button type="button" onClick={() => { setIsEditingPassword(false); setPassword(''); setConfirmPassword(''); setSecMsg(null); }} className="ss-cancel-btn" disabled={secLoading}>
+                          Annuler
+                        </button>
+                        <button type="submit" className="ss-submit-btn" disabled={secLoading || !isPasswordDirty}>
+                          {secLoading
+                            ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'ssspin .7s linear infinite' }} />Mise à jour...</>
+                            : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>Mettre à jour</>
+                          }
+                        </button>
+                      </div>
                     </div>
-                    <button type="submit" className="ss-submit-btn" disabled={secLoading || !isPasswordDirty}>
-                      {secLoading
-                        ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'ssspin .7s linear infinite' }} />Mise à jour...</>
-                        : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>Mettre à jour</>
-                      }
-                    </button>
+                  </form>
+                ) : (
+                  <div style={{ fontSize: '0.85rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    Votre mot de passe est s&eacute;curis&eacute; et cach&eacute;. Cliquez sur &quot;Modifier&quot; pour le changer.
                   </div>
-                </form>
+                )}
+                {secMsg?.type === 'success' && !isEditingPassword && (
+                  <div className="ss-msg-success" style={{ marginTop: '1rem' }}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {secMsg.text}
+                  </div>
+                )}
               </div>
             </div>
 

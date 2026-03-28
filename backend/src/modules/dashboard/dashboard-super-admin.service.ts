@@ -1,7 +1,7 @@
-//backend/src/modules/dashboard/dashboard-super-admin.service.ts
+// backend/src/modules/dashboard/dashboard-super-admin.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserRole, ContributionStatus, ProjectStatus, UserStatus } from '@prisma/client';
+import { UserRole, ContributionStatus, ProjectStatus, UserStatus, ExpenseStatus } from '@prisma/client';
 
 @Injectable()
 export class DashboardSuperAdminService {
@@ -29,22 +29,32 @@ export class DashboardSuperAdminService {
       }),
     ]);
 
-    // 👇 AJOUT CHIRURGICAL : Récupération des soldes de toutes les antennes pour les cartes dynamiques
+    // On récupère TOUTES les antennes
     const allAntennas = await this.prisma.antenna.findMany({
-      where: { isActive: true },
       select: { id: true, name: true, defaultCurrency: true }
     });
 
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        const agg = await this.prisma.contribution.aggregate({
+        // 1. Total de TOUTES les cotisations validées (Historique inclus)
+        const inAgg = await this.prisma.contribution.aggregate({
           where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
           _sum: { amount: true }
         });
+        
+        // 2. Total de TOUTES les dépenses validées
+        const outAgg = await this.prisma.expense.aggregate({
+          where: { antennaId: ant.id, status: ExpenseStatus.VALIDATED },
+          _sum: { amount: true }
+        });
+
+        const totalIn = Number(inAgg._sum.amount ?? 0);
+        const totalOut = Number(outAgg._sum.amount ?? 0);
+
         return {
           id: ant.id,
           name: ant.name,
-          balance: Number(agg._sum.amount ?? 0),
+          balance: totalIn - totalOut, // Le VRAI solde positif
           currency: ant.defaultCurrency || 'GNF'
         };
       })
@@ -101,7 +111,7 @@ export class DashboardSuperAdminService {
         activeProjects: activeProjectsCount,
         totalValidatedContributionsAmount: Number(aggValidatedContributions._sum.amount ?? 0),
       },
-      antennaBalances, // <-- INJECTION DU TABLEAU DES SOLDES
+      antennaBalances,
       recentPendingAccounts,
       recentContributions: recentContributions.map((c) => ({
         ...c,

@@ -92,6 +92,49 @@ export interface FullUserProfile extends UserSummary {
   }> | null;
 }
 
+// --- TYPES LOCAUX POUR LES NOUVEAUX MODULES ---
+export interface Expense {
+  id: string;
+  amount: number;
+  currency: string;
+  category: string;
+  title: string;
+  description?: string | null;
+  expenseDate: string;
+  paymentMethod: string;
+  status: string;
+  rejectionReason?: string | null;
+  proofFileId?: string | null;
+  engagedByUserId: string;
+  validatedByUserId?: string | null;
+  createdAt: string;
+  engagedByUser?: { firstName: string; lastName: string; email: string };
+  proofFile?: { url: string; originalFilename: string } | null;
+  antenna?: { name: string }; // <-- LA CORRECTION EST ICI !
+}
+
+export interface EventItem {
+  id: string;
+  title: string;
+  description?: string | null;
+  type: string;
+  status: string;
+  startsAt: string;
+  endsAt?: string | null;
+  locationText?: string | null;
+  isOnline: boolean;
+  meetingLink?: string | null;
+  createdAt: string;
+}
+
+export interface Sponsor {
+  id: string;
+  name: string;
+  websiteUrl?: string | null;
+  contactEmail?: string | null;
+  isActive: boolean;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -117,6 +160,7 @@ export const api = {
     addressLine1?: string;
     addressLine2?: string;
     function?: string;
+    currency?: string; 
   }) =>
     http<{ id: string; message: string }, typeof body>('/public/signup', {
       method: 'POST',
@@ -219,16 +263,22 @@ export const api = {
     http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body }),
 
   // ==========================================
-  // TARIFICATION
+  // TARIFICATION & SAAS 
+  // ==========================================
+  // ==========================================
+  // TARIFICATION & SAAS 
   // ==========================================
   getPricingSuperAdmin: () =>
-    http<Record<string, { monthlyQuota: number; membershipCard: number }>>('/super-admin/settings/pricing'),
+    http<Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold?: number | null }>>('/super-admin/settings/pricing'),
 
-  updatePricingSuperAdmin: (body: Record<string, { monthlyQuota: number; membershipCard: number }>) =>
+  updatePricingSuperAdmin: (body: Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold?: number | null }>) =>
     http('/super-admin/settings/pricing', { method: 'PUT', body }),
 
   getAssociationPricing: () =>
     http<Record<string, { monthlyQuota: number; membershipCard: number }>>('/member/pricing'),
+
+  getSaaSPlanInfo: () => 
+    http<{ subscriptionPlan: string; stripeCustomerId?: string; subscriptionExpiresAt?: string }>('/super-admin/billing/info'),
 
   // ==========================================
   // DASHBOARDS
@@ -302,7 +352,6 @@ export const api = {
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
       }${typeof params?.isActive === 'boolean' ? `&isActive=${String(params.isActive)}` : ''}`
     ),
-
   getAntenna: (id: string) => http<Antenna>(`/super-admin/antennas/${id}`),
 
   createAntenna: (body: {
@@ -470,6 +519,64 @@ export const api = {
     http<ProjectionResult, typeof body>('/admin/projections/contributions', { method: 'POST', body }),
 
   // ==========================================
+  // NOUVEAU : DÉPENSES (EXPENSES)
+  // ==========================================
+  listAntennaExpenses: (params?: { page?: number; pageSize?: number; status?: string; category?: string; q?: string }) =>
+    http<ApiListResponse<Expense>>(
+      `/admin/expenses?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }${params?.category ? `&category=${encodeURIComponent(params.category)}` : ''}${
+        params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
+      }`
+    ),
+
+  createAntennaExpense: (body: {
+    amount: number;
+    currency?: string;
+    category: string;
+    title: string;
+    description?: string;
+    expenseDate: string;
+    paymentMethod?: string;
+    proofFileId?: string | null;
+  }) =>
+    http<Expense, typeof body>('/admin/expenses', { method: 'POST', body }),
+
+  updateAntennaExpense: (id: string, body: Partial<{
+    amount: number;
+    category: string;
+    title: string;
+    description: string;
+    expenseDate: string;
+    paymentMethod: string;
+    proofFileId: string | null;
+  }>) =>
+    http<Expense, typeof body>(`/admin/expenses/${id}`, { method: 'PATCH', body }),
+
+  deleteAntennaExpense: (id: string) =>
+    http(`/admin/expenses/${id}`, { method: 'DELETE' }),
+
+  listSuperAdminExpenses: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string }) =>
+    http<ApiListResponse<Expense>>(
+      `/super-admin/expenses?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }${params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''}`
+    ),
+
+  validateExpenseSuperAdmin: (id: string) =>
+    http<{ message: string; expense: Expense }>(`/super-admin/expenses/${id}/validate`, { method: 'PATCH' }),
+
+  rejectExpenseSuperAdmin: (id: string, body?: { rejectionReason?: string }) =>
+    http<{ message: string; expense: Expense }, typeof body>(`/super-admin/expenses/${id}/reject`, { method: 'PATCH', body: body ?? {} }),
+
+  listMemberExpenses: (params?: { page?: number; pageSize?: number; category?: string }) =>
+    http<ApiListResponse<Expense>>(
+      `/member/expenses?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.category ? `&category=${encodeURIComponent(params.category)}` : ''
+      }`
+    ),
+
+  // ==========================================
   // PROJETS & PROPOSITIONS
   // ==========================================
   listProjects: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
@@ -546,7 +653,6 @@ export const api = {
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
 
-  // --- PROPOSITIONS DE PROJETS (Membres & Admin) ---
   createProjectProposalMember: (body: {
     title: string;
     description: string;
@@ -580,6 +686,43 @@ export const api = {
       method: 'PATCH',
       body: body ?? {},
     }),
+
+  // ==========================================
+  // ÉVÉNEMENTS 
+  // ==========================================
+  listEvents: (params?: { page?: number; pageSize?: number; status?: string; type?: string }) =>
+    http<ApiListResponse<EventItem>>(
+      `/admin/events?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }${params?.type ? `&type=${encodeURIComponent(params.type)}` : ''}`
+    ),
+
+  createEvent: (body: Partial<EventItem>) =>
+    http<EventItem, typeof body>('/admin/events', { method: 'POST', body }),
+
+  updateEvent: (id: string, body: Partial<EventItem>) =>
+    http<EventItem, typeof body>(`/admin/events/${id}`, { method: 'PATCH', body }),
+
+  deleteEvent: (id: string) =>
+    http(`/admin/events/${id}`, { method: 'DELETE' }),
+
+  registerEventAttendance: (id: string, body: { status: string }) =>
+    http<{ message: string }, typeof body>(`/member/events/${id}/attendance`, { method: 'POST', body }),
+
+  // ==========================================
+  // PARTENAIRES & SPONSORS 
+  // ==========================================
+  listSponsors: () =>
+    http<ApiListResponse<Sponsor>>('/super-admin/sponsors'),
+
+  createSponsor: (body: Omit<Sponsor, 'id'>) =>
+    http<Sponsor, typeof body>('/super-admin/sponsors', { method: 'POST', body }),
+
+  updateSponsor: (id: string, body: Partial<Sponsor>) =>
+    http<Sponsor, typeof body>(`/super-admin/sponsors/${id}`, { method: 'PATCH', body }),
+
+  deleteSponsor: (id: string) =>
+    http(`/super-admin/sponsors/${id}`, { method: 'DELETE' }),
 
   // ==========================================
   // DOCUMENTS & CONTENUS

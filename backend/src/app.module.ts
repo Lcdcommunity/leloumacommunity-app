@@ -29,9 +29,15 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { FileAssetsModule } from './modules/file-assets/file-assets.module';
-import { LedgerModule } from './modules/ledger/ledger.module';           // ✅ Ajouté
-import { ContributionsModule } from './modules/contributions/contributions.module'; // ✅ Ajouté
-import { ProjectsModule } from './modules/projects/projects.module';     // ✅ Ajouté (Nouveau Module)
+import { LedgerModule } from './modules/ledger/ledger.module';           
+import { ContributionsModule } from './modules/contributions/contributions.module'; 
+import { ProjectsModule } from './modules/projects/projects.module';     
+
+// Nouveaux modules créés
+import { ExpensesModule } from './modules/expenses/expenses.module';
+import { EventsModule } from './modules/events/events.module';
+import { SponsorsModule } from './modules/sponsors/sponsors.module';
+// import { BillingModule } from './modules/billing/billing.module'; // <-- Gardé en commentaire pour l'instant
 
 // Nouveaux Modules & Auth Member
 import { PublicModule } from './modules/public/public.module';
@@ -99,11 +105,16 @@ import { UsersModule } from './modules/users/users.module';
     NotificationsModule,
     JobsModule,
     FileAssetsModule,
-    LedgerModule,        // ✅ Connecté
-    ContributionsModule, // ✅ Connecté
-    ProjectsModule,      // ✅ Connecté (Centralise propositions et projets)
+    LedgerModule,        
+    ContributionsModule, 
+    ProjectsModule,      
 
     // Nouveaux modules intégrés
+    ExpensesModule,
+    EventsModule,
+    SponsorsModule,
+    // BillingModule, // <-- Gardé en commentaire pour l'instant
+
     PublicModule,
     DashboardModule,
     MemberModule,

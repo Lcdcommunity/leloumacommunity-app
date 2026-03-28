@@ -15,6 +15,7 @@ import {
   PaymentMethod,
   ContributionPurpose,
   NotificationType,
+  ExpenseStatus, // 👇 AJOUT: Requis pour filtrer les dépenses
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { memberMapper } from './member.mapper';
@@ -114,24 +115,30 @@ export class MemberService {
           },
         },
       }),
-      // 👇 AJOUT CHIRURGICAL : On récupère toutes les antennes de l'association pour la transparence
       this.prisma.antenna.findMany({
         where: { associationId: me.associationId, isActive: true },
         select: { id: true, name: true, defaultCurrency: true }
       })
     ]);
 
-    // 👇 AJOUT CHIRURGICAL : On calcule le solde de chaque antenne
+    // 👇 CORRECTION DÉFINITIVE : Calcul des soldes (Cotisations - Dépenses) pour le Dashboard Membre
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        const agg = await this.prisma.contribution.aggregate({
-          where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
-          _sum: { amount: true }
-        });
+        const [aggC, aggE] = await Promise.all([
+          this.prisma.contribution.aggregate({
+            where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
+            _sum: { amount: true }
+          }),
+          this.prisma.expense.aggregate({
+            where: { antennaId: ant.id, status: ExpenseStatus.VALIDATED },
+            _sum: { amount: true }
+          })
+        ]);
+        
         return {
           id: ant.id,
           name: ant.name,
-          balance: Number(agg._sum.amount ?? 0),
+          balance: Number(aggC._sum.amount ?? 0) - Number(aggE._sum.amount ?? 0),
           currency: ant.defaultCurrency || 'EUR' // Fallback
         };
       })
@@ -168,7 +175,7 @@ export class MemberService {
         activeProjects,
       },
       virtualCard: cardData,
-      antennaBalances, // 👇 AJOUT CHIRURGICAL : Le front va enfin recevoir ce tableau pour remplir les cartes !
+      antennaBalances, // On renvoie enfin les bons soldes déduits !
     };
   }
 
@@ -248,7 +255,7 @@ export class MemberService {
         antennaId: me.antennaId,
         memberUserId: me.id,
         amount: new Prisma.Decimal(dto.amount),
-        currency: 'EUR', // Note : Ici la devise est encore forcée, vous pourrez dynamiser cela plus tard si besoin
+        currency: 'EUR', // Note : Ici la devise est encore forcée
         paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
         externalReference: autoReference,
         contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
@@ -366,7 +373,6 @@ export class MemberService {
         },
       },
     });
-
     const now = new Date();
 
     const computed = members

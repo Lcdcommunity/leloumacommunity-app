@@ -1,4 +1,4 @@
-//web/types/association.ts
+// web/types/association.ts
 export interface Association {
   id: string;
   code: string;
@@ -19,6 +19,9 @@ export interface Association {
   postalCode?: string | null;
   defaultCurrency?: string | null;
   logoFileId?: string | null;
+
+  // NOUVEAU : Seuil de validation des dépenses
+  expenseValidationThreshold?: number | null;
 
   createdAt: string;
   updatedAt: string;

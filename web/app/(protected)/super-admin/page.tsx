@@ -8,17 +8,14 @@ import { formatCurrency, formatDate, fullName } from '../../../lib/format';
 import type { UserSummary } from '../../../types/user';
 import type { Contribution } from '../../../types/contribution';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-// Le backend retourne budgetAmount / amountSpent — on les mappe ici
 type BackendProject = {
   id: string;
   title: string;
   status: string;
-  budgetAmount?: number | null;   // ← champ réel du backend
-  amountSpent?: number | null;    // ← champ réel du backend
-  budgetPlanned?: number | null;  // ← alias possible
-  budgetSpent?: number | null;    // ← alias possible
+  budgetAmount?: number | null; 
+  amountSpent?: number | null;  
+  budgetPlanned?: number | null; 
+  budgetSpent?: number | null;  
   description?: string | null;
   createdAt: string;
   updatedAt?: string;
@@ -59,8 +56,6 @@ type StatCard = {
   onClick?: () => void;
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 function getProjectBudget(p: BackendProject) {
   const planned = p.budgetPlanned ?? p.budgetAmount ?? 0;
   const spent   = p.budgetSpent   ?? p.amountSpent  ?? 0;
@@ -72,13 +67,13 @@ function getInitials(name: string) {
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
     VALIDATED:        { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
     PENDING:          { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
     PENDING_APPROVAL: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    // 👇 CORRECTION 2 : Traduction du statut des dépenses
+    PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' }, 
     REJECTED:         { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
     ACTIVE:           { label: 'Actif',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
     IN_PROGRESS:      { label: 'En cours',   color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
@@ -113,17 +108,7 @@ function EmptyRow({ cols, label }: { cols: number; label: string }) {
   );
 }
 
-// ─── Modals ───────────────────────────────────────────────────────────────────
-
-function BalancesModal({
-  currency,
-  balances,
-  onClose,
-}: {
-  currency: string;
-  balances?: AntennaBalance[];
-  onClose: () => void;
-}) {
+function BalancesModal({ currency, balances, onClose }: { currency: string; balances?: AntennaBalance[]; onClose: () => void; }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', animation: 'sain 0.2s ease' }} onClick={onClose}>
       <div style={{ width: '100%', maxWidth: 480, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: '1.5rem', border: '1px solid rgba(37,99,235,.15)', boxShadow: '0 24px 60px rgba(37,99,235,.12)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
@@ -288,8 +273,6 @@ function AdminProjectDetailModal({ project, onClose }: { project: BackendProject
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 // 4 devises fixes — toujours affichées même si solde = 0
 const FIXED_CURRENCIES = [
   { cur: 'GNF', label: 'Solde antennes (GNF)',     color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
@@ -303,7 +286,6 @@ export default function SuperAdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
   
-  // États pour les modales
   const [selectedAccount, setSelectedAccount] = useState<UserSummary | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null);
   const [selectedProject, setSelectedProject] = useState<BackendProject | null>(null);
@@ -322,7 +304,6 @@ export default function SuperAdminDashboardPage() {
     return () => { isMounted = false; };
   }, []);
 
-  // Grouper les soldes d'antennes par devise
   const currencyGroups = useMemo(() => {
     if (!data?.antennaBalances?.length) return {} as Record<string, { total: number; antennas: AntennaBalance[] }>;
     return data.antennaBalances.reduce((acc, curr) => {
@@ -334,7 +315,6 @@ export default function SuperAdminDashboardPage() {
     }, {} as Record<string, { total: number; antennas: AntennaBalance[] }>);
   }, [data]);
 
-  // Cartes de stats de base
   const baseStats: StatCard[] = data ? [
     {
       label: 'Associations',
@@ -453,8 +433,9 @@ export default function SuperAdminDashboardPage() {
         }
         @media (max-width: 520px) { .sa-stats-currency { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; } }
 
-        /* ── Stat card ── */
+        /* 👇 CORRECTION 1 : Centrage des éléments de la carte */
         .sa-stat {
+          display: flex; flex-direction: column; align-items: center; text-align: center; /* CENTRÉ */
           background: rgba(253,253,255,0.9);
           backdrop-filter: blur(12px);
           border-radius: 18px;
@@ -488,11 +469,12 @@ export default function SuperAdminDashboardPage() {
           .sa-stat-top { flex-direction: column-reverse; gap: 0.2rem; margin-bottom: 0.4rem; }
         }
 
-        .sa-stat-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.65rem; }
-        .sa-stat-label { font-size: 0.61rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7280; max-width: 110px; line-height: 1.4; }
+        /* 👇 CORRECTION 1 : L'icône passe au-dessus du texte */
+        .sa-stat-top { display: flex; flex-direction: column-reverse; align-items: center; justify-content: center; gap: 0.4rem; margin-bottom: 0.65rem; width: 100%; }
+        .sa-stat-label { font-size: 0.61rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7280; text-align: center; line-height: 1.4; }
         .sa-stat-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .sa-stat-value { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 700; color: #111827; letter-spacing: -0.03em; line-height: 1; margin-bottom: 0.28rem; word-break: break-word; }
-        .sa-stat-sub { font-size: 0.62rem; color: #9CA3AF; font-weight: 600; }
+        .sa-stat-sub { font-size: 0.62rem; color: #9CA3AF; font-weight: 600; text-align: center; }
         .sa-stat-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 18px 18px 0 0; }
 
         /* ── Grid panels ── */

@@ -20,12 +20,12 @@ enum UserRole {
 }
 
 enum UserStatus {
-  EMAIL_UNVERIFIED // membre/admin créé mais email non vérifié (si activation par email)
-  PENDING_APPROVAL // email vérifié / créé, en attente validation admin
+  EMAIL_UNVERIFIED
+  PENDING_APPROVAL
   ACTIVE
   REJECTED
   SUSPENDED
-  DELETED // soft-delete logique
+  DELETED
 }
 
 enum Gender {
@@ -46,6 +46,8 @@ enum CurrencyCode {
   GNF
   XOF
   GBP
+  CAD
+  CHF
 }
 
 enum PaymentMethod {
@@ -58,19 +60,18 @@ enum PaymentMethod {
 
 enum ContributionStatus {
   DRAFT
-  SUBMITTED // dépôt déclaré par membre
-  PENDING_VALIDATION // en attente validation admin antenne
+  SUBMITTED
+  PENDING_VALIDATION
   VALIDATED
   REJECTED
   CANCELLED
 }
 
-// NOUVEAU : Motif de la contribution
 enum ContributionPurpose {
-  REGULAR_QUOTA    // Cotisation du mois en cours / mois normal
-  LATE_QUOTA       // NOUVEAU : Paiement des retards
-  MEMBERSHIP_CARD  // Règlement Carte Membre
-  DONATION         // Don libre
+  REGULAR_QUOTA
+  LATE_QUOTA
+  MEMBERSHIP_CARD
+  DONATION
 }
 
 enum ValidationChannel {
@@ -79,6 +80,24 @@ enum ValidationChannel {
   MOBILE_MONEY_RECEIPT
   TRANSFER_PROOF
   OTHER
+}
+
+/// NOUVEAU : Catégories et statuts des dépenses
+enum ExpenseCategory {
+  BILL
+  OFFICE_SUPPLIES
+  TRAVEL
+  HOTEL
+  MEALS
+  PROJECT_FUNDING
+  OTHER
+}
+
+enum ExpenseStatus {
+  PENDING_VALIDATION
+  VALIDATED
+  REJECTED
+  CANCELLED
 }
 
 enum ProjectStatus {
@@ -116,6 +135,36 @@ enum VoteSessionStatus {
   PUBLISHED
 }
 
+/// PROJECTION : Statuts pour les événements (AG, Réunions)
+enum EventType {
+  GENERAL_ASSEMBLY
+  ANTENNA_MEETING
+  FUNDRAISER
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+enum AttendanceStatus {
+  INVITED
+  ATTENDING
+  DECLINED
+  ATTENDED
+  ABSENT
+}
+
+/// PROJECTION : Plans SaaS pour la facturation des associations
+enum SaaSPlan {
+  FREE
+  PREMIUM
+  ENTERPRISE
+}
+
 enum NotificationType {
   ACCOUNT_EMAIL_VERIFICATION
   ACCOUNT_APPROVED
@@ -127,6 +176,11 @@ enum NotificationType {
   CONTRIBUTION_REJECTED
   CONTRIBUTION_CANCELLED
 
+  /// NOUVEAU : Notifications Dépenses
+  EXPENSE_REQUIRES_VALIDATION
+  EXPENSE_VALIDATED
+  EXPENSE_REJECTED
+
   PROJECT_PROPOSAL_SUBMITTED
   PROJECT_PROPOSAL_APPROVED
   PROJECT_PROPOSAL_REJECTED
@@ -136,6 +190,10 @@ enum NotificationType {
   PROJECT_STATUS_CHANGED
   PROJECT_VOTE_OPEN
   PROJECT_VOTE_CLOSED
+
+  /// NOUVEAU : Événements
+  EVENT_PUBLISHED
+  EVENT_REMINDER
 
   NEWS_PUBLISHED
   DOCUMENT_PUBLISHED
@@ -161,11 +219,14 @@ enum NotificationDeliveryStatus {
 enum FileCategory {
   PROFILE_PHOTO
   CONTRIBUTION_PROOF
+  EXPENSE_PROOF          // NOUVEAU : Preuve de dépense
   PROJECT_IMAGE
   PROJECT_DOCUMENT
   NEWS_IMAGE
+  EVENT_COVER            // NOUVEAU : Couverture événement
   ASSOCIATION_DOCUMENT
   ANTENNA_DOCUMENT
+  SPONSOR_LOGO           // NOUVEAU : Logo partenaire
   OTHER
 }
 
@@ -205,6 +266,7 @@ enum LedgerEntryType {
   CONTRIBUTION_IN
   DONATION_IN
   MANUAL_ADJUSTMENT_IN
+  ANTENNA_EXPENSE_OUT    // NOUVEAU : Dépense d'antenne
   PROJECT_EXPENSE_OUT
   OPERATING_EXPENSE_OUT
   MANUAL_ADJUSTMENT_OUT
@@ -240,6 +302,11 @@ enum AuditAction {
   REJECT_CONTRIBUTION
   CANCEL_CONTRIBUTION
 
+  /// NOUVEAU : Actions Dépenses
+  ENGAGE_EXPENSE
+  VALIDATE_EXPENSE
+  REJECT_EXPENSE
+
   CREATE_PROJECT
   UPDATE_PROJECT
   CHANGE_PROJECT_STATUS
@@ -250,6 +317,10 @@ enum AuditAction {
 
   PUBLISH_NEWS
   PUBLISH_DOCUMENT
+  
+  /// NOUVEAU : Événements
+  CREATE_EVENT
+  UPDATE_EVENT
 
   CREATE_ANTENNA
   UPDATE_ANTENNA
@@ -274,6 +345,7 @@ enum TokenType {
 enum ReminderKind {
   CONTRIBUTION_DELAY_3_MONTHS
   CONTRIBUTION_DELAY_CUSTOM
+  EVENT_REMINDER
   GENERAL_ANNOUNCEMENT
 }
 
@@ -300,10 +372,16 @@ model Association {
   defaultCurrency    CurrencyCode @default(EUR)
   isActive           Boolean      @default(true)
 
-  // paramètres globaux
-  contributionDelayThresholdMonths Int     @default(3) // retardataire > N mois
-  allowProjectVoting               Boolean @default(true)
-  requireEmailVerification         Boolean @default(true)
+  // Paramètres globaux
+  contributionDelayThresholdMonths Int      @default(3)
+  allowProjectVoting               Boolean  @default(true)
+  requireEmailVerification         Boolean  @default(true)
+  expenseValidationThreshold       Decimal? @db.Decimal(14, 2) // NOUVEAU : Seuil de validation SA
+
+  // PROJECTION : Champs SaaS
+  subscriptionPlan      SaaSPlan  @default(FREE)
+  stripeCustomerId      String?   @unique
+  subscriptionExpiresAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -327,6 +405,9 @@ model Association {
   AuthToken              AuthToken[]
   Session                Session[]
   Contribution           Contribution[]
+  expenses               Expense[]                 // NOUVEAU
+  events                 Event[]                   // PROJECTION
+  sponsors               Sponsor[]                 // PROJECTION
   BalanceSnapshot        BalanceSnapshot[]
   VoteSession            VoteSession[]
   FileAsset              FileAsset[]
@@ -352,11 +433,9 @@ model Antenna {
   isActive      Boolean @default(true)
   notes         String?
 
-  // Paramètres spécifiques antenne (peuvent override les réglages globaux)
   delayThresholdMonthsOverride Int?
   defaultCurrency              CurrencyCode @default(EUR)
 
-  // Gouvernance : créée uniquement par SUPER_ADMIN (règle backend)
   createdByUserId String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -369,8 +448,10 @@ model Antenna {
   members             Membership[]
   adminAssignments    AntennaAdminAssignment[]
   contributions       Contribution[]
+  expenses            Expense[]                 // NOUVEAU
   projects            Project[]
   projectProposals    ProjectProposal[]
+  events              Event[]                   // PROJECTION
   newsPosts           NewsPost[]
   documents           Document[]
   ledgerEntries       LedgerEntry[]
@@ -404,14 +485,13 @@ model User {
 
   firstName          String
   lastName           String
-  fullNameNormalized String? // utile recherche/tri
+  fullNameNormalized String?
   phone              String?
   birthDate          DateTime?
   gender             Gender?
   
-  // Infos supplémentaires pour la carte membre
   placeOfBirth        String?
-  originSubPrefecture String? // NOUVEAU: Sous-préfecture d'origine (ex: Lafou)
+  originSubPrefecture String?
   countryOfBirth      String?
 
   country            String?
@@ -423,11 +503,10 @@ model User {
 
   preferredLanguage LanguageCode @default(FR)
   timezone          String?      @default("Europe/Paris")
-  isPhoneVerified    Boolean      @default(false)
+  isPhoneVerified   Boolean      @default(false)
 
-  // Gouvernance / traçabilité
-  createdByUserId   String? // SUPER_ADMIN pour admins / auto pour membres = null ou self workflow
-  approvedByUserId  String? // admin antenne ou super admin
+  createdByUserId   String?
+  approvedByUserId  String?
   approvedAt        DateTime?
   rejectedByUserId  String?
   rejectedAt        DateTime?
@@ -437,7 +516,6 @@ model User {
   suspensionReason  String?
   lastLoginAt       DateTime?
 
-  // Soft-delete
   deletedAt       DateTime?
   deletedByUserId String?
 
@@ -446,11 +524,8 @@ model User {
 
   association  Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   profilePhoto FileAsset?  @relation("UserProfilePhoto", fields: [profilePhotoFileId], references: [id], onDelete: SetNull)
-
-  // Relation vers la carte virtuelle
   virtualCard  VirtualCard?
 
-  // self relations (audit de gouvernance)
   createdByUser User?  @relation("UserCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
   createdUsers  User[] @relation("UserCreatedByUser")
 
@@ -466,11 +541,9 @@ model User {
   deletedByUser User?  @relation("UserDeletedByUser", fields: [deletedByUserId], references: [id], onDelete: SetNull)
   deletedUsers  User[] @relation("UserDeletedByUser")
 
-  // liens fonctionnels
   memberships      Membership[]
   adminAssignments AntennaAdminAssignment[]
 
-  // inverse relations manquantes (validation Prisma)
   membershipsApproved Membership[] @relation("MembershipApprovedByUser")
   membershipsRejected Membership[] @relation("MembershipRejectedByUser")
 
@@ -492,11 +565,16 @@ model User {
   contributionsRejected  Contribution[] @relation("ContributionRejectedBy")
   contributionsCancelled Contribution[] @relation("ContributionCancelledBy")
 
+  expensesEngaged   Expense[] @relation("ExpenseEngagedBy")   // NOUVEAU
+  expensesValidated Expense[] @relation("ExpenseValidatedBy") // NOUVEAU
+
   projectProposals       ProjectProposal[] @relation("ProjectProposalAuthor")
   projectsManaged        Project[]         @relation("ProjectManager")
   projectUpdatesAuthored ProjectUpdate[]   @relation("ProjectUpdateAuthor")
   voteSessionsCreated    VoteSession[]     @relation("VoteSessionCreatedBy")
   votes                  ProjectVote[]     @relation("ProjectVoteVoter")
+  
+  eventAttendances       EventAttendance[] @relation("EventParticipant") // PROJECTION
 
   newsPostsCreated   NewsPost[] @relation("NewsPostCreatedBy")
   newsPostsPublished NewsPost[] @relation("NewsPostPublishedBy")
@@ -530,9 +608,6 @@ model User {
   @@map("users")
 }
 
-/// Rattachement d’un user à une antenne (un membre / admin peut avoir historique de rattachement)
-/// Pour un membre classique : 1 membership actif vers 1 antenne.
-/// Pour flexibilité future : historique de changement d’antenne.
 model Membership {
   id            String                   @id @default(cuid())
   associationId String
@@ -544,7 +619,6 @@ model Membership {
   leftAt    DateTime?
   isPrimary Boolean   @default(true)
 
-  // workflow validation membre (par admin de l’antenne ou super admin)
   approvedByUserId String?
   approvedAt       DateTime?
   rejectedByUserId String?
@@ -561,14 +635,12 @@ model Membership {
   approvedByUser User? @relation("MembershipApprovedByUser", fields: [approvedByUserId], references: [id], onDelete: SetNull)
   rejectedByUser User? @relation("MembershipRejectedByUser", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, antennaId, isPrimary]) // évite doublon principal exact
+  @@unique([userId, antennaId, isPrimary])
   @@index([associationId, antennaId, status])
   @@index([userId, status])
   @@map("memberships")
 }
 
-/// Affectation des admins aux antennes
-/// Règle métier : créée par SUPER_ADMIN uniquement (backend)
 model AntennaAdminAssignment {
   id                       String  @id @default(cuid())
   associationId            String
@@ -581,7 +653,7 @@ model AntennaAdminAssignment {
   canManageContent         Boolean @default(true)
   isActive                 Boolean @default(true)
 
-  assignedByUserId String // normalement SUPER_ADMIN
+  assignedByUserId String 
   assignedAt       DateTime  @default(now())
   revokedByUserId  String?
   revokedAt        DateTime?
@@ -600,8 +672,6 @@ model AntennaAdminAssignment {
   @@map("antenna_admin_assignments")
 }
 
-/// Invitation admin créée par SUPER_ADMIN (optionnel mais pro)
-/// Permet créer l’admin via lien d’activation plutôt que mot de passe en clair.
 model AdminInvitation {
   id            String    @id @default(cuid())
   associationId String
@@ -616,7 +686,7 @@ model AdminInvitation {
   revokedAt     DateTime?
   revokedReason String?
 
-  createdByUserId String // SUPER_ADMIN
+  createdByUserId String
   createdAt       DateTime @default(now())
 
   association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -716,7 +786,7 @@ model UserSecuritySetting {
   userId             String    @unique
   twoFactorEnabled   Boolean   @default(false)
   twoFactorSecretEnc String?
-  backupCodesHash    Json? // tableau de hashes
+  backupCodesHash    Json? 
   passwordChangedAt  DateTime?
   forcePasswordReset Boolean   @default(false)
   lastFailedLoginAt  DateTime?
@@ -741,27 +811,24 @@ model Contribution {
   antennaId     String
   memberUserId  String
 
-  // Dépôt déclaré
   amount           Decimal             @db.Decimal(14, 2)
   currency         CurrencyCode        @default(EUR)
   paymentMethod    PaymentMethod
-  purpose          ContributionPurpose @default(REGULAR_QUOTA) // NOUVEAU: Motif
+  purpose          ContributionPurpose @default(REGULAR_QUOTA)
   submittedAt      DateTime            @default(now())
-  contributionDate DateTime? // date réelle du versement déclarée
-  monthReference   Int? // pour stats mensuelles (1..12)
-  yearReference    Int? // ex: 2026
+  contributionDate DateTime? 
+  monthReference   Int? 
+  yearReference    Int? 
 
   status          ContributionStatus @default(PENDING_VALIDATION)
   memberComment   String?
   adminComment    String?
   rejectionReason String?
 
-  // Preuves
   proofFileId       String?
-  externalReference String? // référence virement / mobile money / reçu papier
+  externalReference String? 
   validationChannel ValidationChannel?
 
-  // Validation admin (antenne)
   validatedByUserId String?
   validatedAt       DateTime?
   rejectedByUserId  String?
@@ -769,7 +836,6 @@ model Contribution {
   cancelledByUserId String?
   cancelledAt       DateTime?
 
-  // Optionnel: lien écriture comptable (entrée)
   ledgerEntryId String? @unique
 
   createdAt DateTime @default(now())
@@ -793,15 +859,59 @@ model Contribution {
   @@map("contributions")
 }
 
-/// Journal financier (entrées/sorties) pour un solde robuste et traçable.
-/// Le solde global / par antenne est calculé via SUM(entries) signé.
+/// =========================
+/// NOUVEAU: DÉPENSES
+/// =========================
+model Expense {
+  id            String @id @default(cuid())
+  associationId String
+  antennaId     String
+
+  amount      Decimal         @db.Decimal(14, 2)
+  currency    CurrencyCode    @default(EUR)
+  category    ExpenseCategory
+  title       String          // Motif court
+  description String?         // Détails poussés
+  expenseDate DateTime        // Date réelle de la dépense
+  paymentMethod PaymentMethod @default(OTHER)
+
+  status          ExpenseStatus @default(PENDING_VALIDATION)
+  rejectionReason String?
+
+  proofFileId   String?       // Reçu ou facture uploadé
+  ledgerEntryId String?       @unique // Lien vers l'écriture comptable qui débite le solde
+
+  engagedByUserId   String    // L'admin d'antenne qui a saisi la dépense
+  validatedByUserId String?   // Le Super Admin qui a validé (si dépassement du seuil)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  validatedAt DateTime?
+
+  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna     Antenna     @relation(fields: [antennaId], references: [id], onDelete: Cascade)
+  
+  engagedByUser   User  @relation("ExpenseEngagedBy", fields: [engagedByUserId], references: [id], onDelete: Restrict)
+  validatedByUser User? @relation("ExpenseValidatedBy", fields: [validatedByUserId], references: [id], onDelete: SetNull)
+
+  proofFile   FileAsset?   @relation("ExpenseProofFile", fields: [proofFileId], references: [id], onDelete: SetNull)
+  ledgerEntry LedgerEntry? @relation("ExpenseLedgerEntry")
+
+  @@index([associationId, status, expenseDate])
+  @@index([antennaId, status, expenseDate])
+  @@index([engagedByUserId])
+  @@map("expenses")
+}
+
+/// =========================
+/// COMPTABILITÉ (LEDGER)
+/// =========================
 model LedgerEntry {
   id            String          @id @default(cuid())
   associationId String
   antennaId     String?
   type          LedgerEntryType
 
-  // Convention : montant positif + direction contrôlée par "type"
   amount   Decimal      @db.Decimal(14, 2)
   currency CurrencyCode @default(EUR)
 
@@ -809,8 +919,8 @@ model LedgerEntry {
   description   String?
   effectiveDate DateTime @default(now())
 
-  // Liens métiers (optionnels)
   contributionId String? @unique
+  expenseId      String? @unique // NOUVEAU : Lien vers Expense
   projectId      String?
   documentId     String?
   referenceCode  String?
@@ -824,6 +934,7 @@ model LedgerEntry {
   createdByUser User?       @relation("LedgerEntryCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   contribution Contribution? @relation("ContributionLedgerEntry")
+  expense      Expense?      @relation("ExpenseLedgerEntry", fields: [expenseId], references: [id], onDelete: SetNull)
   project      Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
   document     Document?     @relation(fields: [documentId], references: [id], onDelete: SetNull)
 
@@ -833,8 +944,6 @@ model LedgerEntry {
   @@map("ledger_entries")
 }
 
-/// Snapshots de solde (cache/reporting) - 
-/// optionnels mais utiles pour dashboard rapide
 model BalanceSnapshot {
   id            String       @id @default(cuid())
   associationId String
@@ -842,7 +951,7 @@ model BalanceSnapshot {
   currency      CurrencyCode @default(EUR)
   balanceAmount Decimal      @db.Decimal(14, 2)
   asOf          DateTime
-  generatedBy   String? // "CRON" / user id / system
+  generatedBy   String? 
   createdAt     DateTime     @default(now())  
 
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -877,8 +986,6 @@ model ProjectProposal {
   reviewedByUserId String?
   reviewedAt       DateTime?
 
-  // Si approuvé -> projet créé
-  // La référence et le champ scalaire se font désormais côté 'Project' uniquement
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -920,7 +1027,7 @@ model ProjectProposalComment {
   proposalId   String
   authorUserId String
   body         String
-  isInternal   Boolean  @default(false) // visible admin only
+  isInternal   Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -942,10 +1049,8 @@ model Project {
   description String
   status      ProjectStatus @default(APPROVED)
 
-  // Nouveau : responsable / promoteur du projet
   promoterName String?
 
-  // Nouveaux champs structurés (option A, sans créer de nouvelles tables)
   specificObjectives   Json?
   targetBeneficiaries  String?
   populationImpact     String?
@@ -1018,7 +1123,7 @@ model ProjectUpdate {
   authorUserId    String
   title           String?
   body            String
-  progressPercent Int? // 0..100 (valider côté backend)
+  progressPercent Int? 
   published       Boolean   @default(true)
   publishedAt     DateTime?
   createdAt       DateTime  @default(now())
@@ -1049,22 +1154,21 @@ model ProjectUpdateAttachment {
   @@map("project_update_attachments")
 }
 
-/// Vote / approbation par membres (optionnel mais fortement recommandé)
 model VoteSession {
   id            String  @id @default(cuid())
   associationId String
   antennaId     String?
   projectId     String?
-  proposalId    String?
-
+  proposalId    String?  
+  
   title       String
   description String?
   status      VoteSessionStatus @default(DRAFT)
 
   startsAt        DateTime?
   endsAt          DateTime?
-  quorumPercent   Decimal?  @db.Decimal(5, 2) // ex 50.00
-  approvalPercent Decimal?  @db.Decimal(5, 2) // ex 66.67
+  quorumPercent   Decimal?  @db.Decimal(5, 2) 
+  approvalPercent Decimal?  @db.Decimal(5, 2) 
   allowAbstain    Boolean   @default(true)
 
   createdByUserId String
@@ -1099,9 +1203,75 @@ model ProjectVote {
   voteSession VoteSession @relation(fields: [voteSessionId], references: [id], onDelete: Cascade)
   voter       User        @relation("ProjectVoteVoter", fields: [voterUserId], references: [id], onDelete: Restrict)
 
-  @@unique([voteSessionId, voterUserId]) // 1 vote par membre/session
+  @@unique([voteSessionId, voterUserId]) 
   @@index([voteSessionId, choice])
   @@map("project_votes")
+}
+
+/// =========================
+/// PROJECTION : EVENTS / PARTNERS
+/// =========================
+
+model Event {
+  id            String      @id @default(cuid())
+  associationId String
+  antennaId     String?
+
+  title         String
+  description   String?
+  type          EventType   @default(OTHER)
+  status        EventStatus @default(DRAFT)
+
+  startsAt      DateTime
+  endsAt        DateTime?
+  locationText  String?
+  isOnline      Boolean     @default(false)
+  meetingLink   String?
+  
+  coverImageId  String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  coverImage    FileAsset?  @relation("EventCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  attendees     EventAttendance[]
+
+  @@index([associationId, startsAt])
+  @@index([antennaId, startsAt])
+  @@map("events")
+}
+
+model EventAttendance {
+  id        String           @id @default(cuid())
+  eventId   String
+  userId    String
+  status    AttendanceStatus @default(INVITED)
+  updatedAt DateTime         @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation("EventParticipant", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_attendances")
+}
+
+model Sponsor {
+  id            String  @id @default(cuid())
+  associationId String
+  name          String
+  websiteUrl    String?
+  contactEmail  String?
+  logoFileId    String?
+  isActive      Boolean @default(true)
+
+  createdAt     DateTime @default(now())
+
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  logoFile      FileAsset?  @relation("SponsorLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
+
+  @@map("sponsors")
 }
 
 /// =========================
@@ -1119,7 +1289,7 @@ model NewsPost {
   title    String
   slug     String?
   excerpt  String?
-  content  String // markdown/html/texte selon ton choix
+  content  String 
   isPinned Boolean @default(false)
 
   coverImageFileId  String?
@@ -1204,7 +1374,7 @@ model FileAsset {
   associationId    String
   uploadedByUserId String?
 
-  storageProvider  String // ex: "s3", "cloudinary", "local"
+  storageProvider  String 
   storageKey       String  @unique
   originalFilename String
   mimeType         String
@@ -1216,9 +1386,9 @@ model FileAsset {
 
   width           Int?
   height          Int?
-  durationSeconds Int? // audio/vidéo si besoin
+  durationSeconds Int? 
 
-  url      String? // si URL publique/signée persistée
+  url      String? 
   metadata Json?
 
   createdAt DateTime  @default(now())
@@ -1228,13 +1398,15 @@ model FileAsset {
   association    Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   uploadedByUser User?       @relation("FileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
-  // Relations "pointées"
   associationLogoFor   Association[]  @relation("AssociationLogo")
   userProfilePhotoFor  User[]         @relation("UserProfilePhoto")
   contributionProofFor Contribution[] @relation("ContributionProofFile")
+  expenseProofFor      Expense[]      @relation("ExpenseProofFile") // NOUVEAU
   projectCoverFor      Project[]      @relation("ProjectCoverImage")
   newsCoverFor         NewsPost[]     @relation("NewsPostCoverImage")
   documentFileFor      Document[]     @relation("DocumentFile")
+  eventCoverFor        Event[]        @relation("EventCover") // PROJECTION
+  sponsorLogoFor       Sponsor[]      @relation("SponsorLogo") // PROJECTION
 
   proposalAttachments      ProjectProposalAttachment[]
   projectAttachments       ProjectAttachment[]
@@ -1254,11 +1426,11 @@ model Notification {
   id              String           @id @default(cuid())
   associationId   String
   antennaId       String?
-  userId          String? // cible directe optionnelle
+  userId          String? 
   type            NotificationType
   title           String
   message         String
-  payload         Json? // données contextuelles (ids, liens, etc.)
+  payload         Json? 
   createdByUserId String?
   createdAt       DateTime         @default(now())
 
@@ -1275,7 +1447,6 @@ model Notification {
   @@map("notifications")
 }
 
-/// delivery / lecture par destinataire et par canal
 model NotificationRecipient {
   id             String                     @id @default(cuid())
   notificationId String
@@ -1317,7 +1488,6 @@ model UserNotificationPreference {
   @@map("user_notification_preferences")
 }
 
-/// Logs de campagnes / relances (ex: retardataires > 3 mois)
 model ReminderRunLog {
   id                String       @id @default(cuid())
   associationId     String
@@ -1328,7 +1498,7 @@ model ReminderRunLog {
   successCount      Int          @default(0)
   failedCount       Int          @default(0)
   details           Json?
-  triggeredByUserId String? // null si cron
+  triggeredByUserId String? 
   triggeredAt       DateTime     @default(now())
 
   association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
@@ -1339,6 +1509,7 @@ model ReminderRunLog {
   @@index([antennaId, kind, triggeredAt])
   @@map("reminder_run_logs")
 }
+
 /// =========================
 /// SETTINGS / REPORTING / PROJECTIONS
 /// =========================
@@ -1377,7 +1548,6 @@ model AntennaSetting {
   @@map("antenna_settings")
 }
 
-/// Projections financières (admin/super admin)
 model FinancialProjection {
   id            String  @id @default(cuid())
   associationId String
@@ -1393,7 +1563,7 @@ model FinancialProjection {
   projectedExpense Decimal @db.Decimal(14, 2)
   projectedNet     Decimal @db.Decimal(14, 2)
 
-  assumptions Json? // hypothèses de calcul
+  assumptions Json? 
   version     Int   @default(1)
 
   createdByUserId String
@@ -1422,12 +1592,12 @@ model AuditLog {
   actorUserId String?
   action      AuditAction
 
-  targetModel  String // ex: "User", "Contribution", "Project"
+  targetModel  String 
   targetId     String?
   targetUserId String?
 
   summary   String?
-  metadata  Json? // avant/après, payload, ids...
+  metadata  Json? 
   ipAddress String?
   userAgent String?
 
@@ -1455,7 +1625,7 @@ model VirtualCard {
   id            String   @id @default(cuid())
   userId        String   @unique
   cardNumber    String   @unique
-  qrToken       String   @unique @default(uuid()) // Jeton secret pour le QR Code
+  qrToken       String   @unique @default(uuid()) 
   issuedAt      DateTime?
   expiresAt     DateTime?
   isLocked      Boolean  @default(true)

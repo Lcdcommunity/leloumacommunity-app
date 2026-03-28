@@ -443,7 +443,6 @@ export default function MemberHomePage() {
           }
 
           if (projectsRes.status === 'fulfilled') {
-            // CORRECTION CHIRURGICALE TYPE: On évite les erreurs TS sur les string literals
             res.projectsInProgress = (projectsRes.value.items as Project[])
               .filter(p => !['DRAFT', 'CANCELLED', 'ARCHIVED'].includes(p.status as string))
               .slice(0, 5);
@@ -453,7 +452,6 @@ export default function MemberHomePage() {
             res.latestContents = (contentsRes.value.items as ContentPost[]).slice(0, 5);
           }
           if (lateRes.status === 'fulfilled') {
-            // CORRECTION CHIRURGICALE TYPE: On type correctement pour éviter le "any"
             res.lateMembersPreview = lateRes.value.items as Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
           }
 
@@ -493,14 +491,24 @@ export default function MemberHomePage() {
       return acc;
     }, {});
   }, [data]);
-
+  
   const stats: StatCard[] = data ? [
     { label: 'Total cotisé', value: formatCurrency(totalCotise, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé', spanClass: 'mb-span-1' },
     { label: 'Cotisations validées', value: formatCurrency(totalValide, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>, color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin", spanClass: 'mb-span-1' },
     { label: 'En attente', value: pendingCount, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, color: '#D97706', bg: '#FFFBEB', sub: 'Dépôts à valider', urgent: pendingCount > 0, spanClass: 'mb-span-1' },
     ...FIXED_CURRENCIES_MEMBER.map(({ cur: fc, label, color, bg }) => {
       const grp = mbCurrencyGroups[fc] ?? { total: 0, antennas: [] };
-      return { label, value: formatCurrency(grp.total, fc), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>, color, bg, sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails', clickable: true, onClick: () => setSelectedCurrency(fc), spanClass: 'mb-span-1' };
+      return { 
+        label, 
+        value: formatCurrency(grp.total, fc), 
+        icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>, 
+        color, 
+        bg, 
+        sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails', 
+        clickable: true, 
+        onClick: () => setSelectedCurrency(fc), 
+        spanClass: 'mb-span-1' 
+      };
     }),
     { label: 'Retard', value: `${lateMonths} mois`, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>, color: lateMonths > 0 ? '#DC2626' : '#059669', bg: lateMonths > 0 ? '#FEF2F2' : '#ECFDF5', sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !', urgent: lateMonths > 2, spanClass: 'mb-span-1' },
     { label: 'Dernière cotisation', value: formatDate(lastContribDate), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>, color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement', spanClass: 'mb-span-1' },
@@ -578,7 +586,9 @@ export default function MemberHomePage() {
           .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
         }
 
+        /* 👇 C'est ici que l'on centre le texte et les icônes de la carte ! */
         .mb-stat {
+          display: flex; flex-direction: column; align-items: center; text-align: center;
           background: rgba(253,253,255,0.9); backdrop-filter: blur(12px);
           border-radius: 18px; padding: 1.2rem 1.25rem;
           border: 1px solid rgba(37,99,235,0.12);
@@ -602,12 +612,12 @@ export default function MemberHomePage() {
           border-radius: 18px 18px 0 0;
         }
         .mb-stat-top {
-          display: flex; justify-content: space-between; align-items: flex-start;
-          margin-bottom: 0.8rem;
+          display: flex; flex-direction: column-reverse; align-items: center; justify-content: center;
+          gap: 0.4rem; margin-bottom: 0.8rem; width: 100%;
         }
         .mb-stat-label {
           font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em;
-          text-transform: uppercase; color: #4B5563; max-width: 110px; line-height: 1.4;
+          text-transform: uppercase; color: #4B5563; max-width: 110px; line-height: 1.4; text-align: center;
         }
         .mb-stat-icon {
           width: 36px; height: 36px; border-radius: 10px;
@@ -616,9 +626,9 @@ export default function MemberHomePage() {
         .mb-stat-value {
           font-family: 'Cormorant Garamond', serif;
           font-size: 1.85rem; font-weight: 700; color: #111827;
-          letter-spacing: -0.03em; line-height: 1; margin-bottom: 0.4rem;
+          letter-spacing: -0.03em; line-height: 1; margin-bottom: 0.4rem; word-break: break-word; text-align: center;
         }
-        .mb-stat-sub { font-size: 0.72rem; color: #6B7280; font-weight: 600; }
+        .mb-stat-sub { font-size: 0.72rem; color: #6B7280; font-weight: 600; text-align: center; }
 
         .mb-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
         @media (max-width: 860px) { .mb-grid2 { grid-template-columns: 1fr; } }
