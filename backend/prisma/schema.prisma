@@ -14,6 +14,7 @@ datasource db {
 /// =========================
 
 enum UserRole {
+  SYSTEM_ADMIN   // Le Grand Chef de la plateforme SaaS
   SUPER_ADMIN
   ANTENNA_ADMIN
   MEMBER
@@ -26,6 +27,15 @@ enum UserStatus {
   REJECTED
   SUSPENDED
   DELETED
+}
+
+enum ProfessionalStatus {
+  EMPLOYEE
+  SELF_EMPLOYED
+  STUDENT
+  UNEMPLOYED
+  RETIRED
+  OTHER
 }
 
 enum Gender {
@@ -82,7 +92,6 @@ enum ValidationChannel {
   OTHER
 }
 
-/// NOUVEAU : Catégories et statuts des dépenses
 enum ExpenseCategory {
   BILL
   OFFICE_SUPPLIES
@@ -135,7 +144,6 @@ enum VoteSessionStatus {
   PUBLISHED
 }
 
-/// PROJECTION : Statuts pour les événements (AG, Réunions)
 enum EventType {
   GENERAL_ASSEMBLY
   ANTENNA_MEETING
@@ -158,7 +166,6 @@ enum AttendanceStatus {
   ABSENT
 }
 
-/// PROJECTION : Plans SaaS pour la facturation des associations
 enum SaaSPlan {
   FREE
   PREMIUM
@@ -170,34 +177,25 @@ enum NotificationType {
   ACCOUNT_APPROVED
   ACCOUNT_REJECTED
   ACCOUNT_SUSPENDED
-
   CONTRIBUTION_SUBMITTED
   CONTRIBUTION_VALIDATED
   CONTRIBUTION_REJECTED
   CONTRIBUTION_CANCELLED
-
-  /// NOUVEAU : Notifications Dépenses
   EXPENSE_REQUIRES_VALIDATION
   EXPENSE_VALIDATED
   EXPENSE_REJECTED
-
   PROJECT_PROPOSAL_SUBMITTED
   PROJECT_PROPOSAL_APPROVED
   PROJECT_PROPOSAL_REJECTED
-
   PROJECT_CREATED
   PROJECT_UPDATED
   PROJECT_STATUS_CHANGED
   PROJECT_VOTE_OPEN
   PROJECT_VOTE_CLOSED
-
-  /// NOUVEAU : Événements
   EVENT_PUBLISHED
   EVENT_REMINDER
-
   NEWS_PUBLISHED
   DOCUMENT_PUBLISHED
-
   REMINDER_CONTRIBUTION_DELAY
   SYSTEM_ALERT
 }
@@ -219,14 +217,14 @@ enum NotificationDeliveryStatus {
 enum FileCategory {
   PROFILE_PHOTO
   CONTRIBUTION_PROOF
-  EXPENSE_PROOF          // NOUVEAU : Preuve de dépense
+  EXPENSE_PROOF
   PROJECT_IMAGE
   PROJECT_DOCUMENT
   NEWS_IMAGE
-  EVENT_COVER            // NOUVEAU : Couverture événement
+  EVENT_COVER
   ASSOCIATION_DOCUMENT
   ANTENNA_DOCUMENT
-  SPONSOR_LOGO           // NOUVEAU : Logo partenaire
+  SPONSOR_LOGO
   OTHER
 }
 
@@ -266,7 +264,7 @@ enum LedgerEntryType {
   CONTRIBUTION_IN
   DONATION_IN
   MANUAL_ADJUSTMENT_IN
-  ANTENNA_EXPENSE_OUT    // NOUVEAU : Dépense d'antenne
+  ANTENNA_EXPENSE_OUT
   PROJECT_EXPENSE_OUT
   OPERATING_EXPENSE_OUT
   MANUAL_ADJUSTMENT_OUT
@@ -278,35 +276,35 @@ enum ProjectionPeriodType {
   YEARLY
 }
 
+enum AuditActorType {
+  USER
+  SYSTEM
+  CRON
+}
+
 enum AuditAction {
   CREATE
   UPDATE
   DELETE
   SOFT_DELETE
   RESTORE
-
   LOGIN_SUCCESS
   LOGIN_FAILED
   LOGOUT
   PASSWORD_RESET_REQUEST
   PASSWORD_RESET_SUCCESS
-
   VERIFY_EMAIL
   APPROVE_ACCOUNT
   REJECT_ACCOUNT
   SUSPEND_ACCOUNT
   REACTIVATE_ACCOUNT
-
   SUBMIT_CONTRIBUTION
   VALIDATE_CONTRIBUTION
   REJECT_CONTRIBUTION
   CANCEL_CONTRIBUTION
-
-  /// NOUVEAU : Actions Dépenses
   ENGAGE_EXPENSE
   VALIDATE_EXPENSE
   REJECT_EXPENSE
-
   CREATE_PROJECT
   UPDATE_PROJECT
   CHANGE_PROJECT_STATUS
@@ -314,26 +312,16 @@ enum AuditAction {
   REVIEW_PROJECT_PROPOSAL
   CREATE_VOTE_SESSION
   CAST_VOTE
-
   PUBLISH_NEWS
   PUBLISH_DOCUMENT
-  
-  /// NOUVEAU : Événements
   CREATE_EVENT
   UPDATE_EVENT
-
   CREATE_ANTENNA
   UPDATE_ANTENNA
   SUSPEND_ANTENNA
   CREATE_ADMIN_ACCOUNT
   ASSIGN_ADMIN_TO_ANTENNA
   REMOVE_ADMIN_FROM_ANTENNA
-}
-
-enum AuditActorType {
-  USER
-  SYSTEM
-  CRON
 }
 
 enum TokenType {
@@ -354,34 +342,35 @@ enum ReminderKind {
 /// =========================
 
 model Association {
-  id                 String       @id @default(cuid())
-  code               String       @unique
-  name               String
-  description        String?
-  legalName          String?
-  registrationNumber String?
-  country            String?
-  city               String?
-  addressLine1       String?
-  addressLine2       String?
-  postalCode         String?
-  phone              String?
-  email              String?
-  websiteUrl         String?
-  logoFileId         String?
-  defaultCurrency    CurrencyCode @default(EUR)
-  isActive           Boolean      @default(true)
+  id                  String       @id @default(cuid())
+  code                String       @unique
+  name                String
+  description         String?
+  legalName           String?
+  registrationNumber  String?
+  country             String?
+  city                String?
+  addressLine1        String?
+  addressLine2        String?
+  postalCode          String?
+  phone               String?
+  email               String?
+  websiteUrl          String?
+  logoFileId          String?
+  defaultCurrency     CurrencyCode @default(EUR)
+  isActive            Boolean      @default(true)
 
-  // Paramètres globaux
   contributionDelayThresholdMonths Int      @default(3)
   allowProjectVoting               Boolean  @default(true)
   requireEmailVerification         Boolean  @default(true)
-  expenseValidationThreshold       Decimal? @db.Decimal(14, 2) // NOUVEAU : Seuil de validation SA
+  expenseValidationThreshold       Decimal? @db.Decimal(14, 2)
 
-  // PROJECTION : Champs SaaS
   subscriptionPlan      SaaSPlan  @default(FREE)
   stripeCustomerId      String?   @unique
   subscriptionExpiresAt DateTime?
+  domainName            String?   @unique 
+  themeColors           Json?     
+  fontFamily            String?   
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -398,16 +387,16 @@ model Association {
   projections            FinancialProjection[]
   notifications          Notification[]
   settings               AssociationSetting[]
-  auditLogs              AuditLog[]
+  auditLogs              AuditLog[] @relation("AssociationAudit")
   Membership             Membership[]
   AntennaAdminAssignment AntennaAdminAssignment[]
   AdminInvitation        AdminInvitation[]
   AuthToken              AuthToken[]
   Session                Session[]
   Contribution           Contribution[]
-  expenses               Expense[]                 // NOUVEAU
-  events                 Event[]                   // PROJECTION
-  sponsors               Sponsor[]                 // PROJECTION
+  expenses               Expense[]
+  events                 Event[]
+  sponsors               Sponsor[]
   BalanceSnapshot        BalanceSnapshot[]
   VoteSession            VoteSession[]
   FileAsset              FileAsset[]
@@ -448,10 +437,10 @@ model Antenna {
   members             Membership[]
   adminAssignments    AntennaAdminAssignment[]
   contributions       Contribution[]
-  expenses            Expense[]                 // NOUVEAU
+  expenses            Expense[]
   projects            Project[]
   projectProposals    ProjectProposal[]
-  events              Event[]                   // PROJECTION
+  events              Event[]
   newsPosts           NewsPost[]
   documents           Document[]
   ledgerEntries       LedgerEntry[]
@@ -476,7 +465,7 @@ model Antenna {
 
 model User {
   id              String     @id @default(cuid())
-  associationId   String
+  associationId   String?    
   email           String     @unique
   emailVerifiedAt DateTime?
   passwordHash    String
@@ -489,13 +478,17 @@ model User {
   phone              String?
   birthDate          DateTime?
   gender             Gender?
-  
-  placeOfBirth        String?
-  originSubPrefecture String?
-  countryOfBirth      String?
+  professionalStatus ProfessionalStatus?
 
-  country            String?
-  city               String?
+  placeOfBirth        String?
+  countryOfBirth      String?
+  country             String?
+  city                String?
+  originSubPrefecture String?
+  originDistrict      String?
+  originQuarter       String?
+  originSector        String?
+
   addressLine1       String?
   addressLine2       String?
   postalCode         String?
@@ -505,12 +498,12 @@ model User {
   timezone          String?      @default("Europe/Paris")
   isPhoneVerified   Boolean      @default(false)
 
-  createdByUserId   String?
-  approvedByUserId  String?
-  approvedAt        DateTime?
-  rejectedByUserId  String?
-  rejectedAt        DateTime?
-  rejectionReason   String?
+  createdByUserId  String?
+  approvedByUserId String?
+  approvedAt       DateTime?
+  rejectedByUserId String?
+  rejectedAt       DateTime?
+  rejectionReason  String?
   suspendedByUserId String?
   suspendedAt       DateTime?
   suspensionReason  String?
@@ -522,8 +515,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  association  Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  profilePhoto FileAsset?  @relation("UserProfilePhoto", fields: [profilePhotoFileId], references: [id], onDelete: SetNull)
+  association  Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  profilePhoto FileAsset?   @relation("UserProfilePhoto", fields: [profilePhotoFileId], references: [id], onDelete: SetNull)
   virtualCard  VirtualCard?
 
   createdByUser User?  @relation("UserCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
@@ -565,16 +558,16 @@ model User {
   contributionsRejected  Contribution[] @relation("ContributionRejectedBy")
   contributionsCancelled Contribution[] @relation("ContributionCancelledBy")
 
-  expensesEngaged   Expense[] @relation("ExpenseEngagedBy")   // NOUVEAU
-  expensesValidated Expense[] @relation("ExpenseValidatedBy") // NOUVEAU
+  expensesEngaged   Expense[] @relation("ExpenseEngagedBy")
+  expensesValidated Expense[] @relation("ExpenseValidatedBy")
 
-  projectProposals       ProjectProposal[] @relation("ProjectProposalAuthor")
-  projectsManaged        Project[]         @relation("ProjectManager")
-  projectUpdatesAuthored ProjectUpdate[]   @relation("ProjectUpdateAuthor")
-  voteSessionsCreated    VoteSession[]     @relation("VoteSessionCreatedBy")
-  votes                  ProjectVote[]     @relation("ProjectVoteVoter")
+  projectProposals        ProjectProposal[] @relation("ProjectProposalAuthor")
+  projectsManaged         Project[]         @relation("ProjectManager")
+  projectUpdatesAuthored  ProjectUpdate[]   @relation("ProjectUpdateAuthor")
+  voteSessionsCreated     VoteSession[]     @relation("VoteSessionCreatedBy")
+  votes                   ProjectVote[]     @relation("ProjectVoteVoter")
   
-  eventAttendances       EventAttendance[] @relation("EventParticipant") // PROJECTION
+  eventAttendances        EventAttendance[] @relation("EventParticipant")
 
   newsPostsCreated   NewsPost[] @relation("NewsPostCreatedBy")
   newsPostsPublished NewsPost[] @relation("NewsPostPublishedBy")
@@ -582,8 +575,8 @@ model User {
   documentsUploaded Document[]  @relation("DocumentUploadedBy")
   filesUploaded     FileAsset[] @relation("FileUploadedBy")
   notifications        NotificationRecipient[]
-  notificationsCreated Notification[]          @relation("NotificationCreatedBy")
-  notificationsTarget  Notification[]          @relation("NotificationUserTarget")
+  notificationsCreated Notification[]           @relation("NotificationCreatedBy")
+  notificationsTarget  Notification[]           @relation("NotificationUserTarget")
 
   ledgerEntriesCreated LedgerEntry[]         @relation("LedgerEntryCreatedBy")
   projectionsCreated   FinancialProjection[] @relation("ProjectionCreatedBy")
@@ -595,8 +588,8 @@ model User {
   notificationPrefs    UserNotificationPreference?
   securitySettings     UserSecuritySetting?
 
-  auditLogsActor  AuditLog[] @relation("AuditActorUser")
-  auditLogsTarget AuditLog[] @relation("AuditTargetUser")
+  auditLogsActor  AuditLog[] @relation("AuditActor")
+  auditLogsTarget AuditLog[] @relation("AuditTarget")
 
   createdAntennas Antenna[] @relation("AntennaCreatedByUser")
 
@@ -684,14 +677,14 @@ model AdminInvitation {
   expiresAt     DateTime
   acceptedAt    DateTime?
   revokedAt     DateTime?
-  revokedReason String?
+  revokeReason  String?
 
   createdByUserId String
   createdAt       DateTime @default(now())
 
-  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
-  createdByUser User        @relation("AdminInvitationCreatedByUser", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  association  Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna      Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  createdByUser User       @relation("AdminInvitationCreatedByUser", fields: [createdByUserId], references: [id], onDelete: Restrict)
 
   @@unique([associationId, email, role])
   @@index([associationId, antennaId, expiresAt])
@@ -703,20 +696,20 @@ model AdminInvitation {
 /// =========================
 
 model AuthToken {
-  id                 String    @id @default(cuid())
-  associationId      String
-  userId             String?
-  email              String?
-  type               TokenType
-  tokenHash          String    @unique
-  expiresAt          DateTime
-  consumedAt         DateTime?
-  createdByIp        String?
-  createdByUserAgent String?
-  createdAt          DateTime  @default(now())
+  id                  String    @id @default(cuid())
+  associationId       String?   
+  userId              String?
+  email               String?
+  type                TokenType
+  tokenHash           String    @unique
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  createdByIp         String?
+  createdByUserAgent  String?
+  createdAt           DateTime  @default(now())
 
-  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  user        User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  association Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user        User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([associationId, type, expiresAt])
   @@index([userId, type])
@@ -725,7 +718,7 @@ model AuthToken {
 
 model Session {
   id               String    @id @default(cuid())
-  associationId    String
+  associationId    String?   
   userId           String
   sessionTokenHash String    @unique
   ipAddress        String?
@@ -735,8 +728,8 @@ model Session {
   lastSeenAt       DateTime?
   createdAt        DateTime  @default(now())
 
-  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  association Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
   @@index([associationId, expiresAt])
@@ -745,7 +738,7 @@ model Session {
 
 model RefreshTokenSession {
   id            String    @id @default(cuid())
-  associationId String
+  associationId String?   
   userId        String
   tokenHash     String    @unique
   userAgent     String?
@@ -766,7 +759,7 @@ model RefreshTokenSession {
 
 model PasswordResetToken {
   id            String    @id @default(cuid())
-  associationId String
+  associationId String?   
   userId        String
   tokenHash     String    @unique
   expiresAt     DateTime
@@ -802,7 +795,7 @@ model UserSecuritySetting {
 }
 
 /// =========================
-/// CONTRIBUTIONS / TRÉSORERIE
+/// CONTRIBUTIONS
 /// =========================
 
 model Contribution {
@@ -811,14 +804,14 @@ model Contribution {
   antennaId     String
   memberUserId  String
 
-  amount           Decimal             @db.Decimal(14, 2)
-  currency         CurrencyCode        @default(EUR)
-  paymentMethod    PaymentMethod
-  purpose          ContributionPurpose @default(REGULAR_QUOTA)
-  submittedAt      DateTime            @default(now())
-  contributionDate DateTime? 
-  monthReference   Int? 
-  yearReference    Int? 
+  amount            Decimal             @db.Decimal(14, 2)
+  currency          CurrencyCode        @default(EUR)
+  paymentMethod     PaymentMethod
+  purpose           ContributionPurpose @default(REGULAR_QUOTA)
+  submittedAt       DateTime            @default(now())
+  contributionDate  DateTime? 
+  monthReference    Int? 
+  yearReference     Int? 
 
   status          ContributionStatus @default(PENDING_VALIDATION)
   memberComment   String?
@@ -859,30 +852,27 @@ model Contribution {
   @@map("contributions")
 }
 
-/// =========================
-/// NOUVEAU: DÉPENSES
-/// =========================
 model Expense {
   id            String @id @default(cuid())
   associationId String
   antennaId     String
 
-  amount      Decimal         @db.Decimal(14, 2)
-  currency    CurrencyCode    @default(EUR)
-  category    ExpenseCategory
-  title       String          // Motif court
-  description String?         // Détails poussés
-  expenseDate DateTime        // Date réelle de la dépense
-  paymentMethod PaymentMethod @default(OTHER)
+  amount        Decimal         @db.Decimal(14, 2)
+  currency      CurrencyCode    @default(EUR)
+  category      ExpenseCategory
+  title         String
+  description   String?
+  expenseDate   DateTime
+  paymentMethod PaymentMethod   @default(OTHER)
 
   status          ExpenseStatus @default(PENDING_VALIDATION)
   rejectionReason String?
 
-  proofFileId   String?       // Reçu ou facture uploadé
-  ledgerEntryId String?       @unique // Lien vers l'écriture comptable qui débite le solde
+  proofFileId   String?
+  ledgerEntryId String?       @unique
 
-  engagedByUserId   String    // L'admin d'antenne qui a saisi la dépense
-  validatedByUserId String?   // Le Super Admin qui a validé (si dépassement du seuil)
+  engagedByUserId   String
+  validatedByUserId String?
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -903,9 +893,6 @@ model Expense {
   @@map("expenses")
 }
 
-/// =========================
-/// COMPTABILITÉ (LEDGER)
-/// =========================
 model LedgerEntry {
   id            String          @id @default(cuid())
   associationId String
@@ -920,7 +907,7 @@ model LedgerEntry {
   effectiveDate DateTime @default(now())
 
   contributionId String? @unique
-  expenseId      String? @unique // NOUVEAU : Lien vers Expense
+  expenseId      String? @unique
   projectId      String?
   documentId     String?
   referenceCode  String?
@@ -963,7 +950,7 @@ model BalanceSnapshot {
 }
 
 /// =========================
-/// PROJECTS / PROPOSALS / VOTES
+/// PROJECTS / VOTES
 /// =========================
 
 model ProjectProposal {
@@ -1023,13 +1010,13 @@ model ProjectProposalAttachment {
 }
 
 model ProjectProposalComment {
-  id           String   @id @default(cuid())
-  proposalId   String
-  authorUserId String
-  body         String
-  isInternal   Boolean  @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  proposalId    String
+  authorUserId  String
+  body          String
+  isInternal    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   proposal ProjectProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   author   User            @relation("ProjectProposalCommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
@@ -1183,7 +1170,7 @@ model VoteSession {
   project     Project?         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   proposal    ProjectProposal? @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
-  createdByUser User          @relation("VoteSessionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  createdByUser User           @relation("VoteSessionCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   votes         ProjectVote[]
 
   @@index([associationId, status, startsAt, endsAt])
@@ -1209,7 +1196,7 @@ model ProjectVote {
 }
 
 /// =========================
-/// PROJECTION : EVENTS / PARTNERS
+/// EVENTS / SPONSORS
 /// =========================
 
 model Event {
@@ -1230,13 +1217,13 @@ model Event {
   
   coverImageId  String?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
-  coverImage    FileAsset?  @relation("EventCover", fields: [coverImageId], references: [id], onDelete: SetNull)
-  attendees     EventAttendance[]
+  association    Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna        Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  coverImage     FileAsset?  @relation("EventCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  attendees      EventAttendance[]
 
   @@index([associationId, startsAt])
   @@index([antennaId, startsAt])
@@ -1266,10 +1253,10 @@ model Sponsor {
   logoFileId    String?
   isActive      Boolean @default(true)
 
-  createdAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
 
-  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  logoFile      FileAsset?  @relation("SponsorLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
+  association    Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  logoFile       FileAsset?  @relation("SponsorLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
 
   @@map("sponsors")
 }
@@ -1358,8 +1345,8 @@ model Document {
   antenna     Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
   project     Project?    @relation("ProjectDocuments", fields: [projectId], references: [id], onDelete: SetNull)
 
-  file           FileAsset @relation("DocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
-  uploadedByUser User      @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  file            FileAsset @relation("DocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  uploadedByUser  User      @relation("DocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: Restrict)
 
   ledgerEntries LedgerEntry[]
 
@@ -1381,7 +1368,7 @@ model FileAsset {
   sizeBytes        BigInt
   checksumSha256   String?
 
-  category   FileCategory   @default(OTHER)
+  category   FileCategory  @default(OTHER)
   visibility FileVisibility @default(PRIVATE)
 
   width           Int?
@@ -1401,12 +1388,12 @@ model FileAsset {
   associationLogoFor   Association[]  @relation("AssociationLogo")
   userProfilePhotoFor  User[]         @relation("UserProfilePhoto")
   contributionProofFor Contribution[] @relation("ContributionProofFile")
-  expenseProofFor      Expense[]      @relation("ExpenseProofFile") // NOUVEAU
+  expenseProofFor      Expense[]      @relation("ExpenseProofFile")
   projectCoverFor      Project[]      @relation("ProjectCoverImage")
   newsCoverFor         NewsPost[]     @relation("NewsPostCoverImage")
   documentFileFor      Document[]     @relation("DocumentFile")
-  eventCoverFor        Event[]        @relation("EventCover") // PROJECTION
-  sponsorLogoFor       Sponsor[]      @relation("SponsorLogo") // PROJECTION
+  eventCoverFor        Event[]        @relation("EventCover")
+  sponsorLogoFor       Sponsor[]      @relation("SponsorLogo")
 
   proposalAttachments      ProjectProposalAttachment[]
   projectAttachments       ProjectAttachment[]
@@ -1511,7 +1498,7 @@ model ReminderRunLog {
 }
 
 /// =========================
-/// SETTINGS / REPORTING / PROJECTIONS
+/// SETTINGS / PROJECTIONS
 /// =========================
 
 model AssociationSetting {
@@ -1584,41 +1571,35 @@ model FinancialProjection {
 /// =========================
 
 model AuditLog {
-  id            String  @id @default(cuid())
-  associationId String
-  antennaId     String?
+  id              String   @id @default(cuid())
+  action          AuditAction // 👈 Changé de String à AuditAction
+  entity          String   
+  entityId        String?
+  details         Json     // 👈 Utilise bien "details" pour le service
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime @default(now())
 
-  actorType   AuditActorType @default(USER)
-  actorUserId String?
-  action      AuditAction
+  // Relations
+  actorUserId     String?
+  actorUser       User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  
+  targetUserId    String?
+  targetUser      User?    @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
 
-  targetModel  String 
-  targetId     String?
-  targetUserId String?
+  associationId   String?
+  association     Association? @relation("AssociationAudit", fields: [associationId], references: [id], onDelete: Cascade)
 
-  summary   String?
-  metadata  Json? 
-  ipAddress String?
-  userAgent String?
-
-  createdAt DateTime @default(now())
-
-  association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  antenna     Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
-
-  actorUser  User? @relation("AuditActorUser", fields: [actorUserId], references: [id], onDelete: SetNull)
-  targetUser User? @relation("AuditTargetUser", fields: [targetUserId], references: [id], onDelete: SetNull)
+  antennaId       String?
+  antenna         Antenna?     @relation(fields: [antennaId], references: [id], onDelete: SetNull)
 
   @@index([associationId, createdAt])
-  @@index([antennaId, createdAt])
   @@index([actorUserId, createdAt])
-  @@index([action, createdAt])
-  @@index([targetModel, targetId])
   @@map("audit_logs")
 }
 
 /// =========================
-/// CARTE MEMBRE VIRTUELLE
+/// VIRTUAL CARDS
 /// =========================
 
 model VirtualCard {
@@ -1638,3 +1619,5 @@ model VirtualCard {
   @@index([qrToken])
   @@map("virtual_cards")
 }
+//npx prisma generate
+//npx prisma db push

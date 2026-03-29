@@ -1,4 +1,4 @@
-//src/modules/uploads/uploads.service.ts
+// src/modules/uploads/uploads.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthUser } from '../../common/types/auth-user.type';
@@ -82,14 +82,15 @@ export class UploadsService {
       },
     });
 
+    // ✅ CORRECTION LOG : targetModel -> entity | summary/metadata -> details
     await this.audit.log({
       associationId: params.actor.associationId,
       actorUserId: params.actor.id,
       action: AuditAction.CREATE,
-      targetModel: 'FileAsset',
-      targetId: created.id,
-      summary: `Upload fichier (${driver}) + création FileAsset`,
-      metadata: {
+      entity: 'FileAsset',
+      entityId: created.id,
+      details: {
+        summary: `Upload fichier (${driver}) + création FileAsset`,
         originalName: params.file.originalname,
         mimeType: params.file.mimetype,
         size: params.file.size.toString(),

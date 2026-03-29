@@ -37,6 +37,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { EventsModule } from './modules/events/events.module';
 import { SponsorsModule } from './modules/sponsors/sponsors.module';
+import { SystemAdminModule } from './modules/system-admin/system-admin.module'; // <-- LE NOUVEAU MODULE DU GRAND CHEF
 // import { BillingModule } from './modules/billing/billing.module'; // <-- Gardé en commentaire pour l'instant
 
 // Nouveaux Modules & Auth Member
@@ -113,6 +114,7 @@ import { UsersModule } from './modules/users/users.module';
     ExpensesModule,
     EventsModule,
     SponsorsModule,
+    SystemAdminModule, // <-- LE NOUVEAU MODULE DU GRAND CHEF INTÉGRÉ ICI
     // BillingModule, // <-- Gardé en commentaire pour l'instant
 
     PublicModule,

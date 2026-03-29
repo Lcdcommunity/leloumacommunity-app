@@ -1,19 +1,17 @@
-//src/modules/audit/audit.service.ts
+// backend/src/modules/audit/audit.service.ts
 import { Injectable } from '@nestjs/common';
-import { AuditAction, AuditActorType, Prisma } from '@prisma/client';
+import { AuditAction, Prisma } from '@prisma/client'; // Supprimé AuditActorType qui n'est plus dans le modèle
 import { PrismaService } from '../../prisma/prisma.service';
 
 export type AuditLogInput = {
-  associationId: string;
+  associationId?: string;
   antennaId?: string;
-  actorType?: AuditActorType;
   actorUserId?: string;
   action: AuditAction;
-  targetModel: string;
-  targetId?: string;
+  entity: string;         // Renommé (était targetModel)
+  entityId?: string;      // Renommé (était targetId)
   targetUserId?: string;
-  summary?: string;
-  metadata?: Prisma.InputJsonValue;
+  details: Prisma.InputJsonValue; // Renommé (était metadata)
   ipAddress?: string;
   userAgent?: string;
 };
@@ -27,14 +25,12 @@ export class AuditService {
       data: {
         associationId: input.associationId,
         antennaId: input.antennaId,
-        actorType: input.actorType ?? AuditActorType.USER,
         actorUserId: input.actorUserId,
         action: input.action,
-        targetModel: input.targetModel,
-        targetId: input.targetId,
+        entity: input.entity,
+        entityId: input.entityId,
         targetUserId: input.targetUserId,
-        summary: input.summary,
-        metadata: input.metadata,
+        details: input.details,
         ipAddress: input.ipAddress,
         userAgent: input.userAgent,
       },
@@ -43,5 +39,21 @@ export class AuditService {
 
   async log(input: AuditLogInput): Promise<void> {
     await this.create(input);
+  }
+
+  // Ajout de la méthode list() pour que le contrôleur fonctionne
+  async list(filters: { associationId?: string; antennaId?: string }) {
+    return this.prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { associationId: filters.associationId },
+          { antennaId: filters.antennaId }
+        ]
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        actorUser: { select: { firstName: true, lastName: true } }
+      }
+    });
   }
 }

@@ -28,10 +28,14 @@ export default function LoginPage() {
     try {
       const res = await login(email, password);
       const role = res.user?.role;
-      if (role === 'SUPER_ADMIN') router.replace('/super-admin');
+      
+      // 👇 LA CORRECTION CHIRURGICALE EST ICI : Ajout du SYSTEM_ADMIN
+      if (role === 'SYSTEM_ADMIN') router.replace('/system-admin');
+      else if (role === 'SUPER_ADMIN') router.replace('/super-admin');
       else if (role === 'ANTENNA_ADMIN') router.replace('/admin');
       else if (role === 'MEMBER') router.replace('/member');
       else router.replace('/dashboard');
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Identifiants incorrects ou erreur de connexion.');
     } finally {

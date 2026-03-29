@@ -110,7 +110,7 @@ export interface Expense {
   createdAt: string;
   engagedByUser?: { firstName: string; lastName: string; email: string };
   proofFile?: { url: string; originalFilename: string } | null;
-  antenna?: { name: string }; // <-- LA CORRECTION EST ICI !
+  antenna?: { name: string }; 
 }
 
 export interface EventItem {
@@ -265,9 +265,6 @@ export const api = {
   // ==========================================
   // TARIFICATION & SAAS 
   // ==========================================
-  // ==========================================
-  // TARIFICATION & SAAS 
-  // ==========================================
   getPricingSuperAdmin: () =>
     http<Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold?: number | null }>>('/super-admin/settings/pricing'),
 
@@ -327,6 +324,7 @@ export const api = {
       projectsInProgress: Project[];
       latestContents: ContentPost[];
       lateMembersPreview: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
+      antennaBalances?: Array<{ id: string; name: string; balance: number; currency: string }>;
     }>('/member/dashboard'),
 
   getAssociationBalanceSummary: () =>
@@ -519,7 +517,7 @@ export const api = {
     http<ProjectionResult, typeof body>('/admin/projections/contributions', { method: 'POST', body }),
 
   // ==========================================
-  // NOUVEAU : DÉPENSES (EXPENSES)
+  // DÉPENSES (EXPENSES)
   // ==========================================
   listAntennaExpenses: (params?: { page?: number; pageSize?: number; status?: string; category?: string; q?: string }) =>
     http<ApiListResponse<Expense>>(
@@ -826,4 +824,78 @@ export const api = {
         params?.action ? `&action=${encodeURIComponent(params.action)}` : ''
       }`
     ),
-};
+// ==========================================
+  // SYSTEM ADMIN (GRAND CHEF)
+  // ==========================================
+  
+  // 1. Créer une nouvelle association
+  createAssociationSystemAdmin: (body: {
+    associationName: string;
+    code: string;
+    domain?: string;
+    themeColors?: Record<string, string>;
+    fontFamily?: string;
+    adminFirstName: string;
+    adminLastName: string;
+    adminEmail: string;
+    adminPhone: string;
+    country?: string;
+    city?: string;
+  }) =>
+    http<{ message: string; associationId: string }, typeof body>('/system-admin/associations', {
+      method: 'POST',
+      body,
+    }),
+
+  // 2. Récupérer les stats du tableau de bord global
+  getSystemDashboard: () =>
+    http<{
+      stats: { totalAssociations: number; totalUsers: number };
+      associations: Array<{
+        id: string;
+        name: string;
+        code: string;
+        domainName: string | null;
+        createdAt: string;
+        _count: { users: number; antennas: number };
+      }>;
+    }>('/system-admin/dashboard'),
+
+  // 3. Récupérer les logs d'audit système
+  getSystemAuditLogs: () =>
+    http<Array<{ 
+      id: string; 
+      action: string; 
+      userName: string; 
+      associationName: string; 
+      createdAt: string; 
+      entity: string;
+      ipAddress?: string;
+    }>>('/system-admin/audit-logs'),
+    // 4. Récupérer une association par son ID
+  // 4. Récupérer une association par son ID avec ses compteurs
+  getAssociationByIdSystemAdmin: (id: string) =>
+    http<{
+      id: string;
+      name: string;
+      code: string;
+      isActive: boolean;
+      domainName?: string | null;
+      defaultCurrency: string;
+      country?: string | null;
+      createdAt: string;
+      updatedAt: string;
+      _count: {
+        users: number;
+        antennas: number;
+      };
+    }>(`/system-admin/associations/${id}`),
+
+  // 5. Changer le statut (Activer/Suspendre)
+  // 5. Changer le statut (Activer/Suspendre)
+  updateAssociationStatusSystemAdmin: (id: string, isActive: boolean) =>
+    http<{ message: string }>(`/system-admin/associations/${id}/status`, {
+      method: 'PATCH',
+      body: { isActive },
+    }),
+}; // <-- Fin de l'objet "api"

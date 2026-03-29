@@ -1,4 +1,4 @@
-//web/types/member.ts
+// web/types/member.ts
 export interface MemberDashboardStats {
   myContributionsTotal: number;
   myContributionsValidatedTotal: number;

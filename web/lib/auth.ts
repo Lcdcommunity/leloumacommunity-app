@@ -1,4 +1,4 @@
-//web/lib/auth.ts
+// web/lib/auth.ts
 'use client';
 
 import { http } from './http';

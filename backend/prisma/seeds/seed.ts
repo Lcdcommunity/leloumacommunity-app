@@ -7,14 +7,13 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Début du seeding...');
 
-  // 1. Création de l'Association principale
+  // 1. Création de l'Association principale (pour les tests Super Admin / Admin)
   const association = await prisma.association.upsert({
     where: { code: 'ASSOC-MAIN' },
     update: {},
     create: {
       code: 'ASSOC-MAIN',
       name: 'Association Community',
-      isActive: true,
     },
   });
 
@@ -35,11 +34,31 @@ async function main() {
     },
   });
 
-  // 3. Hachage du mot de passe pour le compte admin
+  // 3. Hachage du mot de passe (commun pour les comptes de test)
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
-  // 4. Création unique du Super Admin
-  console.log('👤 Création du compte Super Admin...');
+  // 4. CRÉATION DU GRAND CHEF (SYSTEM_ADMIN)
+  // Indépendant de toute association, maître de la plateforme
+  console.log('👑 Création du compte Grand Chef (SYSTEM_ADMIN)...');
+  await prisma.user.upsert({
+    where: { email: 'thiernodoniko21@outlook.fr' },
+    update: {
+      role: UserRole.SYSTEM_ADMIN,
+      associationId: null, // Très important : le grand chef est au-dessus
+    },
+    create: {
+      email: 'thiernodoniko21@outlook.fr',
+      passwordHash: hashedPwd,
+      firstName: 'Grand',
+      lastName: 'Chef',
+      role: UserRole.SYSTEM_ADMIN,
+      status: UserStatus.ACTIVE,
+      associationId: null, 
+    },
+  });
+
+  // 5. Création du Super Admin de l'association locale
+  console.log('👤 Création du compte Super Admin d\'association...');
   await prisma.user.upsert({
     where: { email: 'thiernodoniko@gmail.com' },
     update: {},
@@ -65,6 +84,5 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
 // Commande pour exécuter : npx prisma db seed
   //npx prisma db seed

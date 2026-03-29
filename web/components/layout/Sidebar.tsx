@@ -40,67 +40,78 @@ const ICO = {
   history:    'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
   edit:       'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
   user:       'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+  cube:       'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
 };
 
+// 👇 NOUVEL ITEMS POUR LE GRAND CHEF
+const systemAdminItems: NavItem[] = [
+  { href: '/system-admin',                  label: 'Tableau de Bord',        icon: <Ico d={ICO.home} /> },
+  { href: '/system-admin/associations/new', label: 'Nouvelle Instance',      icon: <Ico d={ICO.plus} /> },
+  { href: '/system-admin/audit',            label: 'Logs Système',           icon: <Ico d={ICO.audit} /> },
+  { href: '/system-admin/profile',          label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
+  { href: '/system-admin/settings',         label: 'Paramètres Plateforme',  icon: <Ico d={ICO.gear} /> },
+];
+
 const superAdminItems: NavItem[] = [
-  { href: '/super-admin',                label: 'Dashboard',             icon: <Ico d={ICO.home} /> },
-  { href: '/super-admin/antennas',       label: 'Antennes',              icon: <Ico d={ICO.pin} /> },
-  { href: '/super-admin/admins',         label: 'Admins antenne',        icon: <Ico d={ICO.users} /> },
-  { href: '/super-admin/members',        label: 'Membres',               icon: <Ico d={ICO.group} /> },
-  { href: '/super-admin/approvals',      label: 'Validations comptes',   icon: <Ico d={ICO.check} /> },
-  { href: '/super-admin/contributions',  label: 'Cotisations',           icon: <Ico d={ICO.coin} /> },
-  { href: '/super-admin/expenses',       label: 'Dépenses',              icon: <Ico d={ICO.creditCard} /> },
-  { href: '/super-admin/projects',       label: 'Projets',               icon: <Ico d={ICO.clip} /> },
-  { href: '/super-admin/sponsors',       label: 'Partenaires',           icon: <Ico d={ICO.users} /> },
-  { href: '/super-admin/documents',      label: 'Documents',             icon: <Ico d={ICO.doc} /> },
-  { href: '/super-admin/notifications',  label: 'Notifications',         icon: <Ico d={ICO.bell} /> },
-  { href: '/super-admin/audit',          label: 'Audit',                 icon: <Ico d={ICO.audit} /> },
-  { href: '/super-admin/profile',        label: 'Mon profil',            icon: <Ico d={ICO.user} /> },
-  { href: '/super-admin/settings',       label: 'Paramètres',            icon: <Ico d={ICO.gear} /> },
+  { href: '/super-admin',                 label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
+  { href: '/super-admin/antennas',        label: 'Antennes',               icon: <Ico d={ICO.pin} /> },
+  { href: '/super-admin/admins',         label: 'Admins antenne',         icon: <Ico d={ICO.users} /> },
+  { href: '/super-admin/members',         label: 'Membres',                icon: <Ico d={ICO.group} /> },
+  { href: '/super-admin/approvals',       label: 'Validations comptes',    icon: <Ico d={ICO.check} /> },
+  { href: '/super-admin/contributions',   label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
+  { href: '/super-admin/expenses',        label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
+  { href: '/super-admin/projects',        label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/super-admin/sponsors',        label: 'Partenaires',            icon: <Ico d={ICO.users} /> },
+  { href: '/super-admin/documents',       label: 'Documents',              icon: <Ico d={ICO.doc} /> },
+  { href: '/super-admin/notifications',   label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
+  { href: '/super-admin/audit',           label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
+  { href: '/super-admin/profile',         label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
+  { href: '/super-admin/settings',        label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },
 ];
 
 const adminItems: NavItem[] = [
-  { href: '/admin',                      label: 'Dashboard',             icon: <Ico d={ICO.home} /> },
-  { href: '/admin/approvals',            label: 'Validations comptes',   icon: <Ico d={ICO.check} /> },
-  { href: '/admin/members',              label: 'Membres',               icon: <Ico d={ICO.group} /> },
-  { href: '/admin/contributions',        label: 'Cotisations',           icon: <Ico d={ICO.coin} /> },
-  { href: '/admin/contributions/history',label: 'Historique cotisations',icon: <Ico d={ICO.history} /> },
-  { href: '/admin/expenses',             label: 'Dépenses',              icon: <Ico d={ICO.creditCard} /> },
-  { href: '/admin/projects',             label: 'Projets',               icon: <Ico d={ICO.clip} /> },
-  { href: '/admin/events',               label: 'Événements',            icon: <Ico d={ICO.bell} /> },
-  { href: '/admin/documents',            label: 'Documents & photos',    icon: <Ico d={ICO.doc} /> },
-  { href: '/admin/contents',             label: 'Informations',          icon: <Ico d={ICO.news} /> },
-  { href: '/admin/late-members',         label: 'Retardataires +3 mois', icon: <Ico d={ICO.clock} /> },
-  { href: '/admin/projections',          label: 'Projections',           icon: <Ico d={ICO.chart} /> },
-  { href: '/admin/notifications',        label: 'Notifications',         icon: <Ico d={ICO.bell} /> },
-  { href: '/admin/audit',                label: 'Audit',                 icon: <Ico d={ICO.audit} /> },
-  { href: '/admin/profile',              label: 'Mon profil',            icon: <Ico d={ICO.user} /> },
-  { href: '/admin/settings',             label: 'Paramètres',            icon: <Ico d={ICO.gear} /> },
+  { href: '/admin',                       label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
+  { href: '/admin/approvals',             label: 'Validations comptes',    icon: <Ico d={ICO.check} /> },
+  { href: '/admin/members',               label: 'Membres',                icon: <Ico d={ICO.group} /> },
+  { href: '/admin/contributions',         label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
+  { href: '/admin/contributions/history', label: 'Historique cotisations', icon: <Ico d={ICO.history} /> },
+  { href: '/admin/expenses',              label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
+  { href: '/admin/projects',              label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/admin/events',                label: 'Événements',             icon: <Ico d={ICO.bell} /> },
+  { href: '/admin/documents',             label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
+  { href: '/admin/contents',              label: 'Informations',           icon: <Ico d={ICO.news} /> },
+  { href: '/admin/late-members',          label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
+  { href: '/admin/projections',           label: 'Projections',            icon: <Ico d={ICO.chart} /> },
+  { href: '/admin/notifications',         label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
+  { href: '/admin/audit',                 label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
+  { href: '/admin/profile',               label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
+  { href: '/admin/settings',              label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },
 ];
 
 const memberItems: NavItem[] = [
-  { href: '/member',                       label: 'Dashboard',             icon: <Ico d={ICO.home} /> },
-  { href: '/member/contributions/new',     label: 'Faire un dépôt',        icon: <Ico d={ICO.plus} /> },
-  { href: '/member/contributions/history', label: 'Mes cotisations',       icon: <Ico d={ICO.coin} /> },
-  { href: '/member/expenses',              label: 'Dépenses',              icon: <Ico d={ICO.creditCard} /> },
-  { href: '/member/projects',              label: 'Projets',               icon: <Ico d={ICO.clip} /> },
-  { href: '/member/projects/propose',      label: 'Proposer un projet',    icon: <Ico d={ICO.edit} /> },
-  { href: '/member/events',                label: 'Événements',            icon: <Ico d={ICO.bell} /> },
-  { href: '/member/documents',             label: 'Documents & photos',    icon: <Ico d={ICO.doc} /> },
-  { href: '/member/contents',              label: 'Informations',          icon: <Ico d={ICO.news} /> },
-  { href: '/member/late-members',          label: 'Retardataires +3 mois', icon: <Ico d={ICO.clock} /> },
-  { href: '/member/notifications',         label: 'Notifications',         icon: <Ico d={ICO.bell} /> },
-  { href: '/member/profile',               label: 'Mon profil',            icon: <Ico d={ICO.user} /> },
-  { href: '/member/settings',              label: 'Paramètres',            icon: <Ico d={ICO.gear} /> },
+  { href: '/member',                       label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
+  { href: '/member/contributions/new',     label: 'Faire un dépôt',         icon: <Ico d={ICO.plus} /> },
+  { href: '/member/contributions/history', label: 'Mes cotisations',        icon: <Ico d={ICO.coin} /> },
+  { href: '/member/expenses',              label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
+  { href: '/member/projects',              label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/member/projects/propose',      label: 'Proposer un projet',     icon: <Ico d={ICO.edit} /> },
+  { href: '/member/events',                label: 'Événements',             icon: <Ico d={ICO.bell} /> },
+  { href: '/member/documents',             label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
+  { href: '/member/contents',              label: 'Informations',           icon: <Ico d={ICO.news} /> },
+  { href: '/member/late-members',          label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
+  { href: '/member/notifications',         label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
+  { href: '/member/profile',               label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
+  { href: '/member/settings',              label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },
 ];
 
 const BOTTOM_SLUGS = ['settings', 'profile'];
 
 /**
  * Couleurs par rôle :
- * SUPER_ADMIN   → rouge doux
- * ANTENNA_ADMIN → bleu ciel
- * MEMBER        → vert
+ * SYSTEM_ADMIN   → violet SaaS
+ * SUPER_ADMIN    → rouge doux
+ * ANTENNA_ADMIN  → bleu ciel
+ * MEMBER         → vert
  */
 const ROLE_COLORS: Record<string, {
   accent: string;
@@ -111,6 +122,15 @@ const ROLE_COLORS: Record<string, {
   label: string;
   hoverBg: string;
 }> = {
+  SYSTEM_ADMIN: {
+    accent: '#7C3AED',
+    dim: 'rgba(124,58,237,0.08)',
+    pillBg: '#F5F3FF',
+    pillText: '#7C3AED',
+    gradient: 'linear-gradient(135deg,#7C3AED,#9333EA)',
+    label: 'Grand Chef',
+    hoverBg: 'rgba(124,58,237,0.05)',
+  },
   SUPER_ADMIN: {
     accent: '#C0392B',
     dim: 'rgba(192,57,43,0.08)',
@@ -157,6 +177,7 @@ export function Sidebar() {
   }, []);
 
   const allItems = useMemo(() => {
+    if (role === 'SYSTEM_ADMIN')   return systemAdminItems;
     if (role === 'SUPER_ADMIN')   return superAdminItems;
     if (role === 'ANTENNA_ADMIN') return adminItems;
     if (role === 'MEMBER')        return memberItems;
@@ -275,7 +296,7 @@ export function Sidebar() {
         className="sidebar"
         style={{
           '--sb-accent': colors.accent,
-          '--sb-dim':    colors.dim,
+          '--sb-dim':     colors.dim,
           '--sb-hover':  colors.hoverBg,
         } as React.CSSProperties}
       >
@@ -289,7 +310,7 @@ export function Sidebar() {
             className="sb-logo-img"
           />
           <div className="sb-brand-text">
-            <div className="sb-name">Lélouma</div>
+            <div className="sb-name">{role === 'SYSTEM_ADMIN' ? 'LCD Platform' : 'Lélouma'}</div>
             <div
               className="sb-pill"
               style={{ background: colors.pillBg, color: colors.pillText }}

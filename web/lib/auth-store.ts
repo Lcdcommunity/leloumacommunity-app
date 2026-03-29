@@ -1,5 +1,5 @@
 // web/lib/auth-store.ts
-// Store simple en mémoire + localStorage (stable, sans lib)
+// Store simple en mémoire + localStorage + synchronisation Cookie pour le middleware
 
 type AuthState = {
   accessToken: string | null;
@@ -44,14 +44,25 @@ export function loadAuthState(): AuthState {
 }
 
 /**
- * Sauvegarde l'état en mémoire et dans le localStorage.
+ * Sauvegarde l'état en mémoire, dans le localStorage ET dans les cookies.
  */
 export function saveAuthState(next: AuthState): void {
   memoryState = next;
   if (typeof window === 'undefined') return;
   
   try {
+    // 1. Sauvegarde dans le localStorage (pour ton app React)
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+
+    // 2. Synchronisation avec les Cookies (pour le middleware Next.js)
+    if (next.accessToken) {
+      // On crée un cookie valable 1 jour (86400 secondes), accessible partout (path=/)
+      document.cookie = `accessToken=${next.accessToken}; path=/; max-age=86400; SameSite=Lax`;
+    } else {
+      // S'il n'y a plus de token (ex: déconnexion), on détruit le cookie en le périmant
+      document.cookie = "accessToken=; path=/; max-age=0; SameSite=Lax";
+    }
+
   } catch (error) {
     console.error("Impossible de sauvegarder l'état d'authentification:", error);
   }

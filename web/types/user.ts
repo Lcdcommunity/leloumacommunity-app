@@ -1,8 +1,9 @@
 // web/types/user.ts
-export type UserRole = 'SUPER_ADMIN' | 'ANTENNA_ADMIN' | 'MEMBER';
+
+export type UserRole = 'SYSTEM_ADMIN' | 'SUPER_ADMIN' | 'ANTENNA_ADMIN' | 'MEMBER';
 
 export type UserStatus =
-  | 'PENDING_EMAIL_VERIFICATION'
+  | 'EMAIL_UNVERIFIED'
   | 'PENDING_APPROVAL'
   | 'ACTIVE'
   | 'SUSPENDED'
@@ -11,7 +12,7 @@ export type UserStatus =
 
 export interface UserSummary {
   id: string;
-  associationId: string;
+  associationId?: string | null; // Optionnel car le SYSTEM_ADMIN n'en a pas forcément
   antennaId?: string | null;
   email: string;
   firstName: string;
@@ -29,8 +30,18 @@ export interface UserSummary {
   postalCode?: string | null;
   addressLine1?: string | null;
   addressLine2?: string | null;
+  
+  // Origines & Géographie détaillées
+  placeOfBirth?: string | null;
+  countryOfBirth?: string | null;
   originSubPrefecture?: string | null;
   originVillage?: string | null;
+  originDistrict?: string | null;
+  originQuarter?: string | null;
+  originSector?: string | null;
+
+  // Profession
+  professionalStatus?: string | null;
 
   // Numéro de carte (pour affichage admin au lieu de l'ID technique)
   cardNumber?: string | null;

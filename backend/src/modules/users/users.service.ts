@@ -9,7 +9,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { CloudinaryService } from '../uploads/cloudinary.service';
-import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
+import { NotificationsService } from '../notifications/notifications.service';
 
 type RequestMeta = {
   ipAddress?: string;
@@ -39,7 +39,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly cloudinaryService: CloudinaryService,
-    private readonly notifications: NotificationsService, // Injecté chirurgicalement
+    private readonly notifications: NotificationsService,
   ) {}
 
   async getMe(userId: string) {
@@ -62,16 +62,16 @@ export class UsersService {
 
     if (dto.firstName?.trim()) data.firstName = dto.firstName.trim();
     if (dto.lastName?.trim())  data.lastName  = dto.lastName.trim();
-    if (dto.phone              !== undefined) data.phone              = this.normalize(dto.phone);
+    if (dto.phone               !== undefined) data.phone               = this.normalize(dto.phone);
     if (dto.originSubPrefecture !== undefined) data.originSubPrefecture = this.normalize(dto.originSubPrefecture);
-    if (dto.birthDate          !== undefined) data.birthDate          = dto.birthDate ? new Date(`${dto.birthDate}T00:00:00.000Z`) : null;
-    if (dto.placeOfBirth       !== undefined) data.placeOfBirth       = this.normalize(dto.placeOfBirth);
-    if (dto.countryOfBirth     !== undefined) data.countryOfBirth     = this.normalize(dto.countryOfBirth);
-    if (dto.addressLine1       !== undefined) data.addressLine1       = this.normalize(dto.addressLine1);
-    if (dto.addressLine2       !== undefined) data.addressLine2       = this.normalize(dto.addressLine2);
-    if (dto.postalCode         !== undefined) data.postalCode         = this.normalize(dto.postalCode);
-    if (dto.city               !== undefined) data.city               = this.normalize(dto.city);
-    if (dto.country            !== undefined) data.country            = this.normalize(dto.country);
+    if (dto.birthDate           !== undefined) data.birthDate           = dto.birthDate ? new Date(`${dto.birthDate}T00:00:00.000Z`) : null;
+    if (dto.placeOfBirth        !== undefined) data.placeOfBirth        = this.normalize(dto.placeOfBirth);
+    if (dto.countryOfBirth      !== undefined) data.countryOfBirth      = this.normalize(dto.countryOfBirth);
+    if (dto.addressLine1        !== undefined) data.addressLine1        = this.normalize(dto.addressLine1);
+    if (dto.addressLine2        !== undefined) data.addressLine2        = this.normalize(dto.addressLine2);
+    if (dto.postalCode          !== undefined) data.postalCode          = this.normalize(dto.postalCode);
+    if (dto.city                !== undefined) data.city                = this.normalize(dto.city);
+    if (dto.country             !== undefined) data.country             = this.normalize(dto.country);
 
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
@@ -88,15 +88,15 @@ export class UsersService {
       title: 'Profil mis à jour',
     });
 
+    // ✅ AUDIT : targetModel -> entity | metadata -> details
     await this.auditService.create({
       associationId: updatedUser.associationId,
       actorUserId: updatedUser.id,
       action: AuditAction.UPDATE,
-      targetModel: 'User',
-      targetId: updatedUser.id,
+      entity: 'User',
+      entityId: updatedUser.id,
       targetUserId: updatedUser.id,
-      summary: 'Mise à jour du profil utilisateur',
-      metadata: { updatedFields: Object.keys(dto) },
+      details: { updatedFields: Object.keys(dto) },
       ipAddress: meta?.ipAddress,
       userAgent: meta?.userAgent,
     });
@@ -163,16 +163,16 @@ export class UsersService {
         title: 'Photo mise à jour',
       });
 
-      // 3. Audit
+      // 3. Audit : targetModel -> entity | metadata -> details
       await this.auditService.create({
         associationId: user.associationId,
         actorUserId: user.id,
         action: AuditAction.UPDATE,
-        targetModel: 'User',
-        targetId: user.id,
+        entity: 'User',
+        entityId: user.id,
         targetUserId: user.id,
-        summary: 'Mise à jour de la photo de profil (Cloudinary)',
-        metadata: {
+        details: {
+          summary: 'Mise à jour de la photo de profil (Cloudinary)',
           fileId: result.createdFileAsset.id,
           url: result.createdFileAsset.url,
         },
@@ -188,8 +188,7 @@ export class UsersService {
         avatarUrl: result.updatedUser.profilePhoto?.url ?? null,
         user: profile,
       };
-    } catch {
-      // ✅ ESLint fix : catch sans (error) car non utilisé
+    } catch (error) {
       throw new BadRequestException("Échec de l'upload vers Cloudinary.");
     }
   }

@@ -9,7 +9,6 @@ import { CurrentUser, AuthUser } from '../../common/decorators/current-user.deco
 
 @Controller('audit')
 @UseGuards(JwtAuthGuard, RolesGuard)
-// 👇 LA SOLUTION : On autorise aussi les ANTENNA_ADMIN !
 @Roles(UserRole.SUPER_ADMIN, UserRole.ANTENNA_ADMIN) 
 export class AuditController {
   constructor(private readonly service: AuditService) {}
@@ -19,10 +18,16 @@ export class AuditController {
     @CurrentUser() user: AuthUser,
     @Query('page') page: number = 1,
     @Query('pageSize') pageSize: number = 100,
-    @Query('action') action?: AuditAction,
   ) {
-    // Note: Vous devrez ajouter une vraie méthode list() dans votre AuditService
-    // En attendant, on renvoie une liste vide pour éviter l'erreur sur le Frontend.
-    return { items: [], total: 0 }; 
+    // Si c'est un ANTENNA_ADMIN, on ne lui montre que les logs de son antenne
+    const logs = await this.service.list({
+      associationId: user.associationId,
+      antennaId: user.role === UserRole.ANTENNA_ADMIN ? user.antennaId : undefined
+    });
+
+    return {
+      items: logs,
+      total: logs.length
+    };
   }
 }
