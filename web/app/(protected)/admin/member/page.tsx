@@ -20,13 +20,14 @@ function Initials({ name, color = '#2563EB' }: { name: string; color?: string })
 }
 
 /* ══════════════════════════════════════════════════════ USER STATUS BADGE */
+// Correction : Remplacement de PENDING_EMAIL_VERIFICATION par EMAIL_UNVERIFIED pour correspondre au schéma Prisma
 const USER_STATUS_MAP: Record<UserStatus, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:                     { label: 'Actif',              color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  PENDING_APPROVAL:           { label: 'En attente',         color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  PENDING_EMAIL_VERIFICATION: { label: 'Email non vérifié',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  SUSPENDED:                  { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  REJECTED:                   { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  DELETED:                    { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+  ACTIVE:           { label: 'Actif',              color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  PENDING_APPROVAL: { label: 'En attente',         color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  EMAIL_UNVERIFIED: { label: 'Email non vérifié',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  SUSPENDED:        { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  REJECTED:         { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  DELETED:          { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
 };
 
 function UserStatusBadge({ status }: { status: UserStatus }) {
@@ -169,7 +170,7 @@ export default function AdminMembersDirectoryPage() {
             </div>
             <select className="aa-select" value={status} onChange={e => setStatus(e.target.value)}>
               <option value="">Tous statuts</option>
-              <option value="PENDING_EMAIL_VERIFICATION">Email non vérifié</option>
+              <option value="EMAIL_UNVERIFIED">Email non vérifié</option>
               <option value="PENDING_APPROVAL">En attente approbation</option>
               <option value="ACTIVE">Actif</option>
               <option value="SUSPENDED">Suspendu</option>

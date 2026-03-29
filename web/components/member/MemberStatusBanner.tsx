@@ -1,4 +1,4 @@
-//web/components/member/MemberStatusBanner.tsx
+// web/components/member/MemberStatusBanner.tsx
 'use client';
 
 import type { UserSummary } from '../../types/user';
@@ -37,7 +37,8 @@ function getConfig(status: string): StatusConfig {
   };
 
   const map: Record<string, StatusConfig> = {
-    PENDING_EMAIL_VERIFICATION: {
+    // FIX: EMAIL_UNVERIFIED remplace PENDING_EMAIL_VERIFICATION
+    EMAIL_UNVERIFIED: {
       color: '#92400E', bg: '#FFFBEB', border: '#FDE68A',
       icon: icons.warning, label: 'Email non vérifié',
       message: 'Vérifiez votre boîte mail et cliquez sur le lien d\'activation pour continuer.',
@@ -135,9 +136,10 @@ export function MemberStatusBanner({ me }: { me: UserSummary }) {
           <p className="msb-msg">{cfg.message}</p>
         </div>
 
-        {/* Show action hint for pending states */}
-        {me.status === 'PENDING_EMAIL_VERIFICATION' && (
+        {/* FIX: EMAIL_UNVERIFIED pour la condition d'affichage du bouton */}
+        {me.status === 'EMAIL_UNVERIFIED' && (
           <button
+            type="button"
             style={{
               flexShrink: 0, alignSelf: 'center',
               background: 'none', border: `1px solid ${cfg.border}`,

@@ -21,12 +21,12 @@ function Initials({ name, color = '#2563EB' }: { name: string; color?: string })
 
 /* ══════════════════════════════════════════════════════ USER STATUS BADGE */
 const USER_STATUS_MAP: Record<UserStatus, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:                     { label: 'Actif',              color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  PENDING_APPROVAL:           { label: 'En attente',         color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  PENDING_EMAIL_VERIFICATION: { label: 'Email non vérifié',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  SUSPENDED:                  { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  REJECTED:                   { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  DELETED:                    { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+  ACTIVE:           { label: 'Actif',              color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  PENDING_APPROVAL: { label: 'En attente',         color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  EMAIL_UNVERIFIED: { label: 'Email non vérifié',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  SUSPENDED:        { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  REJECTED:         { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  DELETED:          { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
 };
 
 function UserStatusBadge({ status }: { status: UserStatus }) {
@@ -95,14 +95,14 @@ export default function AdminMembersDirectoryPage() {
 
         /* Toolbar */
         .aa-toolbar { display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap; padding: 1rem 1.3rem; border-bottom: 1px solid rgba(37,99,235,.07); }
-        .aa-sw { position: relative; flex: 1; min-width: 180px; }
+        .aa-sw { position: relative; flex: 2; min-width: 240px; }
         .aa-si { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
         .aa-search { width: 100%; height: 40px; border-radius: 11px; border: 1px solid rgba(37,99,235,.15); background: rgba(255,255,255,.88); padding: 0 .9rem 0 2.3rem; font-family: 'DM Sans', sans-serif; font-size: 0.83rem; color: #111827; outline: none; transition: border-color .2s, box-shadow .2s; }
         .aa-search:focus { border-color: rgba(37,99,235,.4); box-shadow: 0 0 0 3px rgba(37,99,235,.08); background: white; }
         .aa-search::placeholder { color: rgba(107,114,128,.45); }
         .aa-select { height: 40px; border-radius: 11px; border: 1px solid rgba(37,99,235,.15); background: rgba(255,255,255,.88); padding: 0 2rem 0 .85rem; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; color: #374151; font-weight: 600; outline: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .65rem center; min-width: 170px; transition: border-color .2s; }
         .aa-select:focus { border-color: rgba(37,99,235,.4); outline: none; }
-        .aa-filter-btn { height: 40px; padding: 0 1.1rem; border-radius: 11px; background: linear-gradient(135deg,#1D4ED8,#2563EB); border: none; color: white; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 0.35rem; box-shadow: 0 3px 10px rgba(37,99,235,.28); transition: all 0.18s; white-space: nowrap; }
+        .aa-filter-btn { height: 40px; padding: 0 1.4rem; border-radius: 11px; background: linear-gradient(135deg,#1D4ED8,#2563EB); border: none; color: white; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 0.35rem; box-shadow: 0 3px 10px rgba(37,99,235,.28); transition: all 0.18s; white-space: nowrap; }
         .aa-filter-btn:hover { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(37,99,235,.38); }
 
         /* Members panel */
@@ -126,9 +126,14 @@ export default function AdminMembersDirectoryPage() {
         .aa-row-clickable:hover { background: rgba(37,99,235,0.03) !important; }
         .aa-row-clickable:active { background: rgba(37,99,235,0.06) !important; }
 
+        /* Responsive */
         .hide-mobile { display: table-cell; }
+        .hide-desktop { display: none; }
         @media(max-width:768px){
           .hide-mobile { display: none !important; }
+          .hide-desktop { display: block; }
+          .aa-sw { flex: 1 1 100%; min-width: 100%; }
+          .aa-select { flex: 1; min-width: 120px; }
         }
 
         @keyframes aain { to { opacity: 1; transform: translateY(0); } }
@@ -169,14 +174,13 @@ export default function AdminMembersDirectoryPage() {
             </div>
             <select className="aa-select" value={status} onChange={e => setStatus(e.target.value)}>
               <option value="">Tous statuts</option>
-              <option value="PENDING_EMAIL_VERIFICATION">Email non vérifié</option>
+              <option value="EMAIL_UNVERIFIED">Email non vérifié</option>
               <option value="PENDING_APPROVAL">En attente approbation</option>
               <option value="ACTIVE">Actif</option>
               <option value="SUSPENDED">Suspendu</option>
               <option value="REJECTED">Rejeté</option>
             </select>
             <button className="aa-filter-btn" onClick={() => void loadMembers(q, status)}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/></svg>
               Filtrer
             </button>
           </div>
