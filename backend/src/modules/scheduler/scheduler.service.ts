@@ -1,4 +1,4 @@
-// src/modules/scheduler/scheduler.service.ts
+// backend/src/modules/scheduler/scheduler.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -13,15 +13,22 @@ export class SchedulerService {
     private readonly jobsService: JobsService,
   ) {}
 
+  /**
+   * Vérifie si le scheduler est activé dans l'environnement.
+   */
   private enabled(): boolean {
     return (process.env.SCHEDULER_ENABLED || 'true') === 'true';
   }
 
+  /**
+   * 🕒 CHAQUE SEMAINE (Lundi à minuit) :
+   * Détecte les membres en retard de cotisation et alerte les admins d'antenne.
+   */
   @Cron(CronExpression.EVERY_WEEK)
   async weeklyLateMembersDigest() {
     if (!this.enabled()) return;
 
-    this.logger.log('Cron weeklyLateMembersDigest started');
+    this.logger.log('[CRON] Début du rapport hebdomadaire des membres en retard...');
 
     const associations = await this.prisma.association.findMany({
       where: { isActive: true },
@@ -30,20 +37,49 @@ export class SchedulerService {
 
     for (const assoc of associations) {
       try {
-        // ts-ignore temporaire pour permettre la compilation
-        // @ts-ignore
-        const digest = await this.jobsService.buildLateMembersDigest(assoc.id, 3);
-        this.logger.log(`[${assoc.name}] retardataires>3m = ${digest?.total || 0}`);
-
-        // @ts-ignore
-        await this.jobsService.notifyAntennaAdminsLateDigest(assoc.id, 3);
+        const result = await this.jobsService.checkAndNotifyLateMembers(assoc.id);
+        this.logger.log(`[${assoc.name}] Alertes envoyées : ${result.notificationsSent}`);
       } catch (error) {
         this.logger.error(
-          `Cron failed for association ${assoc.id}: ${(error as Error).message}`,
+          `[${assoc.name}] Échec du cron LateMembers : ${(error as Error).message}`,
         );
       }
     }
 
-    this.logger.log('Cron weeklyLateMembersDigest finished');
+    this.logger.log('[CRON] Rapport hebdomadaire terminé.');
+  }
+
+  /**
+   * 🕒 CHAQUE JOUR (À minuit) :
+   * Nettoie les tokens de sécurité expirés ou consommés.
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  async dailySecurityCleanup() {
+    if (!this.enabled()) return;
+
+    this.logger.log('[CRON] Purge des tokens de sécurité...');
+    try {
+      const res = await this.jobsService.purgeExpiredAuthTokens();
+      this.logger.log(`[SYSTEM] ${res.cleaned} tokens purgés avec succès.`);
+    } catch (error) {
+      this.logger.error(`[SYSTEM] Échec de la purge des tokens : ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * 🕒 CHAQUE JOUR (À 1h du matin) :
+   * Génère les snapshots de solde pour toutes les associations actives (Reporting).
+   */
+  @Cron(CronExpression.EVERY_DAY_AT_1AM)
+  async dailyBalanceSnapshots() {
+    if (!this.enabled()) return;
+
+    this.logger.log('[CRON] Génération des snapshots financiers...');
+    try {
+      const res = await this.jobsService.generateBalanceSnapshots();
+      this.logger.log(`[SYSTEM] Snapshots créés pour ${res.updated} associations.`);
+    } catch (error) {
+      this.logger.error(`[SYSTEM] Échec des snapshots financiers : ${(error as Error).message}`);
+    }
   }
 }

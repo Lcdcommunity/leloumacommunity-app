@@ -1,4 +1,4 @@
-// src/modules/ledger/ledger.service.ts
+// backend/src/modules/ledger/ledger.service.ts
 import { Injectable } from '@nestjs/common';
 import { LedgerEntryType, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -25,6 +25,7 @@ export class LedgerService {
       CONTRIBUTION_IN: 1,
       DONATION_IN: 1,
       MANUAL_ADJUSTMENT_IN: 1,
+      ANTENNA_EXPENSE_OUT: -1, // 🔥 CORRECTION CRITIQUE : Les dépenses d'antenne sont bien déduites !
       PROJECT_EXPENSE_OUT: -1,
       OPERATING_EXPENSE_OUT: -1,
       MANUAL_ADJUSTMENT_OUT: -1,
@@ -48,10 +49,10 @@ export class LedgerService {
     const entry = await this.prisma.ledgerEntry.create({ data });
 
     // ✅ NOTIFICATION : Alerter la direction pour les mouvements manuels ou les sorties d'argent
-    // Typage explicite ajouté ici pour corriger l'erreur d'assignation TypeScript
     const sensitiveTypes: LedgerEntryType[] = [
       LedgerEntryType.MANUAL_ADJUSTMENT_IN,
       LedgerEntryType.MANUAL_ADJUSTMENT_OUT,
+      LedgerEntryType.ANTENNA_EXPENSE_OUT, // 🔥 CORRECTION : Notifier aussi les dépenses d'antenne
       LedgerEntryType.PROJECT_EXPENSE_OUT,
       LedgerEntryType.OPERATING_EXPENSE_OUT,
     ];

@@ -434,23 +434,23 @@ model Antenna {
   association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   createdByUser User?       @relation("AntennaCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
-  members             Membership[]
-  adminAssignments    AntennaAdminAssignment[]
-  contributions       Contribution[]
-  expenses            Expense[]
-  projects            Project[]
-  projectProposals    ProjectProposal[]
-  events              Event[]
-  newsPosts           NewsPost[]
-  documents           Document[]
-  ledgerEntries       LedgerEntry[]
-  settings            AntennaSetting[]
-  notifications       Notification[]
-  reminders           ReminderRunLog[]
-  auditLogs           AuditLog[]
-  AdminInvitation     AdminInvitation[]
-  BalanceSnapshot     BalanceSnapshot[]
-  VoteSession         VoteSession[]
+  members           Membership[]
+  adminAssignments  AntennaAdminAssignment[]
+  contributions     Contribution[]
+  expenses          Expense[]
+  projects          Project[]
+  projectProposals  ProjectProposal[]
+  events            Event[]
+  newsPosts         NewsPost[]
+  documents         Document[]
+  ledgerEntries     LedgerEntry[]
+  settings          AntennaSetting[]
+  notifications     Notification[]
+  reminders         ReminderRunLog[]
+  auditLogs         AuditLog[]
+  AdminInvitation   AdminInvitation[]
+  BalanceSnapshot   BalanceSnapshot[]
+  VoteSession       VoteSession[]
   FinancialProjection FinancialProjection[]
 
   @@unique([associationId, code])
@@ -602,11 +602,11 @@ model User {
 }
 
 model Membership {
-  id            String                   @id @default(cuid())
-  associationId String
-  userId        String
-  antennaId     String
-  status        MembershipApprovalStatus @default(PENDING)
+  id              String                   @id @default(cuid())
+  associationId   String
+  userId          String
+  antennaId       String
+  status          MembershipApprovalStatus @default(PENDING)
 
   joinedAt  DateTime?
   leftAt    DateTime?
@@ -1010,13 +1010,13 @@ model ProjectProposalAttachment {
 }
 
 model ProjectProposalComment {
-  id            String   @id @default(cuid())
-  proposalId    String
-  authorUserId  String
-  body          String
-  isInternal    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String   @id @default(cuid())
+  proposalId   String
+  authorUserId String
+  body         String
+  isInternal   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   proposal ProjectProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
   author   User            @relation("ProjectProposalCommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
@@ -1358,7 +1358,7 @@ model Document {
 
 model FileAsset {
   id               String  @id @default(cuid())
-  associationId    String
+  associationId    String? // 👈 MODIFIÉ ICI (ajout du '?')
   uploadedByUserId String?
 
   storageProvider  String 
@@ -1382,8 +1382,8 @@ model FileAsset {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  association    Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  uploadedByUser User?       @relation("FileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
+  association    Association? @relation(fields: [associationId], references: [id], onDelete: Cascade) // 👈 MODIFIÉ ICI (ajout du '?')
+  uploadedByUser User?        @relation("FileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
   associationLogoFor   Association[]  @relation("AssociationLogo")
   userProfilePhotoFor  User[]         @relation("UserProfilePhoto")
@@ -1435,7 +1435,7 @@ model Notification {
 }
 
 model NotificationRecipient {
-  id             String                     @id @default(cuid())
+  id             String                   @id @default(cuid())
   notificationId String
   userId         String
   channel        NotificationChannel        @default(IN_APP)
@@ -1488,8 +1488,8 @@ model ReminderRunLog {
   triggeredByUserId String? 
   triggeredAt       DateTime     @default(now())
 
-  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  antenna         Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
   triggeredByUser User?       @relation("ReminderTriggeredByUser", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
 
   @@index([associationId, kind, triggeredAt])
@@ -1572,10 +1572,10 @@ model FinancialProjection {
 
 model AuditLog {
   id              String   @id @default(cuid())
-  action          AuditAction // 👈 Changé de String à AuditAction
+  action          AuditAction 
   entity          String   
   entityId        String?
-  details         Json     // 👈 Utilise bien "details" pour le service
+  details         Json     
   ipAddress       String?
   userAgent       String?
   createdAt       DateTime @default(now())

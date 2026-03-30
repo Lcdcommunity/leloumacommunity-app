@@ -2,16 +2,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateSponsorDto, UpdateSponsorDto } from './dto/sponsor.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class SponsorsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listSponsors(associationId: string) {
+  /**
+   * Liste les sponsors d'une association avec pagination.
+   */
+  async listSponsors(associationId: string, page = 1, pageSize = 100) {
+    const skip = (page - 1) * pageSize;
+    const where: Prisma.SponsorWhereInput = { associationId };
+
     const [total, items] = await Promise.all([
-      this.prisma.sponsor.count({ where: { associationId } }),
+      this.prisma.sponsor.count({ where }),
       this.prisma.sponsor.findMany({
-        where: { associationId },
+        where,
+        skip,
+        take: pageSize,
         orderBy: { createdAt: 'desc' },
         include: {
           logoFile: {
@@ -21,10 +30,18 @@ export class SponsorsService {
       })
     ]);
     
-    // On simule une pagination (même si on ramène tout pour l'instant)
-    return { items, total, page: 1, pageSize: 100 };
+    return { 
+      items, 
+      total, 
+      page, 
+      pageSize,
+      totalPages: Math.ceil(total / pageSize)
+    };
   }
 
+  /**
+   * Crée un nouveau partenaire sponsor.
+   */
   async createSponsor(associationId: string, dto: CreateSponsorDto) {
     return this.prisma.sponsor.create({
       data: {
@@ -38,12 +55,16 @@ export class SponsorsService {
     });
   }
 
+  /**
+   * Met à jour un sponsor (avec vérification de propriété).
+   */
   async updateSponsor(associationId: string, sponsorId: string, dto: UpdateSponsorDto) {
+    // On vérifie d'abord l'existence et l'appartenance
     const sponsor = await this.prisma.sponsor.findFirst({
       where: { id: sponsorId, associationId }
     });
 
-    if (!sponsor) throw new NotFoundException('Sponsor introuvable.');
+    if (!sponsor) throw new NotFoundException('Sponsor introuvable dans votre association.');
 
     return this.prisma.sponsor.update({
       where: { id: sponsorId },
@@ -57,6 +78,9 @@ export class SponsorsService {
     });
   }
 
+  /**
+   * Supprime définitivement un sponsor.
+   */
   async deleteSponsor(associationId: string, sponsorId: string) {
     const sponsor = await this.prisma.sponsor.findFirst({
       where: { id: sponsorId, associationId }

@@ -59,7 +59,7 @@ export class SuperAdminService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  /* ── GESTION DES PRIX (PRICING CONFIG) ── */
+  /* ── GESTION DES PRIX ── */
 
   async getPricingConfig(associationId: string) {
     const setting = await this.prisma.associationSetting.findUnique({
@@ -100,12 +100,11 @@ export class SuperAdminService {
     });
   }
 
-  /* ─────────────────────────────────────────────────────────────────── */
-  /* ── ANTENNAS ─────────────────────────────────────────────────────── */
+  /* ── ANTENNAS ── */
 
-  async listAntennas(page: number, pageSize: number, q?: string, isActive?: boolean) {
+  async listAntennas(associationId: string, page: number, pageSize: number, q?: string, isActive?: boolean) {
     const skip = (page - 1) * pageSize;
-    const where: Prisma.AntennaWhereInput = {};
+    const where: Prisma.AntennaWhereInput = { associationId }; // 🔥 FILTRÉ
 
     if (q) {
       where.OR = [
@@ -140,42 +139,28 @@ export class SuperAdminService {
 
   async listAntennasByAssociation(associationId: string) {
     return this.prisma.antenna.findMany({
-      where: { associationId },
+      where: { associationId }, // 🔥 FILTRÉ
       include: {
         _count: {
-          select: {
-            members: true,
-          },
+          select: { members: true },
         },
       },
       orderBy: { name: 'asc' },
     });
   }
 
-  async getAntennaById(id: string) {
-    const antenna = await this.prisma.antenna.findUnique({
-      where: { id },
+  async getAntennaById(id: string, associationId: string) {
+    const antenna = await this.prisma.antenna.findFirst({
+      where: { id, associationId }, // 🔥 FILTRÉ
     });
 
-    if (!antenna) {
-      throw new NotFoundException('Antenne introuvable.');
-    }
-
+    if (!antenna) throw new NotFoundException('Antenne introuvable.');
     return antenna;
   }
 
-  async createAntenna(data: CreateAntennaDto, actorId: string) {
-    const association = await this.prisma.association.findFirst({
-      where: { isActive: true },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    if (!association) {
-      throw new NotFoundException('Association manquante.');
-    }
-
+  async createAntenna(data: CreateAntennaDto, actorId: string, associationId: string) {
     const code = await this.buildUniqueAntennaCode(
-      association.id,
+      associationId,
       data.code,
       data.name,
     );
@@ -183,7 +168,7 @@ export class SuperAdminService {
     const created = await this.prisma.$transaction(async (tx) => {
       const antenna = await tx.antenna.create({
         data: {
-          associationId: association.id,
+          associationId,
           code,
           name: data.name,
           addressLine1: data.addressLine1,
@@ -199,23 +184,13 @@ export class SuperAdminService {
         },
       });
 
-      let createdAdmin:
-        | {
-            email: string;
-            firstName: string;
-            lastName: string;
-            temporaryPassword: string;
-            antennaName: string;
-            associationTitle?: string;
-            sendInvite?: boolean;
-          }
-        | null = null;
+      let createdAdmin = null;
 
       if (data.admin?.email) {
         const result = await this.createAntennaAdminRecord(
           tx,
           {
-            associationId: association.id,
+            associationId,
             antennaId: antenna.id,
             firstName: data.admin.firstName,
             lastName: data.admin.lastName,
@@ -248,8 +223,8 @@ export class SuperAdminService {
     });
 
     await this.notifications.notifySuperAdmins(
-      association.id,
-      `Une nouvelle antenne "${created.antenna.name}" a été créée par l'administrateur.`,
+      associationId,
+      `Une nouvelle antenne "${created.antenna.name}" a été créée.`,
       NotificationType.SYSTEM_ALERT,
     );
 
@@ -267,9 +242,9 @@ export class SuperAdminService {
     return created.antenna;
   }
 
-  async updateAntenna(id: string, data: Partial<CreateAntennaDto>) {
+  async updateAntenna(id: string, data: Partial<CreateAntennaDto>, associationId: string) {
     return this.prisma.antenna.update({
-      where: { id },
+      where: { id, associationId }, // 🔥 FILTRÉ
       data: {
         ...(data.code !== undefined ? { code: data.code } : {}),
         ...(data.name !== undefined ? { name: data.name } : {}),
@@ -286,16 +261,17 @@ export class SuperAdminService {
     });
   }
 
-  async deleteAntenna(id: string) {
-    return this.prisma.antenna.delete({ where: { id } });
+  async deleteAntenna(id: string, associationId: string) {
+    return this.prisma.antenna.delete({ where: { id, associationId } }); // 🔥 FILTRÉ
   }
 
-  /* ── USERS ────────────────────────────────────────────────────────── */
+  /* ── USERS ── */
 
-  async listUsersByRole(role: UserRole, page: number, pageSize: number, q?: string, status?: string) {
+  async listUsersByRole(associationId: string, role: UserRole, page: number, pageSize: number, q?: string, status?: string) {
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.UserWhereInput = {
+      associationId, // 🔥 FILTRÉ
       role,
       ...(status
         ? { status: status as UserStatus }
@@ -334,34 +310,9 @@ export class SuperAdminService {
     };
   }
 
-  async listUsers(associationId: string, query: ListUsersQuery) {
-    const where: Prisma.UserWhereInput = {
-      associationId,
-      ...(query.role ? { role: query.role } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.q
-        ? {
-            OR: [
-              { firstName: { contains: query.q, mode: 'insensitive' } },
-              { lastName: { contains: query.q, mode: 'insensitive' } },
-              { email: { contains: query.q, mode: 'insensitive' } },
-            ],
-          }
-        : {}),
-    };
-
-    return this.prisma.user.findMany({
-      where,
-      include: {
-        memberships: { include: { antenna: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  async approveUser(userId: string, adminId: string) {
+  async approveUser(userId: string, adminId: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: userId, associationId }, // 🔥 FILTRÉ
       data: {
         status: UserStatus.ACTIVE,
         approvedByUserId: adminId,
@@ -370,9 +321,9 @@ export class SuperAdminService {
     });
 
     await this.notifications.createForUser({
-      associationId: user.associationId,
+      associationId,
       userId: user.id,
-      message: `Votre compte a été approuvé. Vous avez désormais accès à l'espace membre.`,
+      message: `Votre compte a été approuvé.`,
       type: NotificationType.ACCOUNT_APPROVED,
       title: 'Compte activé',
     });
@@ -380,9 +331,9 @@ export class SuperAdminService {
     return user;
   }
 
-  async rejectUser(userId: string, adminId: string, reason: string) {
+  async rejectUser(userId: string, adminId: string, reason: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: userId, associationId }, // 🔥 FILTRÉ
       data: {
         status: UserStatus.REJECTED,
         rejectedByUserId: adminId,
@@ -392,7 +343,7 @@ export class SuperAdminService {
     });
 
     await this.notifications.createForUser({
-      associationId: user.associationId,
+      associationId,
       userId: user.id,
       message: `Votre demande d'adhésion a été refusée. Motif : ${reason}`,
       type: NotificationType.ACCOUNT_REJECTED,
@@ -402,23 +353,9 @@ export class SuperAdminService {
     return user;
   }
 
-  async updateUser(
-    userId: string,
-    data: {
-      firstName?: string;
-      lastName?: string;
-      email?: string;
-      phone?: string;
-      birthDate?: string | Date;
-      originSubPrefecture?: string;
-      city?: string;
-      country?: string;
-      addressLine1?: string;
-      addressLine2?: string;
-    },
-  ) {
+  async updateUser(userId: string, data: any, associationId: string) {
     return this.prisma.user.update({
-      where: { id: userId },
+      where: { id: userId, associationId }, // 🔥 FILTRÉ
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -434,9 +371,9 @@ export class SuperAdminService {
     });
   }
 
-  async suspendUser(userId: string, actorId: string) {
+  async suspendUser(userId: string, actorId: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: userId, associationId }, // 🔥 FILTRÉ
       data: {
         status: UserStatus.SUSPENDED,
         suspendedByUserId: actorId,
@@ -445,9 +382,9 @@ export class SuperAdminService {
     });
 
     await this.notifications.createForUser({
-      associationId: user.associationId,
+      associationId,
       userId: user.id,
-      message: `Votre compte a été suspendu par un administrateur. Veuillez contacter le support pour plus d'informations.`,
+      message: `Votre compte a été suspendu par un administrateur.`,
       type: NotificationType.ACCOUNT_SUSPENDED,
       title: 'Compte suspendu',
     });
@@ -455,9 +392,9 @@ export class SuperAdminService {
     return user;
   }
 
-  async activateUser(userId: string, actorId: string) {
+  async activateUser(userId: string, actorId: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId },
+      where: { id: userId, associationId }, // 🔥 FILTRÉ
       data: {
         status: UserStatus.ACTIVE,
         approvedByUserId: actorId,
@@ -468,7 +405,7 @@ export class SuperAdminService {
     });
 
     await this.notifications.createForUser({
-      associationId: user.associationId,
+      associationId,
       userId: user.id,
       message: `Votre compte a été réactivé avec succès.`,
       type: NotificationType.ACCOUNT_APPROVED,
@@ -477,9 +414,9 @@ export class SuperAdminService {
     return user;
   }
 
-  async deleteUser(userId: string, actorId: string) {
+  async deleteUser(userId: string, actorId: string, associationId: string) {
     return this.prisma.user.update({
-      where: { id: userId },
+      where: { id: userId, associationId }, // 🔥 FILTRÉ
       data: {
         status: UserStatus.DELETED,
         deletedAt: new Date(),
@@ -488,64 +425,17 @@ export class SuperAdminService {
     });
   }
 
-  async updateAntennaAdmin(
-    userId: string,
-    data: {
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      city?: string;
-      country?: string;
-      postalCode?: string;
-      originSubPrefecture?: string;
-      addressLine1?: string;
-      addressLine2?: string;
-    },
-    actorId: string,
-  ) {
-    const admin = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        role: UserRole.ANTENNA_ADMIN,
-        NOT: { status: UserStatus.DELETED },
-      },
+  async createAntennaAdmin(data: CreateAntennaAdminDto, actorId: string, associationId: string) {
+    const antenna = await this.prisma.antenna.findFirst({
+      where: { id: data.antennaId, associationId }, // 🔥 FILTRÉ
     });
 
-    if (!admin) {
-      throw new NotFoundException('Administrateur introuvable.');
-    }
-    const updateData: Prisma.UserUpdateInput = {};
-
-    if (data.firstName !== undefined) updateData.firstName = data.firstName;
-    if (data.lastName !== undefined) updateData.lastName = data.lastName;
-    if (data.phone !== undefined) updateData.phone = data.phone;
-    if (data.city !== undefined) updateData.city = data.city;
-    if (data.country !== undefined) updateData.country = data.country;
-    if (data.postalCode !== undefined) updateData.postalCode = data.postalCode;
-    if (data.originSubPrefecture !== undefined) updateData.originSubPrefecture = data.originSubPrefecture;
-    if (data.addressLine1 !== undefined) updateData.addressLine1 = data.addressLine1;
-    if (data.addressLine2 !== undefined) updateData.addressLine2 = data.addressLine2;
-
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-    });
-  }
-
-  async createAntennaAdmin(data: CreateAntennaAdminDto, actorId: string) {
-    const antenna = await this.prisma.antenna.findUnique({
-      where: { id: data.antennaId },
-      select: { id: true, name: true, associationId: true },
-    });
-
-    if (!antenna) {
-      throw new NotFoundException('Antenne introuvable.');
-    }
+    if (!antenna) throw new NotFoundException('Antenne introuvable.');
 
     const result = await this.createAntennaAdminRecord(
       this.prisma,
       {
-        associationId: antenna.associationId,
+        associationId,
         antennaId: antenna.id,
         firstName: data.firstName,
         lastName: data.lastName,
@@ -564,7 +454,7 @@ export class SuperAdminService {
     );
 
     await this.notifications.createForUser({
-      associationId: antenna.associationId,
+      associationId,
       userId: result.user.id,
       message: `Bienvenue ! Vous avez été nommé administrateur pour l'antenne "${antenna.name}".`,
       type: NotificationType.SYSTEM_ALERT,
@@ -584,59 +474,41 @@ export class SuperAdminService {
 
     return this.prisma.user.findUnique({
       where: { id: result.user.id },
-      include: {
-        adminAssignments: { include: { antenna: true } },
+      include: { adminAssignments: { include: { antenna: true } } },
+    });
+  }
+
+  async updateAntennaAdmin(userId: string, data: any, actorId: string, associationId: string) {
+    return this.prisma.user.update({
+      where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN }, // 🔥 FILTRÉ
+      data: {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        city: data.city,
+        country: data.country,
+        postalCode: data.postalCode,
+        originSubPrefecture: data.originSubPrefecture,
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
       },
     });
   }
 
-  async suspendAntennaAdmin(userId: string, actorId: string) {
-    const admin = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        role: UserRole.ANTENNA_ADMIN,
-        NOT: { status: UserStatus.DELETED },
-      },
-    });
-
-    if (!admin) {
-      throw new NotFoundException('Administrateur introuvable.');
-    }
-
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
+  async suspendAntennaAdmin(userId: string, actorId: string, associationId: string) {
+    return this.prisma.user.update({
+      where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN },
       data: {
         status: UserStatus.SUSPENDED,
         suspendedByUserId: actorId,
         suspendedAt: new Date(),
       },
     });
-
-    await this.notifications.createForUser({
-      associationId: updated.associationId,
-      userId: updated.id,
-      message: `Vos privilèges d'administrateur ont été suspendus temporairement.`,
-      type: NotificationType.ACCOUNT_SUSPENDED,
-    });
-
-    return updated;
   }
 
-  async activateAntennaAdmin(userId: string, actorId: string) {
-    const admin = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        role: UserRole.ANTENNA_ADMIN,
-        NOT: { status: UserStatus.DELETED },
-      },
-    });
-
-    if (!admin) {
-      throw new NotFoundException('Administrateur introuvable.');
-    }
-
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
+  async activateAntennaAdmin(userId: string, actorId: string, associationId: string) {
+    return this.prisma.user.update({
+      where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN },
       data: {
         status: UserStatus.ACTIVE,
         approvedByUserId: actorId,
@@ -645,36 +517,18 @@ export class SuperAdminService {
         suspendedByUserId: null,
       },
     });
-
-    await this.notifications.createForUser({
-      associationId: updated.associationId,
-      userId: updated.id,
-      message: `Votre compte administrateur a été réactivé.`,
-      type: NotificationType.ACCOUNT_APPROVED,
-    });
-
-    return updated;
   }
 
-  async deleteAntennaAdmin(userId: string, actorId: string) {
+  async deleteAntennaAdmin(userId: string, actorId: string, associationId: string) {
     const admin = await this.prisma.user.findFirst({
-      where: {
-        id: userId,
-        role: UserRole.ANTENNA_ADMIN,
-        NOT: { status: UserStatus.DELETED },
-      },
+      where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN },
     });
 
-    if (!admin) {
-      throw new NotFoundException('Administrateur introuvable.');
-    }
+    if (!admin) throw new NotFoundException('Administrateur introuvable.');
 
     return this.prisma.$transaction(async (tx) => {
       await tx.antennaAdminAssignment.updateMany({
-        where: {
-          adminUserId: userId,
-          isActive: true,
-        },
+        where: { adminUserId: userId, associationId, isActive: true },
         data: {
           isActive: false,
           revokedAt: new Date(),
@@ -694,13 +548,14 @@ export class SuperAdminService {
     });
   }
 
-  /* ── PROJECTS ─────────────────────────────────────────────────────── */
+  /* ── PROJECTS ── */
 
-  async listProjects(page: number, pageSize: number, q?: string) {
+  async listProjects(associationId: string, page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
-    const where: Prisma.ProjectWhereInput = q
-      ? { title: { contains: q, mode: 'insensitive' } }
-      : {};
+    const where: Prisma.ProjectWhereInput = { 
+      associationId, // 🔥 FILTRÉ
+      ...(q ? { title: { contains: q, mode: 'insensitive' } } : {})
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.project.findMany({
@@ -717,24 +572,7 @@ export class SuperAdminService {
     ]);
 
     return {
-      items: items.map((p) => {
-        const mappedProject = memberMapper.project(p as never);
-        return {
-          ...mappedProject,
-          attachments:
-            (p as {
-              attachments?: Array<{
-                file: {
-                  id: string;
-                  url: string;
-                };
-              }>;
-            }).attachments?.map((a) => ({
-              id: a.file.id,
-              url: a.file.url,
-            })) || [],
-        };
-      }),
+      items: items.map((p) => memberMapper.project(p as any)),
       total,
       page,
       pageSize,
@@ -742,57 +580,32 @@ export class SuperAdminService {
     };
   }
 
-  // AJOUT DE LA MÉTHODE MANQUANTE
-  async updateProject(id: string, data: any) {
-    const project = await this.prisma.project.findUnique({ where: { id } });
-    if (!project) {
-      throw new NotFoundException('Projet introuvable.');
-    }
-
-    // Extraction des champs pour correspondre au schéma Prisma (Original names)
+  async updateProject(id: string, data: any, associationId: string) {
     return this.prisma.project.update({
-      where: { id },
+      where: { id, associationId }, // 🔥 FILTRÉ
       data: {
         title: data.title,
         summary: data.summary,
         description: data.description,
         status: data.status,
-        locationText: data.locationText,
-        promoterName: data.promoterName,
-        budgetAmount: data.budgetAmount, // Nom original Prisma
-        amountSpent: data.amountSpent,   // Nom original Prisma
-        startDate: data.startDate ? new Date(data.startDate) : undefined, // Nom original Prisma
-        endDate: data.endDate ? new Date(data.endDate) : undefined,     // Nom original Prisma
-        targetBeneficiaries: data.targetBeneficiaries,
-        populationImpact: data.populationImpact,
-        environmentalImpact: data.environmentalImpact,
-        implementationMethod: data.implementationMethod,
-        risksAndMitigation: data.risksAndMitigation,
+        budgetAmount: data.budgetAmount,
+        amountSpent: data.amountSpent,
+        startDate: data.startDate ? new Date(data.startDate) : undefined,
+        endDate: data.endDate ? new Date(data.endDate) : undefined,
       },
     });
   }
 
-  async deleteProject(id: string) {
-    const project = await this.prisma.project.findUnique({ where: { id } });
-    if (!project) {
-      throw new NotFoundException('Projet introuvable.');
-    }
-
-    return this.prisma.project.delete({ where: { id } });
+  async deleteProject(id: string, associationId: string) {
+    return this.prisma.project.delete({ where: { id, associationId } }); // 🔥 FILTRÉ
   }
 
-  /* ── DOCUMENTS ────────────────────────────────────────────────────── */
+  /* ── DOCUMENTS ── */
 
-  async createDocument(
-    data: CreateDocumentInput,
-    actorId: string,
-    associationId: string,
-  ) {
-    if (!data.fileAssetId) {
-      throw new BadRequestException('Un fichier est requis.');
-    }
+  async createDocument(data: CreateDocumentInput, actorId: string, associationId: string) {
+    if (!data.fileAssetId) throw new BadRequestException('Un fichier est requis.');
 
-    const doc = await this.prisma.document.create({
+    return this.prisma.document.create({
       data: {
         associationId,
         title: data.title,
@@ -801,26 +614,18 @@ export class SuperAdminService {
         fileId: data.fileAssetId,
         uploadedByUserId: actorId,
         scope: 'GLOBAL',
-        isDownloadable: true,
         publishedAt: new Date(),
       },
       include: { file: true },
     });
-
-    await this.notifications.notifySuperAdmins(
-      associationId,
-      `Un nouveau document global "${doc.title}" a été publié.`,
-      NotificationType.DOCUMENT_PUBLISHED,
-    );
-
-    return doc;
   }
 
-  async listDocuments(page: number, pageSize: number, q?: string) {
+  async listDocuments(associationId: string, page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
-    const where: Prisma.DocumentWhereInput = q
-      ? { title: { contains: q, mode: 'insensitive' } }
-      : {};
+    const where: Prisma.DocumentWhereInput = {
+      associationId, // 🔥 FILTRÉ
+      ...(q ? { title: { contains: q, mode: 'insensitive' } } : {})
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.document.findMany({
@@ -834,7 +639,7 @@ export class SuperAdminService {
     ]);
 
     return {
-      items: items.map((d) => memberMapper.documentItem(d as never)),
+      items: items.map((d) => memberMapper.documentItem(d as any)),
       total,
       page,
       pageSize,
@@ -842,30 +647,25 @@ export class SuperAdminService {
     };
   }
 
-  async deleteDocument(id: string) {
-    const doc = await this.prisma.document.findUnique({ where: { id } });
-    if (!doc) {
-      throw new NotFoundException('Document introuvable.');
-    }
+  async deleteDocument(id: string, associationId: string) {
+    const doc = await this.prisma.document.findFirst({ where: { id, associationId } });
+    if (!doc) throw new NotFoundException('Document introuvable.');
 
     return this.prisma.$transaction(async (tx) => {
       await tx.document.delete({ where: { id } });
-
-      if (doc.fileId) {
-        await tx.fileAsset.delete({ where: { id: doc.fileId } });
-      }
-
+      if (doc.fileId) await tx.fileAsset.delete({ where: { id: doc.fileId } });
       return { success: true };
     });
   }
 
-  /* ── CONTRIBUTIONS ────────────────────────────────────────────────── */
+  /* ── CONTRIBUTIONS ── */
 
-  async listAllContributions(page: number, pageSize: number, status?: string) {
+  async listAllContributions(associationId: string, page: number, pageSize: number, status?: string) {
     const skip = (page - 1) * pageSize;
-    const where: Prisma.ContributionWhereInput = status
-      ? { status: status as never }
-      : {};
+    const where: Prisma.ContributionWhereInput = {
+      associationId, // 🔥 FILTRÉ
+      ...(status ? { status: status as any } : {})
+    };
     const [items, total] = await Promise.all([
       this.prisma.contribution.findMany({
         where,
@@ -886,26 +686,11 @@ export class SuperAdminService {
     };
   }
 
-  /* ── ADMIN ASSIGNMENTS ────────────────────────────────────────────── */
+  /* ── HELPERS PRIVÉS ── */
 
-  async createAntennaAdminAssignment(data: Prisma.AntennaAdminAssignmentCreateInput) {
-    return this.prisma.antennaAdminAssignment.create({ data });
-  }
-
-  /* ── HELPERS PRIVÉS ──────────────────────────────────────────────── */
-
-  private async createAntennaAdminRecord(
-    prisma: PrismaLike,
-    payload: InternalAdminPayload,
-    actorId: string,
-  ) {
-    const existing = await prisma.user.findUnique({
-      where: { email: payload.email },
-    });
-
-    if (existing) {
-      throw new ConflictException('Un utilisateur existe déjà avec cette adresse email.');
-    }
+  private async createAntennaAdminRecord(prisma: PrismaLike, payload: InternalAdminPayload, actorId: string) {
+    const existing = await prisma.user.findUnique({ where: { email: payload.email } });
+    if (existing) throw new ConflictException('Email déjà utilisé.');
 
     const temporaryPassword = this.generateTemporaryPassword();
     const passwordHash = await bcrypt.hash(temporaryPassword, 10);
@@ -921,28 +706,9 @@ export class SuperAdminService {
         emailVerifiedAt: now,
         firstName: payload.firstName,
         lastName: payload.lastName,
-        phone: payload.phone,
-        addressLine1: payload.addressLine1,
-        addressLine2: payload.addressLine2,
-        postalCode: payload.postalCode,
-        city: payload.city,
-        country: payload.country,
-        originSubPrefecture: payload.originSubPrefecture,
         createdByUserId: actorId,
         approvedByUserId: actorId,
         approvedAt: now,
-      },
-    });
-
-    await prisma.userSecuritySetting.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        forcePasswordReset: true,
-        passwordChangedAt: now,
-      },
-      update: {
-        forcePasswordReset: true,
       },
     });
 
@@ -953,10 +719,6 @@ export class SuperAdminService {
         adminUserId: user.id,
         assignedByUserId: actorId,
         isPrimaryManager: true,
-        canValidateMembers: true,
-        canValidateContributions: true,
-        canManageProjects: true,
-        canManageContent: true,
         isActive: true,
       },
     });
@@ -965,51 +727,18 @@ export class SuperAdminService {
   }
 
   private generateTemporaryPassword() {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-    let out = '';
-
-    for (let i = 0; i < 12; i += 1) {
-      out += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-
-    return out;
+    return Math.random().toString(36).slice(-10) + '!A1';
   }
 
-  private async buildUniqueAntennaCode(
-    associationId: string,
-    preferredCode?: string,
-    fallbackName?: string,
-  ) {
-    const base = this.normalizeCode(preferredCode || fallbackName || 'ANT');
+  private async buildUniqueAntennaCode(associationId: string, preferredCode?: string, fallbackName?: string) {
+    const base = (preferredCode || fallbackName || 'ANT').slice(0, 4).toUpperCase();
     let candidate = base;
     let counter = 1;
-
     while (true) {
-      const exists = await this.prisma.antenna.findFirst({
-        where: { associationId, code: candidate },
-        select: { id: true },
-      });
-
-      if (!exists) {
-        return candidate;
-      }
-
+      const exists = await this.prisma.antenna.findFirst({ where: { associationId, code: candidate } });
+      if (!exists) return candidate;
       counter += 1;
       candidate = `${base}${counter}`;
     }
-  }
-
-  private normalizeCode(input: string) {
-    const normalized = input
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^A-Za-z0-9]/g, '')
-      .toUpperCase();
-
-    if (normalized.length >= 4) {
-      return normalized.slice(0, 8);
-    }
-
-    return `${normalized || 'ANT'}01`;
   }
 }

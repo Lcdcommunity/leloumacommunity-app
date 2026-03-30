@@ -1,11 +1,11 @@
 // backend/src/modules/public/public.service.ts
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthMailerService } from '../auth/auth.mailer.service';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes, createHash } from 'crypto';
-import { UserStatus, NotificationType } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
+import { UserStatus, NotificationType, UserRole, TokenType } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 export interface SignupDto {
   firstName: string;
@@ -27,43 +27,47 @@ export class PublicService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly authMailer: AuthMailerService,
-    private readonly notifications: NotificationsService, // Injecté chirurgicalement
+    private readonly notifications: NotificationsService,
   ) {}
 
+  /**
+   * Inscription d'un nouveau membre via le formulaire public
+   */
   async signup(dto: SignupDto) {
     const emailLower = dto.email.toLowerCase().trim();
 
-    // 1. Vérifier si l'email existe déjà
+    // 1. Vérifier si l'email existe déjà (toutes associations confondues)
     const existingUser = await this.prisma.user.findUnique({
       where: { email: emailLower },
     });
 
     if (existingUser) {
-      throw new BadRequestException('Un compte existe déjà avec cet email.');
+      throw new BadRequestException('Un compte existe déjà avec cette adresse email.');
     }
 
-    // 2. Vérifier que l'antenne existe et récupérer son associationId
+    // 2. Vérifier que l'antenne existe
     const antenna = await this.prisma.antenna.findUnique({
       where: { id: dto.antennaId },
+      include: { association: { include: { logoFile: true } } }
     });
 
     if (!antenna) {
       throw new BadRequestException('L\'antenne sélectionnée est introuvable.');
     }
 
-    // 3. Hasher le mot de passe s'il est fourni
-    let passwordHash = '';
-    if (dto.password) {
-      passwordHash = await bcrypt.hash(dto.password, 12);
+    // 3. Hasher le mot de passe
+    if (!dto.password) {
+      throw new BadRequestException('Le mot de passe est obligatoire.');
     }
+    const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    // 4. Créer l'utilisateur en base de données
+    // 4. Création atomique (Utilisateur + Membership + Notification)
     const user = await this.prisma.user.create({
       data: {
         email: emailLower,
         passwordHash,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
         phone: dto.phone,
         city: dto.city,
         country: dto.country,
@@ -71,10 +75,9 @@ export class PublicService {
         addressLine2: dto.addressLine2,
         originSubPrefecture: dto.originSubPrefecture,
         placeOfBirth: dto.placeOfBirth,
-        role: 'MEMBER',
-        status: 'EMAIL_UNVERIFIED', 
+        role: UserRole.MEMBER,
+        status: UserStatus.EMAIL_UNVERIFIED, 
         associationId: antenna.associationId, 
-
         memberships: {
           create: {
             antennaId: antenna.id,
@@ -85,56 +88,58 @@ export class PublicService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer le Super Admin d'une nouvelle inscription (pour suivi)
+    // Notification système pour le Super Admin (suivi des inscriptions)
     await this.notifications.notifySuperAdmins(
       antenna.associationId,
-      `Nouvelle inscription en attente de vérification email : ${user.firstName} ${user.lastName} (${emailLower}).`,
+      `Nouvelle inscription (email non vérifié) : ${user.firstName} ${user.lastName}.`,
       NotificationType.SYSTEM_ALERT,
     );
 
-    // 5. Générer un token sécurisé pour la vérification
+    // 5. Gestion du Token de vérification
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 heures
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Valable 24h
 
-    // 6. Sauvegarder le token dans la table AuthToken
     await this.prisma.authToken.create({
       data: {
         associationId: antenna.associationId,
         userId: user.id,
         email: user.email,
-        type: 'EMAIL_VERIFICATION',
+        type: TokenType.EMAIL_VERIFICATION,
         tokenHash,
         expiresAt,
       },
     });
 
-    // 7. Construire le lien et envoyer l'email de vérification
+    // 6. Envoi de l'email via le service mailer (Marque blanche)
     const frontUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const verifyUrl = `${frontUrl.replace(/\/$/, '')}/verify-email?token=${rawToken}`;
 
     await this.authMailer.sendVerificationEmail({
       to: user.email,
       verifyUrl,
+      appName: antenna.association.name,
+      logoUrl: antenna.association.logoFile?.url
     });
 
     return {
       id: user.id,
-      message: 'Inscription réussie. Vérifiez votre email.',
+      message: 'Inscription enregistrée. Veuillez vérifier votre boîte mail pour confirmer votre adresse.',
     };
   }
 
+  /**
+   * Vérification du jeton d'email
+   */
   async verifyEmailToken(rawToken: string) {
-    if (!rawToken) {
-      throw new BadRequestException('Token manquant.');
-    }
+    if (!rawToken) throw new BadRequestException('Token manquant.');
 
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
 
     const authToken = await this.prisma.authToken.findFirst({
       where: {
         tokenHash,
-        type: 'EMAIL_VERIFICATION',
+        type: TokenType.EMAIL_VERIFICATION,
         consumedAt: null,
         expiresAt: { gt: new Date() },
       },
@@ -152,9 +157,8 @@ export class PublicService {
     }
 
     const user = authToken.user;
-    const primaryAntenna = user.memberships[0]?.antenna;
+    const primaryAntennaId = user.memberships[0]?.antennaId;
 
-    // On invalide le token et on passe le membre en attente de validation admin
     await this.prisma.$transaction([
       this.prisma.authToken.update({
         where: { id: authToken.id },
@@ -169,12 +173,12 @@ export class PublicService {
       })
     ]);
 
-    // ✅ NOTIFICATION : Notifier les admins de l'antenne qu'un membre a validé son email et attend son approbation
-    if (primaryAntenna) {
+    // Notification aux Admins d'antenne pour validation finale du compte
+    if (primaryAntennaId) {
       await this.notifications.notifyAntennaAdmins(
-        primaryAntenna.id,
+        primaryAntennaId,
         user.associationId,
-        `Nouveau membre en attente d'approbation : ${user.firstName} ${user.lastName} a vérifié son adresse email.`,
+        `Nouveau membre à valider : ${user.firstName} ${user.lastName} a vérifié son email.`,
         NotificationType.SYSTEM_ALERT,
       );
     }

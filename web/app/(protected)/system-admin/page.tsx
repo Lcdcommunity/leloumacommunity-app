@@ -28,9 +28,10 @@ export default function SystemAdminDashboard() {
   const [data, setData] = useState<SystemDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState(''); // État pour la recherche
-  
+  const [search, setSearch] = useState('');
   const [selectedAsso, setSelectedAsso] = useState<AssociationItem | null>(null);
+  
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     api.getSystemDashboard()
@@ -39,11 +40,10 @@ export default function SystemAdminDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Filtrage des associations en fonction de la recherche
   const filteredAssociations = useMemo(() => {
     if (!data) return [];
-    return data.associations.filter(a => 
-      a.name.toLowerCase().includes(search.toLowerCase()) || 
+    return data.associations.filter(a =>
+      a.name.toLowerCase().includes(search.toLowerCase()) ||
       a.code.toLowerCase().includes(search.toLowerCase())
     );
   }, [data, search]);
@@ -51,204 +51,734 @@ export default function SystemAdminDashboard() {
   const enrichedStats = useMemo(() => {
     if (!data) return null;
     const totalAntennas = data.associations.reduce((acc, curr) => acc + curr._count.antennas, 0);
-    const avgUsers = data.stats.totalAssociations > 0 
-      ? (data.stats.totalUsers / data.stats.totalAssociations).toFixed(1) 
+    const avgUsers = data.stats.totalAssociations > 0
+      ? (data.stats.totalUsers / data.stats.totalAssociations).toFixed(1)
       : 0;
-    return { totalAntennas, avgUsers, activeRate: "100%" };
+    return { totalAntennas, avgUsers, activeRate: '100%' };
   }, [data]);
+
+  // Logique de Suspension / Activation
+  const handleToggleStatus = async () => {
+    if (!selectedAsso) return;
+    try {
+      setIsProcessing(true);
+      const newStatus = selectedAsso.isActive === false ? true : false;
+      await api.updateAssociationStatusSystemAdmin(selectedAsso.id, newStatus);
+      
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          associations: prev.associations.map(a => 
+            a.id === selectedAsso.id ? { ...a, isActive: newStatus } : a
+          )
+        };
+      });
+      setSelectedAsso({ ...selectedAsso, isActive: newStatus });
+    } catch (err: unknown) { // 🔥 CORRECTION ESLINT ICI
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      alert("Erreur lors de la modification du statut : " + msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Logique de Suppression
+  const handleDelete = async () => {
+    if (!selectedAsso) return;
+    
+    const confirm = window.confirm(`⚠️ DANGER ⚠️\n\nÊtes-vous sûr de vouloir SUPPRIMER DÉFINITIVEMENT l'association "${selectedAsso.name}" ?\n\nCette action détruira toutes les antennes, membres, transactions et fichiers liés à cette organisation. C'est irréversible.`);
+    if (!confirm) return;
+
+    try {
+      setIsProcessing(true);
+      
+      // await api.deleteAssociationSystemAdmin(selectedAsso.id);
+      
+      alert("🚧 Le bouton est prêt ! Il ne reste plus qu'à connecter la fonction api.deleteAssociationSystemAdmin dans votre Backend.");
+      
+    } catch (err: unknown) { // 🔥 CORRECTION ESLINT ICI
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      alert("Erreur lors de la suppression : " + msg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const CSS = `
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+    :root {
+      --bg: #F8FAFC; 
+      --surface: #FFFFFF;
+      --surface-2: #F1F5F9; 
+      --border: rgba(15, 23, 42, 0.08);
+      --border-hover: rgba(139, 92, 246, 0.4);
+      --accent: #8B5CF6;
+      --accent-glow: rgba(139, 92, 246, 0.15);
+      --accent-2: #C026D3;
+      --text-1: #0F172A; 
+      --text-2: #334155; 
+      --text-3: #64748B; 
+      --green: #059669;
+      --green-bg: rgba(16, 185, 129, 0.15);
+      --red: #DC2626;
+      --red-bg: rgba(239, 68, 68, 0.12);
+      
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.03);
+    }
+
+    .gc-root {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      min-height: 100vh;
+      color: var(--text-1);
+      padding: clamp(1rem, 4vw, 2.5rem);
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+
+    /* ─── HERO ─── */
+    .gc-hero {
+      position: relative;
+      text-align: center;
+      padding: clamp(1.5rem, 5vw, 3rem) 1rem clamp(1rem, 4vw, 2rem);
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+    .gc-hero::before {
+      content: '';
+      position: absolute;
+      top: -40px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 300px;
+      background: radial-gradient(ellipse, rgba(139,92,246,0.1) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .gc-eyebrow {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      font-size: 0.7rem; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase;
+      color: var(--accent); background: var(--surface);
+      border: 1px solid var(--border-hover);
+      padding: 0.4rem 1rem; border-radius: 100px;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .gc-eyebrow-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+    .gc-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: clamp(1.75rem, 6vw, 3rem);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.03em;
+      color: var(--text-1);
+      margin: 0 0 0.5rem;
+    }
+    .gc-title-accent {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .gc-subtitle { font-size: 1rem; color: var(--text-2); font-weight: 400; }
+
+    /* ─── TOOLBAR ─── */
+    .gc-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 2rem;
+    }
+    .gc-btn-deploy {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white; border: none;
+      height: 48px; padding: 0 1.5rem; border-radius: 14px;
+      font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(139,92,246,0.25);
+      transition: all 0.25s ease;
+    }
+    .gc-btn-deploy:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(139,92,246,0.3); }
+    .gc-btn-deploy svg { flex-shrink: 0; }
+
+    .gc-search-wrap {
+      position: relative;
+      flex: 1; min-width: 250px; max-width: 400px;
+    }
+    .gc-search-icon {
+      position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      color: var(--text-3); pointer-events: none;
+    }
+    .gc-search {
+      width: 100%; height: 48px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; color: var(--text-1);
+      font-family: 'Inter', sans-serif; font-size: 0.95rem;
+      padding: 0 1rem 0 2.8rem;
+      outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+      box-sizing: border-box;
+      box-shadow: var(--shadow-sm);
+    }
+    .gc-search::placeholder { color: var(--text-3); font-weight: 400; }
+    .gc-search:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-glow); }
+
+    /* ─── STATS GRID ─── */
+    .gc-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: clamp(0.5rem, 2vw, 1rem);
+      margin-bottom: 3rem;
+    }
+    .gc-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: clamp(0.75rem, 2.5vw, 1.5rem) clamp(0.5rem, 2vw, 1rem);
+      text-align: center;
+      position: relative; overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+      animation: fadeUp 0.5s ease-out both;
+    }
+    .gc-stat:hover { border-color: var(--border-hover); transform: translateY(-3px); box-shadow: var(--shadow-lg); }
+    .gc-stat-icon { font-size: clamp(1.1rem, 3vw, 1.4rem); margin-bottom: 0.5rem; line-height: 1; }
+    .gc-stat-val {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: clamp(1.1rem, 3.5vw, 1.75rem);
+      font-weight: 800; color: var(--text-1);
+      letter-spacing: -0.02em; line-height: 1; margin-bottom: 0.4rem;
+    }
+    .gc-stat-lbl {
+      font-size: clamp(0.6rem, 1.8vw, 0.75rem);
+      font-weight: 600; color: var(--text-3);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .gc-stat:nth-child(1) { animation-delay: 0.05s; }
+    .gc-stat:nth-child(2) { animation-delay: 0.1s; }
+    .gc-stat:nth-child(3) { animation-delay: 0.15s; }
+    .gc-stat:nth-child(4) { animation-delay: 0.2s; }
+    .gc-stat:nth-child(5) { animation-delay: 0.25s; }
+    .gc-stat:nth-child(6) { animation-delay: 0.3s; }
+
+    /* ─── ASSOCIATIONS ─── */
+    .gc-section-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 1.2rem; gap: 1rem;
+    }
+    .gc-section-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.9rem; font-weight: 700; color: var(--text-2);
+      text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .gc-section-line { flex: 1; height: 1px; background: var(--border); }
+    .gc-count-badge {
+      font-size: 0.75rem; font-weight: 700; color: var(--text-1);
+      background: var(--surface-2); border: 1px solid var(--border);
+      padding: 0.25rem 0.75rem; border-radius: 100px;
+    }
+
+    .gc-asso-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+    .gc-asso-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: clamp(1rem, 3vw, 1.25rem) clamp(1rem, 3vw, 1.5rem);
+      display: flex; align-items: center; gap: 1rem;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+      animation: fadeUp 0.5s ease-out both;
+    }
+    .gc-asso-card:hover {
+      border-color: var(--border-hover);
+      transform: translateX(4px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .gc-asso-avatar {
+      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1rem; font-weight: 800;
+      color: white; letter-spacing: -0.02em;
+    }
+
+    .gc-asso-body { flex: 1; min-width: 0; }
+    .gc-asso-name {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1rem; font-weight: 700; color: var(--text-1);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 0.2rem;
+    }
+    .gc-asso-meta { font-size: 0.8rem; color: var(--text-3); display: flex; gap: 0.6rem; flex-wrap: wrap; }
+    .gc-asso-meta-chip { display: inline-flex; align-items: center; gap: 0.3rem; }
+
+    .gc-asso-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; flex-shrink: 0; }
+
+    .gc-badge {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+      padding: 0.3rem 0.75rem; border-radius: 100px;
+    }
+    .gc-badge-online { background: var(--green-bg); color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
+    .gc-badge-offline { background: var(--red-bg); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+    .gc-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+    .gc-badge-online .gc-badge-dot { animation: pulse 2s infinite; }
+
+    .gc-asso-chevron { color: var(--text-3); transition: transform 0.2s, color 0.2s; }
+    .gc-asso-card:hover .gc-asso-chevron { transform: translateX(3px); color: var(--accent); }
+
+    .gc-empty {
+      text-align: center; padding: 4rem 1rem; color: var(--text-3);
+      font-size: 0.95rem; background: var(--surface); border: 1px dashed var(--border); border-radius: 16px;
+    }
+    .gc-empty-icon { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.7; }
+
+    /* ─── LOADING ─── */
+    .gc-loading {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 6rem 1rem; gap: 1rem; color: var(--text-3);
+    }
+    .gc-spinner {
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+    }
+    .gc-loading-text { font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
+
+    /* ─── ERROR ─── */
+    .gc-error {
+      background: var(--red-bg); border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red); padding: 1.25rem 1.5rem; border-radius: 14px;
+      margin-bottom: 2rem; font-size: 0.95rem; font-weight: 500;
+      display: flex; align-items: center; gap: 0.75rem;
+    }
+
+    /* ─── MODAL ─── */
+    .gc-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 9999; padding: 0;
+      animation: fadeIn 0.25s ease;
+    }
+    @media (min-width: 640px) {
+      .gc-overlay { align-items: center; padding: 1.5rem; }
+    }
+
+    .gc-modal {
+      background: var(--surface); width: 100%; max-width: 500px;
+      border-radius: 28px 28px 0 0;
+      border: 1px solid var(--border);
+      border-bottom: none;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.1);
+      overflow: hidden;
+      animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      max-height: 90vh; overflow-y: auto;
+    }
+    @media (min-width: 640px) {
+      .gc-modal {
+        border-radius: 24px;
+        border-bottom: 1px solid var(--border);
+        box-shadow: var(--shadow-lg);
+        animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        max-height: 85vh;
+      }
+    }
+
+    .gc-modal-banner {
+      height: 120px; position: relative;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      overflow: hidden;
+    }
+    .gc-modal-banner::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at top right, rgba(255,255,255,0.2), transparent 60%);
+    }
+    .gc-modal-banner-text {
+      position: absolute; bottom: 1.25rem; left: 1.5rem;
+    }
+    .gc-modal-avatar {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--accent);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .gc-modal-close {
+      position: absolute; top: 1rem; right: 1rem;
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(0,0,0,0.15); backdrop-filter: blur(4px);
+      border: none;
+      color: white; cursor: pointer; font-size: 1rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+    }
+    .gc-modal-close:hover { background: rgba(0,0,0,0.25); }
+
+    .gc-modal-body { padding: 1.5rem; }
+
+    .gc-modal-name {
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.4rem; font-weight: 800;
+      color: var(--text-1); margin-bottom: 0.5rem; letter-spacing: -0.02em;
+    }
+
+    .gc-modal-rows { margin: 1.5rem 0; background: var(--surface-2); border-radius: 16px; padding: 0.5rem 1.25rem; }
+    .gc-detail-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .gc-detail-row:last-child { border-bottom: none; }
+    .gc-detail-label { font-size: 0.85rem; color: var(--text-3); font-weight: 500; }
+    .gc-detail-value { font-size: 0.9rem; color: var(--text-1); font-weight: 600; font-family: 'Inter', sans-serif; }
+    .gc-detail-code {
+      font-family: monospace; font-size: 0.85rem; font-weight: 600;
+      background: var(--surface); padding: 0.3rem 0.6rem;
+      border-radius: 8px; color: var(--accent); border: 1px solid var(--border);
+    }
+
+    .gc-modal-footer { padding: 0 1.5rem 1.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+    
+    .gc-btn-manage {
+      width: 100%; height: 52px; border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none; color: white;
+      font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+      box-shadow: 0 8px 20px var(--accent-glow);
+      transition: all 0.2s;
+    }
+    .gc-btn-manage:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(139,92,246,0.3); }
+    
+    .gc-actions-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+    
+    .gc-btn-warning {
+      height: 48px; border-radius: 12px;
+      background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3);
+      color: #D97706; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    .gc-btn-warning:hover:not(:disabled) { background: #F59E0B; color: white; }
+    .gc-btn-warning:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .gc-btn-success {
+      height: 48px; border-radius: 12px;
+      background: var(--green-bg); border: 1px solid rgba(16,185,129,0.3);
+      color: var(--green); font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    .gc-btn-success:hover:not(:disabled) { background: var(--green); color: white; }
+    .gc-btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .gc-btn-danger {
+      height: 48px; border-radius: 12px;
+      background: var(--red-bg); border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red); font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      transition: all 0.2s;
+    }
+    .gc-btn-danger:hover:not(:disabled) { background: var(--red); color: white; }
+    .gc-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .gc-btn-close-modal {
+      width: 100%; height: 48px; border-radius: 14px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      color: var(--text-2); font-family: 'Inter', sans-serif;
+      font-size: 0.95rem; font-weight: 600; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .gc-btn-close-modal:hover { background: var(--surface); color: var(--text-1); border-color: var(--text-3); }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; } to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); } to { transform: translateY(0); }
+    }
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.96) translateY(12px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+    }
+
+    @media (max-width: 480px) {
+      .gc-asso-avatar { width: 40px; height: 40px; border-radius: 10px; font-size: 0.9rem; }
+      .gc-asso-card { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+      .gc-asso-right { width: 100%; flex-direction: row; justify-content: space-between; align-items: center; }
+      .gc-asso-chevron { display: none; }
+      .gc-actions-grid { grid-template-columns: 1fr; }
+    }
+  `;
+
+  const getInitials = (name: string) => {
+    return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+  };
 
   return (
     <AppShell title="Console Grand Chef">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        
-        .sys-wrap { font-family: 'Plus Jakarta Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 1200px; margin: 0 auto; animation: sysin 0.6s ease-out; }
-        .sys-header { text-align: center; margin-bottom: 2rem; }
-        .sys-title { font-size: clamp(1.5rem, 5vw, 2.5rem); font-weight: 800; color: #0F172A; letter-spacing: -0.04em; margin: 0; }
-        .sys-title span { background: linear-gradient(135deg, #7C3AED, #C026D3); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .sys-subtitle { font-size: 0.9rem; color: #64748B; margin-top: 0.5rem; font-weight: 500; }
+      <style>{CSS}</style>
 
-        .sys-actions { display: flex; flex-direction: column; align-items: center; gap: 1rem; margin: 2rem 0; }
-        .sys-btn-new { 
-          background: #7C3AED; color: white; border: none; height: 48px; padding: 0 1.5rem; border-radius: 14px; 
-          font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.6rem;
-          box-shadow: 0 10px 20px rgba(124, 58, 237, 0.2); transition: all 0.3s ease; 
-        }
-        .sys-btn-new:hover { transform: translateY(-2px); background: #6D28D9; }
-
-        .search-input {
-          width: 100%; max-width: 400px; height: 44px; border-radius: 12px; border: 2px solid #F1F5F9;
-          padding: 0 1rem; font-family: inherit; font-size: 0.9rem; outline: none; transition: border-color 0.2s;
-          background: white; text-align: center;
-        }
-        .search-input:focus { border-color: #7C3AED; }
-
-        .sys-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(0.5rem, 2vw, 1.2rem); margin-bottom: 2.5rem; }
-        .stat-card { background: white; padding: 1.2rem 0.5rem; border-radius: 20px; border: 1px solid #F1F5F9; box-shadow: 0 4px 6px rgba(0,0,0,0.02); text-align: center; }
-        .stat-icon { font-size: 1.2rem; margin-bottom: 0.5rem; }
-        .stat-val { font-size: clamp(1.1rem, 3vw, 1.6rem); font-weight: 800; color: #1E293B; margin-bottom: 0.1rem; }
-        .stat-lbl { font-size: 0.6rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; }
-
-        .asso-list-header { text-align: center; margin-bottom: 1.5rem; }
-        .asso-list-header h2 { font-size: 1.2rem; font-weight: 800; color: #1E293B; margin: 0; }
-        
-        .asso-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
-        .asso-row-card { 
-          background: white; border-radius: 20px; border: 1px solid #F1F5F9; padding: 1.2rem;
-          display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-          transition: all 0.2s ease;
-        }
-        .asso-row-card:hover { border-color: #7C3AED; transform: translateX(5px); background: #FBFBFF; }
-        
-        .asso-info-main { display: flex; flex-direction: column; gap: 0.2rem; }
-        .asso-name { font-weight: 800; color: #1E293B; font-size: 0.95rem; }
-        .asso-sub { font-size: 0.7rem; color: #94A3B8; font-weight: 600; }
-
-        .asso-meta { text-align: right; }
-        .badge-status { padding: 0.3rem 0.6rem; border-radius: 8px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; text-transform: uppercase; }
-        .badge-active { background: #DCFCE7; color: #15803D; }
-        .badge-inactive { background: #FEE2E2; color: #B91C1C; }
-
-        .sys-error-banner { background: #FEF2F2; color: #DC2626; padding: 1rem; border-radius: 12px; margin-bottom: 2rem; text-align: center; font-weight: 600; border: 1px solid #FEE2E2; }
-
-        .modal-overlay { 
-          position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
-          background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px);
-          display: flex; align-items: center; justify-content: center; z-index: 9999;
-          padding: 1.5rem; animation: fadeIn 0.3s ease;
-        }
-        .modal-content { 
-          background: white; width: 100%; max-width: 450px; border-radius: 32px; 
-          padding: 2rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-          position: relative; animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .modal-close { position: absolute; top: 1.2rem; right: 1.2rem; border: none; background: #F1F5F9; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-weight: 800; color: #64748B; }
-        
-        .modal-header { text-align: center; margin-bottom: 2rem; }
-        .modal-title { font-size: 1.5rem; font-weight: 800; color: #1E293B; margin-bottom: 0.5rem; }
-        
-        .detail-row { display: flex; justify-content: space-between; padding: 1rem 0; border-bottom: 1px solid #F1F5F9; }
-        .detail-label { font-size: 0.8rem; font-weight: 600; color: #94A3B8; }
-        .detail-value { font-size: 0.85rem; font-weight: 700; color: #1E293B; }
-
-        .btn-full { width: 100%; margin-top: 2rem; background: #1E293B; color: white; border: none; height: 50px; border-radius: 14px; font-weight: 700; cursor: pointer; transition: 0.2s; }
-        .btn-full:hover { background: #0F172A; }
-
-        @keyframes sysin { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-      `}</style>
-
-      <div className="sys-wrap">
-        <header className="sys-header">
-          <h1 className="sys-title">Console <span>Grand Chef</span></h1>
-          <p className="sys-subtitle">Supervision de la plateforme communautaire</p>
+      <div className="gc-root">
+        {/* ── HERO ── */}
+        <header className="gc-hero">
+          <div className="gc-eyebrow">
+            <span className="gc-eyebrow-dot" />
+            Système opérationnel
+          </div>
+          <h1 className="gc-title">
+            Console <span className="gc-title-accent">Grand Chef</span>
+          </h1>
+          <p className="gc-subtitle">Supervision de la plateforme communautaire</p>
         </header>
 
-        {/* AFFICHAGE DE L'ERREUR SI ELLE EXISTE */}
-        {error && <div className="sys-error-banner">⚠️ Erreur : {error}</div>}
+        {/* ── ERROR ── */}
+        {error && (
+          <div className="gc-error">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+            </svg>
+            {error}
+          </div>
+        )}
 
-        <div className="sys-actions">
-          <button className="sys-btn-new" onClick={() => router.push('/system-admin/associations/new')}>
-            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+        {/* ── TOOLBAR ── */}
+        <div className="gc-toolbar">
+          <button className="gc-btn-deploy" onClick={() => router.push('/system-admin/associations/new')}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
             Déployer une instance
           </button>
-          
-          <input 
-            className="search-input" 
-            placeholder="Rechercher une association..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+
+          <div className="gc-search-wrap">
+            <svg className="gc-search-icon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input
+              className="gc-search"
+              placeholder="Rechercher une association..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
+        {/* ── CONTENT ── */}
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '5rem', color: '#94A3B8', fontWeight: 600 }}>Initialisation...</div>
+          <div className="gc-loading">
+            <div className="gc-spinner" />
+            <span className="gc-loading-text">Initialisation...</span>
+          </div>
         ) : data ? (
           <>
-            <div className="sys-stats-grid">
-              <div className="stat-card"><div className="stat-icon">🏢</div><div className="stat-val">{data.stats.totalAssociations}</div><div className="stat-lbl">Instances</div></div>
-              <div className="stat-card"><div className="stat-icon">👥</div><div className="stat-val">{data.stats.totalUsers}</div><div className="stat-lbl">Membres</div></div>
-              <div className="stat-card"><div className="stat-icon">📡</div><div className="stat-val">{enrichedStats?.totalAntennas}</div><div className="stat-lbl">Antennes</div></div>
-              <div className="stat-card"><div className="stat-icon">📊</div><div className="stat-val">{enrichedStats?.avgUsers}</div><div className="stat-lbl">Moyenne</div></div>
-              <div className="stat-card"><div className="stat-icon">⚡</div><div className="stat-val">{enrichedStats?.activeRate}</div><div className="stat-lbl">Status</div></div>
-              <div className="stat-card"><div className="stat-icon">🛡️</div><div className="stat-val">SaaS</div><div className="stat-lbl">Mode</div></div>
+            {/* ── STATS ── */}
+            <div className="gc-stats-grid">
+              {[
+                { icon: '🏢', val: data.stats.totalAssociations, lbl: 'Instances' },
+                { icon: '👥', val: data.stats.totalUsers, lbl: 'Membres' },
+                { icon: '📡', val: enrichedStats?.totalAntennas, lbl: 'Antennes' },
+                { icon: '📊', val: enrichedStats?.avgUsers, lbl: 'Moyenne' },
+                { icon: '⚡', val: enrichedStats?.activeRate, lbl: 'Status' },
+                { icon: '🛡️', val: 'SaaS', lbl: 'Mode' },
+              ].map(({ icon, val, lbl }) => (
+                <div key={lbl} className="gc-stat">
+                  <div className="gc-stat-icon">{icon}</div>
+                  <div className="gc-stat-val">{val}</div>
+                  <div className="gc-stat-lbl">{lbl}</div>
+                </div>
+              ))}
             </div>
 
-            <div className="asso-list-header">
-              <h2>Parc des Associations</h2>
+            {/* ── ASSOCIATIONS ── */}
+            <div className="gc-section-head">
+              <span className="gc-section-title">Parc des Associations</span>
+              <span className="gc-section-line" />
+              <span className="gc-count-badge">{filteredAssociations.length}</span>
             </div>
 
-            <div className="asso-grid">
-              {filteredAssociations.map((asso) => (
-                <div key={asso.id} className="asso-row-card" onClick={() => setSelectedAsso(asso)}>
-                  <div className="asso-info-main">
-                    <span className="asso-name">{asso.name}</span>
-                    <span className="asso-sub">ID: {asso.code} • {asso._count.users} membres</span>
+            <div className="gc-asso-list">
+              {filteredAssociations.length > 0 ? filteredAssociations.map((asso, i) => (
+                <div
+                  key={asso.id}
+                  className="gc-asso-card"
+                  style={{ animationDelay: `${i * 0.05}s` }}
+                  onClick={() => setSelectedAsso(asso)}
+                >
+                  <div className="gc-asso-avatar">{getInitials(asso.name)}</div>
+
+                  <div className="gc-asso-body">
+                    <div className="gc-asso-name">{asso.name}</div>
+                    <div className="gc-asso-meta">
+                      <span className="gc-asso-meta-chip">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <rect x="3" y="3" width="18" height="18" rx="3"/>
+                        </svg>
+                        {asso.code}
+                      </span>
+                      <span>·</span>
+                      <span className="gc-asso-meta-chip">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                        </svg>
+                        {asso._count.users} membres
+                      </span>
+                      {asso._count.antennas > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="gc-asso-meta-chip">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>
+                            </svg>
+                            {asso._count.antennas} antennes
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="asso-meta">
-                    <span className={`badge-status ${asso.isActive !== false ? 'badge-active' : 'badge-inactive'}`}>
+
+                  <div className="gc-asso-right">
+                    <span className={`gc-badge ${asso.isActive !== false ? 'gc-badge-online' : 'gc-badge-offline'}`}>
+                      <span className="gc-badge-dot" />
                       {asso.isActive !== false ? 'En ligne' : 'Suspendu'}
                     </span>
                   </div>
+
+                  <svg className="gc-asso-chevron" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6"/>
+                  </svg>
                 </div>
-              ))}
-              
-              {filteredAssociations.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '3rem', color: '#94A3B8' }}>
-                  Aucun résultat pour &quot;{search}&quot;
+              )) : (
+                <div className="gc-empty">
+                  <div className="gc-empty-icon">🔍</div>
+                  <p>Aucun résultat pour &quot;{search}&quot;</p>
                 </div>
               )}
             </div>
           </>
         ) : null}
+      </div>
 
-        {/* MODAL DE DÉTAILS */}
-        {selectedAsso && (
-          <div className="modal-overlay" onClick={() => setSelectedAsso(null)}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-              <button className="modal-close" onClick={() => setSelectedAsso(null)}>✕</button>
-              
-              <div className="modal-header">
-                <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🏛️</div>
-                <h3 className="modal-title">{selectedAsso.name}</h3>
-                <span className={`badge-status ${selectedAsso.isActive !== false ? 'badge-active' : 'badge-inactive'}`}>
-                   {selectedAsso.isActive !== false ? 'Instance Active' : 'Instance Suspendue'}
+      {/* ── MODAL ── */}
+      {selectedAsso && (
+        <div className="gc-overlay" onClick={() => setSelectedAsso(null)}>
+          <div className="gc-modal" onClick={e => e.stopPropagation()}>
+
+            <div className="gc-modal-banner">
+              <button className="gc-modal-close" onClick={() => setSelectedAsso(null)}>✕</button>
+              <div className="gc-modal-banner-text">
+                <div className="gc-modal-avatar">{getInitials(selectedAsso.name)}</div>
+              </div>
+            </div>
+
+            <div className="gc-modal-body">
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem' }}>
+                <div className="gc-modal-name">{selectedAsso.name}</div>
+                <span className={`gc-badge ${selectedAsso.isActive !== false ? 'gc-badge-online' : 'gc-badge-offline'}`} style={{ flexShrink: 0, marginTop: '0.4rem' }}>
+                  <span className="gc-badge-dot" />
+                  {selectedAsso.isActive !== false ? 'Active' : 'Suspendue'}
                 </span>
               </div>
 
-              <div className="detail-row">
-                <span className="detail-label">Code Identifiant</span>
-                <span className="detail-value">{selectedAsso.code}</span>
+              <div className="gc-modal-rows">
+                <div className="gc-detail-row">
+                  <span className="gc-detail-label">Code identifiant</span>
+                  <span className="gc-detail-code">{selectedAsso.code}</span>
+                </div>
+                <div className="gc-detail-row">
+                  <span className="gc-detail-label">Sous-domaine</span>
+                  <span className="gc-detail-value">{selectedAsso.domainName || 'standard.lcd.com'}</span>
+                </div>
+                <div className="gc-detail-row">
+                  <span className="gc-detail-label">Membres inscrits</span>
+                  <span className="gc-detail-value">{selectedAsso._count.users}</span>
+                </div>
+                <div className="gc-detail-row">
+                  <span className="gc-detail-label">Antennes</span>
+                  <span className="gc-detail-value">{selectedAsso._count.antennas}</span>
+                </div>
+                <div className="gc-detail-row">
+                  <span className="gc-detail-label">Date de déploiement</span>
+                  <span className="gc-detail-value">{formatDate(selectedAsso.createdAt)}</span>
+                </div>
               </div>
-              <div className="detail-row">
-                <span className="detail-label">Sous-domaine</span>
-                <span className="detail-value">{selectedAsso.domainName || 'standard.lcd.com'}</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Utilisateurs</span>
-                <span className="detail-value">{selectedAsso._count.users} inscrits</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Antennes</span>
-                <span className="detail-value">{selectedAsso._count.antennas} antennes</span>
-              </div>
-              <div className="detail-row">
-                <span className="detail-label">Date Déploiement</span>
-                <span className="detail-value">{formatDate(selectedAsso.createdAt)}</span>
+            </div>
+
+            <div className="gc-modal-footer">
+              <button
+                className="gc-btn-manage"
+                onClick={() => router.push(`/system-admin/associations/${selectedAsso.id}`)}
+                disabled={isProcessing}
+              >
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                Modifier et configurer l&apos;instance
+              </button>
+
+              <div className="gc-actions-grid">
+                <button 
+                  className={selectedAsso.isActive !== false ? "gc-btn-warning" : "gc-btn-success"}
+                  onClick={handleToggleStatus}
+                  disabled={isProcessing}
+                >
+                  {selectedAsso.isActive !== false ? (
+                    <>
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Suspendre
+                    </>
+                  ) : (
+                    <>
+                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Réactiver
+                    </>
+                  )}
+                </button>
+
+                <button 
+                  className="gc-btn-danger"
+                  onClick={handleDelete}
+                  disabled={isProcessing}
+                >
+                  <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Supprimer
+                </button>
               </div>
 
-              {/* FIX LIGNE 212 : Utilisation de &apos; pour l'apostrophe */}
-              <button 
-                className="btn-full" 
-                onClick={() => router.push(`/system-admin/associations/${selectedAsso.id}`)}
-              >
-                Gérer l&apos;instance complètement
+              <button className="gc-btn-close-modal" onClick={() => setSelectedAsso(null)} disabled={isProcessing}>
+                Fermer
               </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </AppShell>
   );
 }

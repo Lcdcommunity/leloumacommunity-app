@@ -1,4 +1,4 @@
-//src/modules/auth/auth.controller.ts
+// backend/src/modules/auth/auth.controller.ts
 import { Body, Controller, Post, Get, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -15,14 +15,12 @@ import { Request } from 'express';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // 👇 NOUVELLE ROUTE GET ME 👇
   @UseGuards(JwtAuthGuard)
   @Get('me')
   async getMe(@CurrentUser() user: AuthUser) {
     return this.authService.getMe(user.id);
   }
 
-  // 👇 ROUTES EXISTANTES 👇
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto, {

@@ -2,7 +2,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsQueryDto } from './dto/notifications-query.dto';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, Prisma } from '@prisma/client';
 
 type NotificationListItem = {
   id: string;
@@ -19,12 +19,16 @@ export class NotificationsService {
 
   /**
    * Liste les notifications de l'utilisateur connecté
+   * 🔥 AJOUT CHIRURGICAL : Filtre strict par associationId
    */
-  async listMyNotifications(userId: string, query: NotificationsQueryDto): Promise<NotificationListItem[]> {
+  async listMyNotifications(userId: string, associationId: string, query: NotificationsQueryDto): Promise<NotificationListItem[]> {
     const items = await this.prisma.notificationRecipient.findMany({
       where: {
         userId,
-        ...(query.type ? { notification: { type: query.type as NotificationType } } : {}),
+        notification: {
+          associationId, // 🔒 Verrouillage de l'instance
+          ...(query.type ? { type: query.type as NotificationType } : {}),
+        }
       },
       orderBy: [{ notification: { createdAt: 'desc' } }],
       take: 200,
@@ -43,10 +47,15 @@ export class NotificationsService {
 
   /**
    * Marque une notification comme lue
+   * 🔥 AJOUT CHIRURGICAL : Vérification de l'appartenance à l'association
    */
-  async markAsRead(userId: string, notificationId: string): Promise<{ ok: true }> {
+  async markAsRead(userId: string, associationId: string, notificationId: string): Promise<{ ok: true }> {
     const recipient = await this.prisma.notificationRecipient.findFirst({
-      where: { notificationId, userId },
+      where: { 
+        notificationId, 
+        userId,
+        notification: { associationId } // 🔒 Sécurité SaaS
+      },
     });
 
     if (!recipient) throw new NotFoundException('Notification introuvable.');
@@ -60,14 +69,14 @@ export class NotificationsService {
   }
 
   /**
-   * Crée une notification pour un utilisateur spécifique (Ex: Validation de compte, rejet cotisation)
+   * Crée une notification pour un utilisateur spécifique
    */
   async createForUser(params: {
     associationId: string;
     userId: string;
     message: string;
     type?: NotificationType;
-    metadata?: any;
+    metadata?: Prisma.InputJsonValue;
     title?: string;
   }): Promise<{ id: string }> {
     const created = await this.prisma.notification.create({
@@ -76,7 +85,7 @@ export class NotificationsService {
         type: params.type || NotificationType.SYSTEM_ALERT,
         title: params.title || 'Nouvelle notification',
         message: params.message,
-        payload: params.metadata,
+        payload: params.metadata || Prisma.JsonNull,
         recipients: {
           create: { userId: params.userId },
         },
@@ -87,25 +96,22 @@ export class NotificationsService {
   }
 
   /**
-   * ✅ MÉTHODE AJOUTÉE : Notifie tous les administrateurs d'une antenne
-   * Utile pour : Nouveau projet proposé par un membre, nouvelle cotisation soumise.
+   * Notifie tous les administrateurs d'une antenne
    */
   async notifyAntennaAdmins(
     antennaId: string,
     associationId: string,
     message: string,
     type: NotificationType,
-    metadata?: any,
+    metadata?: Prisma.InputJsonValue,
   ) {
-    // 1. Trouver tous les admins actifs de cette antenne
     const assignments = await this.prisma.antennaAdminAssignment.findMany({
-      where: { antennaId, isActive: true },
+      where: { antennaId, associationId, isActive: true },
       select: { adminUserId: true },
     });
 
     if (assignments.length === 0) return;
 
-    // 2. Créer la notification globale et distribuer aux destinataires
     await this.prisma.notification.create({
       data: {
         associationId,
@@ -113,7 +119,7 @@ export class NotificationsService {
         type,
         title: 'Alerte Antenne',
         message,
-        payload: metadata,
+        payload: metadata || Prisma.JsonNull,
         recipients: {
           createMany: {
             data: assignments.map((a) => ({ userId: a.adminUserId })),
@@ -124,8 +130,7 @@ export class NotificationsService {
   }
 
   /**
-   * ✅ MÉTHODE AJOUTÉE : Notifie le Super Admin (ou tous les Super Admins)
-   * Utile pour : Alertes système critiques, créations d'antennes.
+   * Notifie le Super Admin (ou tous les Super Admins)
    */
   async notifySuperAdmins(associationId: string, message: string, type: NotificationType) {
     const superAdmins = await this.prisma.user.findMany({

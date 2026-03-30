@@ -1,4 +1,4 @@
-//src/modules/contributions/contributions.controller.ts
+// src/modules/contributions/contributions.controller.ts
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -16,6 +16,20 @@ import { RejectContributionDto } from './dto/reject-contribution.dto';
 export class ContributionsController {
   constructor(private readonly service: ContributionsService) {}
 
+  /**
+   * Lister les cotisations (Admin / Super Admin)
+   */
+  @Get()
+  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  listAll(
+    @CurrentUser() user: AuthUser,
+    @Query('antennaId') antennaId?: string,
+  ) {
+    // Un admin d'antenne ne peut lister que sa propre antenne
+    const targetAntennaId = user.role === UserRole.ANTENNA_ADMIN ? user.antennaId : antennaId;
+    return this.service.findAll(user.associationId, targetAntennaId);
+  }
+
   @Post()
   @Roles(UserRole.MEMBER)
   create(@Body() dto: CreateContributionDto, @CurrentUser() user: AuthUser) {
@@ -26,6 +40,15 @@ export class ContributionsController {
   @Roles(UserRole.MEMBER)
   mine(@CurrentUser() user: AuthUser) {
     return this.service.listMine(user);
+  }
+
+  /**
+   * Détail d'une cotisation (Accès Admin)
+   */
+  @Get(':id')
+  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  findOne(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.findOne(id, user.associationId);
   }
 
   @Patch(':id/validate')
@@ -47,7 +70,15 @@ export class ContributionsController {
     @Query('antennaId') antennaId?: string,
     @Query('thresholdMonths') thresholdMonths?: string,
   ) {
+    // Sécurité : Forcer l'antennaId si c'est un Admin d'Antenne
+    const targetAntennaId = user.role === UserRole.ANTENNA_ADMIN ? user.antennaId : antennaId;
     const n = thresholdMonths ? Number(thresholdMonths) : 3;
-    return this.service.lateMembers(user.associationId, antennaId, Number.isFinite(n) ? n : 3);
+    return this.service.lateMembers(user.associationId, targetAntennaId, Number.isFinite(n) ? n : 3);
+  }
+
+  @Post(':id/cancel')
+  @Roles(UserRole.MEMBER)
+  cancel(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.cancelContribution(id, user);
   }
 }

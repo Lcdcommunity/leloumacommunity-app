@@ -51,27 +51,28 @@ export class UsersService {
     return this.toMeResponse(user);
   }
 
-  async updateMe(userId: string, dto: UpdateMeDto, meta?: RequestMeta) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { id: userId },
+  async updateMe(userId: string, associationId: string, dto: UpdateMeDto, meta?: RequestMeta) {
+    const existingUser = await this.prisma.user.findFirst({
+      where: { id: userId, associationId },
       include: meUserInclude,
     });
     if (!existingUser) throw new NotFoundException('Utilisateur introuvable');
 
     const data: Prisma.UserUpdateInput = {};
 
+    // ⚡ Alignement strict avec ton DTO et ton Schéma Prisma
     if (dto.firstName?.trim()) data.firstName = dto.firstName.trim();
     if (dto.lastName?.trim())  data.lastName  = dto.lastName.trim();
     if (dto.phone               !== undefined) data.phone               = this.normalize(dto.phone);
-    if (dto.originSubPrefecture !== undefined) data.originSubPrefecture = this.normalize(dto.originSubPrefecture);
     if (dto.birthDate           !== undefined) data.birthDate           = dto.birthDate ? new Date(`${dto.birthDate}T00:00:00.000Z`) : null;
-    if (dto.placeOfBirth        !== undefined) data.placeOfBirth        = this.normalize(dto.placeOfBirth);
-    if (dto.countryOfBirth      !== undefined) data.countryOfBirth      = this.normalize(dto.countryOfBirth);
-    if (dto.addressLine1        !== undefined) data.addressLine1        = this.normalize(dto.addressLine1);
-    if (dto.addressLine2        !== undefined) data.addressLine2        = this.normalize(dto.addressLine2);
-    if (dto.postalCode          !== undefined) data.postalCode          = this.normalize(dto.postalCode);
-    if (dto.city                !== undefined) data.city                = this.normalize(dto.city);
-    if (dto.country             !== undefined) data.country             = this.normalize(dto.country);
+    if (dto.placeOfBirth         !== undefined) data.placeOfBirth        = this.normalize(dto.placeOfBirth);
+    if (dto.countryOfBirth       !== undefined) data.countryOfBirth      = this.normalize(dto.countryOfBirth);
+    if (dto.originSubPrefecture !== undefined) data.originSubPrefecture = this.normalize(dto.originSubPrefecture);
+    if (dto.addressLine1         !== undefined) data.addressLine1        = this.normalize(dto.addressLine1);
+    if (dto.addressLine2         !== undefined) data.addressLine2        = this.normalize(dto.addressLine2);
+    if (dto.postalCode           !== undefined) data.postalCode          = this.normalize(dto.postalCode);
+    if (dto.city                 !== undefined) data.city                = this.normalize(dto.city);
+    if (dto.country              !== undefined) data.country             = this.normalize(dto.country);
 
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
@@ -79,7 +80,7 @@ export class UsersService {
       include: meUserInclude,
     });
 
-    // ✅ NOTIFICATION : Confirmer à l'utilisateur que son profil est à jour
+    // ✅ NOTIFICATION
     await this.notifications.createForUser({
       associationId: updatedUser.associationId,
       userId: updatedUser.id,
@@ -88,7 +89,7 @@ export class UsersService {
       title: 'Profil mis à jour',
     });
 
-    // ✅ AUDIT : targetModel -> entity | metadata -> details
+    // ✅ AUDIT
     await this.auditService.create({
       associationId: updatedUser.associationId,
       actorUserId: updatedUser.id,
@@ -105,14 +106,15 @@ export class UsersService {
   }
 
   /**
-   * Upload de la photo de profil vers Cloudinary.
+   * Upload de la photo de profil.
    */
   async uploadProfilePhoto(
     userId: string,
+    associationId: string,
     file: Express.Multer.File,
     meta?: RequestMeta,
   ) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findFirst({ where: { id: userId, associationId } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
     if (!file.buffer || file.buffer.length === 0) {
@@ -120,14 +122,12 @@ export class UsersService {
     }
 
     try {
-      // 1. Upload Cloudinary
       const cloudinaryRes = await this.cloudinaryService.uploadFile(file);
 
-      // 2. Transaction : FileAsset + mise à jour user
       const result = await this.prisma.$transaction(async (tx) => {
         const createdFileAsset = await tx.fileAsset.create({
           data: {
-            associationId: user.associationId,
+            associationId,
             uploadedByUserId: user.id,
             storageProvider: 'cloudinary',
             storageKey: cloudinaryRes.public_id,
@@ -138,10 +138,6 @@ export class UsersService {
             category: 'PROFILE_PHOTO',
             visibility: 'PUBLIC',
             url: cloudinaryRes.secure_url,
-            metadata: {
-              purpose: 'member-profile-photo',
-              cloudinary_version: cloudinaryRes.version,
-            },
           },
         });
 
@@ -154,39 +150,10 @@ export class UsersService {
         return { createdFileAsset, updatedUser };
       });
 
-      // ✅ NOTIFICATION : Confirmer le changement de photo
-      await this.notifications.createForUser({
-        associationId: user.associationId,
-        userId: user.id,
-        message: 'Votre nouvelle photo de profil a été enregistrée.',
-        type: NotificationType.SYSTEM_ALERT,
-        title: 'Photo mise à jour',
-      });
-
-      // 3. Audit : targetModel -> entity | metadata -> details
-      await this.auditService.create({
-        associationId: user.associationId,
-        actorUserId: user.id,
-        action: AuditAction.UPDATE,
-        entity: 'User',
-        entityId: user.id,
-        targetUserId: user.id,
-        details: {
-          summary: 'Mise à jour de la photo de profil (Cloudinary)',
-          fileId: result.createdFileAsset.id,
-          url: result.createdFileAsset.url,
-        },
-        ipAddress: meta?.ipAddress,
-        userAgent: meta?.userAgent,
-      });
-
-      const profile = this.toMeResponse(result.updatedUser);
-
       return {
         message: 'Photo de profil mise à jour avec succès',
-        profilePhotoUrl: result.updatedUser.profilePhoto?.url ?? null,
         avatarUrl: result.updatedUser.profilePhoto?.url ?? null,
-        user: profile,
+        user: this.toMeResponse(result.updatedUser),
       };
     } catch (error) {
       throw new BadRequestException("Échec de l'upload vers Cloudinary.");
@@ -222,8 +189,7 @@ export class UsersService {
       birthDate: user.birthDate ? user.birthDate.toISOString().slice(0, 10) : null,
       placeOfBirth: user.placeOfBirth,
       countryOfBirth: user.countryOfBirth,
-      originVillage: user.originSubPrefecture,
-      originSubPrefecture: user.originSubPrefecture,
+      originSubPrefecture: user.originSubPrefecture, // 👈 Seul champ d'origine conservé
       addressLine1: user.addressLine1,
       addressLine2: user.addressLine2,
       postalCode: user.postalCode,
@@ -245,26 +211,12 @@ export class UsersService {
           }
         : null,
 
-      adminAssignments:
-        (user as any).adminAssignments?.map((a: any) => ({
-          antenna: a.antenna
-            ? {
-                name: a.antenna.name,
-                code: a.antenna.code,
-                city: a.antenna.city ?? null,
-                country: a.antenna.country ?? null,
-                defaultCurrency: a.antenna.defaultCurrency ?? null,
-              }
-            : null,
-        })) ?? null,
-
       virtualCard: user.virtualCard
         ? {
             id: user.virtualCard.id,
             cardNumber: user.virtualCard.cardNumber,
             isLocked: user.virtualCard.isLocked,
             expiresAt: user.virtualCard.expiresAt?.toISOString() ?? null,
-            qrToken: user.virtualCard.qrToken,
           }
         : null,
     };

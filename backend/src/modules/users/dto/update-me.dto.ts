@@ -1,4 +1,4 @@
-//////// backend/src/modules/users/dto/update-me.dto.ts
+// backend/src/modules/users/dto/update-me.dto.ts
 import { IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateMeDto {

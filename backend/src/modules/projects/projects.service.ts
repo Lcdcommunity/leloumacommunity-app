@@ -1,4 +1,4 @@
-//backend/src/modules/projects/projects.service.ts
+// backend/src/modules/projects/projects.service.ts
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -46,17 +46,19 @@ export class ProjectsService {
     return proposal;
   }
 
-  async approveProposal(proposalId: string, adminId: string, reviewComment?: string) {
+  // 🔥 AJOUT CHIRURGICAL : Le paramètre associationId
+  async approveProposal(proposalId: string, associationId: string, adminId: string, reviewComment?: string) {
     const proposal = await this.prisma.projectProposal.findUnique({
-      where: { id: proposalId },
+      // 🔥 CLOISONNEMENT STRICT : Vérification de l'associationId
+      where: { id: proposalId, associationId },
     });
 
-    if (!proposal) throw new NotFoundException("Proposition introuvable.");
+    if (!proposal) throw new NotFoundException("Proposition introuvable ou vous n'avez pas les droits.");
 
     return this.prisma.$transaction(async (tx) => {
       // 1. Update Proposition
       const updated = await tx.projectProposal.update({
-        where: { id: proposalId },
+        where: { id: proposalId }, // Plus besoin du associationId ici car on est sûr qu'il existe grâce au findUnique
         data: {
           status: ProposalStatus.APPROVED,
           reviewedByUserId: adminId,
@@ -91,12 +93,14 @@ export class ProjectsService {
     });
   }
 
-  async rejectProposal(proposalId: string, adminId: string, reviewComment: string) {
+  // 🔥 AJOUT CHIRURGICAL : Le paramètre associationId
+  async rejectProposal(proposalId: string, associationId: string, adminId: string, reviewComment: string) {
     const proposal = await this.prisma.projectProposal.findUnique({
-      where: { id: proposalId },
+      // 🔥 CLOISONNEMENT STRICT : Vérification de l'associationId
+      where: { id: proposalId, associationId },
     });
 
-    if (!proposal) throw new NotFoundException("Proposition introuvable.");
+    if (!proposal) throw new NotFoundException("Proposition introuvable ou vous n'avez pas les droits.");
 
     const updated = await this.prisma.projectProposal.update({
       where: { id: proposalId },
@@ -124,7 +128,7 @@ export class ProjectsService {
   async listProjects(params: { associationId: string; antennaId?: string; q?: string; status?: ProjectStatus; page: number; pageSize: number }) {
     const skip = (params.page - 1) * params.pageSize;
     const where: Prisma.ProjectWhereInput = {
-      associationId: params.associationId,
+      associationId: params.associationId, // Cloisonnement déjà en place
       ...(params.antennaId ? { antennaId: params.antennaId } : {}),
       ...(params.status ? { status: params.status } : {}),
       ...(params.q ? { title: { contains: params.q, mode: 'insensitive' } } : {}),
@@ -153,7 +157,7 @@ export class ProjectsService {
     const project = await this.prisma.project.create({
       data: {
         ...data,
-        associationId,
+        associationId, // Cloisonnement à la création
         antennaId,
         createdByUserId: adminId,
         status: data.status || ProjectStatus.APPROVED,
@@ -170,9 +174,11 @@ export class ProjectsService {
     return project;
   }
 
-  async deleteProject(id: string) {
-    const project = await this.prisma.project.findUnique({ where: { id } });
-    if (!project) throw new NotFoundException("Projet introuvable.");
+  // 🔥 AJOUT CHIRURGICAL : Le paramètre associationId
+  async deleteProject(id: string, associationId: string) {
+    // 🔥 CLOISONNEMENT STRICT : On vérifie que le projet appartient bien à cette association
+    const project = await this.prisma.project.findUnique({ where: { id, associationId } });
+    if (!project) throw new NotFoundException("Projet introuvable ou vous n'avez pas les droits de le supprimer.");
     return this.prisma.project.delete({ where: { id } });
   }
 }

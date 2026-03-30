@@ -1,7 +1,8 @@
-//backend/src/modules/file-assets/file-assets.controller.ts
+// backend/src/modules/file-assets/file-assets.controller.ts
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -30,7 +31,7 @@ export class FileAssetsController {
     }),
   )
   async upload(
-    @CurrentUser() user: AuthUser, // <-- On récupère l'utilisateur
+    @CurrentUser() user: AuthUser,
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() dto: CreateFileAssetDto,
   ) {
@@ -39,7 +40,7 @@ export class FileAssetsController {
     }
 
     return this.service.createFromUpload({
-      associationId: user.associationId, // <-- On passe l'ID ici
+      associationId: user.associationId,
       storedFileName: file.filename,
       originalName: file.originalname,
       mimeType: file.mimetype,
@@ -49,7 +50,14 @@ export class FileAssetsController {
   }
 
   @Get(':id')
-  getOne(@Param('id') id: string) {
-    return this.service.getById(id);
+  getOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    // 🔥 SÉCURISÉ : On passe l'ID de l'asso de l'utilisateur connecté
+    return this.service.getById(id, user.associationId);
+  }
+
+  @Delete(':id')
+  deleteOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    // 🔥 SÉCURISÉ : Cloisonnement lors de la suppression
+    return this.service.delete(id, user.associationId);
   }
 }

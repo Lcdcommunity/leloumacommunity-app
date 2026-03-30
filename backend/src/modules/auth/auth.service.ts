@@ -16,8 +16,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { LoginDto } from './dto/login.dto';
-import { NotificationsService } from '../notifications/notifications.service'; // Ajouté
-import { NotificationType } from '@prisma/client'; // Ajouté
+import { NotificationsService } from '../notifications/notifications.service'; 
+import { NotificationType } from '@prisma/client'; 
 
 @Injectable()
 export class AuthService {
@@ -26,7 +26,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly tokens: AuthTokensService,
     private readonly authMailer: AuthMailerService,
-    private readonly notifications: NotificationsService, // Injecté chirurgicalement
+    private readonly notifications: NotificationsService, 
   ) {}
 
   private sha256(input: string): string {
@@ -61,21 +61,25 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
+        association: {
+          include: { logoFile: true }
+        },
         memberships: {
+          where: { isPrimary: true },
           include: { antenna: true },
-          orderBy: { createdAt: 'asc' },
         },
         adminAssignments: {
+          where: { isActive: true },
           include: { antenna: true },
         },
         profilePhoto: true,
-        virtualCard: true,
       },
     });
 
     if (!user) throw new NotFoundException('Utilisateur introuvable');
 
-    const photoUrl = (user as any).profilePhoto?.url ?? null;
+    const photoUrl = user.profilePhoto?.url ?? null;
+    const primaryAntenna = user.memberships?.[0]?.antenna ?? user.adminAssignments?.[0]?.antenna ?? null;
 
     return {
       id: user.id,
@@ -85,13 +89,12 @@ export class AuthService {
       role: user.role,
       status: user.status,
       associationId: user.associationId,
+      associationName: user.association?.name,
+      associationLogo: user.association?.logoFile?.url ?? null,
       permissions: [],
       avatarUrl: photoUrl,
       profilePhotoUrl: photoUrl,
-      antenna:
-        (user as any).memberships?.[0]?.antenna ??
-        (user as any).adminAssignments?.[0]?.antenna ??
-        null,
+      antenna: primaryAntenna,
     };
   }
 
@@ -180,6 +183,7 @@ export class AuthService {
   async forgotPassword(dto: ForgotPasswordDto) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase().trim() },
+      include: { association: { include: { logoFile: true } } }
     });
 
     const generic = {
@@ -188,7 +192,7 @@ export class AuthService {
         'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
     };
 
-    if (!user || user.status === 'REJECTED') {
+    if (!user || user.status === 'REJECTED' || user.status === 'DELETED') {
       return generic;
     }
 
@@ -199,11 +203,13 @@ export class AuthService {
     );
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
+    // Invalider les anciens tokens de l'utilisateur
     await this.prisma.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null },
       data: { usedAt: new Date() },
     });
 
+    // Créer le nouveau token (cloisonné à l'association)
     await this.prisma.passwordResetToken.create({
       data: {
         associationId: user.associationId,
@@ -216,10 +222,12 @@ export class AuthService {
     const front = this.getFrontendBaseUrl();
     const resetUrl = `${front}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
+    // Envoi de l'email en mode "Marque Blanche"
     await this.authMailer.sendPasswordResetEmail({
       to: user.email,
       resetUrl,
-      appName: process.env.APP_NAME || 'Association',
+      appName: user.association?.name || 'Lélouma Community',
+      logoUrl: user.association?.logoFile?.url,
     });
 
     return generic;
@@ -230,7 +238,6 @@ export class AuthService {
 
     const record = await this.prisma.passwordResetToken.findUnique({
       where: { tokenHash },
-      include: { user: true },
     });
 
     if (!record || record.usedAt || record.expiresAt <= new Date()) {
@@ -252,17 +259,18 @@ export class AuthService {
         data: { usedAt: new Date() },
       });
 
+      // Révoquer toutes les sessions en cours pour sécurité
       await tx.refreshTokenSession.updateMany({
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
     });
 
-    // ✅ NOTIFICATION : Alerter l'utilisateur de la modification de ses accès
+    // Notification de sécurité
     await this.notifications.createForUser({
       associationId: record.associationId,
       userId: record.userId,
-      message: 'Votre mot de passe a été modifié avec succès. Si vous n\'êtes pas à l\'origine de cette action, contactez immédiatement l\'administration.',
+      message: 'Votre mot de passe a été modifié avec succès. Si vous n\'êtes pas à l\'origine de cette action, contactez le support.',
       type: NotificationType.SYSTEM_ALERT,
       title: 'Sécurité : Mot de passe modifié',
     });

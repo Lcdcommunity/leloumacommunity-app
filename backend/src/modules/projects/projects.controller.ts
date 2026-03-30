@@ -1,4 +1,4 @@
-//backend/src/modules/projects/projects.controller.ts
+// backend/src/modules/projects/projects.controller.ts
 import { Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -34,13 +34,15 @@ export class ProjectsController {
   @Patch('proposal/:id/approve')
   @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body('comment') comment: string) {
-    return this.service.approveProposal(id, user.id, comment);
+    // 🔥 AJOUT CHIRURGICAL : Passage de user.associationId
+    return this.service.approveProposal(id, user.associationId, user.id, comment);
   }
 
   @Patch('proposal/:id/reject')
   @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
   reject(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body('comment') comment: string) {
-    return this.service.rejectProposal(id, user.id, comment);
+    // 🔥 AJOUT CHIRURGICAL : Passage de user.associationId
+    return this.service.rejectProposal(id, user.associationId, user.id, comment);
   }
 
   @Post()
@@ -51,7 +53,8 @@ export class ProjectsController {
 
   @Delete(':id')
   @Roles(UserRole.SUPER_ADMIN)
-  delete(@Param('id') id: string) {
-    return this.service.deleteProject(id);
+  delete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    // 🔥 AJOUT CHIRURGICAL : Passage de user.associationId
+    return this.service.deleteProject(id, user.associationId);
   }
 }

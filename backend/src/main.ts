@@ -1,4 +1,4 @@
-//src/main.ts
+// backend/src/main.ts
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -8,6 +8,7 @@ import * as express from 'express';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
+// Polyfill BigInt pour la sérialisation JSON (Prisma)
 declare global {
   interface BigInt {
     toJSON(): string;
@@ -20,6 +21,9 @@ if (typeof BigInt !== 'undefined' && !(BigInt.prototype as { toJSON?: () => stri
   };
 }
 
+/**
+ * Nettoie et prépare les URLs d'origine
+ */
 function normalizeOrigins(values: string[]): string[] {
   return values
     .map((value) => value.trim())
@@ -27,6 +31,9 @@ function normalizeOrigins(values: string[]): string[] {
     .map((value) => value.replace(/\/+$/, ''));
 }
 
+/**
+ * Récupère les origines autorisées depuis l'environnement
+ */
 function getAllowedOrigins(): string[] {
   const fromEnv = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '';
 
@@ -37,9 +44,12 @@ function getAllowedOrigins(): string[] {
   ]);
 }
 
+/**
+ * Logique de validation dynamique des origines
+ */
 function isAllowedOrigin(origin: string | undefined, allowedOrigins: string[]): boolean {
   if (!origin) {
-    return true;
+    return true; // Autorise les outils comme Postman
   }
 
   const cleanOrigin = origin.replace(/\/+$/, '');
@@ -57,6 +67,7 @@ function isAllowedOrigin(origin: string | undefined, allowedOrigins: string[]): 
 
   const hostname = parsed.hostname.toLowerCase();
 
+  // Autorise localhost et les domaines de préproduction Vercel
   if (
     hostname === 'localhost' ||
     hostname === '127.0.0.1'
@@ -75,8 +86,10 @@ function isAllowedOrigin(origin: string | undefined, allowedOrigins: string[]): 
 }
 
 async function bootstrap() {
+  // Création de l'application sans CORS par défaut pour le configurer manuellement
   const app = await NestFactory.create(AppModule, { cors: false });
 
+  // Préfixe global pour toutes les routes
   app.setGlobalPrefix('api');
 
   app.use(cookieParser());
@@ -85,6 +98,7 @@ async function bootstrap() {
 
   const allowedOrigins = getAllowedOrigins();
 
+  // Configuration CORS SaaS robuste
   app.enableCors({
     origin: (origin, callback) => {
       if (isAllowedOrigin(origin, allowedOrigins)) {
@@ -99,6 +113,7 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
   });
 
+  // Validation globale des DTOs
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -108,13 +123,15 @@ async function bootstrap() {
     }),
   );
 
+  // Indispensable pour récupérer l'IP réelle derrière un proxy (Vercel/Nginx)
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
+  // Configuration Swagger (Documentation API)
   const swaggerEnabled = (process.env.SWAGGER_ENABLED || 'true') === 'true';
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
       .setTitle('Association Community API')
-      .setDescription("API de gestion d'association communautaire")
+      .setDescription("API de gestion d'association communautaire - Multi-tenant")
       .setVersion('1.0.0')
       .addBearerAuth()
       .build();
@@ -126,8 +143,8 @@ async function bootstrap() {
     });
   }
 
+  // Middleware statique Express (En complément de ServeStaticModule)
   const expressApp = app.getHttpAdapter().getInstance();
-
   expressApp.use(
     '/static',
     express.static(path.resolve(process.env.LOCAL_UPLOAD_DIR || './uploads')),
@@ -140,4 +157,5 @@ async function bootstrap() {
   console.log(`🚀 Serveur lancé sur : http://localhost:${port}/api`);
   console.log('✅ Origines CORS configurées :', allowedOrigins);
 }
+
 void bootstrap();

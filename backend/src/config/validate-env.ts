@@ -1,4 +1,4 @@
-//src/config/validate-env.ts
+// backend/src/config/validate-env.ts
 import { plainToInstance } from 'class-transformer';
 import {
   IsBooleanString,
@@ -7,99 +7,43 @@ import {
   IsOptional,
   IsString,
   validateSync,
+  IsEmail,
 } from 'class-validator';
 
 class EnvVars {
-  @IsString()
-  DATABASE_URL!: string;
+  @IsString() DATABASE_URL!: string;
+  @IsString() JWT_ACCESS_SECRET!: string;
+  @IsString() JWT_ACCESS_EXPIRES_IN!: string;
+  @IsString() JWT_REFRESH_SECRET!: string;
+  @IsString() JWT_REFRESH_EXPIRES_IN!: string;
 
-  @IsString()
-  JWT_ACCESS_SECRET!: string;
+  @IsOptional() @IsString() APP_BASE_URL?: string;
+  @IsOptional() @IsString() FRONTEND_URL?: string;
 
-  @IsString()
-  JWT_ACCESS_EXPIRES_IN!: string;
+  // Sécurité
+  @IsOptional() @IsNumberString() THROTTLE_TTL?: string;
+  @IsOptional() @IsNumberString() THROTTLE_LIMIT?: string;
 
-  @IsString()
-  JWT_REFRESH_SECRET!: string;
+  // Cloudinary (👈 AJOUTÉ POUR LES PROFILS)
+  @IsOptional() @IsString() CLOUDINARY_CLOUD_NAME?: string;
+  @IsOptional() @IsString() CLOUDINARY_API_KEY?: string;
+  @IsOptional() @IsString() CLOUDINARY_API_SECRET?: string;
 
-  @IsString()
-  JWT_REFRESH_EXPIRES_IN!: string;
+  // Mailer (👈 AJOUTÉ POUR LES NOTIFICATIONS)
+  @IsOptional() @IsString() MAIL_HOST?: string;
+  @IsOptional() @IsNumberString() MAIL_PORT?: string;
+  @IsOptional() @IsString() MAIL_USER?: string;
+  @IsOptional() @IsString() MAIL_PASS?: string;
+  @IsOptional() @IsString() MAIL_FROM?: string;
 
-  @IsOptional()
-  @IsString()
-  APP_BASE_URL?: string;
+  // Stockage
+  @IsOptional() @IsIn(['local', 's3']) STORAGE_DRIVER?: 'local' | 's3';
+  @IsOptional() @IsString() LOCAL_UPLOAD_DIR?: string;
+  @IsOptional() @IsString() S3_BUCKET?: string;
 
-  @IsOptional()
-  @IsString()
-  FRONTEND_URL?: string;
-
-  @IsOptional()
-  @IsNumberString()
-  PASSWORD_RESET_TOKEN_TTL_MINUTES?: string;
-
-  @IsOptional()
-  @IsNumberString()
-  THROTTLE_TTL?: string;
-
-  @IsOptional()
-  @IsNumberString()
-  THROTTLE_LIMIT?: string;
-
-  @IsOptional()
-  @IsBooleanString()
-  SWAGGER_ENABLED?: string;
-
-  @IsOptional()
-  @IsString()
-  SWAGGER_PATH?: string;
-
-  @IsOptional()
-  @IsBooleanString()
-  SCHEDULER_ENABLED?: string;
-
-  @IsOptional()
-  @IsString()
-  CRON_SECRET?: string;
-
-  @IsOptional()
-  @IsIn(['local', 's3'])
-  STORAGE_DRIVER?: 'local' | 's3';
-
-  @IsOptional()
-  @IsString()
-  LOCAL_UPLOAD_DIR?: string;
-
-  @IsOptional()
-  @IsString()
-  LOCAL_PUBLIC_BASE_URL?: string;
-
-  @IsOptional()
-  @IsString()
-  S3_ENDPOINT?: string;
-
-  @IsOptional()
-  @IsString()
-  S3_REGION?: string;
-
-  @IsOptional()
-  @IsString()
-  S3_BUCKET?: string;
-
-  @IsOptional()
-  @IsString()
-  S3_ACCESS_KEY_ID?: string;
-
-  @IsOptional()
-  @IsString()
-  S3_SECRET_ACCESS_KEY?: string;
-
-  @IsOptional()
-  @IsBooleanString()
-  S3_FORCE_PATH_STYLE?: string;
-
-  @IsOptional()
-  @IsString()
-  S3_PUBLIC_BASE_URL?: string;
+  // Debug & Meta
+  @IsOptional() @IsBooleanString() SWAGGER_ENABLED?: string;
+  @IsOptional() @IsBooleanString() SCHEDULER_ENABLED?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {
@@ -113,7 +57,7 @@ export function validateEnv(config: Record<string, unknown>) {
 
   if (errors.length > 0) {
     throw new Error(
-      `Environment validation failed:\n${errors
+      `❌ Échec de validation de l'environnement :\n${errors
         .map((e) => Object.values(e.constraints ?? {}).join(', '))
         .join('\n')}`,
     );

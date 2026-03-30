@@ -1,4 +1,4 @@
-//src/common/guards/permissions.guard.ts
+// backend/src/common/guards/permissions.guard.ts
 import {
   CanActivate,
   ExecutionContext,
@@ -6,15 +6,10 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { UserRole } from '@prisma/client';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
+import { AuthUser } from '../decorators/current-user.decorator';
 import type { PermissionCode } from '../constants/permissions';
-
-type RequestUser = {
-  id: string;
-  role: string;
-  associationId: string;
-  permissions?: string[];
-};
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -26,22 +21,26 @@ export class PermissionsGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
+    // Si aucune permission n'est requise, on laisse passer
     if (!required || required.length === 0) return true;
 
-    const req = context.switchToHttp().getRequest<{ user?: RequestUser }>();
+    const req = context.switchToHttp().getRequest<{ user?: AuthUser & { permissions?: string[] } }>();
     const user = req.user;
 
     if (!user) throw new ForbiddenException('Utilisateur non authentifié');
 
-    // SUPER_ADMIN bypass
-    if (user.role === 'SUPER_ADMIN') return true;
+    // 🔥 CORRECTION CHIRURGICALE : Bypass pour SYSTEM_ADMIN et SUPER_ADMIN
+    // Ces rôles n'ont pas besoin de vérification granulaire car ils possèdent tout par défaut.
+    if (user.role === UserRole.SYSTEM_ADMIN || user.role === UserRole.SUPER_ADMIN) {
+      return true;
+    }
 
     const granted = new Set(user.permissions ?? []);
     const missing = required.filter((p) => !granted.has(p));
 
     if (missing.length > 0) {
       throw new ForbiddenException(
-        `Permissions insuffisantes: ${missing.join(', ')}`,
+        `Accès refusé. Permissions manquantes : ${missing.join(', ')}`,
       );
     }
 

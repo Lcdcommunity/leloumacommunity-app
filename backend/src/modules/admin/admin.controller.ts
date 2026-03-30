@@ -147,7 +147,7 @@ export class AdminController {
     @Query('pageSize') pageSize = 10, 
     @Query('status') status?: string
   ) {
-    return (this.service as any).listProjectProposals(user.id, +page, +pageSize, status);
+    return this.service.listProjectProposals(user.id, +page, +pageSize, status);
   }
 
   // --- GESTION DES DOCUMENTS (ANTENNE) ---
@@ -163,11 +163,12 @@ export class AdminController {
 
   @Post('documents')
   createDocument(@CurrentUser() user: AuthUser, @Body() body: any) {
-    // Correction chirurgicale : Adapter la payload du front pour correspondre à ce que le service (Prisma) attend
-    if (body.fileAssetId && !body.fileId) {
-      body.fileId = body.fileAssetId;
-    }
-    return this.service.createDocument(user.id, body);
+    // 🔥 CORRECTION CHIRURGICALE : Normalisation de la payload
+    const payload = {
+      ...body,
+      fileId: body.fileId || body.fileAssetId,
+    };
+    return this.service.createDocument(user.id, payload);
   }
 
   @Delete('documents/:id')

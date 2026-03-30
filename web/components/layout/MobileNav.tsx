@@ -38,13 +38,14 @@ const ICO = {
   edit:       'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
   user:       'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   logout:     'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
+  calendar:   'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+  star:       'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
 };
 
 type NavItem = { href: string; label: string; ico: string; section?: string };
 
-// 👇 NOUVEL ITEMS POUR LE GRAND CHEF
 const systemAdminItems: NavItem[] = [
-  { href: '/system-admin',                  label: 'Dashboard SaaS',        ico: ICO.home,       section: 'Plateforme' },
+  { href: '/system-admin',                  label: 'Dashboard SaaS',      ico: ICO.home,       section: 'Plateforme' },
   { href: '/system-admin/associations/new', label: 'Nouvelle Instance',      ico: ICO.plus,       section: 'Plateforme' },
   { href: '/system-admin/audit',            label: 'Logs Système',           ico: ICO.audit,      section: 'Sécurité' },
   { href: '/system-admin/profile',          label: 'Mon profil',             ico: ICO.user,       section: 'Compte' },
@@ -60,8 +61,8 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/contributions',   label: 'Cotisations',            ico: ICO.coin,       section: 'Gestion' },
   { href: '/super-admin/expenses',        label: 'Dépenses',               ico: ICO.creditCard, section: 'Gestion' },
   { href: '/super-admin/projects',        label: 'Projets',                ico: ICO.clip,       section: 'Gestion' },
-  { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.users,      section: 'Gestion' },
-  { href: '/super-admin/documents',       label: 'Documents',              ico: ICO.doc,        section: 'Gestion' },
+  { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,      section: 'Gestion' },
+  { href: '/super-admin/documents',       label: 'Documents',               ico: ICO.doc,        section: 'Gestion' },
   { href: '/super-admin/notifications',   label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
   { href: '/super-admin/audit',           label: 'Audit',                  ico: ICO.audit,      section: 'Outils' },
   { href: '/super-admin/profile',         label: 'Mon profil',             ico: ICO.user,       section: 'Outils' },
@@ -77,7 +78,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/expenses',              label: 'Dépenses',               ico: ICO.creditCard, section: 'Finances' },
   { href: '/admin/projections',           label: 'Projections',            ico: ICO.chart,      section: 'Finances' },
   { href: '/admin/projects',              label: 'Projets',                ico: ICO.clip,       section: 'Contenu' },
-  { href: '/admin/events',                label: 'Événements',             ico: ICO.bell,       section: 'Contenu' },
+  { href: '/admin/events',                label: 'Événements',             ico: ICO.calendar,   section: 'Contenu' },
   { href: '/admin/documents',             label: 'Documents & photos',     ico: ICO.doc,        section: 'Contenu' },
   { href: '/admin/contents',              label: 'Informations',           ico: ICO.news,       section: 'Contenu' },
   { href: '/admin/late-members',          label: 'Retardataires +3 mois',  ico: ICO.clock,      section: 'Contenu' },
@@ -90,11 +91,11 @@ const adminItems: NavItem[] = [
 const memberItems: NavItem[] = [
   { href: '/member',                       label: 'Dashboard',              ico: ICO.home,       section: 'Principal' },
   { href: '/member/contributions/new',     label: 'Faire un dépôt',         ico: ICO.plus,       section: 'Principal' },
-  { href: '/member/contributions/history', label: 'Mes cotisations',        ico: ICO.coin,       section: 'Principal' },
+  { href: '/member/contributions/history', label: 'Mes cotisations',         ico: ICO.coin,       section: 'Principal' },
   { href: '/member/expenses',              label: 'Dépenses',               ico: ICO.creditCard, section: 'Principal' },
   { href: '/member/projects',              label: 'Projets',                ico: ICO.clip,       section: 'Communauté' },
   { href: '/member/projects/propose',      label: 'Proposer un projet',     ico: ICO.edit,       section: 'Communauté' },
-  { href: '/member/events',                label: 'Événements',             ico: ICO.bell,       section: 'Communauté' },
+  { href: '/member/events',                label: 'Événements',             ico: ICO.calendar,   section: 'Communauté' },
   { href: '/member/documents',             label: 'Documents & photos',     ico: ICO.doc,        section: 'Communauté' },
   { href: '/member/contents',              label: 'Informations',           ico: ICO.news,       section: 'Communauté' },
   { href: '/member/late-members',          label: 'Retardataires +3 mois',  ico: ICO.clock,      section: 'Communauté' },
@@ -134,13 +135,14 @@ const ROLE_COLORS: Record<string, { accent: string; dim: string; pillBg: string;
   SYSTEM_ADMIN:  { accent: '#7C3AED', dim: 'rgba(124,58,237,0.12)', pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef' },
   SUPER_ADMIN:   { accent: '#DC2626', dim: 'rgba(220,38,38,0.12)',  pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin' },
   ANTENNA_ADMIN: { accent: '#2563EB', dim: 'rgba(37,99,235,0.12)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne' },
-  MEMBER:        { accent: '#059669', dim: 'rgba(5,150,105,0.12)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre' },
+  MEMBER:         { accent: '#059669', dim: 'rgba(5,150,105,0.12)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre' },
 };
 
 export function MobileNav() {
   const pathname = usePathname();
   const router   = useRouter();
   const [role, setRole] = useState<UserRole | null>(null);
+  const [associationName, setAssociationName] = useState('Plateforme');
   const [open, setOpen] = useState(false);
   const [prevPath, setPrevPath] = useState(pathname);
 
@@ -159,7 +161,17 @@ export function MobileNav() {
     void (async () => {
       try {
         const me = await api.me();
-        if (mounted) setRole(me.role);
+        if (!mounted) return;
+        
+        setRole(me.role);
+
+        // Récupération sécurisée du nom
+        if (me.association?.name) {
+          setAssociationName(me.association.name);
+        } else if (me.role !== 'SYSTEM_ADMIN') {
+          const assoc = await api.getAssociation();
+          if (mounted && assoc?.name) setAssociationName(assoc.name);
+        }
       } catch { if (mounted) setRole(null); }
     })();
     return () => { mounted = false; };
@@ -244,14 +256,14 @@ export function MobileNav() {
         }
 
         .mn-tab.mn-cta .mn-tab-ico-wrap {
-          width: 40px; height: 40px; border-radius: 50%;
+          width: 42px; height: 42px; border-radius: 50%;
           background: linear-gradient(135deg, var(--mn-accent), var(--mn-accent)) !important;
           box-shadow: 0 4px 14px var(--mn-dim);
-          margin-top: -10px; opacity: 0.9;
+          margin-top: -14px; border: 3px solid white;
         }
         .mn-tab.mn-cta { color: #6B7280; }
         .mn-tab.mn-cta.active { color: var(--mn-accent); }
-        .mn-tab.mn-cta .mn-tab-ico-wrap svg { color: white; width: 17px; height: 17px; }
+        .mn-tab.mn-cta .mn-tab-ico-wrap svg { color: white; width: 20px; height: 20px; }
 
         .mn-burger {
           flex: 1; display: flex; flex-direction: column;
@@ -266,7 +278,6 @@ export function MobileNav() {
         }
         .mn-burger:active { transform: scale(0.9); }
         .mn-burger.open { color: var(--mn-accent); }
-        .mn-burger.open .mn-tab-ico-wrap { background: var(--mn-dim); border-radius: 10px; }
 
         .mn-burger-lines {
           display: flex; flex-direction: column; gap: 3.5px;
@@ -322,15 +333,16 @@ export function MobileNav() {
           flex-shrink: 0;
         }
         .mn-drawer-logo {
-          width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.2rem; font-weight: 700; color: white;
-          box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+          font-size: 1.3rem; font-weight: 700; color: white;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          text-transform: uppercase;
         }
         .mn-drawer-appname {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.1rem; font-weight: 600; color: #111827;
+          font-size: 1.15rem; font-weight: 600; color: #111827;
           line-height: 1.1;
         }
         .mn-drawer-rolepill {
@@ -360,9 +372,9 @@ export function MobileNav() {
 
         .mn-link {
           display: flex; align-items: center; gap: 0.75rem;
-          padding: 0.8rem 1rem;
+          padding: 0.85rem 1rem;
           text-decoration: none; color: #334155;
-          font-size: 0.85rem; font-weight: 600;
+          font-size: 0.875rem; font-weight: 600;
           border-bottom: 1px solid #F1F5F9;
           transition: background 0.15s;
           -webkit-tap-highlight-color: transparent;
@@ -391,9 +403,9 @@ export function MobileNav() {
         }
         .mn-logout {
           display: flex; align-items: center; gap: 0.75rem;
-          width: 100%; padding: 0.8rem 1rem;
+          width: 100%; padding: 0.85rem 1rem;
           background: none; border: none; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700; color: #DC2626;
+          font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 700; color: #DC2626;
           transition: background 0.15s; -webkit-tap-highlight-color: transparent; text-align: left;
         }
         .mn-logout:active { background: #FEF2F2; }
@@ -415,10 +427,10 @@ export function MobileNav() {
             className="mn-drawer-logo"
             style={{ background: `linear-gradient(135deg, ${colors.accent === '#7C3AED' ? '#6D28D9' : colors.accent === '#DC2626' ? '#B91C1C' : colors.accent === '#059669' ? '#047857' : '#1D4ED8'}, ${colors.accent})` }}
           >
-            L
+            {associationName.charAt(0)}
           </div>
           <div>
-            <div className="mn-drawer-appname">{role === 'SYSTEM_ADMIN' ? 'LCD Platform' : 'Lélouma'}</div>
+            <div className="mn-drawer-appname">{role === 'SYSTEM_ADMIN' ? 'LCD Platform' : associationName}</div>
             <div className="mn-drawer-rolepill" style={{ background: colors.pillBg, color: colors.pillText }}>
               {colors.label}
             </div>
@@ -436,7 +448,7 @@ export function MobileNav() {
                     href={item.href}
                     className={`mn-link${isActive(item.href) ? ' active' : ''}`}
                   >
-                    <span className="mn-link-ico"><Ico d={item.ico} size={15} /></span>
+                    <span className="mn-link-ico"><Ico d={item.ico} size={16} /></span>
                     <span className="mn-link-text">{item.label}</span>
                     <span className="mn-link-chevron">
                       <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -452,7 +464,7 @@ export function MobileNav() {
           <div className="mn-logout-group">
             <button className="mn-logout" onClick={handleLogout}>
               <span className="mn-link-ico" style={{ background: '#FEF2F2', color: '#DC2626' }}>
-                <Ico d={ICO.logout} size={15} />
+                <Ico d={ICO.logout} size={16} />
               </span>
               <span className="mn-link-text">Déconnexion</span>
             </button>
@@ -474,7 +486,7 @@ export function MobileNav() {
               className={`mn-tab${active ? ' active' : ''}${isCta ? ' mn-cta' : ''}`}
             >
               <span className="mn-tab-ico-wrap">
-                <Ico d={tab.ico} size={isCta ? 17 : 20} />
+                <Ico d={tab.ico} size={isCta ? 22 : 20} />
               </span>
               {tab.label}
             </Link>

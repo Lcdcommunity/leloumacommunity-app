@@ -7,7 +7,8 @@ import { UserRole, ContributionStatus, ProjectStatus, UserStatus, ExpenseStatus 
 export class DashboardSuperAdminService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSuperAdminDashboard() {
+  // 💉 Le service exige maintenant l'associationId
+  async getSuperAdminDashboard(associationId: string) {
     const [
       associationsCount,
       antennasCount,
@@ -17,34 +18,36 @@ export class DashboardSuperAdminService {
       activeProjectsCount,
       aggValidatedContributions,
     ] = await Promise.all([
-      this.prisma.association.count(),
-      this.prisma.antenna.count(),
-      this.prisma.user.count({ where: { role: UserRole.MEMBER } }),
-      this.prisma.user.count({ where: { status: UserStatus.PENDING_APPROVAL } }),
-      this.prisma.contribution.count({ where: { status: ContributionStatus.PENDING_VALIDATION } }),
-      this.prisma.project.count({ where: { status: ProjectStatus.IN_PROGRESS } }),
+      // 🔒 Cloisonnement de CHAQUE requête
+      this.prisma.association.count({ where: { id: associationId } }), 
+      this.prisma.antenna.count({ where: { associationId } }),
+      this.prisma.user.count({ where: { role: UserRole.MEMBER, associationId } }),
+      this.prisma.user.count({ where: { status: UserStatus.PENDING_APPROVAL, associationId } }),
+      this.prisma.contribution.count({ where: { status: ContributionStatus.PENDING_VALIDATION, associationId } }),
+      this.prisma.project.count({ where: { status: ProjectStatus.IN_PROGRESS, associationId } }),
       this.prisma.contribution.aggregate({
-        where: { status: ContributionStatus.VALIDATED },
+        where: { status: ContributionStatus.VALIDATED, associationId },
         _sum: { amount: true },
       }),
     ]);
 
-    // On récupère TOUTES les antennes
+    // 🔒 On récupère UNIQUEMENT les antennes de cette association
     const allAntennas = await this.prisma.antenna.findMany({
+      where: { associationId },
       select: { id: true, name: true, defaultCurrency: true }
     });
 
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        // 1. Total de TOUTES les cotisations validées (Historique inclus)
+        // 🔒 Cloisonnement des cotisations par antenne ET par association
         const inAgg = await this.prisma.contribution.aggregate({
-          where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
+          where: { antennaId: ant.id, associationId, status: ContributionStatus.VALIDATED },
           _sum: { amount: true }
         });
         
-        // 2. Total de TOUTES les dépenses validées
+        // 🔒 Cloisonnement des dépenses par antenne ET par association
         const outAgg = await this.prisma.expense.aggregate({
-          where: { antennaId: ant.id, status: ExpenseStatus.VALIDATED },
+          where: { antennaId: ant.id, associationId, status: ExpenseStatus.VALIDATED },
           _sum: { amount: true }
         });
 
@@ -54,14 +57,14 @@ export class DashboardSuperAdminService {
         return {
           id: ant.id,
           name: ant.name,
-          balance: totalIn - totalOut, // Le VRAI solde positif
+          balance: totalIn - totalOut,
           currency: ant.defaultCurrency || 'GNF'
         };
       })
     );
 
     const recentPendingAccounts = await this.prisma.user.findMany({
-      where: { status: UserStatus.PENDING_APPROVAL },
+      where: { status: UserStatus.PENDING_APPROVAL, associationId }, // 🔒 Cloisonné
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: {
@@ -76,6 +79,7 @@ export class DashboardSuperAdminService {
     });
 
     const recentContributions = await this.prisma.contribution.findMany({
+      where: { associationId }, // 🔒 Cloisonné
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: {
@@ -89,6 +93,7 @@ export class DashboardSuperAdminService {
     });
 
     const recentProjects = await this.prisma.project.findMany({
+      where: { associationId }, // 🔒 Cloisonné
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: {
@@ -103,7 +108,7 @@ export class DashboardSuperAdminService {
 
     return {
       stats: {
-        associations: associationsCount,
+        associations: associationsCount, // Affichera 1 (sa propre association)
         antennas: antennasCount,
         members: membersCount,
         pendingAccounts: pendingAccountsCount,
@@ -125,20 +130,26 @@ export class DashboardSuperAdminService {
     };
   }
 
-  async listAntennas(page: number, pageSize: number, q?: string) {
+  // 💉 Injection de l'associationId ici aussi
+  async listAntennas(associationId: string, page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
     return this.prisma.antenna.findMany({
-      where: q ? { name: { contains: q, mode: 'insensitive' } } : {},
+      where: {
+        associationId, // 🔒 Cloisonné
+        ...(q ? { name: { contains: q, mode: 'insensitive' } } : {})
+      },
       skip,
       take: pageSize,
       include: { association: true },
     });
   }
 
-  async listAntennaAdmins(page: number, pageSize: number, q?: string) {
+  // 💉 Injection de l'associationId ici aussi
+  async listAntennaAdmins(associationId: string, page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
     return this.prisma.user.findMany({
       where: {
+        associationId, // 🔒 Cloisonné
         role: UserRole.ANTENNA_ADMIN,
         ...(q ? {
           OR: [

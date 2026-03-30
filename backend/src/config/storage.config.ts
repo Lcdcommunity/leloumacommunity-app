@@ -1,4 +1,4 @@
-//src/config/storage.config.ts
+// backend/src/config/storage.config.ts
 export default () => {
   const localPublicBaseUrl =
     process.env.LOCAL_PUBLIC_BASE_URL ||

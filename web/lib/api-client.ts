@@ -35,7 +35,6 @@ export interface VirtualCardData {
     birthCountry?: string | null;
     originSubPrefecture?: string | null;
     originCommune?: string | null;
-    originVillage?: string | null;
     country?: string | null;
     city?: string | null;
     postalCode?: string | null;
@@ -56,8 +55,8 @@ export interface FullUserProfile extends UserSummary {
   countryOfBirth?: string | null;
   profilePhotoUrl?: string | null;
   avatarUrl?: string | null;
-  originVillage?: string | null;
   originSubPrefecture?: string | null;
+  originVillage?: string | null; // Conservé uniquement si présent en DB, sinon à ignorer
   function?: string | null;
   cardNumber?: string | null;
   isCardLocked?: boolean;
@@ -92,7 +91,6 @@ export interface FullUserProfile extends UserSummary {
   }> | null;
 }
 
-// --- TYPES LOCAUX POUR LES NOUVEAUX MODULES ---
 export interface Expense {
   id: string;
   amount: number;
@@ -133,12 +131,30 @@ export interface Sponsor {
   websiteUrl?: string | null;
   contactEmail?: string | null;
   isActive: boolean;
+  logoFile?: { url: string } | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT
 // ─────────────────────────────────────────────────────────────────────────────
 export const api = {
+  // ==========================================
+  // PUBLIC / THÈME VISUEL
+  // ==========================================
+  getPublicTheme: (domain?: string, code?: string) => {
+    const params = new URLSearchParams();
+    if (domain) params.append('domain', domain);
+    if (code) params.append('code', code);
+    
+    return http<{
+      id: string;
+      name: string;
+      logoUrl: string | null;
+      themeColors: { primary: string; secondary: string };
+      fontFamily: string;
+    }>(`/public/theme?${params.toString()}`);
+  },
+
   // ==========================================
   // AUTH / ENRÔLEMENT MEMBRE
   // ==========================================
@@ -150,7 +166,6 @@ export const api = {
     antennaId: string;
     phone?: string;
     originSubPrefecture?: string;
-    originVillage?: string;
     birthDate?: string;
     placeOfBirth?: string;
     birthCountry?: string;
@@ -204,6 +219,7 @@ export const api = {
     const headers: Record<string, string> = {};
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
+    // On utilise l'endpoint /users/me/avatar comme défini dans le backend
     const res = await fetch(`${baseUrl}/users/me/avatar`, {
       method: 'POST',
       headers,
@@ -225,7 +241,7 @@ export const api = {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${data.accessToken}` },
             body: formData,
-          });
+            });
           if (!retryRes.ok) {
             const err = await retryRes.json().catch(() => ({})) as { message?: string };
             throw new Error(err.message ?? 'Erreur lors du téléchargement de la photo.');
@@ -476,7 +492,6 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
-
   validateContributionAntenna: (id: string, payload?: { note?: string }) =>
     http(`/admin/contributions/${id}/validate`, { method: 'PATCH', body: payload ?? {} }),
 
@@ -506,8 +521,8 @@ export const api = {
       `/member/contributions?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
-    ),
-
+    ), 
+    
   runContributionProjection: (body: {
     expectedMembersPaying: number;
     averageContribution: number;
@@ -824,11 +839,10 @@ export const api = {
         params?.action ? `&action=${encodeURIComponent(params.action)}` : ''
       }`
     ),
-// ==========================================
+
+  // ==========================================
   // SYSTEM ADMIN (GRAND CHEF)
   // ==========================================
-  
-  // 1. Créer une nouvelle association
   createAssociationSystemAdmin: (body: {
     associationName: string;
     code: string;
@@ -847,7 +861,6 @@ export const api = {
       body,
     }),
 
-  // 2. Récupérer les stats du tableau de bord global
   getSystemDashboard: () =>
     http<{
       stats: { totalAssociations: number; totalUsers: number };
@@ -861,7 +874,6 @@ export const api = {
       }>;
     }>('/system-admin/dashboard'),
 
-  // 3. Récupérer les logs d'audit système
   getSystemAuditLogs: () =>
     http<Array<{ 
       id: string; 
@@ -872,8 +884,7 @@ export const api = {
       entity: string;
       ipAddress?: string;
     }>>('/system-admin/audit-logs'),
-    // 4. Récupérer une association par son ID
-  // 4. Récupérer une association par son ID avec ses compteurs
+
   getAssociationByIdSystemAdmin: (id: string) =>
     http<{
       id: string;
@@ -891,11 +902,14 @@ export const api = {
       };
     }>(`/system-admin/associations/${id}`),
 
-  // 5. Changer le statut (Activer/Suspendre)
-  // 5. Changer le statut (Activer/Suspendre)
+  deleteAssociationSystemAdmin: (id: string) =>
+    http<{ message: string }>(`/system-admin/associations/${id}`, {
+      method: 'DELETE',
+    }),
+
   updateAssociationStatusSystemAdmin: (id: string, isActive: boolean) =>
     http<{ message: string }>(`/system-admin/associations/${id}/status`, {
       method: 'PATCH',
       body: { isActive },
     }),
-}; // <-- Fin de l'objet "api"
+};

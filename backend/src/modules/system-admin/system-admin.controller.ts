@@ -4,6 +4,7 @@ import {
   Post, 
   Get, 
   Patch, 
+  Delete, // 👈 Ajout de Delete
   Body, 
   Param, 
   UseGuards 
@@ -65,5 +66,14 @@ export class SystemAdminController {
     @Body('isActive') isActive: boolean
   ) {
     return this.systemAdminService.updateAssociationStatus(id, isActive);
+  }
+
+  /**
+   * 🔥 Supprimer DÉFINITIVEMENT une instance d'association
+   */
+  @Delete('associations/:id')
+  @Roles(UserRole.SYSTEM_ADMIN)
+  deleteAssociation(@Param('id') id: string) {
+    return this.systemAdminService.deleteAssociation(id);
   }
 }

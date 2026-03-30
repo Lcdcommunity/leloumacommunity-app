@@ -1,4 +1,4 @@
-// src/modules/uploads/uploads.service.ts
+// backend/src/modules/uploads/uploads.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthUser } from '../../common/types/auth-user.type';
@@ -67,24 +67,32 @@ export class UploadsService {
       };
     }
 
+    // 1. On construit l'objet dynamiquement SANS le "associationId"
+    const fileData: any = {
+      uploadedByUserId: params.actor.id,
+      storageProvider: driver,
+      originalFilename: params.file.originalname,
+      storageKey: stored.storageKey,
+      url: stored.url,
+      mimeType: stored.mimeType ?? params.file.mimetype,
+      sizeBytes: stored.sizeBytes ?? BigInt(params.file.size),
+      category: (params.category as FileCategory) ?? FileCategory.OTHER,
+      visibility: params.isPublic ? FileVisibility.PUBLIC : FileVisibility.PRIVATE,
+    };
+
+    // 2. On ajoute l'association UNIQUEMENT si l'utilisateur en a une (le Grand Chef n'en a pas)
+    if (params.actor.associationId) {
+      fileData.associationId = params.actor.associationId;
+    }
+
+    // 3. Création propre
     const created = await this.prisma.fileAsset.create({
-      data: {
-        associationId: params.actor.associationId,
-        uploadedByUserId: params.actor.id,
-        storageProvider: driver,
-        originalFilename: params.file.originalname,
-        storageKey: stored.storageKey,
-        url: stored.url,
-        mimeType: stored.mimeType ?? params.file.mimetype,
-        sizeBytes: stored.sizeBytes ?? BigInt(params.file.size),
-        category: (params.category as FileCategory) ?? FileCategory.OTHER,
-        visibility: params.isPublic ? FileVisibility.PUBLIC : FileVisibility.PRIVATE,
-      },
+      data: fileData,
     });
 
-    // ✅ CORRECTION LOG : targetModel -> entity | summary/metadata -> details
+    // 4. Log de l'action
     await this.audit.log({
-      associationId: params.actor.associationId,
+      associationId: params.actor.associationId || null,
       actorUserId: params.actor.id,
       action: AuditAction.CREATE,
       entity: 'FileAsset',

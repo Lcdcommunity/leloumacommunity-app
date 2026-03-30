@@ -4,7 +4,7 @@ import { AuditService } from './audit.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { UserRole, AuditAction } from '@prisma/client';
+import { UserRole } from '@prisma/client';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 
 @Controller('audit')
@@ -16,18 +16,21 @@ export class AuditController {
   @Get()
   async list(
     @CurrentUser() user: AuthUser,
-    @Query('page') page: number = 1,
-    @Query('pageSize') pageSize: number = 100,
+    @Query('page') page: string = '1',
+    @Query('pageSize') pageSize: string = '50',
+    @Query('antennaId') antennaId?: string,
   ) {
-    // Si c'est un ANTENNA_ADMIN, on ne lui montre que les logs de son antenne
-    const logs = await this.service.list({
-      associationId: user.associationId,
-      antennaId: user.role === UserRole.ANTENNA_ADMIN ? user.antennaId : undefined
-    });
+    // 🔥 SÉCURITÉ : Si c'est un ANTENNA_ADMIN, on ignore l'antennaId du Query et on force la sienne
+    const resolvedAntennaId = 
+      user.role === UserRole.ANTENNA_ADMIN 
+        ? user.antennaId 
+        : antennaId;
 
-    return {
-      items: logs,
-      total: logs.length
-    };
+    return this.service.list({
+      associationId: user.associationId,
+      antennaId: resolvedAntennaId,
+      page: Math.max(1, parseInt(page, 10)),
+      pageSize: Math.min(100, parseInt(pageSize, 10))
+    });
   }
 }

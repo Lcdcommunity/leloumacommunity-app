@@ -1,4 +1,4 @@
-//backend/src/modules/auth/auth-member.service.ts
+// backend/src/modules/auth/auth-member.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -10,14 +10,25 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { UserRole, UserStatus, TokenType } from '@prisma/client';
+import { AuthMailerService } from './auth.mailer.service'; // 💉 INJECTION CHIRURGICALE
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthMemberService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly authMailer: AuthMailerService, // 💉 INJECTION CHIRURGICALE
+    private readonly config: ConfigService,
+  ) {}
+
+  private getFrontendBaseUrl(): string {
+    return this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
+  }
 
   async memberSignup(dto: MemberSignupDto): Promise<{ message: string }> {
+    const email = dto.email.toLowerCase().trim();
     const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email },
       select: { id: true },
     });
 
@@ -27,7 +38,9 @@ export class AuthMemberService {
 
     const antenna = await this.prisma.antenna.findUnique({
       where: { id: dto.antennaId },
-      select: { id: true, associationId: true, isActive: true },
+      include: { 
+        association: { include: { logoFile: true } } 
+      },
     });
 
     if (!antenna || !antenna.isActive) {
@@ -36,14 +49,14 @@ export class AuthMemberService {
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const verificationToken = randomUUID() + randomUUID();
-    const tokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24);
+    const tokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
 
-    await this.prisma.$transaction(async (prisma) => {
-      const newUser = await prisma.user.create({
+    await this.prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
         data: {
           firstName: dto.firstName.trim(),
           lastName: dto.lastName.trim(),
-          email: dto.email.toLowerCase().trim(),
+          email,
           phone: dto.phone?.trim() || null,
           passwordHash,
           role: UserRole.MEMBER,
@@ -56,7 +69,7 @@ export class AuthMemberService {
         },
       });
 
-      await prisma.membership.create({
+      await tx.membership.create({
         data: {
           associationId: antenna.associationId,
           userId: newUser.id,
@@ -65,11 +78,11 @@ export class AuthMemberService {
         },
       });
 
-      await prisma.authToken.create({
+      await tx.authToken.create({
         data: {
           associationId: antenna.associationId,
           userId: newUser.id,
-          email: newUser.email,
+          email,
           type: TokenType.EMAIL_VERIFICATION,
           tokenHash: verificationToken,
           expiresAt: tokenExpiresAt,
@@ -77,37 +90,40 @@ export class AuthMemberService {
       });
     });
 
+    // 🚀 ENVOI DU MAIL DE VÉRIFICATION (Marque Blanche)
+    const front = this.getFrontendBaseUrl();
+    const verifyUrl = `${front}/verify-email?token=${encodeURIComponent(verificationToken)}`;
+
+    await this.authMailer.sendVerificationEmail({
+      to: email,
+      verifyUrl,
+      appName: antenna.association.name,
+      logoUrl: antenna.association.logoFile?.url,
+    });
+
     return {
-      message:
-        'Inscription enregistrée. Vérifiez votre email pour activer votre compte, puis attendez la validation de l’administrateur.',
+      message: 'Inscription enregistrée. Veuillez vérifier votre adresse email pour continuer.',
     };
   }
 
   async verifyEmail(dto: VerifyEmailDto): Promise<{ message: string; emailVerified: boolean }> {
     const tokenRecord = await this.prisma.authToken.findUnique({
-      where: {
-        tokenHash: dto.token,
-      },
+      where: { tokenHash: dto.token },
       include: {
-        user: {
-          select: { id: true, emailVerifiedAt: true }
-        }
+        user: { select: { id: true, emailVerifiedAt: true } }
       }
     });
 
     if (!tokenRecord || tokenRecord.type !== TokenType.EMAIL_VERIFICATION) {
-      throw new BadRequestException('Token de vérification invalide.');
+      throw new BadRequestException('Lien de vérification invalide.');
     }
 
     if (!tokenRecord.user) {
-       throw new BadRequestException('Utilisateur introuvable pour ce token.');
+       throw new BadRequestException('Utilisateur introuvable.');
     }
 
     if (tokenRecord.user.emailVerifiedAt) {
-      return {
-        message: 'Email déjà vérifié.',
-        emailVerified: true,
-      };
+      return { message: 'Email déjà vérifié.', emailVerified: true };
     }
 
     if (tokenRecord.expiresAt < new Date()) {
@@ -115,28 +131,26 @@ export class AuthMemberService {
     }
 
     if (tokenRecord.consumedAt) {
-        throw new BadRequestException('Ce lien de vérification a déjà été utilisé.');
+        throw new BadRequestException('Ce lien a déjà été utilisé.');
     }
 
-    await this.prisma.$transaction(async (prisma) => {
-      await prisma.user.update({
-        where: { id: tokenRecord.user!.id },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: tokenRecord.userId },
         data: {
           emailVerifiedAt: new Date(),
           status: UserStatus.PENDING_APPROVAL,
         },
       });
 
-      await prisma.authToken.update({
+      await tx.authToken.update({
         where: { id: tokenRecord.id },
-        data: {
-          consumedAt: new Date(),
-        },
+        data: { consumedAt: new Date() },
       });
     });
 
     return {
-      message: 'Email vérifié avec succès. En attente de validation par un administrateur.',
+      message: 'Email vérifié avec succès. Votre compte est en attente de validation par un administrateur.',
       emailVerified: true,
     };
   }

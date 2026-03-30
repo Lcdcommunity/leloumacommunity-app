@@ -50,6 +50,7 @@ export class ContributionsService {
       where: {
         userId: actor.id,
         antennaId: dto.antennaId,
+        associationId: actor.associationId, // 🔒 Cloisonnement Asso
         isPrimary: true,
         status: 'APPROVED',
       },
@@ -79,7 +80,6 @@ export class ContributionsService {
     const proofFileIdInput = dto.proofFileId ?? incoming.receiptFileAssetId ?? undefined;
     const purpose = (dto.purpose as any) ?? 'REGULAR_QUOTA';
 
-    // Récupération tarifaire
     const pricingSetting = await this.prisma.associationSetting.findUnique({
       where: {
         associationId_key: {
@@ -112,7 +112,6 @@ export class ContributionsService {
       proofFileId: proofFileIdInput ?? null,
     };
 
-    // Logique de split si le montant dépasse la mensualité
     if (
       (purpose === 'REGULAR_QUOTA' || purpose === 'LATE_QUOTA') &&
       monthlyPrice > 0 &&
@@ -146,7 +145,6 @@ export class ContributionsService {
       contributionsToCreate.map((data) => this.prisma.contribution.create({ data })),
     );
 
-    // Notification admins
     await this.notifications.notifyAntennaAdmins(
       dto.antennaId,
       actor.associationId,
@@ -154,7 +152,6 @@ export class ContributionsService {
       NotificationType.CONTRIBUTION_SUBMITTED,
     );
 
-    // Audit Log (Entity: Contribution)
     await this.audit.log({
       associationId: actor.associationId,
       antennaId: dto.antennaId,
@@ -164,7 +161,7 @@ export class ContributionsService {
       entityId: createdContributions[0].id,
       targetUserId: actor.id,
       details: {
-        summary: `Dépôt soumis (Total: ${dto.amount}${resolvedCurrency}, scindé en ${createdContributions.length} ligne(s))`,
+        summary: `Dépôt soumis (Total: ${dto.amount}${resolvedCurrency})`,
         currency: resolvedCurrency,
         splitCount: createdContributions.length,
       },
@@ -174,11 +171,15 @@ export class ContributionsService {
   }
 
   /**
-   * Validation d'une cotisation par un admin d'antenne ou super-admin
+   * Validation d'une cotisation
    */
   async validateContribution(id: string, dto: ValidateContributionDto, actor: AuthUser) {
-    const contribution = await this.prisma.contribution.findUnique({ where: { id } });
-    if (!contribution) throw new NotFoundException('Cotisation introuvable');
+    // 🔒 Cloisonnement strict : On cherche la cotisation SEULEMENT dans l'asso de l'acteur
+    const contribution = await this.prisma.contribution.findFirst({ 
+      where: { id, associationId: actor.associationId } 
+    });
+    
+    if (!contribution) throw new NotFoundException('Cotisation introuvable dans votre association');
 
     await this.assertAntennaAdminCanValidate(actor, contribution.antennaId);
 
@@ -240,7 +241,9 @@ export class ContributionsService {
    * Rejet d'une cotisation
    */
   async rejectContribution(id: string, dto: RejectContributionDto, actor: AuthUser) {
-    const contribution = await this.prisma.contribution.findUnique({ where: { id } });
+    const contribution = await this.prisma.contribution.findFirst({ 
+      where: { id, associationId: actor.associationId } 
+    });
     if (!contribution) throw new NotFoundException('Cotisation introuvable');
 
     await this.assertAntennaAdminCanValidate(actor, contribution.antennaId);
@@ -263,26 +266,12 @@ export class ContributionsService {
       type: NotificationType.CONTRIBUTION_REJECTED,
     });
 
-    await this.audit.log({
-      associationId: updated.associationId,
-      antennaId: updated.antennaId,
-      actorUserId: actor.id,
-      action: 'REJECT_CONTRIBUTION' as any,
-      entity: 'Contribution',
-      entityId: updated.id,
-      targetUserId: updated.memberUserId,
-      details: { summary: 'Refus de la cotisation', reason: dto.rejectionReason },
-    });
-
     return updated;
   }
 
-  /**
-   * Liste des cotisations de l'utilisateur connecté
-   */
   async listMine(actor: AuthUser) {
     const contributions = await this.prisma.contribution.findMany({
-      where: { memberUserId: actor.id },
+      where: { memberUserId: actor.id, associationId: actor.associationId },
       include: { antenna: { select: { id: true, name: true, code: true } } },
       orderBy: { submittedAt: 'desc' },
     });
@@ -297,9 +286,6 @@ export class ContributionsService {
     }));
   }
 
-  /**
-   * Récupération de toutes les cotisations (Filtres admin)
-   */
   async findAll(associationId: string, antennaId?: string) {
     return this.prisma.contribution.findMany({
       where: { associationId, antennaId: antennaId || undefined },
@@ -311,12 +297,9 @@ export class ContributionsService {
     });
   }
 
-  /**
-   * Détails d'une cotisation spécifique
-   */
-  async findOne(id: string) {
-    const contribution = await this.prisma.contribution.findUnique({
-      where: { id },
+  async findOne(id: string, associationId: string) {
+    const contribution = await this.prisma.contribution.findFirst({
+      where: { id, associationId }, // 🔒 Protection multi-tenant
       include: {
         member: { select: { firstName: true, lastName: true, email: true, phone: true } },
         antenna: { select: { name: true, code: true } },
@@ -327,13 +310,12 @@ export class ContributionsService {
     return contribution;
   }
 
-  /**
-   * Annulation par le membre (si encore en attente)
-   */
   async cancelContribution(id: string, actor: AuthUser) {
-    const contribution = await this.prisma.contribution.findUnique({ where: { id } });
+    const contribution = await this.prisma.contribution.findFirst({ 
+      where: { id, associationId: actor.associationId, memberUserId: actor.id } 
+    });
+    
     if (!contribution) throw new NotFoundException('Cotisation introuvable');
-    if (contribution.memberUserId !== actor.id) throw new ForbiddenException('Ce n\'est pas votre cotisation');
     if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
       throw new BadRequestException('Impossible d\'annuler une cotisation déjà traitée');
     }
@@ -348,9 +330,6 @@ export class ContributionsService {
     });
   }
 
-  /**
-   * Liste des membres en retard de paiement
-   */
   async lateMembers(associationId: string, antennaId?: string, thresholdMonths = 3) {
     const thresholdDate = new Date();
     thresholdDate.setMonth(thresholdDate.getMonth() - thresholdMonths);
@@ -371,7 +350,7 @@ export class ContributionsService {
             lastName: true,
             email: true,
             contributions: {
-              where: { status: ContributionStatus.VALIDATED },
+              where: { status: ContributionStatus.VALIDATED, associationId },
               orderBy: { validatedAt: 'desc' },
               take: 1,
               select: { id: true, amount: true, validatedAt: true, currency: true },
@@ -395,26 +374,13 @@ export class ContributionsService {
       });
   }
 
-  /**
-   * Statistiques globales des cotisations pour une asso/antenne
-   */
-  async getStats(associationId: string, antennaId?: string) {
-    const where = { associationId, antennaId: antennaId || undefined, status: ContributionStatus.VALIDATED };
-    const sum = await this.prisma.contribution.aggregate({
-      where,
-      _sum: { amount: true },
-      _count: { id: true }
-    });
-    return {
-      totalAmount: Number(sum._sum.amount) || 0,
-      count: sum._count.id
-    };
-  }
-
-  /**
-   * Assertion de sécurité pour les admins d'antenne
-   */
   private async assertAntennaAdminCanValidate(actor: AuthUser, antennaId: string): Promise<void> {
+    // 🔒 Même le SUPER_ADMIN doit appartenir à la même association que l'antenne
+    const antenna = await this.prisma.antenna.findFirst({
+        where: { id: antennaId, associationId: actor.associationId }
+    });
+    if (!antenna) throw new ForbiddenException('Cette antenne ne fait pas partie de votre association');
+
     if (actor.role === UserRole.SUPER_ADMIN) return;
     if (actor.role !== UserRole.ANTENNA_ADMIN) throw new ForbiddenException('Non autorisé');
 

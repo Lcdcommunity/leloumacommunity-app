@@ -52,12 +52,15 @@ export class FileAssetsService {
     };
   }
 
-  async getById(id: string): Promise<FileAssetResponse> {
-    const found = await this.prisma.fileAsset.findUnique({
-      where: { id },
+  /**
+   * 🔥 CORRECTION CHIRURGICALE : Isolation par AssociationId
+   */
+  async getById(id: string, associationId: string): Promise<FileAssetResponse> {
+    const found = await this.prisma.fileAsset.findFirst({
+      where: { id, associationId }, // 🔒 Cloisonnement strict
     });
 
-    if (!found) throw new NotFoundException('Fichier introuvable.');
+    if (!found) throw new NotFoundException('Fichier introuvable dans votre association.');
 
     return {
       id: found.id,
@@ -68,5 +71,22 @@ export class FileAssetsService {
       url: found.url || '',
       createdAt: found.createdAt.toISOString(),
     };
+  }
+
+  /**
+   * 🔥 AJOUT : Suppression sécurisée (métadonnées)
+   */
+  async delete(id: string, associationId: string): Promise<{ success: boolean }> {
+    const found = await this.prisma.fileAsset.findFirst({
+      where: { id, associationId },
+    });
+
+    if (!found) throw new NotFoundException('Fichier introuvable.');
+
+    await this.prisma.fileAsset.delete({
+      where: { id },
+    });
+
+    return { success: true };
   }
 }

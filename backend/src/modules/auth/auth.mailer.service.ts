@@ -20,9 +20,6 @@ export class AuthMailerService {
     });
   }
 
-  /**
-   * Construit l'adresse d'expéditeur formatée.
-   */
   private getMailFrom(appName: string, fallbackLabel: string): string {
     const smtpUser = this.config.get<string>('SMTP_USER') ?? '';
     return (
@@ -31,16 +28,18 @@ export class AuthMailerService {
     );
   }
 
-  /**
-   * Envoie l'email de réinitialisation de mot de passe.
-   */
   async sendPasswordResetEmail(params: {
     to: string;
     resetUrl: string;
     appName?: string;
+    logoUrl?: string; // 👈 AJOUTÉ POUR LE LOGO ASSO
   }): Promise<void> {
     const appName = params.appName || this.config.get<string>('APP_NAME') || 'Lélouma Community';
     const mailFrom = this.getMailFrom(appName, 'Support');
+
+    const logoHtml = params.logoUrl 
+      ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${params.logoUrl}" alt="${appName}" style="max-height: 60px; border-radius: 8px;"></div>`
+      : `<h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>`;
 
     try {
       await this.transporter.sendMail({
@@ -50,13 +49,13 @@ export class AuthMailerService {
         html: `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 25px;">
-              <h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>
+              ${logoHtml}
             </div>
 
             <h2 style="color: #111827; font-size: 20px; font-weight: 600;">Réinitialisation de mot de passe</h2>
             <p style="color: #374151; font-size: 16px; line-height: 1.5;">Bonjour,</p>
             <p style="color: #374151; font-size: 16px; line-height: 1.5;">
-              Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en créer un nouveau en toute sécurité :
+              Vous avez demandé à réinitialiser votre mot de passe pour votre compte <strong>${appName}</strong>. Cliquez sur le bouton ci-dessous :
             </p>
 
             <div style="text-align: center; margin: 35px 0;">
@@ -69,34 +68,27 @@ export class AuthMailerService {
               Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br/>
               <a href="${params.resetUrl}" style="color: #3B82F6; word-break: break-all;">${params.resetUrl}</a>
             </p>
-
-            <p style="font-size: 13px; color: #9CA3AF; margin-top: 15px;">
-              Si vous n'avez pas demandé cette réinitialisation, vous pouvez simplement ignorer cet email. Votre compte restera sécurisé.
-            </p>
           </div>
         `,
       });
-
-      this.logger.log(`✅ Email de reset envoyé avec succès à -> ${params.to}`);
     } catch (error: unknown) {
-      this.logger.error(
-        `❌ Échec de l'envoi de l'email de reset à ${params.to}`,
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.error(`❌ Échec reset email -> ${params.to}`, error);
       throw error;
     }
   }
 
-  /**
-   * Envoie l'email de vérification lors de l'inscription (Signup).
-   */
   async sendVerificationEmail(params: {
     to: string;
     verifyUrl: string;
     appName?: string;
+    logoUrl?: string; // 👈 AJOUTÉ POUR LE LOGO ASSO
   }): Promise<void> {
     const appName = params.appName || this.config.get<string>('APP_NAME') || 'Lélouma Community';
     const mailFrom = this.getMailFrom(appName, 'Bienvenue');
+
+    const logoHtml = params.logoUrl 
+      ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${params.logoUrl}" alt="${appName}" style="max-height: 60px; border-radius: 8px;"></div>`
+      : `<h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>`;
 
     try {
       await this.transporter.sendMail({
@@ -106,13 +98,13 @@ export class AuthMailerService {
         html: `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff;">
             <div style="text-align: center; margin-bottom: 25px;">
-              <h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>
+              ${logoHtml}
             </div>
 
-            <h2 style="color: #111827; font-size: 20px; font-weight: 600;">Bienvenue parmi nous !</h2>
+            <h2 style="color: #111827; font-size: 20px; font-weight: 600;">Bienvenue chez ${appName} !</h2>
             <p style="color: #374151; font-size: 16px; line-height: 1.5;">Bonjour,</p>
             <p style="color: #374151; font-size: 16px; line-height: 1.5;">
-              Merci de nous avoir rejoints. Pour activer votre compte, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :
+              Merci de nous avoir rejoints. Pour activer votre accès, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :
             </p>
 
             <div style="text-align: center; margin: 35px 0;">
@@ -122,23 +114,13 @@ export class AuthMailerService {
             </div>
 
             <p style="font-size: 13px; color: #6B7280; line-height: 1.5; padding-top: 20px; border-top: 1px solid #F3F4F6;">
-              Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br/>
-              <a href="${params.verifyUrl}" style="color: #3B82F6; word-break: break-all;">${params.verifyUrl}</a>
-            </p>
-
-            <p style="font-size: 13px; color: #9CA3AF; margin-top: 15px;">
-              Une fois votre email vérifié, un administrateur devra valider votre compte pour vous donner accès à l'espace membre.
+              Une fois votre email vérifié, un administrateur devra valider votre compte pour vous donner accès à l'espace membre de l'association.
             </p>
           </div>
         `,
       });
-
-      this.logger.log(`✅ Email de vérification envoyé avec succès à -> ${params.to}`);
     } catch (error: unknown) {
-      this.logger.error(
-        `❌ Échec de l'envoi de l'email de vérification à ${params.to}`,
-        error instanceof Error ? error.stack : String(error),
-      );
+      this.logger.error(`❌ Échec verification email -> ${params.to}`, error);
       throw error;
     }
   }

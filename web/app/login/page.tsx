@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { login } from '../../lib/auth';
+import { api } from '../../lib/api-client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,8 +17,58 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // --- ÉTAT DU THÈME DYNAMIQUE (Marque Blanche) ---
+  const [theme, setTheme] = useState<{
+    name: string;
+    logoUrl: string | null;
+    primary: string;
+    secondary: string;
+    fontFamily: string;
+  }>({
+    name: "LELOUMA COMMUNAUTE POUR LE DEVELOPPEMENT",
+    logoUrl: "/assets/images/logolcd.jpg",
+    primary: "#059669", // Emerald par défaut
+    secondary: "#064E3B", // Forest par défaut
+    fontFamily: "'DM Sans', sans-serif"
+  });
+
   useEffect(() => {
     setMounted(true);
+
+    // --- LOGIQUE DE DÉTECTION DU SOUS-DOMAINE ---
+    const fetchTheme = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        // On vérifie d'abord les paramètres d'URL (utile en local : localhost:3000/login?code=ASCOK)
+        const codeParam = urlParams.get('code') || undefined;
+        const domainParam = urlParams.get('domain') || undefined;
+        
+        // Si pas de paramètre, on prend le nom de domaine réel (ex: ajvk.lcd.com)
+        const currentDomain = (!codeParam && !domainParam) ? window.location.hostname : undefined;
+
+        // Si on est sur le domaine principal (ex: lcd.com) ou localhost pur, on ne fait rien (on garde Lélouma)
+        if (currentDomain === 'localhost' || currentDomain === 'votre-domaine-principal.com') {
+          return;
+        }
+
+        const data = await api.getPublicTheme(domainParam || currentDomain, codeParam);
+        
+        if (data) {
+          setTheme({
+            name: data.name,
+            logoUrl: data.logoUrl || "/assets/images/logolcd.jpg",
+            primary: data.themeColors?.primary || "#059669",
+            secondary: data.themeColors?.secondary || "#064E3B",
+            fontFamily: data.fontFamily || "'DM Sans', sans-serif"
+          });
+        }
+      } catch (err) {
+        // 🔥 CORRECTION ESLINT ICI : Utilisation de la variable 'err' dans le log
+        console.warn("Thème personnalisé non trouvé, utilisation du thème par défaut.", err);
+      }
+    };
+
+    fetchTheme();
   }, []);
 
   async function onSubmit(e: FormEvent) {
@@ -29,7 +80,7 @@ export default function LoginPage() {
       const res = await login(email, password);
       const role = res.user?.role;
       
-      // 👇 LA CORRECTION CHIRURGICALE EST ICI : Ajout du SYSTEM_ADMIN
+      // Routage selon le rôle
       if (role === 'SYSTEM_ADMIN') router.replace('/system-admin');
       else if (role === 'SUPER_ADMIN') router.replace('/super-admin');
       else if (role === 'ANTENNA_ADMIN') router.replace('/admin');
@@ -43,27 +94,38 @@ export default function LoginPage() {
     }
   }
 
+  // Fonction pour éclaircir une couleur HEX (pour les halos/hover dynamiques)
+  const getLightColor = (hex: string, opacity: number) => {
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16) || 5;
+    const g = parseInt(hex.substring(2, 4), 16) || 150;
+    const b = parseInt(hex.substring(4, 6), 16) || 105;
+    return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  };
+
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&family=Inter:wght@400;500;700&family=Montserrat:wght@400;500;700&family=Playfair+Display:wght@700&family=Roboto:wght@400;500;700&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+        /* INJECTION DYNAMIQUE DES VARIABLES CSS BASÉES SUR L'API */
         :root {
-          --emerald: #059669;
-          --forest: #064E3B;
-          --mint: #ECFDF5;
+          --primary: ${theme.primary};
+          --secondary: ${theme.secondary};
           --surface: #FFFFFF;
-          --text-deep: #064E3B;
+          --text-deep: ${theme.secondary};
           --text-muted: #6B7280;
           --error: #DC2626;
+          --font-main: ${theme.fontFamily};
         }
 
         .lp-root {
-          font-family: 'DM Sans', sans-serif;
+          font-family: var(--font-main);
           min-height: 100svh;
-          background: radial-gradient(circle at top left, #F0FDF4, #DCFCE7);
+          /* Dégradé de fond généré à partir de la couleur primaire */
+          background: radial-gradient(circle at top left, ${getLightColor(theme.primary, 0.05)}, ${getLightColor(theme.secondary, 0.15)});
           display: flex;
           align-items: center;
           justify-content: center;
@@ -72,7 +134,7 @@ export default function LoginPage() {
           padding: 1.5rem;
         }
 
-        /* ── Animated Green Orbs ── */
+        /* ── Animated Orbs ── */
         .lp-orb {
           position: absolute;
           border-radius: 50%;
@@ -83,13 +145,13 @@ export default function LoginPage() {
         }
         .lp-orb-1 {
           width: 450px; height: 450px;
-          background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, transparent 70%);
+          background: radial-gradient(circle, ${getLightColor(theme.primary, 0.25)} 0%, transparent 70%);
           top: -150px; right: -100px;
           animation: drift 15s ease-in-out infinite alternate;
         }
         .lp-orb-2 {
           width: 350px; height: 350px;
-          background: radial-gradient(circle, rgba(5, 150, 105, 0.15) 0%, transparent 70%);
+          background: radial-gradient(circle, ${getLightColor(theme.secondary, 0.15)} 0%, transparent 70%);
           bottom: -100px; left: -50px;
           animation: drift 20s ease-in-out infinite alternate-reverse;
         }
@@ -106,11 +168,11 @@ export default function LoginPage() {
           background: rgba(255, 255, 255, 0.85);
           backdrop-filter: blur(20px);
           -webkit-backdrop-filter: blur(20px);
-          border: 1px solid rgba(5, 150, 105, 0.1);
+          border: 1px solid ${getLightColor(theme.primary, 0.1)};
           border-radius: 32px;
           padding: clamp(2rem, 5vw, 3.5rem);
           box-shadow: 
-            0 25px 50px -12px rgba(6, 78, 59, 0.15),
+            0 25px 50px -12px ${getLightColor(theme.secondary, 0.15)},
             0 0 0 1px rgba(255, 255, 255, 0.7) inset;
           opacity: 0;
           transform: translateY(20px);
@@ -129,9 +191,9 @@ export default function LoginPage() {
         .lp-logo-box {
           width: 88px; height: 88px;
           padding: 4px;
-          background: linear-gradient(135deg, var(--emerald), var(--forest));
+          background: linear-gradient(135deg, var(--primary), var(--secondary));
           border-radius: 50%;
-          box-shadow: 0 10px 20px rgba(6, 78, 59, 0.2);
+          box-shadow: 0 10px 20px ${getLightColor(theme.secondary, 0.2)};
         }
         .lp-logo-inner {
           width: 100%; height: 100%;
@@ -139,6 +201,7 @@ export default function LoginPage() {
           border-radius: 50%;
           overflow: hidden;
           display: flex; align-items: center; justify-content: center;
+          position: relative;
         }
 
         .lp-title {
@@ -151,10 +214,11 @@ export default function LoginPage() {
         }
         .lp-title span {
           display: block;
-          color: var(--emerald);
+          color: var(--primary);
           font-size: 0.85em;
           margin-top: 0.4rem;
           font-weight: 500;
+          font-family: var(--font-main);
         }
 
         /* ── Form Fields ── */
@@ -162,20 +226,21 @@ export default function LoginPage() {
         .lp-label {
           display: block; font-size: 0.72rem; font-weight: 700;
           text-transform: uppercase; letter-spacing: 0.08em;
-          color: var(--forest); margin-bottom: 0.5rem; margin-left: 0.2rem;
+          color: var(--secondary); margin-bottom: 0.5rem; margin-left: 0.2rem;
         }
         .lp-input-wrap { position: relative; }
         .lp-input {
           width: 100%; height: 54px;
           background: rgba(255, 255, 255, 0.9);
-          border: 1.5px solid rgba(5, 150, 105, 0.1);
+          border: 1.5px solid ${getLightColor(theme.primary, 0.1)};
           border-radius: 14px; padding: 0 1.25rem;
+          font-family: var(--font-main);
           font-size: 0.95rem; color: var(--text-deep);
           transition: all 0.25s ease; outline: none;
         }
         .lp-input:focus {
-          border-color: var(--emerald);
-          box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.1);
+          border-color: var(--primary);
+          box-shadow: 0 0 0 4px ${getLightColor(theme.primary, 0.15)};
           background: white;
         }
 
@@ -187,23 +252,24 @@ export default function LoginPage() {
         }
 
         .lp-forgot { text-align: right; margin-top: 0.5rem; }
-        .lp-forgot a { font-size: 0.75rem; color: var(--emerald); text-decoration: none; font-weight: 600; }
+        .lp-forgot a { font-size: 0.75rem; color: var(--primary); text-decoration: none; font-weight: 600; }
 
         /* ── Submit Button ── */
         .lp-btn {
           width: 100%; height: 54px;
-          background: var(--forest);
+          background: var(--secondary);
           color: white; border: none; border-radius: 14px;
+          font-family: var(--font-main);
           font-size: 1rem; font-weight: 700; letter-spacing: 0.03em;
           cursor: pointer; margin-top: 1.5rem;
           transition: all 0.3s ease;
           display: flex; align-items: center; justify-content: center; gap: 0.75rem;
-          box-shadow: 0 10px 25px rgba(6, 78, 59, 0.2);
+          box-shadow: 0 10px 25px ${getLightColor(theme.secondary, 0.25)};
         }
         .lp-btn:hover:not(:disabled) {
-          background: var(--emerald);
+          background: var(--primary);
           transform: translateY(-2px);
-          box-shadow: 0 15px 30px rgba(6, 78, 59, 0.3);
+          box-shadow: 0 15px 30px ${getLightColor(theme.secondary, 0.35)};
         }
         .lp-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
@@ -216,18 +282,18 @@ export default function LoginPage() {
 
         .lp-footer {
           margin-top: 2rem; padding-top: 1.5rem;
-          border-top: 1px dotted rgba(5, 150, 105, 0.2);
+          border-top: 1px dotted ${getLightColor(theme.primary, 0.2)};
           text-align: center;
         }
         .lp-footer p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem; }
         
         .lp-signup-link {
           display: inline-flex; align-items: center; gap: 0.5rem;
-          color: var(--forest); font-weight: 700;
+          color: var(--secondary); font-weight: 700;
           text-decoration: none; font-size: 0.9rem;
           transition: transform 0.2s ease;
         }
-        .lp-signup-link:hover { transform: translateX(3px); color: var(--emerald); }
+        .lp-signup-link:hover { transform: translateX(3px); color: var(--primary); }
 
         .spinner {
           width: 20px; height: 20px;
@@ -253,20 +319,22 @@ export default function LoginPage() {
           <div className="lp-logo-wrap">
             <div className="lp-logo-box">
               <div className="lp-logo-inner">
-                <Image
-                  src="/assets/images/logolcd.jpg"
-                  alt="Logo Lélouma Communauté"
-                  width={88}
-                  height={88}
-                  priority
-                  style={{ objectFit: 'cover' }}
-                />
+                {theme.logoUrl && (
+                  <Image
+                    src={theme.logoUrl}
+                    alt={`Logo ${theme.name}`}
+                    fill
+                    priority
+                    style={{ objectFit: 'contain', padding: '5px' }}
+                    unoptimized
+                  />
+                )}
               </div>
             </div>
             <h1 className="lp-title">
               Bienvenue dans votre <span>Espace sécurisé</span>
-              <small style={{ display: 'block', fontSize: '0.6em', marginTop: '0.5rem', fontWeight: 400, opacity: 0.8, color: 'var(--text-muted)' }}>
-                LELOUMA COMMUNAUTE POUR LE DEVELOPPEMENT
+              <small style={{ display: 'block', fontSize: '0.6em', marginTop: '0.5rem', fontWeight: 500, opacity: 0.8, color: 'var(--text-muted)' }}>
+                {theme.name.toUpperCase()}
               </small>
             </h1>
           </div>

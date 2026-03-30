@@ -1,4 +1,4 @@
-//backend/src/modules/auth/auth-member.controller.ts
+// backend/src/modules/auth/auth-member.controller.ts
 import { Body, Controller, Post } from '@nestjs/common';
 import { AuthMemberService } from './auth-member.service';
 import { MemberSignupDto } from './dto/member-signup.dto';

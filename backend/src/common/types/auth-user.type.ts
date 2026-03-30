@@ -1,4 +1,4 @@
-// src/common/types/auth-user.type.ts
+// backend/src/common/types/auth-user.type.ts
 import { UserRole, UserStatus } from '@prisma/client';
 
 export type AuthUser = {
@@ -7,8 +7,7 @@ export type AuthUser = {
   role: UserRole;
   status: UserStatus;
   email: string;
-  // 👇 Ajouts chirurgicaux pour résoudre l'erreur TypeScript
   firstName?: string;
   lastName?: string;
-  antennaId?: string; // Toujours utile d'avoir l'antenne sous la main
+  antennaId?: string | null; // 👈 Harmonisation avec Prisma (null autorisé)
 };

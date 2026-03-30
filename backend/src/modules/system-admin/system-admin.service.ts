@@ -1,5 +1,5 @@
 // backend/src/modules/system-admin/system-admin.service.ts
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/services/mail.service';
 import * as bcrypt from 'bcryptjs';
@@ -166,5 +166,21 @@ export class SystemAdminService {
       ipAddress: log.ipAddress,
       createdAt: log.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * 🔥 DESTRUCTION MASSIVE : Suppression définitive d'une instance.
+   */
+  async deleteAssociation(id: string) {
+    const association = await this.prisma.association.findUnique({ where: { id } });
+    if (!association) throw new NotFoundException("Association introuvable.");
+
+    // La suppression en cascade détruira tous les enregistrements liés 
+    // (si schema.prisma est correctement configuré avec onDelete: Cascade)
+    await this.prisma.association.delete({
+      where: { id }
+    });
+
+    return { message: `L'association ${association.name} a été détruite définitivement.` };
   }
 }

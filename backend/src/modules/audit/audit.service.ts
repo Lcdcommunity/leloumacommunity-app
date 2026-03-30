@@ -1,6 +1,6 @@
 // backend/src/modules/audit/audit.service.ts
 import { Injectable } from '@nestjs/common';
-import { AuditAction, Prisma } from '@prisma/client'; // Supprimé AuditActorType qui n'est plus dans le modèle
+import { AuditAction, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export type AuditLogInput = {
@@ -8,10 +8,10 @@ export type AuditLogInput = {
   antennaId?: string;
   actorUserId?: string;
   action: AuditAction;
-  entity: string;         // Renommé (était targetModel)
-  entityId?: string;      // Renommé (était targetId)
+  entity: string;
+  entityId?: string;
   targetUserId?: string;
-  details: Prisma.InputJsonValue; // Renommé (était metadata)
+  details: Prisma.InputJsonValue;
   ipAddress?: string;
   userAgent?: string;
 };
@@ -41,19 +41,43 @@ export class AuditService {
     await this.create(input);
   }
 
-  // Ajout de la méthode list() pour que le contrôleur fonctionne
-  async list(filters: { associationId?: string; antennaId?: string }) {
-    return this.prisma.auditLog.findMany({
-      where: {
-        OR: [
-          { associationId: filters.associationId },
-          { antennaId: filters.antennaId }
-        ]
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        actorUser: { select: { firstName: true, lastName: true } }
-      }
-    });
+  /**
+   * 🔥 CORRECTION CHIRURGICALE : Isolation AND + Pagination native
+   */
+  async list(filters: { 
+    associationId: string; 
+    antennaId?: string; 
+    page: number; 
+    pageSize: number 
+  }) {
+    const skip = (filters.page - 1) * filters.pageSize;
+
+    // Construction du filtre strict : Toujours filtrer par associationId
+    const where: Prisma.AuditLogWhereInput = {
+      associationId: filters.associationId,
+      ...(filters.antennaId ? { antennaId: filters.antennaId } : {}),
+    };
+
+    const [items, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        skip,
+        take: filters.pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          actorUser: { select: { firstName: true, lastName: true } },
+          antenna: { select: { name: true } } // Ajout utile pour l'admin
+        }
+      }),
+      this.prisma.auditLog.count({ where })
+    ]);
+
+    return {
+      items,
+      total,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      totalPages: Math.ceil(total / filters.pageSize)
+    };
   }
 }

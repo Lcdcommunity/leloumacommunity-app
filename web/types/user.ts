@@ -1,5 +1,4 @@
 // web/types/user.ts
-
 export type UserRole = 'SYSTEM_ADMIN' | 'SUPER_ADMIN' | 'ANTENNA_ADMIN' | 'MEMBER';
 
 export type UserStatus =
@@ -12,7 +11,7 @@ export type UserStatus =
 
 export interface UserSummary {
   id: string;
-  associationId?: string | null; // Optionnel car le SYSTEM_ADMIN n'en a pas forcément
+  associationId?: string | null;
   antennaId?: string | null;
   email: string;
   firstName: string;
@@ -23,6 +22,13 @@ export interface UserSummary {
   emailVerifiedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // Ajout de l'objet association pour le dynamisme SaaS
+  association?: {
+    id: string;
+    name: string;
+    logoUrl?: string | null;
+  } | null;
 
   // Infos de localisation / profil supplémentaires
   city?: string | null;
@@ -43,13 +49,13 @@ export interface UserSummary {
   // Profession
   professionalStatus?: string | null;
 
-  // Numéro de carte (pour affichage admin au lieu de l'ID technique)
+  // Numéro de carte
   cardNumber?: string | null;
 
-  // Date de naissance pour la carte/profil
+  // Date de naissance
   birthDate?: string | null;
 
-  // Photo de profil — URL retournée par le backend après upload
+  // Photo de profil
   avatarUrl?: string | null;
 }
 

@@ -1,7 +1,7 @@
 // backend/src/modules/expenses/expenses.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ExpenseStatus, LedgerEntryType, UserRole, ExpenseCategory, CurrencyCode } from '@prisma/client';
+import { ExpenseStatus, LedgerEntryType, UserRole, ExpenseCategory, CurrencyCode, Prisma } from '@prisma/client';
 import { CreateExpenseDto, RejectExpenseDto } from './dto/expense.dto';
 
 @Injectable()
@@ -34,9 +34,8 @@ export class ExpensesService {
         antennaId: antenna.id,
         engagedByUserId: adminUserId,
         amount: dto.amount,
-        // 👇 CORRECTION ICI : On précise à Prisma que c'est bien un CurrencyCode
         currency: (dto.currency || antenna.defaultCurrency || 'EUR') as CurrencyCode,
-        category: dto.category,
+        category: dto.category as ExpenseCategory,
         title: dto.title,
         description: dto.description,
         expenseDate: new Date(dto.expenseDate),
@@ -54,7 +53,7 @@ export class ExpensesService {
           antennaId: antenna.id,
           type: LedgerEntryType.ANTENNA_EXPENSE_OUT,
           amount: dto.amount,
-          currency: expense.currency as any, 
+          currency: expense.currency, 
           title: `Dépense: ${expense.title}`,
           effectiveDate: expense.expenseDate,
           expenseId: expense.id,
@@ -72,8 +71,9 @@ export class ExpensesService {
     });
     if (!assignment) throw new ForbiddenException("Accès refusé.");
 
-    const where = {
+    const where: Prisma.ExpenseWhereInput = {
       antennaId: assignment.antennaId,
+      associationId: assignment.associationId, // 🔥 CLOISONNEMENT
       ...(status ? { status: status as ExpenseStatus } : {})
     };
 
@@ -91,14 +91,20 @@ export class ExpensesService {
     return { items, total, page, pageSize };
   }
 
-  async deleteAntennaExpense(adminUserId: string, expenseId: string) {
-    const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
-    if (!expense || expense.engagedByUserId !== adminUserId) {
-      throw new NotFoundException("Dépense introuvable.");
+  async deleteAntennaExpense(adminUserId: string, associationId: string, expenseId: string) {
+    // 🔥 CLOISONNEMENT : On vérifie l'ID, l'auteur ET l'association
+    const expense = await this.prisma.expense.findFirst({ 
+      where: { id: expenseId, associationId, engagedByUserId: adminUserId } 
+    });
+    
+    if (!expense) {
+      throw new NotFoundException("Dépense introuvable ou vous n'avez pas les droits.");
     }
+    
     if (expense.status === ExpenseStatus.VALIDATED) {
-      throw new BadRequestException("Impossible de supprimer une dépense déjà validée et déduite du solde.");
+      throw new BadRequestException("Impossible de supprimer une dépense déjà validée.");
     }
+    
     return this.prisma.expense.delete({ where: { id: expenseId } });
   }
 
@@ -106,8 +112,10 @@ export class ExpensesService {
   // LOGIQUE SUPER ADMIN
   // ==========================================
 
-  async listSuperAdminExpenses(page = 1, pageSize = 20, status?: string, antennaId?: string) {
-    const where = {
+  async listSuperAdminExpenses(associationId: string, page = 1, pageSize = 20, status?: string, antennaId?: string) {
+    // 🔥 CLOISONNEMENT STRICT : associationId est requis
+    const where: Prisma.ExpenseWhereInput = {
+      associationId,
       ...(status ? { status: status as ExpenseStatus } : {}),
       ...(antennaId ? { antennaId } : {})
     };
@@ -129,9 +137,14 @@ export class ExpensesService {
     return { items, total, page, pageSize };
   }
 
-  async validateExpense(superAdminId: string, expenseId: string) {
-    const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
-    if (!expense) throw new NotFoundException("Dépense introuvable.");
+  async validateExpense(superAdminId: string, associationId: string, expenseId: string) {
+    // 🔥 CLOISONNEMENT : On vérifie que la dépense appartient à l'asso du Super Admin
+    const expense = await this.prisma.expense.findFirst({ 
+      where: { id: expenseId, associationId } 
+    });
+
+    if (!expense) throw new NotFoundException("Dépense introuvable dans votre association.");
+    
     if (expense.status !== ExpenseStatus.PENDING_VALIDATION) {
       throw new BadRequestException("Cette dépense n'est pas en attente de validation.");
     }
@@ -151,7 +164,7 @@ export class ExpensesService {
           antennaId: expense.antennaId,
           type: LedgerEntryType.ANTENNA_EXPENSE_OUT,
           amount: expense.amount,
-          currency: expense.currency as any, 
+          currency: expense.currency, 
           title: `Dépense validée: ${expense.title}`,
           effectiveDate: expense.expenseDate,
           expenseId: expense.id,
@@ -163,9 +176,14 @@ export class ExpensesService {
     return { message: "Dépense validée avec succès", expense: updatedExpense };
   }
 
-  async rejectExpense(superAdminId: string, expenseId: string, reason: string) {
-    const expense = await this.prisma.expense.findUnique({ where: { id: expenseId } });
+  async rejectExpense(superAdminId: string, associationId: string, expenseId: string, reason: string) {
+    // 🔥 CLOISONNEMENT
+    const expense = await this.prisma.expense.findFirst({ 
+      where: { id: expenseId, associationId } 
+    });
+
     if (!expense) throw new NotFoundException("Dépense introuvable.");
+    
     if (expense.status !== ExpenseStatus.PENDING_VALIDATION) {
       throw new BadRequestException("Cette dépense n'est pas en attente de validation.");
     }
@@ -186,12 +204,9 @@ export class ExpensesService {
   // ==========================================
   // LOGIQUE MEMBRE (Lecture seule / Transparence)
   // ==========================================
-  async listMemberExpenses(userId: string, page = 1, pageSize = 20, category?: string) {
-    const me = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!me) throw new NotFoundException("Membre introuvable");
-
-    const where = {
-      associationId: me.associationId,
+  async listMemberExpenses(userId: string, associationId: string, page = 1, pageSize = 20, category?: string) {
+    const where: Prisma.ExpenseWhereInput = {
+      associationId,
       status: ExpenseStatus.VALIDATED,
       ...(category ? { category: category as ExpenseCategory } : {})
     };

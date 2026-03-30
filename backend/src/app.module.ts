@@ -17,90 +17,55 @@ import { ThrottlerBehindProxyGuard } from './common/guards/throttler-behind-prox
 
 // Core & Shared Modules
 import { PrismaModule } from './prisma/prisma.module';
-import { PrismaService } from './prisma/prisma.service';
 
-// Feature Modules existants
+// Feature Modules
 import { AuthModule } from './modules/auth/auth.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
-
-// Modules récemment créés ou mis à jour
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { FileAssetsModule } from './modules/file-assets/file-assets.module';
 import { LedgerModule } from './modules/ledger/ledger.module';           
 import { ContributionsModule } from './modules/contributions/contributions.module'; 
-import { ProjectsModule } from './modules/projects/projects.module';     
-
-// Nouveaux modules créés
+import { ProjectsModule } from './modules/projects/projects.module';      
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { EventsModule } from './modules/events/events.module';
 import { SponsorsModule } from './modules/sponsors/sponsors.module';
-import { SystemAdminModule } from './modules/system-admin/system-admin.module'; // <-- LE NOUVEAU MODULE DU GRAND CHEF
-// import { BillingModule } from './modules/billing/billing.module'; // <-- Gardé en commentaire pour l'instant
-
-// Nouveaux Modules & Auth Member
+import { SystemAdminModule } from './modules/system-admin/system-admin.module'; 
 import { PublicModule } from './modules/public/public.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { MemberModule } from './modules/member/member.module';
-import { AuthMemberController } from './modules/auth/auth-member.controller';
-import { AuthMemberService } from './modules/auth/auth-member.service';
-
-// Modules d'administration (Global & Antenne)
 import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { AssociationsModule } from './modules/associations/associations.module';
 import { AdminModule } from './modules/admin/admin.module';
-
-// Module Users
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [
-    // Configuration globale
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
       load: [authConfig, rateLimitConfig, storageConfig, swaggerConfig],
     }),
-
-    // Exposition publique des fichiers locaux via /static
     ServeStaticModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const configuredUploadDir =
-          config.get<string>('storage.local.uploadDir') ||
-          process.env.LOCAL_UPLOAD_DIR ||
-          './uploads';
-
-        const rootPath = isAbsolute(configuredUploadDir)
-          ? configuredUploadDir
-          : join(process.cwd(), configuredUploadDir);
-
-        return [
-          {
-            rootPath,
-            serveRoot: '/static',
-          },
-        ];
+        const configuredUploadDir = config.get<string>('storage.local.uploadDir') || './uploads';
+        const rootPath = isAbsolute(configuredUploadDir) ? configuredUploadDir : join(process.cwd(), configuredUploadDir);
+        return [{ rootPath, serveRoot: '/static' }];
       },
     }),
-
-    // Sécurité & Tâches planifiées
-    ThrottlerModule.forRoot([
-      {
-        ttl: Number(process.env.THROTTLE_TTL ?? 60) * 1000,
-        limit: Number(process.env.THROTTLE_LIMIT ?? 120),
-      },
-    ]),
+    ThrottlerModule.forRoot([{
+      ttl: Number(process.env.THROTTLE_TTL ?? 60) * 1000,
+      limit: Number(process.env.THROTTLE_LIMIT ?? 120),
+    }]),
     ScheduleModule.forRoot(),
-
-    // Modules d'infrastructure
     PrismaModule,
 
-    // Modules applicatifs (Métier)
+    // --- MODULES MÉTIER ---
     PermissionsModule,
-    AuthModule,
+    AuthModule, // 👈 C'est LUI qui gère AuthMemberController et AuthMemberService
     UploadsModule,
     SchedulerModule,
     NotificationsModule,
@@ -109,36 +74,26 @@ import { UsersModule } from './modules/users/users.module';
     LedgerModule,        
     ContributionsModule, 
     ProjectsModule,      
-
-    // Nouveaux modules intégrés
     ExpensesModule,
     EventsModule,
     SponsorsModule,
-    SystemAdminModule, // <-- LE NOUVEAU MODULE DU GRAND CHEF INTÉGRÉ ICI
-    // BillingModule, // <-- Gardé en commentaire pour l'instant
-
+    SystemAdminModule,
     PublicModule,
     DashboardModule,
     MemberModule,
-
-    // Modules d'administration
     SuperAdminModule,
     AssociationsModule,
     AdminModule,
-
-    // Module Users
     UsersModule,
   ],
-  controllers: [AuthMemberController],
+  controllers: [], // 🔥 RETIRÉ : AuthMemberController est déjà dans AuthModule
   providers: [
-    // Guard de sécurité global
     {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,
     },
-    // Services additionnels
-    AuthMemberService,
-    PrismaService,
+    // 🔥 RETIRÉ : AuthMemberService est déjà dans AuthModule
+    // 🔥 RETIRÉ : PrismaService est déjà fourni par PrismaModule
   ],
 })
 export class AppModule {}

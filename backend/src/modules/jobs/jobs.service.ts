@@ -3,7 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { LedgerService } from '../ledger/ledger.service';
-import { NotificationType, ReminderKind } from '@prisma/client';
+import { NotificationType, ReminderKind, CurrencyCode, Prisma } from '@prisma/client';
 
 @Injectable()
 export class JobsService {
@@ -16,8 +16,7 @@ export class JobsService {
   ) {}
 
   /**
-   * Purge les tokens d'authentification (email, password reset) expirés ou consommés.
-   * Basé sur le modèle AuthToken du schéma.
+   * Purge les tokens d'authentification expirés ou consommés (Action Globale).
    */
   async purgeExpiredAuthTokens(): Promise<{ cleaned: number }> {
     const now = new Date();
@@ -36,11 +35,15 @@ export class JobsService {
   }
 
   /**
-   * Recalcule les soldes et génère des snapshots (BalanceSnapshot) pour le reporting.
+   * Recalcule les soldes et génère des snapshots.
+   * 🔥 AMÉLIORATION : Peut être filtré par associationId pour l'isolation.
    */
-  async generateBalanceSnapshots(): Promise<{ updated: number }> {
+  async generateBalanceSnapshots(associationId?: string): Promise<{ updated: number }> {
     const associations = await this.prisma.association.findMany({ 
-      where: { isActive: true },
+      where: { 
+        isActive: true,
+        ...(associationId ? { id: associationId } : {}) 
+      },
       select: { id: true } 
     });
 
@@ -51,8 +54,8 @@ export class JobsService {
         await this.prisma.balanceSnapshot.create({
           data: {
             associationId: assoc.id,
-            currency: currency as any,
-            balanceAmount: amount as any,
+            currency: currency as CurrencyCode,
+            balanceAmount: new Prisma.Decimal(amount),
             asOf: new Date(),
             generatedBy: 'SYSTEM_JOB',
           },
@@ -65,18 +68,19 @@ export class JobsService {
   }
 
   /**
-   * ✅ NOUVEAU JOB : Détecte les membres n'ayant pas cotisé depuis plus de 3 mois
-   * et envoie une notification automatique aux Admins d'antenne.
+   * Détecte les membres n'ayant pas cotisé depuis plus de 3 mois.
+   * 🔥 AMÉLIORATION : Cloisonnement strict par associationId.
    */
-  async checkAndNotifyLateMembers(): Promise<{ notificationsSent: number }> {
+  async checkAndNotifyLateMembers(associationId?: string): Promise<{ notificationsSent: number }> {
     const thresholdDate = new Date();
     thresholdDate.setMonth(thresholdDate.getMonth() - 3);
 
-    // On cherche les membres actifs dont la dernière cotisation validée est ancienne
+    // Recherche des membres actifs n'ayant aucune cotisation validée récente
     const lateMembers = await this.prisma.user.findMany({
       where: {
         role: 'MEMBER',
         status: 'ACTIVE',
+        ...(associationId ? { associationId } : {}), // 🔒 Cloisonnement
         contributions: {
           none: {
             status: 'VALIDATED',
@@ -91,7 +95,7 @@ export class JobsService {
 
     if (lateMembers.length === 0) return { notificationsSent: 0 };
 
-    // Regrouper par antenne pour ne pas spammer les admins
+    // Regrouper par antenne
     const antennaMap = new Map<string, string[]>();
     for (const member of lateMembers) {
       const antennaId = member.memberships[0]?.antennaId;
@@ -104,20 +108,21 @@ export class JobsService {
 
     let sent = 0;
     for (const [antennaId, members] of antennaMap.entries()) {
-      const associationId = lateMembers.find(m => m.memberships[0]?.antennaId === antennaId)?.associationId;
+      // Récupérer l'associationId du premier membre du groupe (sécurité)
+      const memberInAntenna = lateMembers.find(m => m.memberships[0]?.antennaId === antennaId);
+      const targetAssoId = memberInAntenna?.associationId;
       
-      if (associationId) {
+      if (targetAssoId) {
         await this.notifications.notifyAntennaAdmins(
           antennaId,
-          associationId,
+          targetAssoId,
           `Alerte : ${members.length} membres de votre antenne n'ont pas cotisé depuis plus de 3 mois.`,
           NotificationType.REMINDER_CONTRIBUTION_DELAY,
         );
 
-        // Log de l'opération dans ReminderRunLog (comme prévu dans ton schéma)
         await this.prisma.reminderRunLog.create({
           data: {
-            associationId,
+            associationId: targetAssoId,
             antennaId,
             kind: ReminderKind.CONTRIBUTION_DELAY_3_MONTHS,
             thresholdMonths: 3,
@@ -129,7 +134,7 @@ export class JobsService {
       }
     }
 
-    this.logger.log(`checkAndNotifyLateMembers: ${sent} alertes envoyées aux antennes.`);
+    this.logger.log(`checkAndNotifyLateMembers: ${sent} alertes envoyées.`);
     return { notificationsSent: sent };
   }
 }

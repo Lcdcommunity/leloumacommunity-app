@@ -95,7 +95,7 @@ export default function MemberProfilePage() {
           birthCountry: countryOfBirth || null,
           originSubPrefecture: originSubPrefecture || null,
           originCommune: originSubPrefecture || null,
-          originVillage: originVillage || null,
+          // 🔥 La ligne originVillage a été supprimée ici car elle n'existe pas dans VirtualCardData
           country: country || null,
           city: city || null,
           postalCode: postalCode || null,

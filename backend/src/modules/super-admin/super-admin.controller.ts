@@ -1,4 +1,4 @@
-//backend/src/modules/super-admin/super-admin.controller.ts
+// backend/src/modules/super-admin/super-admin.controller.ts
 import {
   Body,
   Controller,
@@ -45,8 +45,9 @@ export class SuperAdminController {
   /* ────────────────────────────────────────────────── */
 
   @Get('members')
-  listMembers(@Query() query: PaginationQueryDto) {
+  listMembers(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listUsersByRole(
+      actor.associationId, // 🔥 FILTRE INJECTÉ
       UserRole.MEMBER,
       query.page,
       query.pageSize,
@@ -56,8 +57,9 @@ export class SuperAdminController {
   }
 
   @Get('admins')
-  listAdmins(@Query() query: PaginationQueryDto) {
+  listAdmins(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listUsersByRole(
+      actor.associationId, // 🔥 FILTRE INJECTÉ
       UserRole.ANTENNA_ADMIN,
       query.page,
       query.pageSize,
@@ -68,64 +70,65 @@ export class SuperAdminController {
 
   @Post('admins')
   createAdmin(@Body() body: CreateAntennaAdminDto, @CurrentUser() actor: AuthUser) {
-    return this.service.createAntennaAdmin(body, actor.id);
+    return this.service.createAntennaAdmin(body, actor.id, actor.associationId);
   }
 
   @Patch('admins/:id')
   updateAdmin(@Param('id') id: string, @Body() body: any, @CurrentUser() actor: AuthUser) {
-    return this.service.updateAntennaAdmin(id, body, actor.id);
+    return this.service.updateAntennaAdmin(id, body, actor.id, actor.associationId);
   }
 
   @Patch('admins/:id/suspend')
   suspendAdmin(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.service.suspendAntennaAdmin(id, actor.id);
+    return this.service.suspendAntennaAdmin(id, actor.id, actor.associationId);
   }
 
   @Patch('admins/:id/activate')
   activateAdmin(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.service.activateAntennaAdmin(id, actor.id);
+    return this.service.activateAntennaAdmin(id, actor.id, actor.associationId);
   }
 
   @Delete('admins/:id')
   deleteAdmin(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.service.deleteAntennaAdmin(id, actor.id);
+    return this.service.deleteAntennaAdmin(id, actor.id, actor.associationId);
   }
 
-  /* ── GESTION DES UTILISATEURS (MEMBRES) PAR LE SUPER ADMIN ── */
+  /* ── GESTION DES UTILISATEURS (MEMBRES) ── */
   @Patch('users/:id')
-  updateUser(@Param('id') id: string, @Body() body: any) {
-    return this.service.updateUser(id, body);
+  updateUser(@Param('id') id: string, @Body() body: any, @CurrentUser() actor: AuthUser) {
+    return this.service.updateUser(id, body, actor.associationId);
   }
 
   @Patch('users/:id/approve')
   approveMember(@Param('id') id: string, @CurrentUser() admin: AuthUser) {
-    return this.service.approveUser(id, admin.id);
+    return this.service.approveUser(id, admin.id, admin.associationId);
   }
 
   @Patch('users/:id/reject')
   rejectMember(@Param('id') id: string, @Body('reason') reason: string, @CurrentUser() admin: AuthUser) {
-    return this.service.rejectUser(id, admin.id, reason);
+    return this.service.rejectUser(id, admin.id, reason, admin.associationId);
   }
 
   @Patch('users/:id/suspend')
   suspendUser(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.service.suspendUser(id, actor.id);
+    return this.service.suspendUser(id, actor.id, actor.associationId);
   }
 
   @Patch('users/:id/activate')
   activateUser(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.service.activateUser(id, actor.id);
+    return this.service.activateUser(id, actor.id, actor.associationId);
   }
 
   @Delete('users/:id')
   deleteUser(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.service.deleteUser(id, actor.id);
+    return this.service.deleteUser(id, actor.id, actor.associationId);
   }
 
   /* ── ANTENNES ── */
   @Get('antennas')
-  listAntennas(@Query() query: ListAntennasQueryDto) {
+  listAntennas(@CurrentUser() actor: AuthUser, @Query() query: ListAntennasQueryDto) {
     return this.service.listAntennas(
+      actor.associationId, // 🔥 FILTRE INJECTÉ
       query.page,
       query.pageSize,
       query.q,
@@ -134,40 +137,39 @@ export class SuperAdminController {
   }
 
   @Get('antennas/:id')
-  getAntenna(@Param('id') id: string) {
-    return this.service.getAntennaById(id);
+  getAntenna(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.getAntennaById(id, actor.associationId);
   }
 
   @Post('antennas')
   createAntenna(@Body() body: CreateAntennaDto, @CurrentUser() actor: AuthUser) {
-    return this.service.createAntenna(body, actor.id);
+    return this.service.createAntenna(body, actor.id, actor.associationId);
   }
 
   @Patch('antennas/:id')
-  updateAntenna(@Param('id') id: string, @Body() body: Partial<CreateAntennaDto>) {
-    return this.service.updateAntenna(id, body);
+  updateAntenna(@Param('id') id: string, @Body() body: Partial<CreateAntennaDto>, @CurrentUser() actor: AuthUser) {
+    return this.service.updateAntenna(id, body, actor.associationId);
   }
 
   @Delete('antennas/:id')
-  deleteAntenna(@Param('id') id: string) {
-    return this.service.deleteAntenna(id);
+  deleteAntenna(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.deleteAntenna(id, actor.associationId);
   }
 
   /* ── PROJETS ── */
   @Get('projects')
-  listProjects(@Query() query: PaginationQueryDto) {
-    return this.service.listProjects(query.page, query.pageSize, query.q);
+  listProjects(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.service.listProjects(actor.associationId, query.page, query.pageSize, query.q);
   }
 
-  // AJOUT DE LA ROUTE MANQUANTE ICI
   @Patch('projects/:id')
-  updateProject(@Param('id') id: string, @Body() body: any) {
-    return this.service.updateProject(id, body);
+  updateProject(@Param('id') id: string, @Body() body: any, @CurrentUser() actor: AuthUser) {
+    return this.service.updateProject(id, body, actor.associationId);
   }
 
   @Delete('projects/:id')
-  deleteProject(@Param('id') id: string) {
-    return this.service.deleteProject(id);
+  deleteProject(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.deleteProject(id, actor.associationId);
   }
 
   /* ── DOCUMENTS ── */
@@ -177,18 +179,18 @@ export class SuperAdminController {
   }
 
   @Get('documents')
-  listDocuments(@Query() query: PaginationQueryDto) {
-    return this.service.listDocuments(query.page, query.pageSize, query.q);
+  listDocuments(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.service.listDocuments(actor.associationId, query.page, query.pageSize, query.q);
   }
 
   @Delete('documents/:id')
-  deleteDocument(@Param('id') id: string) {
-    return this.service.deleteDocument(id);
+  deleteDocument(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.deleteDocument(id, actor.associationId);
   }
 
   /* ── CONTRIBUTIONS ── */
   @Get('contributions')
-  listContributions(@Query() query: PaginationQueryDto) {
-    return this.service.listAllContributions(query.page, query.pageSize, query.status);
+  listContributions(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.service.listAllContributions(actor.associationId, query.page, query.pageSize, query.status);
   }
 }

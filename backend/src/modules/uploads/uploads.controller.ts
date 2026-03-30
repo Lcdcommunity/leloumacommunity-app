@@ -23,7 +23,8 @@ export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post('single')
-  @Roles(UserRole.MEMBER, UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  // Ajout chirurgical de UserRole.SYSTEM_ADMIN ici
+  @Roles(UserRole.MEMBER, UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB

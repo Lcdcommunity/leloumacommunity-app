@@ -3,16 +3,16 @@ import { Module } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
-import { AuditModule } from '../audit/audit.module';
+import { AuditModule } from '../audit/audit.module'; // 🔥 CORRECTION : .module au lieu de .service
 import { UploadsModule } from '../uploads/uploads.module';
-import { NotificationsModule } from '../notifications/notifications.module'; // <-- Ajouté
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     PrismaModule, 
     AuditModule, 
     UploadsModule, 
-    NotificationsModule // <-- Injection pour les alertes liées au compte
+    NotificationsModule
   ],
   controllers: [UsersController],
   providers: [UsersService],

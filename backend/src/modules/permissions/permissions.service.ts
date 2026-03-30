@@ -6,13 +6,17 @@ import { PERMISSIONS } from '../../common/constants/permissions';
 @Injectable()
 export class PermissionsService {
   /**
-   * Retourne la liste des permissions par défaut attribuées à un rôle lors de sa création
-   * ou de la vérification des droits d'accès.
+   * Retourne la liste des permissions par défaut attribuées à un rôle.
    */
   getDefaultPermissionsForRole(role: UserRole): string[] {
     switch (role) {
+      case UserRole.SYSTEM_ADMIN:
+        // 🔥 AJOUT CHIRURGICAL : Le Grand Chef a accès à TOUT, 
+        // y compris la gestion des associations elles-mêmes.
+        return Object.values(PERMISSIONS);
+
       case UserRole.SUPER_ADMIN:
-        // Le Super Admin possède l'intégralité des droits du système
+        // Le Super Admin possède l'intégralité des droits de SON association
         return Object.values(PERMISSIONS);
 
       case UserRole.ANTENNA_ADMIN:
@@ -35,8 +39,7 @@ export class PermissionsService {
 
       case UserRole.MEMBER:
       default:
-        // Le membre n'a par défaut que le droit d'uploader ses preuves de paiement (fichiers)
-        // Ses autres accès sont régis par le contrôleur MemberController
+        // Le membre n'a par défaut que le droit d'uploader ses preuves de paiement
         return [PERMISSIONS.FILES_UPLOAD];
     }
   }

@@ -18,7 +18,10 @@ export interface Association {
   addressLine2?: string | null;
   postalCode?: string | null;
   defaultCurrency?: string | null;
+  
+  // Identifiant du fichier et URL calculée pour l'affichage
   logoFileId?: string | null;
+  logoUrl?: string | null;
 
   // NOUVEAU : Seuil de validation des dépenses
   expenseValidationThreshold?: number | null;

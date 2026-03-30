@@ -1,10 +1,11 @@
-//src/common/decorators/current-user.decorator.ts
+// backend/src/common/decorators/current-user.decorator.ts
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { UserRole } from '@prisma/client'; // 👈 AJOUTÉ pour le typage strict
 
 export interface AuthUser {
   id: string;
-  role: string;
-  associationId?: string | null;
+  role: UserRole; // 👈 Changé de string à UserRole
+  associationId: string; // 👈 Rendu obligatoire (crucial pour le Multi-tenant)
   antennaId?: string | null;
   email?: string;
 }
