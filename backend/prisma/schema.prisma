@@ -478,7 +478,8 @@ model User {
   phone              String?
   birthDate          DateTime?
   gender             Gender?
-  professionalStatus ProfessionalStatus?
+  professionalStatus String?
+  function           String?
 
   placeOfBirth        String?
   countryOfBirth      String?

@@ -9,10 +9,11 @@ type Theme = 'light' | 'dark' | 'system';
 
 /* ══════════════════════════════════════════════════════ FIELD COMPONENT (Thème Bleu) */
 function Field({
-  label, value, onChange, placeholder, required = false, mono = false, hint, type = 'text', disabled = false
+  label, value, onChange, placeholder, required = false, mono = false, hint, type = 'text', disabled = false, autoComplete
 }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; required?: boolean; mono?: boolean; hint?: string; type?: string; disabled?: boolean;
+  autoComplete?: string;
 }) {
   const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -32,6 +33,7 @@ function Field({
           placeholder={placeholder}
           required={required}
           disabled={disabled}
+          autoComplete={autoComplete}
           style={{
             width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box',
             border: disabled ? '1.5px solid transparent' : `1.5px solid ${focused ? 'rgba(37,99,235,.45)' : 'rgba(37,99,235,.18)'}`,
@@ -155,17 +157,33 @@ export default function MemberSettingsPage() {
     }
     setSecLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await api.updateMyPassword(password);
       setSecMsg({ type: 'success', text: 'Mot de passe mis à jour avec succès.' });
+      
+      // ✅ Force le nettoyage des champs
       setPassword('');
       setConfirmPassword('');
-      setShowSecurityFields(false);
-    } catch {
-      setSecMsg({ type: 'error', text: 'Erreur lors de la mise à jour.' });
+      
+      // Petit délai pour afficher le succès avant de masquer
+      setTimeout(() => {
+        setShowSecurityFields(false);
+        setSecMsg(null);
+      }, 2000);
+      
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la mise à jour.';
+      setSecMsg({ type: 'error', text: msg });
     } finally {
       setSecLoading(false);
     }
   }
+
+  const handleCancelPassword = () => {
+    setShowSecurityFields(false);
+    setSecMsg(null);
+    setPassword('');
+    setConfirmPassword('');
+  };
 
   const isPasswordDirty = password.length > 0 || confirmPassword.length > 0;
 
@@ -437,7 +455,11 @@ export default function MemberSettingsPage() {
                     <button 
                       type="button" 
                       className="ms-unlock-btn"
-                      onClick={() => setShowSecurityFields(true)}
+                      onClick={() => {
+                        setPassword('');
+                        setConfirmPassword('');
+                        setShowSecurityFields(true);
+                      }}
                     >
                       <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -454,6 +476,7 @@ export default function MemberSettingsPage() {
                         placeholder="Entrez votre nouveau mot de passe"
                         required
                         hint="Utilisez au moins 8 caractères."
+                        autoComplete="new-password"
                       />
                       <Field
                         label="Confirmer nouveau mot de passe"
@@ -462,6 +485,7 @@ export default function MemberSettingsPage() {
                         onChange={setConfirmPassword}
                         placeholder="Retapez le mot de passe"
                         required
+                        autoComplete="new-password"
                       />
 
                       <div className="ms-footer" style={{ padding: '1rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>
@@ -482,7 +506,7 @@ export default function MemberSettingsPage() {
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
                           <button 
                             type="button" 
-                            onClick={() => { setShowSecurityFields(false); setSecMsg(null); }}
+                            onClick={handleCancelPassword}
                             style={{ background: 'none', border: 'none', fontSize: '0.8rem', fontWeight: 700, color: '#6B7280', cursor: 'pointer' }}
                           >
                             Annuler

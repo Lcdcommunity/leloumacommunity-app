@@ -1,21 +1,13 @@
-// web/app/(protected)/member/profile/page.tsx
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type FullUserProfile, type VirtualCardData } from '../../../../lib/api-client';
 import { VirtualCardWidget } from '../../../../components/member/VirtualCardWidget';
 
 type FlashMessage = { text: string; ok: boolean } | null;
-
-type FullUserProfileWithProfession = FullUserProfile & {
-  function?: string | null;
-  originVillage?: string | null;
-  originSubPrefecture?: string | null;
-  birthCountry?: string | null;
-  countryOfBirth?: string | null;
-  postalCode?: string | null;
-};
 
 export const ASSOCIATION_ROLES = [
   'Membre (simple)',
@@ -27,37 +19,41 @@ export const ASSOCIATION_ROLES = [
   'Chargé(e) de communication',
   'Conseiller / Conseillère',
   'Autre',
-] as const;
+];
 
-function getApiBaseUrl(): string {
-  const fromEnv = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  if (fromEnv) return fromEnv.replace(/\/$/, '');
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    return `http://${host}:3001/api`;
-  }
-  return 'http://localhost:3001/api';
-}
+export const PROFESSION_LIST = [
+  'Étudiant(e)',
+  'Employé(e)',
+  'Fonctionnaire',
+  'Indépendant / Entrepreneur',
+  'Profession libérale',
+  'Cadre / Dirigeant',
+  'Artisan / Commerçant',
+  'Agriculteur',
+  'Sans emploi',
+  'Retraité(e)',
+  'Autre',
+];
 
 export default function MemberProfilePage() {
-  const [me, setMe] = useState<FullUserProfileWithProfession | null>(null);
+  const [me, setMe] = useState<FullUserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [cardVisible, setCardVisible] = useState(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  const [profession, setProfession] = useState('');
+  const [originSubPrefecture, setOriginSubPrefecture] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
-  const [countryOfBirth, setCountryOfBirth] = useState('');
-  const [originSubPrefecture, setOriginSubPrefecture] = useState('');
-  const [originVillage, setOriginVillage] = useState('');
-  const [addressLine1, setAddressLine1] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
-  const [postalCode, setPostalCode] = useState('');
+  const [birthCountry, setBirthCountry] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [profession, setProfession] = useState('');
+  const [associationRole, setAssociationRole] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -68,95 +64,54 @@ export default function MemberProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
-
-  const currentPhotoUrl = useMemo(() => {
-    if (photoPreviewUrl) return photoPreviewUrl;
-    if (!me?.profilePhotoUrl) return null;
-    if (/^https?:\/\//i.test(me.profilePhotoUrl)) return me.profilePhotoUrl;
-    if (me.profilePhotoUrl.startsWith('/')) {
-      return `${apiBaseUrl.replace(/\/api$/, '')}${me.profilePhotoUrl}`;
-    }
-    return me.profilePhotoUrl;
-  }, [apiBaseUrl, me?.profilePhotoUrl, photoPreviewUrl]);
-
-  const liveCardData: VirtualCardData | null = me
-    ? {
-        cardNumber: me.virtualCard?.cardNumber || me.cardNumber || 'EN ATTENTE',
-        isLocked: me.virtualCard?.isLocked ?? me.isCardLocked ?? false,
-        expiresAt: me.virtualCard?.expiresAt || me.cardExpiresAt || null,
-        qrToken: me.virtualCard?.qrToken || me.qrToken || 'preview-token',
-        antennaName: me.antenna?.name || me.antennaName || 'Antenne non assignée',
-        user: {
-          firstName,
-          lastName,
-          birthDate: birthDate || null,
-          placeOfBirth: placeOfBirth || null,
-          birthCountry: countryOfBirth || null,
-          originSubPrefecture: originSubPrefecture || null,
-          originCommune: originSubPrefecture || null,
-          // 🔥 La ligne originVillage a été supprimée ici car elle n'existe pas dans VirtualCardData
-          country: country || null,
-          city: city || null,
-          postalCode: postalCode || null,
-          profilePhotoUrl: currentPhotoUrl,
-          function: profession || null,
-        },
-      }
-    : null;
-
-  const rawMemberNumber = me?.virtualCard?.cardNumber || me?.cardNumber;
-  const displayMemberNumber = rawMemberNumber ? rawMemberNumber.replace(/-/g, '') : null;
-  const initials = `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase();
-
   useEffect(() => {
     let isMounted = true;
-
     void (async () => {
       try {
-        const user = (await api.getMyProfile()) as FullUserProfileWithProfession;
+        const user = await api.getMyProfile();
         if (!isMounted) return;
         setMe(user);
         populateFields(user);
       } catch (err) {
         if (!isMounted) return;
-        setMessage({
-          text: err instanceof Error ? err.message : 'Erreur chargement profil',
-          ok: false,
-        });
+        setMessage({ text: err instanceof Error ? err.message : 'Erreur chargement profil', ok: false });
       } finally {
         if (isMounted) setLoading(false);
       }
     })();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (photoPreviewUrl) {
-        URL.revokeObjectURL(photoPreviewUrl);
-      }
-    };
-  }, [photoPreviewUrl]);
-
-  function populateFields(user: FullUserProfileWithProfession) {
+  function populateFields(user: FullUserProfile) {
     setFirstName(user.firstName || '');
     setLastName(user.lastName || '');
     setPhone(user.phone || '');
-    setProfession(user.function || '');
-    setBirthDate(user.birthDate ? new Date(user.birthDate).toISOString().split('T')[0] : '');
-    setPlaceOfBirth(user.placeOfBirth || '');
-    setCountryOfBirth(user.birthCountry || user.countryOfBirth || '');
     setOriginSubPrefecture(user.originSubPrefecture || '');
-    setOriginVillage(user.originVillage || '');
-    setAddressLine1(user.addressLine1 || '');
-    setAddressLine2(user.addressLine2 || '');
-    setPostalCode(user.postalCode || '');
+    setPlaceOfBirth(user.placeOfBirth || '');
+    setBirthCountry(user.countryOfBirth || user.birthCountry || '');
     setCity(user.city || '');
     setCountry(user.country || '');
+    setPostalCode(user.postalCode || '');
+    setAddressLine1(user.addressLine1 || '');
+    setAddressLine2(user.addressLine2 || '');
+
+    // 👇 Les deux champs sont désormais parfaitement indépendants !
+    setAssociationRole(user.function || '');
+    setProfession(user.professionalStatus || '');
+
+    if (user.birthDate) {
+      const d = new Date(user.birthDate);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        setBirthDate(`${day}/${month}/${year}`);
+      } else {
+        setBirthDate('');
+      }
+    } else {
+      setBirthDate('');
+    }
   }
 
   function handleCancel() {
@@ -165,34 +120,32 @@ export default function MemberProfilePage() {
     setMessage(null);
   }
 
+  const handleBirthDateChange = (e: ChangeEvent<HTMLInputElement>) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value.length > 8) value = value.slice(0, 8);
+    let formatted = value;
+    if (value.length > 2) formatted = `${value.slice(0, 2)}/${value.slice(2)}`;
+    if (value.length > 4) formatted = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
+    setBirthDate(formatted);
+  };
+
+  const convertDateToISO = (dateStr: string): string | undefined => {
+    if (!dateStr || dateStr.length !== 10) return undefined;
+    const [day, month, year] = dateStr.split('/');
+    const d = new Date(`${year}-${month}-${day}T00:00:00Z`);
+    if (isNaN(d.getTime())) return undefined;
+    return d.toISOString();
+  };
+
   async function handlePhotoUpload(file: File) {
     setUploadingPhoto(true);
     setPhotoMessage(null);
-
     try {
       const result = await api.uploadProfilePhoto(file);
-      const nextUser = (result?.user ?? null) as FullUserProfileWithProfession | null;
-
-      if (nextUser) {
-        setMe(nextUser);
-        populateFields(nextUser);
-      } else if (result?.profilePhotoUrl && me) {
-        setMe({ ...me, profilePhotoUrl: result.profilePhotoUrl });
-      }
-
-      setPhotoMessage({
-        text: result?.message || 'Photo mise à jour avec succès.',
-        ok: true,
-      });
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      if (result?.user) setMe(result.user as FullUserProfile);
+      setPhotoMessage({ text: 'Photo mise à jour.', ok: true });
     } catch (err) {
-      setPhotoMessage({
-        text: err instanceof Error ? err.message : 'Erreur upload photo',
-        ok: false,
-      });
+      setPhotoMessage({ text: err instanceof Error ? err.message : 'Erreur upload photo', ok: false });
     } finally {
       setUploadingPhoto(false);
     }
@@ -200,26 +153,9 @@ export default function MemberProfilePage() {
 
   async function handleQuickPhotoChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
-    setPhotoMessage(null);
-
     if (!file) return;
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      e.target.value = '';
-      setPhotoMessage({ text: 'Formats autorisés : JPG, PNG, WEBP.', ok: false });
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      e.target.value = '';
-      setPhotoMessage({ text: 'La photo ne doit pas dépasser 5 Mo.', ok: false });
-      return;
-    }
-
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-    const preview = URL.createObjectURL(file);
-    setPhotoPreviewUrl(preview);
-
+    setPhotoPreviewUrl(URL.createObjectURL(file));
     await handlePhotoUpload(file);
   }
 
@@ -227,67 +163,84 @@ export default function MemberProfilePage() {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
-
+    
     try {
+      const formattedDate = convertDateToISO(birthDate);
+
       const payload: Record<string, string | undefined> = {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         phone: phone.trim() || undefined,
-        function: profession.trim() || undefined,
-        birthDate: birthDate || undefined,
-        placeOfBirth: placeOfBirth.trim() || undefined,
         originSubPrefecture: originSubPrefecture.trim() || undefined,
-        addressLine1: addressLine1.trim() || undefined,
-        addressLine2: addressLine2.trim() || undefined,
-        postalCode: postalCode.trim() || undefined,
+        birthDate: formattedDate,
+        placeOfBirth: placeOfBirth.trim() || undefined,
+        countryOfBirth: birthCountry.trim() || undefined,
         city: city.trim() || undefined,
         country: country.trim() || undefined,
+        postalCode: postalCode.trim() || undefined,
+        addressLine1: addressLine1.trim() || undefined,
+        addressLine2: addressLine2.trim() || undefined,
+        function: associationRole || undefined,               // 👈 Envoi séparé
+        professionalStatus: profession || undefined,          // 👈 Envoi séparé
       };
 
-      const nextUser = (await api.updateMyProfile(payload)) as FullUserProfileWithProfession;
+      Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
-      setMe(nextUser);
-      populateFields(nextUser);
+      const nextUser = await api.updateMyProfile(payload);
+      setMe(nextUser as FullUserProfile);
       setIsEditing(false);
       setMessage({ text: 'Profil mis à jour avec succès.', ok: true });
-    } catch (err) {
-      setMessage({
-        text: err instanceof Error ? err.message : 'Erreur sauvegarde profil',
-        ok: false,
-      });
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Erreur sauvegarde';
+      setMessage({ text: `Erreur : ${errorMsg}`, ok: false });
     } finally {
       setSaving(false);
     }
   }
 
+  const isLocked = me?.virtualCard?.isLocked ?? me?.isCardLocked ?? true;
+  const isExpired = me?.virtualCard?.expiresAt
+    ? new Date(me.virtualCard.expiresAt) < new Date()
+    : false;
+  const currentPhoto = photoPreviewUrl || me?.avatarUrl || me?.profilePhotoUrl || '';
+
+  const liveCardData: VirtualCardData | null = me ? {
+    cardNumber: me.virtualCard?.cardNumber || me.cardNumber || 'EN ATTENTE',
+    isLocked: isLocked,
+    expiresAt: me.virtualCard?.expiresAt || me.cardExpiresAt || null,
+    qrToken: me.virtualCard?.qrToken || me.qrToken || 'preview-token',
+    antennaName: me.antenna?.name || me.antennaName || 'Antenne non assignée',
+    user: {
+      firstName,
+      lastName,
+      birthDate: convertDateToISO(birthDate) || null,
+      placeOfBirth: placeOfBirth || null,
+      birthCountry: birthCountry || null,
+      originSubPrefecture: originSubPrefecture || null,
+      originCommune: originSubPrefecture || null,
+      country: country || null,
+      city: city || null,
+      postalCode: postalCode || null,
+      profilePhotoUrl: currentPhoto,
+      function: associationRole || profession || null,
+    },
+  } : null;
+
+  const initials = `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase();
+
   if (loading) {
     return (
       <AppShell title="Mon profil">
-        <style>{`
-          @keyframes mprspin { to { transform: rotate(360deg); } }
-        `}</style>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '4rem',
-            color: '#2D6A4F',
-            fontFamily: "'DM Sans', sans-serif",
-            gap: '0.75rem',
-          }}
-        >
-          <div
-            style={{
-              width: 22,
-              height: 22,
-              border: '2.5px solid rgba(45,106,79,0.15)',
-              borderTopColor: '#2D6A4F',
-              borderRadius: '50%',
-              animation: 'mprspin 0.8s linear infinite',
-            }}
-          />
-          Chargement du profil…
+        <div style={{ padding: '4rem', textAlign: 'center' }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: '50%',
+            border: '3px solid #E2E8F0', borderTopColor: '#2D6A4F',
+            animation: 'mpr-spin 0.8s linear infinite', margin: '0 auto 1rem',
+          }} />
+          <p style={{ color: '#64748B', fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: '0.85rem' }}>
+            Chargement de votre profil…
+          </p>
+          <style>{`@keyframes mpr-spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </AppShell>
     );
@@ -296,1202 +249,482 @@ export default function MemberProfilePage() {
   return (
     <AppShell title="Mon profil">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500&display=swap');
 
-        .mpr-wrap {
-          font-family: 'DM Sans', sans-serif;
-          padding: clamp(1.25rem, 3vw, 2rem);
-          max-width: 960px;
-          margin: 0 auto;
-        }
-
-        .mpr-header-block {
-          margin-bottom: 1.75rem;
-          opacity: 0;
-          transform: translateY(12px);
-          animation: mprin 0.55s 0.04s cubic-bezier(.22,1,.36,1) forwards;
-        }
-
-        .mpr-eyebrow {
-          font-size: 0.67rem;
-          font-weight: 700;
-          letter-spacing: 0.13em;
-          text-transform: uppercase;
-          color: #2D6A4F;
-          margin-bottom: 0.4rem;
-          display: flex;
-          align-items: center;
-          gap: 0.45rem;
-        }
-
-        .mpr-eyebrow-dot {
-          width: 6px;
-          height: 6px;
-          background: #2D6A4F;
-          border-radius: 50%;
-          animation: mprpulse 2s ease-in-out infinite;
-        }
-
-        @keyframes mprpulse {
-          0%,100% { opacity: 1; }
-          50% { opacity: .25; }
-        }
-
-        .mpr-page-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(1.6rem, 3.5vw, 2.1rem);
-          font-weight: 600;
-          color: #1A4731;
-          letter-spacing: -0.025em;
-          line-height: 1.1;
-        }
-
-        .mpr-page-title span {
-          color: #2D6A4F;
-        }
+        .mpr-wrap { font-family: 'DM Sans', sans-serif; padding: 1.25rem 1rem 3rem; max-width: 680px; margin: 0 auto; }
 
         .mpr-hero {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-          flex-wrap: wrap;
-          background: rgba(255,255,255,0.95);
-          backdrop-filter: blur(16px);
-          border-radius: 22px;
-          border: 1px solid rgba(45,106,79,0.12);
-          box-shadow: 0 4px 24px rgba(45,106,79,0.08), 0 1px 2px rgba(0,0,0,0.04);
-          padding: 1.75rem;
-          margin-bottom: 1.25rem;
-          opacity: 0;
-          transform: translateY(12px);
-          animation: mprin 0.55s 0.1s cubic-bezier(.22,1,.36,1) forwards;
-          position: relative;
-          overflow: hidden;
+          position: relative; overflow: hidden;
+          background: linear-gradient(135deg, #0f3d2e 0%, #1b5e42 55%, #c89f3d 130%);
+          border-radius: 24px; padding: 2rem 1.75rem; margin-bottom: 1.25rem;
+          display: flex; align-items: center; gap: 1.5rem;
+          box-shadow: 0 20px 48px rgba(15,61,46,0.25), 0 0 0 1px rgba(200,159,61,0.15);
         }
-
         .mpr-hero::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 3px;
-          background: linear-gradient(90deg, #1A4731, #2D6A4F, #86EFAC);
-          border-radius: 22px 22px 0 0;
+          content: ''; position: absolute; inset: 0;
+          background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200"><path fill="rgba(255,255,255,0.03)" d="M0,100 C150,160 350,40 600,100 L600,200 L0,200Z"/><path fill="rgba(255,255,255,0.03)" d="M0,130 C200,70 400,170 600,110 L600,200 L0,200Z"/></svg>') no-repeat bottom;
+          background-size: cover; pointer-events: none;
         }
-
-        .mpr-avatar-wrap {
-          position: relative;
-          flex-shrink: 0;
-          width: 96px;
-          height: 96px;
+        .mpr-guinea-stripe {
+          position: absolute; top: 0; right: 0; bottom: 0; width: 6px;
+          display: flex; flex-direction: column;
         }
+        .mpr-guinea-stripe span { flex: 1; }
+        .mpr-guinea-stripe span:nth-child(1) { background: #CE1126; }
+        .mpr-guinea-stripe span:nth-child(2) { background: #FCD116; }
+        .mpr-guinea-stripe span:nth-child(3) { background: #009460; }
 
+        .mpr-avatar-wrap { position: relative; flex-shrink: 0; }
         .mpr-avatar {
-          width: 96px;
-          height: 96px;
-          border-radius: 22px;
-          background: linear-gradient(145deg, #1A4731, #2D6A4F);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: white;
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 2.3rem;
-          font-weight: 700;
-          box-shadow: 0 6px 20px rgba(26,71,49,0.3);
-          overflow: hidden;
+          width: 88px; height: 88px; border-radius: 20px;
+          background: rgba(255,255,255,0.12); border: 2px solid rgba(255,255,255,0.25);
+          display: flex; align-items: center; justify-content: center;
+          color: white; font-family: 'Cormorant Garamond', serif;
+          font-size: 2.2rem; font-weight: 700; overflow: hidden;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.2);
         }
-
-        .mpr-avatar img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          border-radius: 22px;
+        .mpr-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+        .mpr-edit-photo {
+          position: absolute; bottom: -8px; right: -8px;
+          width: 32px; height: 32px; border-radius: 50%;
+          border: 2.5px solid #0f3d2e; background: #FCD116;
+          color: #0f3d2e; display: flex; align-items: center; justify-content: center;
+          cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
+        .mpr-edit-photo:hover { transform: scale(1.1); box-shadow: 0 6px 16px rgba(0,0,0,0.3); }
 
-        .mpr-avatar-spinner {
-          position: absolute;
-          inset: 0;
-          border-radius: 22px;
-          background: rgba(15,35,24,0.65);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .mpr-spinner-ring {
-          width: 28px;
-          height: 28px;
-          border: 3px solid rgba(255,255,255,0.2);
-          border-top-color: white;
-          border-radius: 50%;
-          animation: mprspin 0.7s linear infinite;
-        }
-
-        .mpr-avatar-edit-btn {
-          position: absolute;
-          right: -6px;
-          bottom: -6px;
-          width: 38px;
-          height: 38px;
-          border-radius: 50%;
-          border: 2px solid #ffffff;
-          background: linear-gradient(135deg, #1A4731, #2D6A4F);
-          color: #ffffff;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          box-shadow: 0 6px 18px rgba(26,71,49,0.28);
-          transition: transform 0.18s, box-shadow 0.18s;
-        }
-
-        .mpr-avatar-edit-btn:hover {
-          transform: translateY(-1px) scale(1.03);
-          box-shadow: 0 8px 22px rgba(26,71,49,0.34);
-        }
-
-        .mpr-hidden-file-input {
-          display: none;
-        }
-
-        .mpr-hero-info {
-          flex: 1;
-          min-width: 0;
-        }
-
+        .mpr-hero-info { flex: 1; min-width: 0; position: relative; z-index: 1; }
         .mpr-hero-name {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.75rem;
-          font-weight: 700;
-          color: #1A4731;
-          margin-bottom: 0.45rem;
-          letter-spacing: -0.02em;
+          font-size: 1.85rem; font-weight: 700; line-height: 1;
+          color: #fffdf6; margin-bottom: 0.3rem;
+        }
+        .mpr-hero-name em { font-style: normal; color: #FCD116; }
+        .mpr-hero-role {
+          display: inline-flex; align-items: center; gap: 0.4rem;
+          background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
+          color: rgba(255,255,255,0.9); border-radius: 99px;
+          font-size: 0.65rem; font-weight: 800; text-transform: uppercase;
+          letter-spacing: 0.1em; padding: 0.22rem 0.7rem; margin-bottom: 0.5rem;
+        }
+        .mpr-hero-email { font-size: 0.75rem; color: rgba(255,255,255,0.55); font-weight: 500; }
+
+        .mpr-card-lock-banner {
+          position: relative; overflow: hidden;
+          background: #F8FAFC; border: 1px solid #E2E8F0;
+          border-radius: 20px; margin-bottom: 1.25rem;
+          box-shadow: 0 8px 24px rgba(15,23,42,0.06);
+        }
+        .mpr-lock-bg {
+          position: absolute; inset: 0;
+          background: linear-gradient(135deg, #F1F5F9 0%, #E2E8F0 100%);
+          z-index: 0;
+        }
+        .mpr-lock-overlay {
+          position: relative; z-index: 1;
+          padding: 1.75rem 1.5rem;
+          display: flex; flex-direction: column; align-items: center;
+          gap: 0.75rem; text-align: center;
+          background: rgba(255,255,255,0.7);
+          backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+        }
+        .mpr-lock-icon-wrap {
+          width: 56px; height: 56px; border-radius: 50%;
+          background: #FFFFFF; border: 1px solid #E2E8F0;
+          box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+          display: flex; align-items: center; justify-content: center;
+        }
+        .mpr-lock-title {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 1.3rem; font-weight: 600; color: #0F172A; line-height: 1.2;
+        }
+        .mpr-lock-sub {
+          max-width: 280px; font-size: 0.76rem;
+          line-height: 1.55; color: #475569; font-weight: 500;
+        }
+        .mpr-lock-cta {
+          display: inline-flex; align-items: center; gap: 0.5rem;
+          padding: 0.72rem 1.4rem; border-radius: 12px;
+          background: #0F172A; color: #FFFFFF; text-decoration: none;
+          font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em;
+          box-shadow: 0 4px 14px rgba(15,23,42,0.35);
+          transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+        .mpr-lock-cta:hover {
+          transform: translateY(-2px); background: #1E293B;
+          box-shadow: 0 8px 24px rgba(15,23,42,0.45);
         }
 
-        .mpr-hero-name em {
-          color: #2D6A4F;
-          font-style: italic;
+        .mpr-card-btn {
+          display: flex; align-items: center; justify-content: center; gap: 0.55rem;
+          width: 100%; padding: 0.9rem; border: none; cursor: pointer;
+          border-radius: 16px; font-family: 'DM Sans', sans-serif;
+          font-size: 0.88rem; font-weight: 700; margin-bottom: 1.25rem;
+          background: linear-gradient(135deg, #0f3d2e 0%, #1b5e42 50%, #c89f3d 100%);
+          color: #fffdf6; box-shadow: 0 8px 24px rgba(15,61,46,0.25);
+          transition: transform 0.2s ease, box-shadow 0.2s ease; position: relative; overflow: hidden;
         }
-
-        .mpr-hero-meta {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          flex-wrap: wrap;
+        .mpr-card-btn::before {
+          content: ''; position: absolute; inset: 0;
+          background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+          transform: translateX(-100%); transition: transform 0.5s ease;
         }
-
-        .mpr-role-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.35rem;
-          font-size: 0.63rem;
-          font-weight: 800;
-          background: #ECFDF5;
-          color: #1A4731;
-          padding: 0.28rem 0.7rem;
-          border-radius: 99px;
-          border: 1px solid #A7F3D0;
-          letter-spacing: 0.05em;
-          text-transform: uppercase;
-        }
-
-        .mpr-role-dot {
-          width: 5px;
-          height: 5px;
-          background: #2D6A4F;
-          border-radius: 50%;
-        }
-
-        .mpr-member-tag {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.35rem;
-          font-size: 0.63rem;
-          font-weight: 700;
-          background: #FEF3C7;
-          color: #92400E;
-          padding: 0.28rem 0.7rem;
-          border-radius: 99px;
-          border: 1px solid #FDE68A;
-          letter-spacing: 0.03em;
-        }
-
-        .mpr-hero-email {
-          margin-top: 0.5rem;
-          font-size: 0.8rem;
-          color: #52796A;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          overflow-wrap: anywhere;
-        }
-
-        .mpr-compact-feedback {
-          margin-bottom: 1rem;
-        }
-
-        .mpr-card-fab {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.55rem;
-          margin-bottom: 1rem;
-          padding: 0.7rem 1.35rem;
-          background: linear-gradient(135deg, #1A4731, #2D6A4F);
-          border: none;
-          border-radius: 50px;
-          color: white;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.86rem;
-          font-weight: 700;
-          cursor: pointer;
-          box-shadow: 0 4px 16px rgba(26,71,49,0.28);
-          transition: transform 0.18s, box-shadow 0.18s;
-        }
-
-        .mpr-card-fab:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 22px rgba(26,71,49,0.35);
-        }
-
-        .mpr-card-overlay {
-          position: fixed;
-          inset: 0;
-          z-index: 200;
-          background: rgba(0,0,0,0.55);
-          backdrop-filter: blur(6px);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 1.5rem;
-          animation: mprfadein 0.22s ease forwards;
-        }
-
-        @keyframes mprfadein {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-
-        .mpr-card-modal {
-          position: relative;
-          width: 100%;
-          max-width: 420px;
-          animation: mprscalein 0.28s cubic-bezier(.22,1,.36,1) forwards;
-        }
-
-        @keyframes mprscalein {
-          from {
-            opacity: 0;
-            transform: scale(0.88) translateY(18px);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-          }
-        }
-
-        .mpr-card-modal-close {
-          position: absolute;
-          top: -0.7rem;
-          right: -0.7rem;
-          z-index: 10;
-          width: 32px;
-          height: 32px;
-          background: white;
-          border: 1px solid rgba(0,0,0,0.10);
-          border-radius: 50%;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.14);
-          color: #374151;
-          transition: background 0.15s, transform 0.15s;
-        }
-
-        .mpr-card-modal-close:hover {
-          background: #F3F4F6;
-          transform: scale(1.1);
-        }
+        .mpr-card-btn:hover::before { transform: translateX(100%); }
+        .mpr-card-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 32px rgba(15,61,46,0.3); }
 
         .mpr-panel {
-          background: rgba(255,255,255,0.95);
-          backdrop-filter: blur(16px);
-          border-radius: 22px;
-          border: 1px solid rgba(45,106,79,0.09);
-          box-shadow: 0 4px 24px rgba(45,106,79,0.06), 0 1px 2px rgba(0,0,0,0.03);
-          overflow: hidden;
-          opacity: 0;
-          transform: translateY(12px);
-          animation: mprin 0.55s 0.2s cubic-bezier(.22,1,.36,1) forwards;
+          background: white; border-radius: 20px; padding: 1.5rem;
+          box-shadow: 0 2px 16px rgba(15,23,42,0.05); margin-bottom: 1rem;
+          border: 1px solid rgba(226,232,240,0.8);
+          transition: box-shadow 0.2s ease;
         }
-
-        .mpr-section {
-          padding: 1.5rem 1.75rem;
-          border-bottom: 1px solid rgba(45,106,79,0.06);
-        }
-
-        .mpr-section:last-child {
-          border-bottom: none;
-        }
-
-        .mpr-section-head {
-          display: flex;
-          align-items: center;
-          gap: 0.7rem;
-          margin-bottom: 1.25rem;
-          flex-wrap: wrap;
-        }
-
-        .mpr-section-ico {
-          width: 32px;
-          height: 32px;
-          border-radius: 9px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
+        .mpr-panel:hover { box-shadow: 0 4px 24px rgba(15,23,42,0.08); }
 
         .mpr-section-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 1.05rem;
-          font-weight: 600;
-          color: #1A4731;
-          letter-spacing: -0.01em;
+          font-size: 0.65rem; font-weight: 800; color: #1D4ED8;
+          text-transform: uppercase; letter-spacing: 0.1em;
+          margin-bottom: 1.1rem;
+          display: flex; align-items: center; gap: 0.6rem;
         }
-
-        .mpr-section-divider {
-          flex: 1;
-          height: 1px;
-          background: linear-gradient(90deg, rgba(45,106,79,0.18), transparent);
-          min-width: 60px;
+        .mpr-section-icon {
+          width: 28px; height: 28px; border-radius: 8px;
+          background: #EFF6FF; display: flex; align-items: center; justify-content: center;
+          color: #1D4ED8; flex-shrink: 0;
         }
+        .mpr-section-title::after { content: ''; flex: 1; height: 1px; background: #DBEAFE; }
 
-        .mpr-section-badge {
-          font-size: 0.6rem;
-          font-weight: 800;
-          letter-spacing: 0.07em;
-          text-transform: uppercase;
-          background: #FEF3C7;
-          color: #92400E;
-          border: 1px solid #FDE68A;
-          padding: 0.18rem 0.55rem;
-          border-radius: 99px;
-          white-space: nowrap;
-        }
-
-        .mpr-grid-2-keep {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 1rem 1.25rem;
-        }
-
-        .mpr-field {
-          display: flex;
-          flex-direction: column;
-          gap: 0.38rem;
-          min-width: 0;
-        }
-
+        .mpr-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 0.85rem; }
+        .mpr-grid-1 { display: grid; grid-template-columns: 1fr; gap: 0.85rem; margin-bottom: 0.85rem; }
+        .mpr-grid-num { display: grid; grid-template-columns: 90px 1fr; gap: 0.85rem; margin-bottom: 0.85rem; }
+        .mpr-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
         .mpr-label {
-          font-size: 0.68rem;
-          font-weight: 700;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: #2D6A4F;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 0.5rem;
+          font-size: 0.63rem; font-weight: 700; color: #94A3B8;
+          text-transform: uppercase; letter-spacing: 0.06em;
         }
-
-        .mpr-label .opt {
-          font-weight: 500;
-          color: #94A3B8;
-          text-transform: none;
-          letter-spacing: 0;
-          font-size: 0.63rem;
+        .mpr-input, .mpr-select {
+          width: 100%; height: 44px; border-radius: 12px;
+          border: 1.5px solid #E2E8F0; padding: 0 0.85rem;
+          font-size: 0.875rem; font-family: 'DM Sans', sans-serif;
+          color: #0F172A; outline: none; background: #FAFAFA;
+          transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+          -webkit-appearance: none; appearance: none;
         }
-
-        .mpr-input,
-        .mpr-select {
-          width: 100%;
-          height: 46px;
-          padding: 0 1rem;
-          border-radius: 11px;
-          border: 1.5px solid rgba(45,106,79,0.15);
-          background: #ffffff;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.875rem;
-          color: #000000;
-          font-weight: 500;
-          outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          box-sizing: border-box;
-          -webkit-appearance: none;
-          appearance: none;
-        }
-
-        .mpr-input:focus,
-        .mpr-select:focus {
-          border-color: rgba(45,106,79,0.55);
+        .mpr-input:focus, .mpr-select:focus {
+          border-color: #2D6A4F; background: white;
           box-shadow: 0 0 0 3px rgba(45,106,79,0.1);
         }
-
-        .mpr-input:disabled,
-        .mpr-select:disabled {
-          background: #ffffff;
-          color: #000000;
-          cursor: default;
-          border-color: rgba(45,106,79,0.10);
+        .mpr-input:disabled, .mpr-select:disabled {
+          background: #F8FAFC; color: #94A3B8;
+          cursor: not-allowed; border-color: #F1F5F9;
         }
+        .mpr-select { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'><path d='m6 9 6 6 6-6'/></svg>"); background-repeat: no-repeat; background-position: right 0.75rem center; padding-right: 2.5rem; }
 
-        .mpr-input::placeholder {
-          color: rgba(0,0,0,0.35);
-        }
-
-        .mpr-select {
-          cursor: pointer;
-          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%231A4731' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 0.85rem center;
-          padding-right: 2.2rem;
-          background-color: #ffffff;
-        }
-
-        .mpr-select:disabled {
-          cursor: not-allowed;
-          background-image: none;
-        }
-
-        .mpr-input-readonly {
-          background: #ffffff !important;
-          color: #000000 !important;
-          border-color: rgba(45,106,79,0.10) !important;
-        }
-
-        .mpr-footer {
-          padding: 1.25rem 1.75rem;
-          border-top: 1px solid rgba(45,106,79,0.07);
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          flex-wrap: wrap;
-          background: rgba(236,253,245,0.3);
-        }
-
+        .mpr-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
         .mpr-btn-primary {
-          height: 46px;
-          padding: 0 1.5rem;
+          flex: 1; height: 48px;
           background: linear-gradient(135deg, #1A4731, #2D6A4F);
-          border: none;
-          border-radius: 11px;
-          color: white;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.85rem;
-          font-weight: 700;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.45rem;
-          box-shadow: 0 4px 16px rgba(26,71,49,0.28);
-          transition: transform 0.15s, box-shadow 0.2s;
-          white-space: nowrap;
+          color: white; border: none; border-radius: 14px;
+          font-weight: 700; font-size: 0.9rem; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+          box-shadow: 0 4px 14px rgba(26,71,49,0.3);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
-
-        .mpr-btn-primary:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 6px 22px rgba(26,71,49,0.38);
+        .mpr-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(26,71,49,0.35); }
+        .mpr-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+        .mpr-btn-cancel {
+          flex: 1; height: 48px;
+          background: #F1F5F9; color: #475569; border: none; border-radius: 14px;
+          font-weight: 700; font-size: 0.9rem; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          transition: background 0.15s ease;
         }
+        .mpr-btn-cancel:hover { background: #E2E8F0; }
 
-        .mpr-btn-primary:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
+        .mpr-flash {
+          margin-top: 1rem; padding: 0.9rem 1rem; border-radius: 14px;
+          font-weight: 700; font-size: 0.8rem; text-align: center;
+          display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+          animation: mpr-fadein 0.25s ease;
         }
+        .mpr-flash.ok { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+        .mpr-flash.err { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
+        @keyframes mpr-fadein { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
-        .mpr-btn-secondary {
-          height: 46px;
-          padding: 0 1.25rem;
-          background: #ffffff;
-          border: 1.5px solid rgba(45,106,79,0.22);
-          border-radius: 11px;
-          color: #1A4731;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.85rem;
-          font-weight: 700;
-          cursor: pointer;
-          display: inline-flex;
-          align-items: center;
-          gap: 0.45rem;
-          transition: background 0.15s, border-color 0.15s;
-          white-space: nowrap;
-        }
-
-        .mpr-btn-secondary:hover:not(:disabled) {
-          background: #ECFDF5;
-          border-color: rgba(45,106,79,0.38);
-        }
-
-        .mpr-spinner-btn {
-          width: 15px;
-          height: 15px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-top-color: white;
-          border-radius: 50%;
-          animation: mprspin 0.7s linear infinite;
-        }
-
-        .mpr-toast {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          padding: 0.65rem 1rem;
-          border-radius: 11px;
-          font-size: 0.8rem;
-          font-weight: 700;
-          border: 1px solid;
-          animation: mprin 0.3s cubic-bezier(.22,1,.36,1);
-        }
-
-        .mpr-toast.ok {
-          background: #ECFDF5;
-          color: #065F46;
-          border-color: #A7F3D0;
-        }
-
-        .mpr-toast.err {
-          background: #FEF2F2;
-          color: #B91C1C;
-          border-color: #FECACA;
-        }
-
-        @keyframes mprin {
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes mprspin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-
-        @media (max-width: 640px) {
-          .mpr-wrap {
-            padding: 0.85rem 0.85rem 4rem;
-          }
-
-          .mpr-section {
-            padding: 1.1rem 1rem;
-          }
-
-          .mpr-footer {
-            flex-direction: column;
-            align-items: stretch;
-          }
-
-          .mpr-btn-primary,
-          .mpr-btn-secondary,
-          .mpr-toast {
-            width: 100%;
-            justify-content: center;
-          }
-
-          .mpr-avatar-wrap {
-            width: 84px;
-            height: 84px;
-          }
-
-          .mpr-avatar {
-            width: 84px;
-            height: 84px;
-          }
-
-          .mpr-avatar-edit-btn {
-            width: 34px;
-            height: 34px;
-            right: -4px;
-            bottom: -4px;
-          }
-        }
-
-        @media (max-width: 430px) {
-          .mpr-grid-2-keep {
-            grid-template-columns: 1fr;
-          }
+        @media (max-width: 520px) {
+          .mpr-hero { gap: 1rem; padding: 1.5rem 1.25rem; }
+          .mpr-avatar { width: 72px; height: 72px; border-radius: 16px; font-size: 1.8rem; }
+          .mpr-hero-name { font-size: 1.45rem; }
+          .mpr-panel { padding: 1.25rem; }
+          .mpr-lock-overlay { padding: 1.5rem 1.25rem; }
+          .mpr-grid-2 { gap: 0.55rem; }
+          .mpr-grid-num { gap: 0.55rem; }
         }
       `}</style>
 
       <div className="mpr-wrap">
-        <div className="mpr-header-block">
-          <div className="mpr-eyebrow">
-            <div className="mpr-eyebrow-dot" />
-            Espace membre
-          </div>
-          <h1 className="mpr-page-title">
-            Mon profil <span>membre</span>
-          </h1>
-        </div>
 
+        {/* ── HERO ── */}
         <div className="mpr-hero">
+          <div className="mpr-guinea-stripe">
+            <span /><span /><span />
+          </div>
+
           <div className="mpr-avatar-wrap">
-            {currentPhotoUrl ? (
-              <div className="mpr-avatar">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={currentPhotoUrl} alt="Photo de profil" />
-              </div>
-            ) : (
-              <div className="mpr-avatar">
-                <span>{initials || '?'}</span>
-              </div>
-            )}
-
-            <button
-              type="button"
-              className="mpr-avatar-edit-btn"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Changer la photo de profil"
-              title="Changer la photo"
-              disabled={uploadingPhoto}
-            >
-              <svg
-                width="17"
-                height="17"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth="2.1"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            </button>
-
-            <input
-              ref={fileInputRef}
-              className="mpr-hidden-file-input"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              onChange={handleQuickPhotoChange}
-            />
-
-            {uploadingPhoto && (
-              <div className="mpr-avatar-spinner">
-                <div className="mpr-spinner-ring" />
-              </div>
-            )}
+            <div className="mpr-avatar">
+              {currentPhoto ? (
+                <Image src={currentPhoto} alt="Profil" width={88} height={88} className="mpr-avatar-img" unoptimized />
+              ) : initials}
+            </div>
+            <label className="mpr-edit-photo" title="Changer la photo">
+              <input
+                type="file" ref={fileInputRef} hidden accept="image/*"
+                onChange={handleQuickPhotoChange} disabled={uploadingPhoto}
+              />
+              {uploadingPhoto ? (
+                <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ animation: 'mpr-spin 0.8s linear infinite' }}>
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                </svg>
+              ) : (
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              )}
+            </label>
           </div>
 
           <div className="mpr-hero-info">
-            <h2 className="mpr-hero-name">
-              {firstName || lastName ? (
-                <>
-                  {firstName} <em>{lastName}</em>
-                </>
-              ) : (
-                'Mon profil'
-              )}
-            </h2>
-
-            <div className="mpr-hero-meta">
-              <span className="mpr-role-tag">
-                <span className="mpr-role-dot" />
-                Membre
-              </span>
-
-              {displayMemberNumber && (
-                <span className="mpr-member-tag">
-                  <svg
-                    width="11"
-                    height="11"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-                    />
-                  </svg>
-                  N° {displayMemberNumber}
-                </span>
-              )}
+            <div className="mpr-hero-role">
+              <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Membre Officiel
             </div>
-
-            {me?.email && (
-              <div className="mpr-hero-email">
-                <svg
-                  width="13"
-                  height="13"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                  />
-                </svg>
-                {me.email}
-              </div>
-            )}
+            <h2 className="mpr-hero-name">
+              {firstName} <em>{lastName}</em>
+            </h2>
+            <p className="mpr-hero-email">{me?.email}</p>
           </div>
         </div>
 
-        {photoMessage && (
-          <div className="mpr-compact-feedback">
-            <div className={`mpr-toast ${photoMessage.ok ? 'ok' : 'err'}`}>
-              {photoMessage.ok ? (
-                <svg
-                  width="13"
-                  height="13"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2.2"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        {/* ── CARTE VERROUILLÉE ── */}
+        {(isLocked || isExpired) && (
+          <div className="mpr-card-lock-banner">
+            <div className="mpr-lock-bg" />
+            <div className="mpr-lock-overlay">
+              <div className="mpr-lock-icon-wrap">
+                <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#0F172A" strokeWidth="1.8">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
-              ) : (
-                <svg
-                  width="13"
-                  height="13"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+              </div>
+              <div className="mpr-lock-title">Carte verrouillée</div>
+              <p className="mpr-lock-sub">
+                {isExpired
+                  ? "Votre carte a expiré. Veuillez la renouveler pour continuer à l'utiliser."
+                  : "Réglez votre adhésion annuelle pour débloquer votre carte membre."}
+              </p>
+              <Link href="/member/contributions/new" className="mpr-lock-cta">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
-              )}
-              {photoMessage.text}
+                {isExpired ? 'Renouveler ma carte' : 'Régulariser ma cotisation'}
+              </Link>
             </div>
           </div>
         )}
 
-        {me && (
+        {/* ── TOGGLE CARTE ── */}
+        {!isLocked && !isExpired && (
           <button
             type="button"
-            className="mpr-card-fab"
-            onClick={() => setCardVisible((v) => !v)}
+            className="mpr-card-btn"
+            onClick={() => setCardVisible(!cardVisible)}
           >
-            <svg
-              width="16"
-              height="16"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth="2.2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"
-              />
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
             </svg>
-            {cardVisible ? 'Masquer ma carte' : 'Ma carte membre'}
+            {cardVisible ? 'Masquer ma carte' : 'Afficher ma carte membre'}
           </button>
         )}
 
-        {cardVisible && (
-          <div className="mpr-card-overlay" onClick={() => setCardVisible(false)}>
-            <div className="mpr-card-modal" onClick={(e) => e.stopPropagation()}>
-              <button
-                className="mpr-card-modal-close"
-                onClick={() => setCardVisible(false)}
-                type="button"
-                aria-label="Fermer"
-              >
-                <svg
-                  width="15"
-                  height="15"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-
-              <VirtualCardWidget card={liveCardData} />
-            </div>
+        {cardVisible && !isLocked && !isExpired && (
+          <div style={{ marginBottom: '1.5rem' }}>
+            <VirtualCardWidget card={liveCardData} />
           </div>
         )}
 
+        {/* ── FORMULAIRE ── */}
         <form onSubmit={handleSubmit}>
+
+          {/* IDENTITÉ & CONTACT */}
           <div className="mpr-panel">
-            <div className="mpr-section">
-              <div className="mpr-section-head">
-                <div className="mpr-section-ico" style={{ background: '#ECFDF5' }}>
-                  <svg
-                    width="16"
-                    height="16"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="#1A4731"
-                    strokeWidth="2.2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
-                </div>
-                <span className="mpr-section-title">Identité &amp; Contact</span>
-                <div className="mpr-section-divider" />
-              </div>
-
-              <div className="mpr-grid-2-keep" style={{ marginBottom: '1rem' }}>
-                <div className="mpr-field">
-                  <label className="mpr-label">Prénom</label>
-                  <input
-                    className="mpr-input"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Votre prénom"
-                  />
-                </div>
-
-                <div className="mpr-field">
-                  <label className="mpr-label">Nom</label>
-                  <input
-                    className="mpr-input"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Votre nom"
-                  />
-                </div>
-              </div>
-
-              <div className="mpr-grid-2-keep" style={{ marginBottom: '1rem' }}>
-                <div className="mpr-field">
-                  <label className="mpr-label">Téléphone</label>
-                  <input
-                    className="mpr-input"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="+33 6 xx xx xx xx"
-                  />
-                </div>
-
-                <div className="mpr-field">
-                  <label className="mpr-label">
-                    Poste occupé
-                    <span className="opt">Optionnel</span>
-                  </label>
-                  <select
-                    className="mpr-select"
-                    value={profession}
-                    onChange={(e) => setProfession(e.target.value)}
-                    disabled={!isEditing}
-                  >
-                    <option value="">Sélectionnez un rôle dans l&apos;association</option>
-                    {ASSOCIATION_ROLES.map((role) => (
-                      <option key={role} value={role}>
-                        {role}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
+            <h3 className="mpr-section-title">
+              <span className="mpr-section-icon">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" /></svg>
+              </span>
+              Identité &amp; Contact
+            </h3>
+            <div className="mpr-grid-2">
               <div className="mpr-field">
-                <label className="mpr-label">
-                  Email
-                  <span className="opt">Non modifiable</span>
-                </label>
-                <input className="mpr-input mpr-input-readonly" value={me?.email || ''} disabled />
+                <label className="mpr-label">Prénom</label>
+                <input className="mpr-input" value={firstName} onChange={e => setFirstName(e.target.value)} disabled={!isEditing} required />
+              </div>
+              <div className="mpr-field">
+                <label className="mpr-label">Nom</label>
+                <input className="mpr-input" value={lastName} onChange={e => setLastName(e.target.value)} disabled={!isEditing} required />
               </div>
             </div>
-
-            <div className="mpr-section">
-              <div className="mpr-section-head">
-                <div className="mpr-section-ico" style={{ background: '#FEF3C7' }}>
-                  <svg
-                    width="16"
-                    height="16"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="#B45309"
-                    strokeWidth="2.2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    />
-                  </svg>
-                </div>
-                <span className="mpr-section-title">Naissance &amp; Origine</span>
-                <span className="mpr-section-badge">Requis pour la carte</span>
-                <div className="mpr-section-divider" />
-              </div>
-
-              <div className="mpr-grid-2-keep" style={{ marginBottom: '1rem' }}>
-                <div className="mpr-field">
-                  <label className="mpr-label">Date de naissance</label>
-                  <input
-                    className="mpr-input"
-                    type="date"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    disabled={!isEditing}
-                  />
-                </div>
-
-                <div className="mpr-field">
-                  <label className="mpr-label">Lieu de naissance</label>
-                  <input
-                    className="mpr-input"
-                    value={placeOfBirth}
-                    onChange={(e) => setPlaceOfBirth(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Ex : Lélouma"
-                  />
-                </div>
-              </div>
-
-              <div className="mpr-grid-2-keep" style={{ marginBottom: '1rem' }}>
-                <div className="mpr-field">
-                  <label className="mpr-label">
-                    Pays de naissance
-                    <span className="opt">Non modifiable</span>
-                  </label>
-                  <input
-                    className="mpr-input mpr-input-readonly"
-                    value={countryOfBirth}
-                    placeholder="Ex : Guinée"
-                    disabled
-                  />
-                </div>
-
-                <div className="mpr-field">
-                  <label className="mpr-label">Commune d&apos;origine</label>
-                  <input
-                    className="mpr-input"
-                    value={originSubPrefecture}
-                    onChange={(e) => setOriginSubPrefecture(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Ex : Lafou"
-                  />
-                </div>
-              </div>
-
+            <div className="mpr-grid-2" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
-                <label className="mpr-label">
-                  Village d&apos;origine
-                  <span className="opt">Non modifiable</span>
-                </label>
-                <input
-                  className="mpr-input mpr-input-readonly"
-                  value={originVillage}
-                  placeholder="Ex : Balaya"
-                  disabled
-                />
+                <label className="mpr-label">Téléphone</label>
+                <input className="mpr-input" value={phone} onChange={e => setPhone(e.target.value)} disabled={!isEditing} />
               </div>
-            </div>
-
-            <div className="mpr-section">
-              <div className="mpr-section-head">
-                <div className="mpr-section-ico" style={{ background: '#F0FDFA' }}>
-                  <svg
-                    width="16"
-                    height="16"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="#0D9488"
-                    strokeWidth="2.2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                    />
-                  </svg>
-                </div>
-                <span className="mpr-section-title">Adresse de résidence</span>
-                <div className="mpr-section-divider" />
-              </div>
-
-              <div className="mpr-field" style={{ marginBottom: '1rem' }}>
-                <label className="mpr-label">Ligne 1</label>
-                <input
-                  className="mpr-input"
-                  value={addressLine1}
-                  onChange={(e) => setAddressLine1(e.target.value)}
-                  disabled={!isEditing}
-                  placeholder="N° et nom de rue"
-                />
-              </div>
-
-              <div className="mpr-field" style={{ marginBottom: '1rem' }}>
-                <label className="mpr-label">
-                  Ligne 2
-                  <span className="opt">Optionnel</span>
-                </label>
-                <input
-                  className="mpr-input"
-                  value={addressLine2}
-                  onChange={(e) => setAddressLine2(e.target.value)}
-                  disabled={!isEditing}
-                  placeholder="Appartement, bâtiment…"
-                />
-              </div>
-
-              <div className="mpr-grid-2-keep" style={{ marginBottom: '1rem' }}>
-                <div className="mpr-field">
-                  <label className="mpr-label">Code postal</label>
-                  <input
-                    className="mpr-input"
-                    value={postalCode}
-                    onChange={(e) => setPostalCode(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="75001"
-                  />
-                </div>
-
-                <div className="mpr-field">
-                  <label className="mpr-label">Ville</label>
-                  <input
-                    className="mpr-input"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    disabled={!isEditing}
-                    placeholder="Paris"
-                  />
-                </div>
-              </div>
-
               <div className="mpr-field">
-                <label className="mpr-label">Pays</label>
-                <input
-                  className="mpr-input"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  disabled={!isEditing}
-                  placeholder="France"
-                />
+                <label className="mpr-label">Email (fixe)</label>
+                <input className="mpr-input" value={me?.email || ''} disabled />
               </div>
-            </div>
-
-            <div className="mpr-footer">
-              {!isEditing ? (
-                <button
-                  type="button"
-                  className="mpr-btn-primary"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <svg
-                    width="15"
-                    height="15"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                    />
-                  </svg>
-                  Modifier mes informations
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    className="mpr-btn-secondary"
-                    onClick={handleCancel}
-                    disabled={saving}
-                  >
-                    Annuler
-                  </button>
-
-                  <button type="submit" className="mpr-btn-primary" disabled={saving}>
-                    {saving ? (
-                      <>
-                        <div className="mpr-spinner-btn" />
-                        Enregistrement…
-                      </>
-                    ) : (
-                      <>
-                        <svg
-                          width="15"
-                          height="15"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          strokeWidth="2.2"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                          />
-                        </svg>
-                        Mettre à jour
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-
-              {message && (
-                <div className={`mpr-toast ${message.ok ? 'ok' : 'err'}`}>
-                  {message.ok ? (
-                    <svg
-                      width="13"
-                      height="13"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  ) : (
-                    <svg
-                      width="13"
-                      height="13"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <circle cx="12" cy="12" r="10" />
-                      <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-                    </svg>
-                  )}
-                  {message.text}
-                </div>
-              )}
             </div>
           </div>
+
+          {/* NAISSANCE & ORIGINE */}
+          <div className="mpr-panel">
+            <h3 className="mpr-section-title">
+              <span className="mpr-section-icon">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zM2 12h20" /></svg>
+              </span>
+              Naissance &amp; Origine
+            </h3>
+            <div className="mpr-grid-2">
+              <div className="mpr-field">
+                <label className="mpr-label">Date (JJ/MM/AAAA)</label>
+                <input className="mpr-input" value={birthDate} onChange={handleBirthDateChange} disabled={!isEditing} placeholder="01/01/1990" />
+              </div>
+              <div className="mpr-field">
+                <label className="mpr-label">Lieu de naissance</label>
+                <input className="mpr-input" value={placeOfBirth} onChange={e => setPlaceOfBirth(e.target.value)} disabled={!isEditing} />
+              </div>
+            </div>
+            <div className="mpr-grid-2" style={{ marginBottom: 0 }}>
+              <div className="mpr-field">
+                <label className="mpr-label">Commune d&apos;origine</label>
+                <input className="mpr-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} disabled={!isEditing} />
+              </div>
+              <div className="mpr-field">
+                <label className="mpr-label">Pays de naissance</label>
+                <input className="mpr-input" value={birthCountry} onChange={e => setBirthCountry(e.target.value)} disabled={!isEditing} />
+              </div>
+            </div>
+          </div>
+
+          {/* POSTE & PROFESSION */}
+          <div className="mpr-panel">
+            <h3 className="mpr-section-title">
+              <span className="mpr-section-icon">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              </span>
+              Poste &amp; Profession
+            </h3>
+            <div className="mpr-grid-2" style={{ marginBottom: 0 }}>
+              <div className="mpr-field">
+                <label className="mpr-label">Poste dans l&apos;association</label>
+                <select className="mpr-select" value={associationRole} onChange={e => setAssociationRole(e.target.value)} disabled={!isEditing}>
+                  <option value="">Sélectionnez un poste…</option>
+                  {ASSOCIATION_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="mpr-field">
+                <label className="mpr-label">Profession / Situation</label>
+                <select className="mpr-select" value={profession} onChange={e => setProfession(e.target.value)} disabled={!isEditing}>
+                  <option value="">Sélectionnez une profession…</option>
+                  {PROFESSION_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* ADRESSE DE RÉSIDENCE */}
+          <div className="mpr-panel">
+            <h3 className="mpr-section-title">
+              <span className="mpr-section-icon">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              </span>
+              Adresse de résidence
+            </h3>
+            <div className="mpr-grid-num">
+              <div className="mpr-field">
+                <label className="mpr-label">N° de rue</label>
+                <input className="mpr-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} disabled={!isEditing} placeholder="N°" />
+              </div>
+              <div className="mpr-field">
+                <label className="mpr-label">Libellé de voie</label>
+                <input className="mpr-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} disabled={!isEditing} placeholder="Rue, Avenue…" />
+              </div>
+            </div>
+            <div className="mpr-grid-2">
+              <div className="mpr-field">
+                <label className="mpr-label">Code postal</label>
+                <input className="mpr-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} disabled={!isEditing} />
+              </div>
+              <div className="mpr-field">
+                <label className="mpr-label">Ville</label>
+                <input className="mpr-input" value={city} onChange={e => setCity(e.target.value)} disabled={!isEditing} />
+              </div>
+            </div>
+            <div className="mpr-grid-1" style={{ marginBottom: 0 }}>
+              <div className="mpr-field">
+                <label className="mpr-label">Pays</label>
+                <input className="mpr-input" value={country} onChange={e => setCountry(e.target.value)} disabled={!isEditing} />
+              </div>
+            </div>
+          </div>
+
+          {/* ACTIONS */}
+          <div className="mpr-actions">
+            {!isEditing ? (
+              <button type="button" className="mpr-btn-primary" onClick={() => setIsEditing(true)}>
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+                  <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Modifier mes informations
+              </button>
+            ) : (
+              <>
+                <button type="button" className="mpr-btn-cancel" onClick={handleCancel}>
+                  Annuler
+                </button>
+                <button type="submit" className="mpr-btn-primary" disabled={saving}>
+                  {saving ? (
+                    <>
+                      <svg width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ animation: 'mpr-spin 0.8s linear infinite' }}>
+                        <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+                      </svg>
+                      Sauvegarde…
+                    </>
+                  ) : (
+                    <>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                      Enregistrer
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* MESSAGES */}
+          {(message || photoMessage) && (
+            <div className={`mpr-flash ${(message?.ok || photoMessage?.ok) ? 'ok' : 'err'}`}>
+              {(message?.ok || photoMessage?.ok) ? (
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              ) : (
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M12 8v4m0 4h.01" /></svg>
+              )}
+              {message?.text || photoMessage?.text}
+            </div>
+          )}
         </form>
       </div>
     </AppShell>

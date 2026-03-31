@@ -56,7 +56,7 @@ export interface FullUserProfile extends UserSummary {
   profilePhotoUrl?: string | null;
   avatarUrl?: string | null;
   originSubPrefecture?: string | null;
-  originVillage?: string | null; // Conservé uniquement si présent en DB, sinon à ignorer
+  originVillage?: string | null;
   function?: string | null;
   cardNumber?: string | null;
   isCardLocked?: boolean;
@@ -207,6 +207,10 @@ export const api = {
   updateMemberProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
 
+  // ⚡ NOUVELLE FONCTION D'APPEL
+  updateMyPassword: (password: string) =>
+    http<{ message: string }, { password: string }>('/users/me/password', { method: 'PATCH', body: { password } }),
+
   uploadAvatar: async (formData: FormData): Promise<{
     message: string;
     avatarUrl: string | null;
@@ -219,7 +223,6 @@ export const api = {
     const headers: Record<string, string> = {};
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
-    // On utilise l'endpoint /users/me/avatar comme défini dans le backend
     const res = await fetch(`${baseUrl}/users/me/avatar`, {
       method: 'POST',
       headers,
@@ -262,11 +265,8 @@ export const api = {
 
   uploadProfilePhoto: async (file: File) => {
     const form = new FormData();
-    form.append('file', file);
-    return http<{ message?: string; profilePhotoUrl?: string | null; user?: FullUserProfile }>('/users/me/profile-photo', {
-      method: 'POST',
-      body: form,
-    });
+    form.append('avatar', file);
+    return api.uploadAvatar(form);
   },
 
   updateMemberPreferences: (body: {
@@ -808,17 +808,120 @@ export const api = {
   // ==========================================
   // SYSTEME
   // ==========================================
-  uploadFile: async (file: File, body?: { category?: string; folder?: string; description?: string }) => {
-    const form = new FormData();
-    form.append('file', file);
-    if (body?.category) form.append('category', body.category);
-    if (body?.folder) form.append('folder', body.folder);
-    if (body?.description) form.append('description', body.description);
-    return http<{ id: string; url: string; fileName: string }>('/uploads/single', {
-      method: 'POST',
-      body: form,
-    });
-  },
+  uploadFile: async (
+  file: File,
+  body?: {
+    category?: string;
+    folder?: string;
+    description?: string;
+  }
+): Promise<{
+  id: string;
+  url: string;
+  fileName: string;
+}> => {
+  const form = new FormData();
+  form.append('file', file);
+
+  if (body?.category) {
+    form.append('category', body.category);
+  }
+
+  if (body?.folder) {
+    form.append('folder', body.folder);
+  }
+
+  if (body?.description) {
+    form.append('description', body.description);
+  }
+
+  const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
+  const accessToken = getAccessToken();
+
+  const headers: Record<string, string> = {};
+
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const res = await fetch(`${baseUrl}/uploads/single`, {
+    method: 'POST',
+    headers,
+    body: form,
+  });
+
+  if (res.status === 401) {
+    const refreshToken = getRefreshToken();
+
+    if (refreshToken) {
+      const refreshRes = await fetch(`${baseUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (refreshRes.ok) {
+        const tokens = (await refreshRes.json()) as {
+          accessToken: string;
+          refreshToken: string;
+          refreshTokenExpiresAt: string;
+        };
+
+        setTokens({
+          accessToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          refreshTokenExpiresAt:
+            tokens.refreshTokenExpiresAt ?? '',
+        });
+
+        const retryRes = await fetch(
+          `${baseUrl}/uploads/single`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${tokens.accessToken}`,
+            },
+            body: form,
+          }
+        );
+
+        if (!retryRes.ok) {
+          const err = (await retryRes
+            .json()
+            .catch(() => ({}))) as {
+            message?: string;
+          };
+
+          throw new Error(
+            err.message ??
+              'Erreur lors du téléchargement du fichier.'
+          );
+        }
+
+        return retryRes.json();
+      }
+
+      clearAuthState();
+    }
+  }
+
+  if (!res.ok) {
+    const err = (await res
+      .json()
+      .catch(() => ({}))) as {
+      message?: string;
+    };
+
+    throw new Error(
+      err.message ??
+        'Erreur lors du téléchargement du fichier.'
+    );
+  }
+
+  return res.json();
+},
 
   listNotifications: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<NotificationItem>>(

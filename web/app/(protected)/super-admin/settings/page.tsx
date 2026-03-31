@@ -8,7 +8,6 @@ import { formatDate } from '../../../../lib/format';
 import type { Association } from '../../../../types/association';
 
 type Theme = 'light' | 'dark' | 'system';
-// NOUVEAU: Ajout de expenseValidationThreshold dans la map de pricing
 type PricingMap = Record<string, { monthlyQuota: string; membershipCard: string; expenseValidationThreshold: string }>;
 const SUPPORTED_CURRENCIES = ['EUR', 'GNF', 'USD', 'XOF'];
 
@@ -56,10 +55,10 @@ function StatusToggle({ checked, onChange, disabled = false }: { checked: boolea
 
 /* ══════════════════════════════════════════════════════ FIELD COMPONENT */
 function Field({
-  label, value, onChange, placeholder, required = false, mono = false, hint, type = 'text', step, disabled = false
+  label, value, onChange, placeholder, required = false, mono = false, hint, type = 'text', step, disabled = false, autoComplete
 }: {
   label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; required?: boolean; mono?: boolean; hint?: string; type?: string; step?: string; disabled?: boolean;
+  placeholder?: string; required?: boolean; mono?: boolean; hint?: string; type?: string; step?: string; disabled?: boolean; autoComplete?: string;
 }) {
   const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -80,6 +79,7 @@ function Field({
           placeholder={placeholder}
           required={required}
           disabled={disabled}
+          autoComplete={autoComplete}
           style={{
             width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box',
             border: disabled ? '1.5px solid transparent' : `1.5px solid ${focused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
@@ -109,9 +109,9 @@ function Field({
             }}
           >
             {showPassword ? (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
             ) : (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.543 7-1.275 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.543 7-1.275 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             )}
           </button>
         )}
@@ -126,8 +126,8 @@ export default function SuperAdminSettingsPage() {
   const [association, setAssociation] = useState<Association | null>(null);
   
   // Settings Association
-  const [name,        setName]        = useState('');
-  const [code,        setCode]        = useState('');
+  const [name, setName] = useState('');
+  const [code, setCode] = useState('');
   const [isActive, setIsActive] = useState(true);
   
   // Settings Pricing Multi-Devises
@@ -135,7 +135,7 @@ export default function SuperAdminSettingsPage() {
   const [pricingMap, setPricingMap] = useState<PricingMap>({});
   const [initialPricingMap, setInitialPricingMap] = useState<PricingMap>({});
 
-  const [loading,  setLoading]  = useState(false);
+  const [loading, setLoading] = useState(false);
   const [initLoad, setInitLoad] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -155,16 +155,18 @@ export default function SuperAdminSettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [secLoading, setSecLoading] = useState(false);
   const [secMsg, setSecMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [secFormKey, setSecFormKey] = useState(0);
 
   useEffect(() => {
+    let mounted = true;
     void (async () => {
       try {
         const [a, pricingData] = await Promise.all([
           api.getAssociation(),
-          // On s'attend à recevoir expenseValidationThreshold dans l'objet par devise depuis l'API
           api.getPricingSuperAdmin().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold?: number }>)),
         ]);
         
+        if (!mounted) return;
         setAssociation(a);
         setName(a.name);
         setCode(a.code);
@@ -183,11 +185,12 @@ export default function SuperAdminSettingsPage() {
         setPricingMap(formattedMap);
         setInitialPricingMap(JSON.parse(JSON.stringify(formattedMap)));
       } catch {
-        setMsg({ type: 'error', text: 'Erreur de chargement' });
+        if (mounted) setMsg({ type: 'error', text: 'Erreur de chargement' });
       } finally {
-        setInitLoad(false);
+        if (mounted) setInitLoad(false);
       }
     })();
+    return () => { mounted = false; };
   }, []);
 
   const handlePricingChange = (field: keyof PricingMap[string], value: string) => {
@@ -220,7 +223,7 @@ export default function SuperAdminSettingsPage() {
 
       await Promise.all([
         api.updateAssociation({ name, code, isActive }),
-        api.updatePricingSuperAdmin(payload), // Envoie le nouveau seuil avec les prix
+        api.updatePricingSuperAdmin(payload),
       ]);
       
       const updated = await api.getAssociation();
@@ -240,7 +243,7 @@ export default function SuperAdminSettingsPage() {
     setPrefLoading(true);
     setPrefMsg(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await api.updateMemberPreferences({ emailNotifications, smsNotifications, pushNotifications, language, theme });
       setPrefMsg({ type: 'success', text: 'Préférences enregistrées avec succès.' });
     } catch {
       setPrefMsg({ type: 'error', text: 'Erreur lors de l\'enregistrement des préférences.' });
@@ -258,16 +261,32 @@ export default function SuperAdminSettingsPage() {
     }
     setSecLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ✅ APPEL API RÉEL
+      await api.updateMyPassword(password);
+      
       setSecMsg({ type: 'success', text: 'Mot de passe mis à jour avec succès.' });
       setPassword('');
       setConfirmPassword('');
-      setIsEditingPassword(false);
-    } catch {
-      setSecMsg({ type: 'error', text: 'Erreur lors de la mise à jour du mot de passe.' });
+      setSecFormKey(prev => prev + 1); // 🔥 Détruit l'ancien formulaire pour effacer le cache navigateur
+
+      setTimeout(() => {
+        setIsEditingPassword(false);
+        setSecMsg(null);
+      }, 2500);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Erreur lors de la mise à jour.';
+      setSecMsg({ type: 'error', text: errorMsg });
     } finally {
       setSecLoading(false);
     }
+  };
+
+  const handleCancelPassword = () => {
+    setIsEditingPassword(false);
+    setPassword('');
+    setConfirmPassword('');
+    setSecMsg(null);
+    setSecFormKey(prev => prev + 1);
   };
 
   const isDirty = association
@@ -284,120 +303,80 @@ export default function SuperAdminSettingsPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
         .ss-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1050px;margin:0 auto}
-
-        /* Header */
         .ss-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:ssin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
         .ss-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
         .ss-dot{width:6px;height:6px;background:#EF4444;border-radius:50%;animation:sspulse 2s ease-in-out infinite}
         @keyframes sspulse{0%,100%{opacity:1}50%{opacity:.3}}
         .ss-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .ss-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-
-        /* Layout 2-col */
         .ss-layout{display:grid;grid-template-columns:1fr 380px;gap:1.4rem;align-items:start}
         .ss-left-col { display: flex; flex-direction: column; gap: 1.4rem; }
         @media(max-width:900px){.ss-layout{grid-template-columns:1fr}}
-
-        /* Panel */
         .ss-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden}
         .ss-panel-left{opacity:0;transform:translateY(10px);animation:ssin .5s .10s cubic-bezier(.22,1,.36,1) forwards}
         .ss-panel-right{opacity:0;transform:translateY(10px);animation:ssin .5s .16s cubic-bezier(.22,1,.36,1) forwards}
-        
         .ss-panel-head{padding:1rem 1.5rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.55rem}
         .ss-panel-head-left{display:flex;align-items:center;gap:.55rem}
         .ss-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
         .ss-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
-        
         .ss-panel-body{padding:1.5rem}
-        @media(max-width:540px){.ss-panel-body{padding:1.1rem}}
-
-        /* Form stack & Sections */
         .ss-form-stack{display:flex;flex-direction:column;gap:1.1rem}
         .ss-section { padding: 1.2rem 1.5rem; border-bottom: 1px solid rgba(220,38,38,0.06); }
         .ss-section:last-child { border-bottom: none; }
         .ss-section-label { font-size: 0.65rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.85rem; }
-
-        /* Buttons */
         .ss-edit-btn { padding: 0.4rem 0.8rem; border-radius: 8px; border: 1px solid #E5E7EB; background: white; color: #374151; font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.35rem; transition: all 0.2s; }
         .ss-edit-btn:hover { background: #F9FAFB; border-color: #D1D5DB; }
         .ss-cancel-btn { height: 42px; padding: 0 1.2rem; border-radius: 11px; background: transparent; border: 1px solid #D1D5DB; color: #4B5563; font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.84rem; cursor: pointer; transition: all 0.2s; }
         .ss-cancel-btn:hover { background: #F3F4F6; color: #111827; }
-
-        /* Toggles Prefs */
         .ss-toggle-pref-row { display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 0.85rem; border-radius: 12px; border: 1px solid rgba(220,38,38,0.09); background: rgba(254,242,242,0.3); margin-bottom: 0.55rem; gap: 0.75rem; transition: background 0.2s, border-color 0.2s; cursor: pointer; }
-        .ss-toggle-pref-row:last-child { margin-bottom: 0; }
         .ss-toggle-pref-row:hover { background: #FEF2F2; border-color: rgba(220,38,38,0.18); }
         .ss-toggle-pref-row.active { background: #FEF2F2; border-color: rgba(220,38,38,0.22); }
         .ss-toggle-info { display: flex; align-items: center; gap: 0.65rem; flex: 1; min-width: 0; pointer-events: none; }
         .ss-toggle-ico { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .ss-toggle-name { font-size: 0.83rem; font-weight: 700; color: #111827; }
         .ss-toggle-desc { font-size: 0.68rem; font-weight: 500; color: #9CA3AF; margin-top: 1px; }
-
         .ss-switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
         .ss-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
         .ss-switch-track { position: absolute; inset: 0; border-radius: 99px; background: #E2E8F0; transition: background 0.2s; cursor: pointer; }
         .ss-switch input:checked + .ss-switch-track { background: #DC2626; }
         .ss-switch-thumb { position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: white; transition: transform 0.2s cubic-bezier(.22,1,.36,1); box-shadow: 0 1px 4px rgba(0,0,0,0.15); pointer-events: none; }
         .ss-switch input:checked ~ .ss-switch-thumb { transform: translateX(18px); }
-
-        /* Preferences Fields */
         .ss-field-group { display: flex; flex-direction: column; gap: 0.38rem; margin-bottom: 0.7rem; }
-        .ss-field-group:last-child { margin-bottom: 0; }
         .ss-field-label { font-size: 0.68rem; font-weight: 900; letter-spacing: 0.09em; text-transform: uppercase; color: #DC2626; }
         .ss-select-wrap { position: relative; }
         .ss-select { width: 100%; height: 44px; padding: 0 2.2rem 0 1rem; border-radius: 11px; border: 1px solid rgba(220,38,38,0.15); background: rgba(255,255,255,0.85); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700; color: #111827; outline: none; -webkit-appearance: none; appearance: none; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
         .ss-select:focus { border-color: rgba(220,38,38,0.5); box-shadow: 0 0 0 3px rgba(220,38,38,0.09); background: white; }
         .ss-select-chevron { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
-
         .ss-theme-row { display: flex; gap: 0.5rem; }
         .ss-theme-pill { flex: 1; height: 38px; border-radius: 10px; border: 1.5px solid rgba(220,38,38,0.13); background: rgba(255,255,255,0.8); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 700; color: #374151; display: flex; align-items: center; justify-content: center; gap: 0.35rem; transition: all 0.2s; }
-        .ss-theme-pill:hover { border-color: rgba(220,38,38,0.35); background: #FEF2F2; color: #991B1B; }
         .ss-theme-pill.active { border-color: #DC2626; background: #FEF2F2; color: #991B1B; box-shadow: 0 0 0 3px rgba(220,38,38,0.1); }
-
-        /* Currencies Tabs */
         .ss-tabs { display: flex; gap: 0.4rem; padding: 0.4rem; background: rgba(220,38,38,.05); border-radius: 12px; margin-bottom: 1rem; }
         .ss-tab { flex: 1; padding: 0.55rem 0; text-align: center; font-size: 0.76rem; font-weight: 800; color: #6B7280; border-radius: 8px; cursor: pointer; transition: all 0.2s; border: none; background: transparent; }
         .ss-tab.active { background: white; color: #DC2626; box-shadow: 0 2px 6px rgba(220,38,38,.15); }
-        .ss-tab:hover:not(.active) { color: #111827; background: rgba(255,255,255,0.5); }
-
-        /* Toggle row (Global config) */
         .ss-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;background:rgba(254,242,242,.3);border:1px solid rgba(220,38,38,.1);border-radius:12px}
         .ss-toggle-label{font-size:.84rem;font-weight:800;color:#111827;margin-bottom:.18rem}
         .ss-toggle-sub{font-size:.72rem;font-weight:600;color:#6B7280;line-height:1.45}
-
-        /* Form footer & Messages */
         .ss-form-footer{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1.2rem 1.5rem;border-top:1px solid rgba(220,38,38,.08);}
         .ss-msg-success{display:flex;align-items:center;gap:.45rem;font-size:.8rem;font-weight:800;color:#059669;}
         .ss-msg-error{display:flex;align-items:center;gap:.45rem;font-size:.8rem;font-weight:800;color:#DC2626;}
-        
         .ss-toast { display: flex; align-items: center; gap: 0.45rem; padding: 0.6rem 0.9rem; border-radius: 10px; font-size: 0.77rem; font-weight: 700; border: 1px solid; animation: ssin 0.3s cubic-bezier(.22,1,.36,1); }
         .ss-toast.ok  { background: #ECFDF5; color: #065F46; border-color: #A7F3D0; }
         .ss-toast.err { background: #FEF2F2; color: #B91C1C; border-color: #FECACA; }
-        
         .ss-submit-btn{height:42px;padding:0 1.4rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.84rem;font-weight:800;display:flex;align-items:center;gap:.45rem;box-shadow:0 4px 14px rgba(220,38,38,.32);transition:all .18s;white-space:nowrap}
         .ss-submit-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(220,38,38,.42)}
         .ss-submit-btn:disabled{opacity:.6;cursor:not-allowed}
-
-        /* System info */
         .ss-info-stack{padding:.25rem 0}
-        .ss-info-last{border-bottom:none !important}
-
-        /* Governance notice */
         .ss-governance{display:flex;gap:.7rem;align-items:flex-start;padding:.95rem 1.1rem;background:linear-gradient(135deg,rgba(220,38,38,.05),rgba(239,68,68,.03));border:1px solid rgba(220,38,38,.14);border-radius:13px;margin-top:.5rem}
         .ss-gov-ico{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(220,38,38,.28)}
         .ss-gov-title{font-size:.8rem;font-weight:900;color:#111827;margin-bottom:.3rem}
         .ss-gov-body{font-size:.76rem;font-weight:600;color:#6B7280;line-height:1.55}
-
-        /* Skeleton loader */
         .ss-skeleton{height:42px;border-radius:11px;background:linear-gradient(90deg,#f0f0f0 25%,#f8f8f8 50%,#f0f0f0 75%);background-size:200% 100%;animation:ssshimmer 1.4s infinite}
         @keyframes ssshimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
-
         @keyframes ssin{to{opacity:1;transform:translateY(0)}}
         @keyframes ssspin{to{transform:rotate(360deg)}}
       `}</style>
 
       <div className="ss-wrap">
-
         {/* Header */}
         <div className="ss-header">
           <div className="ss-eyebrow"><div className="ss-dot" />Super Admin</div>
@@ -421,7 +400,7 @@ export default function SuperAdminSettingsPage() {
                   <span className="ss-panel-title">Configuration de l&apos;association</span>
                 </div>
                 {!isEditing && !initLoad && (
-                  <button type="button" className="ss-edit-btn" onClick={(e) => { e.preventDefault(); setIsEditing(true); setMsg(null); }}>
+                  <button type="button" className="ss-edit-btn" onClick={() => setIsEditing(true)}>
                     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
@@ -434,7 +413,6 @@ export default function SuperAdminSettingsPage() {
                 <form onSubmit={(e: FormEvent<HTMLFormElement>) => void onSubmit(e)}>
                   <div className="ss-panel-body" style={{ paddingBottom: isEditing ? '1rem' : '1.5rem' }}>
                     <div className="ss-form-stack">
-                      {/* Message (visible in read-only mode if recently saved) */}
                       {!isEditing && msg?.type === 'success' && (
                         <div className="ss-msg-success" style={{ marginBottom: '.5rem' }}>
                           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -463,7 +441,6 @@ export default function SuperAdminSettingsPage() {
                         hint="Uniquement des lettres majuscules, chiffres et tirets. Utilis&eacute; comme r&eacute;f&eacute;rence interne."
                       />
 
-                      {/* Tarification Multi-devises */}
                       <div style={{ marginTop: '.8rem', marginBottom: '.2rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(220,38,38,.07)' }}>
                         <span style={{ fontSize: '.75rem', fontWeight: 900, letterSpacing: '.09em', textTransform: 'uppercase', color: '#1F2937' }}>
                           Tarification Globale par devise
@@ -504,7 +481,6 @@ export default function SuperAdminSettingsPage() {
                           disabled={!isEditing}
                           hint="Prix de la carte annuelle."
                         />
-                        {/* NOUVEAU: Le champ seuil de validation intégré ici */}
                         <Field
                           label={`Seuil dépenses (${activeCurrency})`}
                           value={pricingMap[activeCurrency]?.expenseValidationThreshold || ''}
@@ -517,7 +493,6 @@ export default function SuperAdminSettingsPage() {
                         />
                       </div>
 
-                      {/* Toggle statut */}
                       <div className="ss-toggle-row" style={{ marginTop: '.5rem' }}>
                         <div>
                           <div className="ss-toggle-label">Statut de l&apos;association</div>
@@ -636,7 +611,7 @@ export default function SuperAdminSettingsPage() {
                         <option value="fr">Fran&ccedil;ais</option>
                         <option value="en">English</option>
                       </select>
-                      <span className="ss-select-chevron">
+                      <span className="ast-select-chevron">
                         <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
@@ -707,7 +682,7 @@ export default function SuperAdminSettingsPage() {
               </div>
               <div className="ss-panel-body">
                 {isEditingPassword ? (
-                  <form onSubmit={handlePasswordSubmit} className="ss-form-stack">
+                  <form key={secFormKey} onSubmit={handlePasswordSubmit} className="ss-form-stack">
                     <Field
                       label="Nouveau mot de passe"
                       type="password"
@@ -716,6 +691,7 @@ export default function SuperAdminSettingsPage() {
                       placeholder="Entrez votre nouveau mot de passe"
                       required
                       hint="Utilisez au moins 8 caractères."
+                      autoComplete="new-password"
                     />
                     <Field
                       label="Confirmer nouveau mot de passe"
@@ -724,6 +700,7 @@ export default function SuperAdminSettingsPage() {
                       onChange={setConfirmPassword}
                       placeholder="Retapez le mot de passe"
                       required
+                      autoComplete="new-password"
                     />
 
                     <div className="ss-form-footer" style={{ padding: '1rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>
@@ -736,7 +713,7 @@ export default function SuperAdminSettingsPage() {
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: '0.65rem' }}>
-                        <button type="button" onClick={() => { setIsEditingPassword(false); setPassword(''); setConfirmPassword(''); setSecMsg(null); }} className="ss-cancel-btn" disabled={secLoading}>
+                        <button type="button" onClick={handleCancelPassword} className="ss-cancel-btn" disabled={secLoading}>
                           Annuler
                         </button>
                         <button type="submit" className="ss-submit-btn" disabled={secLoading || !isPasswordDirty}>
@@ -777,15 +754,14 @@ export default function SuperAdminSettingsPage() {
             </div>
             <div className="ss-panel-body">
               <div className="ss-info-stack">
-                <InfoRow label="ID Syst&egrave;me"          value={association?.id ?? '—'}                          mono />
-                <InfoRow label="Code actuel"              value={association?.code ?? '—'}                        mono />
+                <InfoRow label="ID Syst&egrave;me"           value={association?.id ?? '—'}                          mono />
+                <InfoRow label="Code actuel"               value={association?.code ?? '—'}                        mono />
                 <InfoRow label="Date de cr&eacute;ation"    value={association ? formatDate(association.createdAt) : '—'} />
                 <div style={{ borderBottom: 'none' }}>
                   <InfoRow label="Derni&egrave;re modification" value={association ? formatDate(association.updatedAt) : '—'} />
                 </div>
               </div>
 
-              {/* Governance notice */}
               <div className="ss-governance">
                 <div className="ss-gov-ico">
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.2">

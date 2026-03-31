@@ -60,4 +60,14 @@ export class UpdateMeDto {
   @IsString()
   @MaxLength(120)
   country?: string;
+
+  // 👇 L'AJOUT CHIRURGICAL EST LÀ 👇
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  function?: string;
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  professionalStatus?: string;
 }

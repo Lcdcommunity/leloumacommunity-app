@@ -3,15 +3,16 @@
 
 import { type ChangeEvent, type FormEvent, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
+import { api } from '../../../../lib/api-client';
 
 type Theme = 'light' | 'dark' | 'system';
 
 /* ══════════════════════════════════════════════════════ FIELD COMPONENT (Thème Bleu) */
 function Field({
-  label, value, onChange, placeholder, required = false, mono = false, hint, type = 'text', disabled = false
+  label, value, onChange, placeholder, required = false, mono = false, hint, type = 'text', disabled = false, autoComplete
 }: {
   label: string; value: string; onChange: (v: string) => void;
-  placeholder?: string; required?: boolean; mono?: boolean; hint?: string; type?: string; disabled?: boolean;
+  placeholder?: string; required?: boolean; mono?: boolean; hint?: string; type?: string; disabled?: boolean; autoComplete?: string;
 }) {
   const [focused, setFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +32,7 @@ function Field({
           placeholder={placeholder}
           required={required}
           disabled={disabled}
+          autoComplete={autoComplete}
           style={{
             width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box',
             border: disabled ? '1.5px solid transparent' : `1.5px solid ${focused ? 'rgba(37,99,235,.45)' : 'rgba(37,99,235,.18)'}`,
@@ -60,9 +62,9 @@ function Field({
             }}
           >
             {showPassword ? (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
             ) : (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.543 7-1.275 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.543 7-1.275 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             )}
           </button>
         )}
@@ -121,13 +123,16 @@ export default function AdminSettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [secLoading, setSecLoading] = useState(false);
   const [secMsg, setSecMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // 🔥 L'astuce magique pour forcer le navigateur à oublier le mot de passe pré-rempli
+  const [formKey, setFormKey] = useState(0);
 
   async function handlePreferencesSubmit(e: FormEvent) {
     e.preventDefault();
     setPrefLoading(true);
     setPrefMsg(null);
     try {
-      // Simulation API pour les préférences Admin
+      // Simulation API pour les préférences Admin (à remplacer par ton API si besoin)
       await new Promise(resolve => setTimeout(resolve, 1000));
       setPrefMsg({ text: 'Préférences enregistrées avec succès.', ok: true });
     } catch {
@@ -140,23 +145,33 @@ export default function AdminSettingsPage() {
   const handlePasswordSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setSecMsg(null);
+    
     if (password !== confirmPassword) {
       setSecMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
       return;
     }
+    
     setSecLoading(true);
+    
     try {
-      // Simulation API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ✅ APPEL API RÉEL
+      await api.updateMyPassword(password);
+      
       setSecMsg({ type: 'success', text: 'Mot de passe mis à jour avec succès.' });
       setPassword('');
       setConfirmPassword('');
+      
+      // 🔥 On change la clé du formulaire : React détruit les anciens champs et crée des nouveaux (totalement vides)
+      setFormKey(prev => prev + 1);
+
       setTimeout(() => {
         setIsChangingPassword(false);
         setSecMsg(null);
-      }, 3000);
-    } catch {
-      setSecMsg({ type: 'error', text: 'Erreur lors de la mise à jour.' });
+      }, 2500);
+      
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Erreur lors de la mise à jour.';
+      setSecMsg({ type: 'error', text: errorMsg });
     } finally {
       setSecLoading(false);
     }
@@ -167,6 +182,7 @@ export default function AdminSettingsPage() {
     setPassword('');
     setConfirmPassword('');
     setSecMsg(null);
+    setFormKey(prev => prev + 1); // Sécurité supplémentaire au clic sur annuler
   };
 
   const isPasswordDirty = password.length > 0 || confirmPassword.length > 0;
@@ -424,7 +440,11 @@ export default function AdminSettingsPage() {
                   )}
                   <button
                     type="button"
-                    onClick={() => setIsChangingPassword(true)}
+                    onClick={() => {
+                      setIsChangingPassword(true);
+                      setPassword('');
+                      setConfirmPassword('');
+                    }}
                     className="ast-cancel-btn"
                     style={{ color: '#2563EB', borderColor: '#BFDBFE', display: 'flex', alignItems: 'center', gap: '.4rem' }}
                   >
@@ -439,7 +459,8 @@ export default function AdminSettingsPage() {
                 </div>
               ) : (
                 <div className="ast-panel-body">
-                  <form onSubmit={handlePasswordSubmit} className="ast-form-stack">
+                  {/* 🔥 L'astuce magique est ici : la "key" force la réinitialisation du formulaire au niveau du DOM */}
+                  <form key={formKey} onSubmit={handlePasswordSubmit} className="ast-form-stack">
                     <Field
                       label="Nouveau mot de passe"
                       type="password"
@@ -448,6 +469,7 @@ export default function AdminSettingsPage() {
                       placeholder="Entrez votre nouveau mot de passe"
                       required
                       hint="Utilisez au moins 8 caractères."
+                      autoComplete="new-password"
                     />
                     <Field
                       label="Confirmer nouveau mot de passe"
@@ -456,6 +478,7 @@ export default function AdminSettingsPage() {
                       onChange={setConfirmPassword}
                       placeholder="Retapez le mot de passe"
                       required
+                      autoComplete="new-password"
                     />
 
                     <div className="ast-form-footer" style={{ padding: '1.2rem 0 0 0', marginTop: '.25rem', borderTop: 'none' }}>

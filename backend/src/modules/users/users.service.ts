@@ -10,13 +10,13 @@ import { AuditService } from '../audit/audit.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { CloudinaryService } from '../uploads/cloudinary.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import * as bcrypt from 'bcrypt'; // 👈 AJOUT POUR LE HACHAGE DU MOT DE PASSE
 
 type RequestMeta = {
   ipAddress?: string;
   userAgent?: string;
 };
 
-// ── Include étendu : memberships + adminAssignments + virtualCard + profilePhoto
 const meUserInclude = Prisma.validator<Prisma.UserInclude>()({
   memberships: {
     include: { antenna: true },
@@ -60,19 +60,21 @@ export class UsersService {
 
     const data: Prisma.UserUpdateInput = {};
 
-    // ⚡ Alignement strict avec ton DTO et ton Schéma Prisma
     if (dto.firstName?.trim()) data.firstName = dto.firstName.trim();
     if (dto.lastName?.trim())  data.lastName  = dto.lastName.trim();
     if (dto.phone               !== undefined) data.phone               = this.normalize(dto.phone);
-    if (dto.birthDate           !== undefined) data.birthDate           = dto.birthDate ? new Date(`${dto.birthDate}T00:00:00.000Z`) : null;
-    if (dto.placeOfBirth         !== undefined) data.placeOfBirth        = this.normalize(dto.placeOfBirth);
-    if (dto.countryOfBirth       !== undefined) data.countryOfBirth      = this.normalize(dto.countryOfBirth);
+    if (dto.birthDate           !== undefined) data.birthDate           = dto.birthDate ? new Date(dto.birthDate) : null;
+    if (dto.placeOfBirth        !== undefined) data.placeOfBirth        = this.normalize(dto.placeOfBirth);
+    if (dto.countryOfBirth      !== undefined) data.countryOfBirth      = this.normalize(dto.countryOfBirth);
     if (dto.originSubPrefecture !== undefined) data.originSubPrefecture = this.normalize(dto.originSubPrefecture);
-    if (dto.addressLine1         !== undefined) data.addressLine1        = this.normalize(dto.addressLine1);
-    if (dto.addressLine2         !== undefined) data.addressLine2        = this.normalize(dto.addressLine2);
-    if (dto.postalCode           !== undefined) data.postalCode          = this.normalize(dto.postalCode);
-    if (dto.city                 !== undefined) data.city                = this.normalize(dto.city);
-    if (dto.country              !== undefined) data.country             = this.normalize(dto.country);
+    if (dto.addressLine1        !== undefined) data.addressLine1        = this.normalize(dto.addressLine1);
+    if (dto.addressLine2        !== undefined) data.addressLine2        = this.normalize(dto.addressLine2);
+    if (dto.postalCode          !== undefined) data.postalCode          = this.normalize(dto.postalCode);
+    if (dto.city                !== undefined) data.city                = this.normalize(dto.city);
+    if (dto.country             !== undefined) data.country             = this.normalize(dto.country);
+    
+    if (dto.function            !== undefined) data.function            = this.normalize(dto.function);
+    if (dto.professionalStatus  !== undefined) data.professionalStatus  = this.normalize(dto.professionalStatus);
 
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
@@ -80,7 +82,6 @@ export class UsersService {
       include: meUserInclude,
     });
 
-    // ✅ NOTIFICATION
     await this.notifications.createForUser({
       associationId: updatedUser.associationId,
       userId: updatedUser.id,
@@ -89,7 +90,6 @@ export class UsersService {
       title: 'Profil mis à jour',
     });
 
-    // ✅ AUDIT
     await this.auditService.create({
       associationId: updatedUser.associationId,
       actorUserId: updatedUser.id,
@@ -105,9 +105,19 @@ export class UsersService {
     return this.toMeResponse(updatedUser);
   }
 
-  /**
-   * Upload de la photo de profil.
-   */
+  // ⚡ NOUVELLE MÉTHODE POUR CHANGER LE MOT DE PASSE
+  async updatePassword(userId: string, newPasswordRaw: string) {
+    const saltRounds = 10;
+    const passwordHash = await bcrypt.hash(newPasswordRaw, saltRounds);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash },
+    });
+
+    return { message: 'Mot de passe mis à jour avec succès' };
+  }
+
   async uploadProfilePhoto(
     userId: string,
     associationId: string,
@@ -160,7 +170,6 @@ export class UsersService {
     }
   }
 
-  // ── Helpers ────────────────────────────────────────────────
   private normalize(value: string | undefined): string | null | undefined {
     if (value === undefined) return undefined;
     const t = value.trim();
@@ -189,12 +198,15 @@ export class UsersService {
       birthDate: user.birthDate ? user.birthDate.toISOString().slice(0, 10) : null,
       placeOfBirth: user.placeOfBirth,
       countryOfBirth: user.countryOfBirth,
-      originSubPrefecture: user.originSubPrefecture, // 👈 Seul champ d'origine conservé
+      originSubPrefecture: user.originSubPrefecture,
       addressLine1: user.addressLine1,
       addressLine2: user.addressLine2,
       postalCode: user.postalCode,
       city: user.city,
       country: user.country,
+      
+      function: user.function, 
+      professionalStatus: user.professionalStatus,
 
       avatarUrl: photoUrl,
       profilePhotoUrl: photoUrl,

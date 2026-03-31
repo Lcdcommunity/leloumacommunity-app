@@ -1,4 +1,3 @@
-// backend/src/modules/users/users.controller.ts
 import {
   BadRequestException,
   Body,
@@ -44,6 +43,19 @@ export class UsersController {
       ipAddress: this.extractIp(req),
       userAgent: req.headers['user-agent'],
     });
+  }
+
+  // ⚡ NOUVELLE ROUTE POUR LE MOT DE PASSE
+  @UseGuards(JwtAuthGuard)
+  @Patch('me/password')
+  async updatePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { password?: string }
+  ) {
+    if (!body.password || body.password.length < 8) {
+      throw new BadRequestException('Le mot de passe doit faire au moins 8 caractères.');
+    }
+    return this.usersService.updatePassword(user.id, body.password);
   }
 
   @UseGuards(JwtAuthGuard)

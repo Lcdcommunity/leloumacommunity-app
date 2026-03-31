@@ -4,8 +4,15 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
-import type { NotificationItem } from '../../../../types/notification';
-import { formatDate } from '../../../../lib/format';
+
+// On redéfinit le type localement pour s'aligner sur la vraie réponse du backend
+type NotificationItem = {
+  id: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+  type?: string | null;
+};
 
 export default function MemberNotificationsPage() {
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -17,8 +24,16 @@ export default function MemberNotificationsPage() {
   async function load() {
     setError(null);
     try {
-      const res = await api.listMyNotifications();
-      setItems(res?.items || []);
+      // ✅ CORRECTION ICI : On déclare proprement les deux formats possibles pour ESLint
+      const res = await api.listMyNotifications() as NotificationItem[] | { items: NotificationItem[] };
+      
+      if (Array.isArray(res)) {
+        setItems(res);
+      } else if (res && Array.isArray(res.items)) {
+        setItems(res.items);
+      } else {
+        setItems([]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement notifications');
     } finally {
@@ -52,6 +67,15 @@ export default function MemberNotificationsPage() {
     if (filter === 'read') return n.isRead;
     return true;
   });
+
+  // Petit helper pour formater la date
+  function formatDate(dateStr: string) {
+    const d = new Date(dateStr);
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    }).format(d);
+  }
 
   return (
     <AppShell title="Notifications">
