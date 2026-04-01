@@ -189,9 +189,20 @@ export class SuperAdminController {
     return this.service.deleteDocument(id, actor.associationId);
   }
 
-  /* ── CONTRIBUTIONS ── */
+/* ── CONTRIBUTIONS ── */
   @Get('contributions')
-  listContributions(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
-    return this.service.listAllContributions(actor.associationId, query.page, query.pageSize, query.status);
+  listContributions(
+    @CurrentUser() actor: AuthUser,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('status') status?: string,
+  ) {
+    // 🔥 On force la conversion en Nombre pour éviter que Prisma ne crashe en PROD
+    return this.service.listAllContributions(
+      actor.associationId,
+      Number(page) || 1,
+      Number(pageSize) || 100,
+      status
+    );
   }
-}
+} // 👈 LA VOICI ! C'est elle qui ferme la classe SuperAdminController
