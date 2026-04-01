@@ -35,13 +35,14 @@ const METHOD_MAP: Record<string, string> = {
 
 /* ══════════════════════════════════════════════════════ MODALE DE CRÉATION */
 
-function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('OTHER');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
+function CreateExpenseModal({ onClose, onSuccess, availableBalance }: { onClose: () => void; onSuccess: () => void; availableBalance: number }) {
+  const [amount, setAmount] = useState<string>('');
+  const [category, setCategory] = useState<string>('OTHER');
+  const [title, setTitle] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
+  const [expenseDate, setExpenseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [paymentMethod, setPaymentMethod] = useState<string>('CASH');
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,15 +50,29 @@ function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuc
     e.preventDefault();
     setSaving(true);
     setError(null);
+
+    const expenseAmount = Number(amount);
+
+    // Vérification stricte du solde
+    if (expenseAmount > availableBalance) {
+      setError(`Transaction impossible : Le montant (${formatCurrency(expenseAmount, 'EUR')}) excède le solde disponible de l'antenne (${formatCurrency(availableBalance, 'EUR')}).`);
+      setSaving(false);
+      return;
+    }
+
     try {
-      await api.createAntennaExpense({
-        amount: Number(amount),
+      const payload = {
+        amount: expenseAmount,
         category,
         title,
         description: description || undefined,
         expenseDate: new Date(expenseDate).toISOString(),
         paymentMethod: paymentMethod || 'OTHER',
-      });
+      };
+
+      // Typage strict pour éviter les erreurs ESLint (au lieu de `as any`)
+      await api.createAntennaExpense(payload as Parameters<typeof api.createAntennaExpense>[0]); 
+      
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création de la dépense.');
@@ -68,30 +83,34 @@ function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuc
   return (
     <div className="ae-modal-overlay" onClick={onClose}>
       <div className="ae-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="ae-modal-head">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+        <div className="ae-modal-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/>
+              </svg>
             </div>
-            <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>Nouvelle Dépense</h2>
+            <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0F172A', margin: 0 }}>
+              Nouvelle Dépense
+            </h2>
           </div>
           <button className="ae-modal-close" onClick={onClose} disabled={saving}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="ae-modal-body">
           {error && (
-            <div className="ae-error" style={{ marginBottom: '1rem' }}>
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-              {error}
+            <div className="ae-error">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+              <span>{error}</span>
             </div>
           )}
 
           <div className="ae-grid-2">
             <div className="ae-field">
               <label>Titre de la dépense <span>*</span></label>
-              <input className="ae-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Achat cartouches d'encre" required />
+              <input className="ae-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Ex: Achat fournitures" required />
             </div>
             <div className="ae-field">
               <label>Montant <span>*</span></label>
@@ -126,11 +145,11 @@ function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuc
           </div>
 
           <div className="ae-field">
-            <label>Description / Justification <span>(Optionnel)</span></label>
-            <textarea className="ae-input" style={{ minHeight: '80px', padding: '0.6rem 0.9rem', resize: 'vertical' }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Détails supplémentaires..." />
+            <label>Description / Justificatif <span>(Optionnel)</span></label>
+            <textarea className="ae-input" style={{ minHeight: '80px', padding: '0.75rem 1rem', resize: 'vertical' }} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Détails supplémentaires..." />
           </div>
 
-          <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+          <div className="ae-modal-footer">
             <button type="button" className="ae-btn-cancel" onClick={onClose} disabled={saving}>Annuler</button>
             <button type="submit" className="ae-btn-submit" disabled={saving}>
               {saving ? <><div className="ae-spinner" />Création...</> : 'Enregistrer la dépense'}
@@ -142,37 +161,25 @@ function CreateExpenseModal({ onClose, onSuccess }: { onClose: () => void; onSuc
   );
 }
 
-/* ══════════════════════════════════════════════════════ MODALE DE DÉTAILS */
+/* ══════════════════════════════════════════════════════ MODALE DE DÉTAILS (LECTURE SEULE) */
 
-function ExpenseDetailModal({ expense, onClose, onDeleted }: { expense: Expense; onClose: () => void; onDeleted: () => void }) {
-  const [deleting, setDeleting] = useState(false);
+function ExpenseDetailModal({ expense, onClose }: { expense: Expense; onClose: () => void; }) {
   const s = STATUS_MAP[expense.status] || { label: expense.status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
-
-  async function handleDelete() {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette dépense ?')) return;
-    setDeleting(true);
-    try {
-      await api.deleteAntennaExpense(expense.id);
-      onDeleted();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Erreur lors de la suppression');
-      setDeleting(false);
-    }
-  }
 
   return (
     <div className="ae-modal-overlay" onClick={onClose}>
       <div className="ae-modal" onClick={(e) => e.stopPropagation()}>
-        <div style={{ height: 4, background: `linear-gradient(90deg, ${s.color}, ${s.color}66)` }} />
-        <div className="ae-modal-head">
-          <div>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.65rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.2rem 0.6rem', marginBottom: '0.4rem', textTransform: 'uppercase' }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }} />{s.label}
-            </span>
-            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', margin: 0, lineHeight: 1.2 }}>{expense.title}</h2>
-          </div>
-          <button className="ae-modal-close" onClick={onClose}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        <div style={{ height: 5, background: `linear-gradient(90deg, ${s.color}, ${s.color}88)` }} />
+        
+        {/* Entête avec statut centré */}
+        <div className="ae-modal-head" style={{ flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.65rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.3rem 0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />{s.label}
+          </span>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#0F172A', marginTop: '0.75rem', marginBottom: 0, lineHeight: 1.2 }}>{expense.title}</h2>
+          
+          <button className="ae-modal-close" onClick={onClose} style={{ position: 'absolute', right: '1.25rem', top: '1.25rem' }}>
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
@@ -183,47 +190,43 @@ function ExpenseDetailModal({ expense, onClose, onDeleted }: { expense: Expense;
             </div>
           )}
 
-          <div className="ae-grid-2">
-            <div className="ae-info-box">
-              <span className="ae-info-lbl">Montant</span>
-              <span className="ae-info-val mono" style={{ fontSize: '1.1rem', color: s.color }}>{formatCurrency(expense.amount, expense.currency)}</span>
+          <div className="ae-details-sections">
+            <div className="ae-grid-2">
+              <div className="ae-detail-block">
+                <span className="ae-label">Montant</span>
+                <span className="ae-value mono" style={{ fontSize: '1.2rem', color: s.color }}>{formatCurrency(expense.amount, expense.currency)}</span>
+              </div>
+              <div className="ae-detail-block">
+                <span className="ae-label">Date de la dépense</span>
+                <span className="ae-value">{formatDate(expense.expenseDate)}</span>
+              </div>
+              <div className="ae-detail-block">
+                <span className="ae-label">Catégorie</span>
+                <span className="ae-value">{CATEGORY_MAP[expense.category] ?? expense.category}</span>
+              </div>
+              <div className="ae-detail-block">
+                <span className="ae-label">Méthode de paiement</span>
+                <span className="ae-value">{METHOD_MAP[expense.paymentMethod] ?? expense.paymentMethod}</span>
+              </div>
             </div>
-            <div className="ae-info-box">
-              <span className="ae-info-lbl">Date de la dépense</span>
-              <span className="ae-info-val">{formatDate(expense.expenseDate)}</span>
-            </div>
-            <div className="ae-info-box">
-              <span className="ae-info-lbl">Catégorie</span>
-              <span className="ae-info-val">{CATEGORY_MAP[expense.category] ?? expense.category}</span>
-            </div>
-            <div className="ae-info-box">
-              <span className="ae-info-lbl">Méthode de paiement</span>
-              <span className="ae-info-val">{METHOD_MAP[expense.paymentMethod] ?? expense.paymentMethod}</span>
-            </div>
-          </div>
 
-          <div className="ae-info-box" style={{ marginTop: '0.75rem' }}>
-            <span className="ae-info-lbl">Description / Justificatif</span>
-            <span className="ae-info-val" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{expense.description || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucune description fournie.</span>}</span>
-          </div>
-
-          <div className="ae-grid-2" style={{ marginTop: '0.75rem' }}>
-            <div className="ae-info-box">
-              <span className="ae-info-lbl">Engagée par</span>
-              <span className="ae-info-val">{expense.engagedByUser ? `${expense.engagedByUser.firstName} ${expense.engagedByUser.lastName}` : '—'}</span>
+            <div className="ae-detail-block full-width">
+              <span className="ae-label">Description / Justificatif</span>
+              <span className="ae-value" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+                {expense.description || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucune description fournie.</span>}
+              </span>
             </div>
-            <div className="ae-info-box">
-              <span className="ae-info-lbl">ID Dépense</span>
-              <span className="ae-info-val mono" style={{ fontSize: '0.75rem', color: '#6B7280' }}>{expense.id}</span>
-            </div>
-          </div>
 
-          <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid #E5E7EB', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            {expense.status !== 'VALIDATED' && (
-              <button className="ae-btn-del" disabled={deleting} onClick={handleDelete}>
-                {deleting ? 'Suppression...' : 'Supprimer cette dépense'}
-              </button>
-            )}
+            <div className="ae-grid-2">
+              <div className="ae-detail-block">
+                <span className="ae-label">Engagée par</span>
+                <span className="ae-value">{expense.engagedByUser ? `${expense.engagedByUser.firstName} ${expense.engagedByUser.lastName}` : '—'}</span>
+              </div>
+              <div className="ae-detail-block">
+                <span className="ae-label">ID Dépense</span>
+                <span className="ae-value mono" style={{ fontSize: '0.75rem', color: '#64748B', wordBreak: 'break-all' }}>{expense.id}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -241,8 +244,33 @@ export default function AntennaAdminExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [availableBalance, setAvailableBalance] = useState(0);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+
+  // Calcule le solde disponible (Entrées validées - Sorties validées)
+  const fetchBalance = async () => {
+    try {
+      const [contribsRes, expensesRes] = await Promise.all([
+        api.listAntennaContributions({ page: 1, pageSize: 1000, status: 'VALIDATED' }),
+        api.listAntennaExpenses({ page: 1, pageSize: 1000, status: 'VALIDATED' })
+      ]);
+      
+      // Utilisation d'un type local pour corriger l'erreur "any"
+      type ApiItem = { amount: number | string };
+      type ApiResponse = { items?: ApiItem[] };
+
+      const incomeList = Array.isArray(contribsRes) ? contribsRes : (contribsRes as unknown as ApiResponse)?.items ?? [];
+      const expenseList = Array.isArray(expensesRes) ? expensesRes : (expensesRes as unknown as ApiResponse)?.items ?? [];
+
+      const totalIncome = incomeList.reduce((acc, curr) => acc + Number(curr.amount), 0);
+      const totalSpent = expenseList.reduce((acc, curr) => acc + Number(curr.amount), 0);
+      
+      setAvailableBalance(totalIncome - totalSpent);
+    } catch (err) {
+      console.error('Erreur lors du calcul du solde:', err);
+    }
+  };
 
   const load = useCallback(async (search = q, st = status, cat = category) => {
     setLoading(true);
@@ -250,6 +278,7 @@ export default function AntennaAdminExpensesPage() {
     try {
       const res = await api.listAntennaExpenses({ page: 1, pageSize: 100, q: search, status: st, category: cat });
       setItems(res.items);
+      await fetchBalance();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement des dépenses.');
     } finally {
@@ -265,115 +294,126 @@ export default function AntennaAdminExpensesPage() {
   return (
     <AppShell title="Dépenses de l'antenne">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@500;600&family=Inter:wght@400;500;600;700&display=swap');
 
-        .ae-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1200px; margin: 0 auto; }
+        .ae-wrap { font-family: 'DM Sans', 'Inter', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 1200px; margin: 0 auto; }
         
-        .ae-header { margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.04s cubic-bezier(.22,1,.36,1) forwards; }
-        .ae-eyebrow { font-size: 0.67rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
-        .ae-eyebrow-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; animation: aepulse 2s ease-in-out infinite; }
-        @keyframes aepulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        .ae-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 700; color: #111827; letter-spacing: -0.02em; line-height: 1.15; }
-        .ae-title span { background: linear-gradient(135deg, #1D4ED8, #3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .ae-header { margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s cubic-bezier(.22,1,.36,1) forwards; }
+        .ae-eyebrow { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem; }
+        .ae-eyebrow-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; }
+        .ae-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 700; color: #0F172A; letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
+        .ae-title span { color: #2563EB; }
 
-        .ae-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards; }
-        .ae-stat { background: rgba(253,253,255,0.9); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(37,99,235,0.09); border-top: 3px solid; padding: 1.1rem 1.25rem; box-shadow: 0 4px 12px rgba(37,99,235,0.04); }
-        .ae-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.85rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
-        .ae-stat-lbl { font-size: 0.65rem; font-weight: 800; color: #6B7280; text-transform: uppercase; letter-spacing: 0.08em; }
+        .ae-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.05s cubic-bezier(.22,1,.36,1) forwards; }
+        .ae-stat { background: white; border-radius: 16px; border: 1px solid #E2E8F0; padding: 1.25rem 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: center; }
+        .ae-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: 0.4rem; color: #0F172A; }
+        .ae-stat-lbl { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }
 
-        .ae-panel { background: rgba(253,253,255,0.94); backdrop-filter: blur(14px); border-radius: 22px; border: 1px solid rgba(37,99,235,0.1); box-shadow: 0 4px 20px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.8) inset; overflow: hidden; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.12s cubic-bezier(.22,1,.36,1) forwards; }
-        .ae-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid rgba(37,99,235,0.08); display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; background: rgba(239,246,255,0.3); }
-        .ae-panel-titlerow { display: flex; align-items: center; gap: 0.55rem; }
-        .ae-panel-ico { width: 30px; height: 30px; border-radius: 8px; background: linear-gradient(135deg, #1D4ED8, #2563EB); display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 3px 8px rgba(37,99,235,0.25); }
-        .ae-panel-title { font-size: 0.78rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: #1E3A8A; }
+        .ae-panel { background: white; border-radius: 20px; border: 1px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); overflow: hidden; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards; }
+        
+        .ae-panel-head { padding: 1.25rem 1.5rem; border-bottom: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; background: #F8FAFC; }
+        .ae-panel-titlerow { display: flex; align-items: center; gap: 0.6rem; }
+        .ae-panel-ico { width: 36px; height: 36px; border-radius: 10px; background: #2563EB; display: flex; align-items: center; justify-content: center; color: white; box-shadow: 0 4px 10px rgba(37,99,235,0.2); }
+        .ae-panel-title { font-size: 0.9rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #0F172A; }
 
-        .ae-new-btn { height: 40px; padding: 0 1.25rem; border-radius: 11px; background: linear-gradient(135deg, #1D4ED8, #3B82F6); border: none; color: white; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.84rem; font-weight: 800; display: flex; align-items: center; gap: 0.45rem; box-shadow: 0 4px 14px rgba(37,99,235,0.25); transition: all 0.2s; white-space: nowrap; }
-        .ae-new-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,0.35); }
+        .ae-new-btn { height: 42px; padding: 0 1.25rem; border-radius: 10px; background: #2563EB; border: none; color: white; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(37,99,235,0.2); transition: all 0.2s; }
+        .ae-new-btn:hover { background: #1D4ED8; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37,99,235,0.3); }
 
-        .ae-toolbar { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; padding: 1rem 1.4rem; border-bottom: 1px solid rgba(37,99,235,0.06); }
-        .ae-filter-field { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 180px; }
-        .ae-filter-lbl { font-size: 0.68rem; font-weight: 800; color: #4B5563; letter-spacing: 0.06em; text-transform: uppercase; }
-        .ae-filter-input, .ae-filter-select { height: 42px; border-radius: 10px; border: 1px solid rgba(37,99,235,0.15); background: white; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; color: #111827; outline: none; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; box-sizing: border-box; }
-        .ae-filter-input:focus, .ae-filter-select:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .ae-toolbar { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; padding: 1.25rem 1.5rem; border-bottom: 1px solid #F1F5F9; }
+        .ae-filter-field { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; min-width: 180px; }
+        .ae-filter-lbl { font-size: 0.65rem; font-weight: 800; color: #475569; letter-spacing: 0.05em; text-transform: uppercase; }
+        .ae-filter-input, .ae-filter-select { height: 44px; border-radius: 10px; border: 1px solid #CBD5E1; background: white; padding: 0 1rem; font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 500; color: #0F172A; outline: none; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; box-sizing: border-box; }
+        .ae-filter-input:focus, .ae-filter-select:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         .ae-filter-select { appearance: none; padding-right: 2.2rem; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.8rem center; cursor: pointer; }
 
+        /* Styles Tableau Bureau (Desktop) */
         .ae-table { width: 100%; border-collapse: collapse; }
-        .ae-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.1); }
-        .ae-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: #6B7280; background: rgba(239,246,255,0.2); text-align: left; white-space: nowrap; }
-        .ae-row { border-bottom: 1px solid rgba(37,99,235,0.06); transition: background 0.15s; cursor: pointer; }
-        .ae-row:hover { background: rgba(37,99,235,0.03); }
+        .ae-table thead tr { border-bottom: 1px solid #E2E8F0; }
+        .ae-table th { padding: 1rem 1.5rem; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #64748B; background: #F8FAFC; text-align: left; white-space: nowrap; }
+        .ae-row { border-bottom: 1px solid #F1F5F9; transition: background 0.15s; cursor: pointer; }
+        .ae-row:hover { background: #F8FAFC; }
         .ae-row:last-child { border-bottom: none; }
-        .ae-table td { padding: 0.95rem 1.4rem; font-size: 0.84rem; color: #1F2937; vertical-align: middle; }
-        .ae-td-title { font-weight: 800; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
-        .ae-td-cat { font-size: 0.72rem; color: #6B7280; font-weight: 600; margin-top: 0.2rem; }
-        .ae-td-amount { font-family: 'DM Mono', monospace; font-weight: 800; font-size: 0.9rem; }
-        .ae-td-date { font-size: 0.78rem; font-weight: 600; color: #6B7280; }
+        .ae-table td { padding: 1rem 1.5rem; font-size: 0.85rem; color: #1E293B; vertical-align: middle; }
+        .ae-td-title { font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; font-size: 0.95rem; }
+        .ae-td-cat { font-size: 0.75rem; color: #64748B; font-weight: 500; margin-top: 0.2rem; }
+        .ae-td-amount { font-family: 'DM Mono', monospace; font-weight: 700; font-size: 1rem; }
+        .ae-td-date { font-size: 0.8rem; font-weight: 500; color: #475569; }
 
-        /* ── MODALE STYLES ── */
-        .ae-modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: aefade 0.2s ease; }
-        .ae-modal { background: white; width: 100%; max-width: 540px; border-radius: 24px; box-shadow: 0 24px 60px rgba(0,0,0,0.15); overflow: hidden; animation: aescale 0.3s cubic-bezier(.22,1,.36,1); display: flex; flex-direction: column; max-height: 90vh; }
-        .ae-modal-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem 1.5rem; border-bottom: 1px solid #F3F4F6; background: rgba(248,250,252,0.5); }
-        .ae-modal-close { background: white; border: 1px solid #E5E7EB; width: 34px; height: 34px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #6B7280; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .ae-modal-close:hover { background: #F3F4F6; color: #111827; }
-        .ae-modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        /* ── CORRECTIONS MOBILE : Cartes Fintech Épurées ── */
+        .ae-cards-mobile { display: none; }
 
-        .ae-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; margin-bottom: 1.25rem; }
+        @media (max-width: 768px) {
+            .hide-mobile { display: none !important; }
+            .ae-table { display: none; } 
+            
+            .ae-stats { grid-template-columns: 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+            .ae-stat { padding: 1rem; flex-direction: row; justify-content: space-between; align-items: center; border-top: 1px solid #E2E8F0; border-left: 4px solid; }
+
+            .ae-cards-mobile { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: #F8FAFC; }
+
+            .ae-m-card { display: flex; align-items: center; gap: 1rem; background: white; padding: 1rem; border-radius: 16px; border: 1px solid #E2E8F0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+            .ae-m-card:active { transform: scale(0.98); }
+            
+            .ae-m-icon { width: 44px; height: 44px; border-radius: 12px; background: #F1F5F9; color: #64748B; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+            
+            .ae-m-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+            .ae-m-title { font-weight: 700; font-size: 0.95rem; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .ae-m-date { font-size: 0.75rem; font-weight: 500; color: #64748B; }
+            
+            .ae-m-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.35rem; flex-shrink: 0; }
+            .ae-m-amount { font-family: 'DM Mono', monospace; font-weight: 700; font-size: 1rem; color: #0F172A; }
+
+            .ae-toolbar { flex-wrap: nowrap; gap: 0.5rem; padding: 1rem; overflow-x: auto; scrollbar-width: none; }
+            .ae-toolbar::-webkit-scrollbar { display: none; }
+            .ae-filter-field { min-width: 0; flex: 1; }
+            .ae-filter-lbl { font-size: 0.55rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .ae-filter-input, .ae-filter-select { height: 40px; font-size: 0.8rem; padding: 0 0.75rem; }
+            .ae-filter-select { padding-right: 1.8rem; background-position: right 0.5rem center; background-size: 10px; }
+        }
+
+        /* ── MODALES (Correction fusion textes) ── */
+        .ae-modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(15,23,42,0.5); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: aefade 0.2s ease; }
+        .ae-modal { background: white; width: 100%; max-width: 520px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; animation: aescale 0.3s cubic-bezier(.22,1,.36,1); display: flex; flex-direction: column; max-height: calc(100vh - 2rem); position: relative; }
         
-        .ae-field { display: flex; flex-direction: column; gap: 0.35rem; }
-        .ae-field label { font-size: 0.68rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #1D4ED8; }
-        .ae-field label span { color: #9CA3AF; text-transform: none; font-weight: 500; font-size: 0.6rem; margin-left: 0.2rem; }
-        .ae-input, .ae-select { width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid #D1D5DB; background: #F9FAFB; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 600; color: #111827; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
-        .ae-input:focus, .ae-select:focus { border-color: #2563EB; background: white; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        .ae-input.mono { font-family: 'DM Mono', monospace; font-size: 0.95rem; }
+        .ae-modal-head { padding: 1.25rem 1.5rem; border-bottom: 1px solid #F1F5F9; background: white; }
+        .ae-modal-close { background: white; border: 1px solid #E2E8F0; width: 34px; height: 34px; border-radius: 50%; display: flex; justify-content: center; align-items: center; cursor: pointer; color: #64748B; transition: all 0.2s; }
+        .ae-modal-close:hover { background: #F1F5F9; color: #0F172A; }
+        
+        .ae-modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        
+        .ae-details-sections { display: flex; flex-direction: column; gap: 0.75rem; }
+        .ae-detail-block { background: white; border: 1px solid #E2E8F0; border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+        .ae-label { font-size: 0.65rem; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em; display: block; }
+        .ae-value { font-size: 0.9rem; font-weight: 600; color: #0F172A; display: block; }
+
+        .ae-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+        .full-width { grid-column: 1 / -1; }
+
+        .ae-field { display: flex; flex-direction: column; gap: 0.4rem; }
+        .ae-field label { font-size: 0.75rem; font-weight: 700; color: #1E293B; }
+        .ae-field label span { color: #DC2626; margin-left: 0.2rem; }
+        .ae-input, .ae-select { width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid #CBD5E1; background: white; padding: 0 1rem; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 500; color: #0F172A; outline: none; transition: border-color 0.2s; box-sizing: border-box; }
+        .ae-input:focus, .ae-select:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        .ae-input.mono { font-family: 'DM Mono', monospace; font-size: 1rem; font-weight: 600; }
         .ae-select { appearance: none; padding-right: 2.2rem; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.8rem center; cursor: pointer; }
 
-        .ae-info-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 0.8rem 1rem; display: flex; flex-direction: column; gap: 0.2rem; }
-        .ae-info-lbl { font-size: 0.62rem; font-weight: 800; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; }
-        .ae-info-val { font-size: 0.88rem; font-weight: 700; color: #111827; }
+        .ae-modal-footer { padding: 1.25rem 1.5rem; border-top: 1px solid #F1F5F9; display: flex; justify-content: flex-end; gap: 0.75rem; background: white; }
+        
+        .ae-btn-submit { height: 44px; padding: 0 1.5rem; border-radius: 10px; background: #2563EB; border: none; color: white; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600; box-shadow: 0 4px 12px rgba(37,99,235,0.2); display: flex; align-items: center; gap: 0.5rem; transition: background 0.2s; }
+        .ae-btn-submit:hover:not(:disabled) { background: #1D4ED8; }
+        .ae-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
+        
+        .ae-btn-cancel { height: 44px; padding: 0 1.25rem; border-radius: 10px; background: white; border: 1px solid #CBD5E1; color: #475569; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600; transition: background 0.2s; }
+        .ae-btn-cancel:hover:not(:disabled) { background: #F8FAFC; color: #0F172A; }
 
-        .ae-btn-submit { height: 44px; padding: 0 1.4rem; border-radius: 11px; background: linear-gradient(135deg, #1D4ED8, #2563EB); border: none; color: white; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 800; box-shadow: 0 4px 14px rgba(37,99,235,0.25); display: flex; align-items: center; gap: 0.5rem; transition: transform 0.15s; }
-        .ae-btn-submit:hover:not(:disabled) { transform: translateY(-1px); }
-        .ae-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-        .ae-btn-cancel { height: 44px; padding: 0 1.25rem; border-radius: 11px; background: white; border: 1px solid #D1D5DB; color: #4B5563; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700; transition: background 0.15s; }
-        .ae-btn-cancel:hover:not(:disabled) { background: #F3F4F6; }
-        .ae-btn-del { height: 44px; padding: 0 1.25rem; border-radius: 11px; background: rgba(254,242,242,0.6); border: 1px solid rgba(220,38,38,0.2); color: #DC2626; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700; transition: background 0.15s; }
-        .ae-btn-del:hover:not(:disabled) { background: #FEE2E2; }
-
-        .ae-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: aespin 0.7s linear infinite; }
-        .ae-error { display: flex; align-items: center; gap: 0.6rem; padding: 0.8rem 1rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; color: #B91C1C; font-size: 0.8rem; font-weight: 700; }
-        .ae-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: 0.75rem; color: #6B7280; font-size: 0.85rem; font-weight: 700; }
-        .ae-ring { width: 24px; height: 24px; border: 2.5px solid rgba(37,99,235,0.12); border-top-color: #2563EB; border-radius: 50%; animation: aespin 0.8s linear infinite; }
-
-        /* ── CORRECTIONS MOBILE (Zéro scroll, cartes alignées, filtres alignés) ── */
-        @media (max-width: 768px) {
-          .hide-mobile { display: none !important; }
-          .ae-grid-2 { grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
-          
-          /* Cartes sur la même ligne */
-          .ae-stats { gap: 0.4rem; grid-template-columns: repeat(3, 1fr); }
-          .ae-stat { padding: 0.6rem 0.3rem; border-radius: 12px; text-align: center; }
-          .ae-stat-val { font-size: 1.1rem; }
-          .ae-stat-lbl { font-size: 0.55rem; }
-
-          /* Filtres sur la même ligne avec scroll horizontal doux si besoin */
-          .ae-toolbar { flex-wrap: nowrap; gap: 0.4rem; padding: 0.8rem 0.5rem; overflow-x: auto; scrollbar-width: none; }
-          .ae-toolbar::-webkit-scrollbar { display: none; }
-          .ae-filter-field { min-width: 0; flex: 1; }
-          .ae-filter-lbl { font-size: 0.5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-          .ae-filter-input, .ae-filter-select { height: 36px; font-size: 0.75rem; padding: 0 0.4rem; }
-          .ae-filter-select { padding-right: 1.2rem; background-position: right 0.3rem center; background-size: 10px; }
-
-          /* Pas de scroll horizontal tableau */
-          .ae-table th, .ae-table td { padding: 0.6rem 0.4rem; }
-          .ae-td-title { max-width: 130px; font-size: 0.8rem; }
-          .ae-td-cat { font-size: 0.65rem; }
-          .ae-td-amount { font-size: 0.75rem; }
-          .ae-status { font-size: 0.55rem !important; padding: 0.15rem 0.3rem !important; }
-        }
+        .ae-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: aespin 0.8s linear infinite; }
+        .ae-error { display: flex; align-items: center; gap: 0.5rem; padding: 0.85rem 1rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; color: #B91C1C; font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
+        .ae-loader { display: flex; align-items: center; justify-content: center; padding: 4rem; gap: 0.75rem; color: #64748B; font-size: 0.9rem; font-weight: 600; }
+        .ae-ring { width: 24px; height: 24px; border: 2.5px solid rgba(37,99,235,0.2); border-top-color: #2563EB; border-radius: 50%; animation: aespin 0.8s linear infinite; }
 
         @keyframes aein { to { opacity: 1; transform: translateY(0); } }
         @keyframes aefade { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes aescale { from { opacity: 0; transform: scale(0.95) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+        @keyframes aescale { from { opacity: 0; transform: scale(0.96) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         @keyframes aespin { to { transform: rotate(360deg); } }
       `}</style>
 
@@ -384,15 +424,15 @@ export default function AntennaAdminExpensesPage() {
         </div>
 
         <div className="ae-stats">
-          <div className="ae-stat" style={{ borderTopColor: '#2563EB' }}>
+          <div className="ae-stat" style={{ borderLeftColor: '#2563EB' }}>
             <div className="ae-stat-val" style={{ color: '#1E3A8A' }}>{items.length}</div>
             <div className="ae-stat-lbl">Enregistrées</div>
           </div>
-          <div className="ae-stat" style={{ borderTopColor: '#059669' }}>
+          <div className="ae-stat" style={{ borderLeftColor: '#059669' }}>
             <div className="ae-stat-val" style={{ color: '#047857' }}>{formatCurrency(totalAmount, items[0]?.currency || 'EUR')}</div>
             <div className="ae-stat-lbl">Total Validé</div>
           </div>
-          <div className="ae-stat" style={{ borderTopColor: '#D97706' }}>
+          <div className="ae-stat" style={{ borderLeftColor: '#D97706' }}>
             <div className="ae-stat-val" style={{ color: '#B45309' }}>{pendingCount}</div>
             <div className="ae-stat-lbl">En attente</div>
           </div>
@@ -402,13 +442,13 @@ export default function AntennaAdminExpensesPage() {
           <div className="ae-panel-head">
             <div className="ae-panel-titlerow">
               <div className="ae-panel-ico">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
               </div>
               <span className="ae-panel-title">Historique</span>
             </div>
             <button className="ae-new-btn" onClick={() => setIsCreateOpen(true)}>
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-              <span className="hide-mobile" style={{ marginLeft: 4 }}>Nouvelle dépense</span>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+              <span className="hide-mobile">Nouvelle dépense</span>
             </button>
           </div>
 
@@ -438,57 +478,87 @@ export default function AntennaAdminExpensesPage() {
           </div>
 
           {error && (
-            <div className="ae-error" style={{ margin: '1rem 1.4rem' }}>
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+            <div className="ae-error" style={{ margin: '1rem 1.5rem' }}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
               {error}
             </div>
           )}
 
           {loading ? (
-            <div className="ae-loader"><div className="ae-ring" />Chargement des dépenses...</div>
+            <div className="ae-loader"><div className="ae-ring" />Chargement...</div>
           ) : items.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#9CA3AF' }}>
-              <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 0.5rem', opacity: 0.5 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-              <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#4B5563' }}>Aucune dépense trouvée</div>
+            <div style={{ textAlign: 'center', padding: '4rem 1rem', color: '#9CA3AF' }}>
+              <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5" style={{ margin: '0 auto 0.75rem', opacity: 0.5 }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#64748B' }}>Aucune dépense trouvée</div>
             </div>
           ) : (
-            <table className="ae-table">
-              <thead>
-                <tr>
-                  <th>Motif</th>
-                  <th className="hide-mobile">Date</th>
-                  <th>Montant</th>
-                  <th>Statut</th>
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* Tableau Bureau */}
+              <table className="ae-table">
+                <thead>
+                  <tr>
+                    <th>Motif / Catégorie</th>
+                    <th className="hide-mobile">Date</th>
+                    <th>Montant</th>
+                    <th>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((expense) => {
+                    const s = STATUS_MAP[expense.status] || { label: expense.status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
+                    return (
+                      <tr key={expense.id} className="ae-row" onClick={() => setSelectedExpense(expense)}>
+                        <td>
+                          <div className="ae-td-title">{expense.title}</div>
+                          <div className="ae-td-cat">{CATEGORY_MAP[expense.category] ?? expense.category}</div>
+                        </td>
+                        <td className="hide-mobile"><span className="ae-td-date">{formatDate(expense.expenseDate)}</span></td>
+                        <td><span className="ae-td-amount" style={{ color: s.color }}>{formatCurrency(expense.amount, expense.currency)}</span></td>
+                        <td>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.65rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.2rem 0.6rem', whiteSpace: 'nowrap', textTransform: 'uppercase' }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />
+                            {s.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Design Mobile Fintech Épuré */}
+              <div className="ae-cards-mobile">
                 {items.map((expense) => {
                   const s = STATUS_MAP[expense.status] || { label: expense.status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
                   return (
-                    <tr key={expense.id} className="ae-row" onClick={() => setSelectedExpense(expense)}>
-                      <td>
-                        <div className="ae-td-title">{expense.title}</div>
-                        <div className="ae-td-cat">{CATEGORY_MAP[expense.category] ?? expense.category}</div>
-                      </td>
-                      <td className="hide-mobile"><span className="ae-td-date">{formatDate(expense.expenseDate)}</span></td>
-                      <td><span className="ae-td-amount" style={{ color: s.color }}>{formatCurrency(expense.amount, expense.currency)}</span></td>
-                      <td>
-                        <span className="ae-status" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.62rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.15rem 0.5rem', whiteSpace: 'nowrap' }}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }} />
+                    <div key={expense.id} className="ae-m-card" onClick={() => setSelectedExpense(expense)}>
+                      <div className="ae-m-icon">
+                        <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                      </div>
+                      <div className="ae-m-body">
+                        <div className="ae-m-title">{expense.title}</div>
+                        <div className="ae-m-date">{formatDate(expense.expenseDate)}</div>
+                      </div>
+                      <div className="ae-m-right">
+                        <div className="ae-m-amount" style={{ color: s.color }}>{formatCurrency(expense.amount, expense.currency)}</div>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', fontSize: '0.55rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.15rem 0.4rem', textTransform: 'uppercase' }}>
+                          <span style={{ width: 4, height: 4, borderRadius: '50%', background: s.color }} />
                           {s.label}
                         </span>
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
       </div>
 
+      {/* Gestion des modales */}
       {isCreateOpen && (
         <CreateExpenseModal
+          availableBalance={availableBalance}
           onClose={() => setIsCreateOpen(false)}
           onSuccess={() => { setIsCreateOpen(false); void load(); }}
         />
@@ -498,7 +568,6 @@ export default function AntennaAdminExpensesPage() {
         <ExpenseDetailModal
           expense={selectedExpense}
           onClose={() => setSelectedExpense(null)}
-          onDeleted={() => { setSelectedExpense(null); void load(); }}
         />
       )}
     </AppShell>

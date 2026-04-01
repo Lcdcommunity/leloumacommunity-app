@@ -4,334 +4,271 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
-import type { AuditItem } from '../../../../types/audit';
 import { formatDate } from '../../../../lib/format';
 
-/* ══════════════════════════════════════════════════════ ACTION PILL */
-type ActionTone = 'delete' | 'create' | 'update' | 'default';
-
-function actionTone(action: string): ActionTone {
-  const a = action.toUpperCase();
-  if (a.includes('DELETE') || a.includes('REMOVE')) return 'delete';
-  if (a.includes('CREATE') || a.includes('ADD')    || a.includes('UPLOAD')) return 'create';
-  if (a.includes('UPDATE') || a.includes('EDIT')   || a.includes('PATCH'))  return 'update';
-  return 'default';
+/* ══════════════════════════════════════════════════════ TYPES */
+interface ExtendedAuditItem {
+  id: string;
+  action: string;
+  entity?: string;
+  entityId?: string | null;
+  details?: Record<string, unknown> | null; 
+  createdAt: string;
+  actorUser?: { firstName: string; lastName: string } | null;
+  antenna?: { name: string } | null;
+  targetModel?: string | null;
+  targetId?: string | null;
+  summary?: string | null;
 }
 
-const ACTION_TONE: Record<ActionTone, { color: string; bg: string; border: string }> = {
-  delete:  { color: '#DC2626', bg: 'rgba(254,242,242,.8)',  border: 'rgba(220,38,38,.25)'  },
-  create:  { color: '#059669', bg: 'rgba(236,253,245,.8)',  border: 'rgba(5,150,105,.22)'  },
-  update:  { color: '#D97706', bg: 'rgba(255,251,235,.8)',  border: 'rgba(217,119,6,.22)'  },
-  default: { color: '#2563EB', bg: 'rgba(239,246,255,.8)',  border: 'rgba(37,99,235,.2)'   },
+/* ══════════════════════════════════════════════════════ ACTION PILL */
+const ACTION_THEMES: Record<string, { color: string; bg: string; border: string; label: string }> = {
+  CREATE: { color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', label: 'Création' },
+  UPDATE: { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', label: 'Modif.' },
+  DELETE: { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', label: 'Suppr.' },
+  LOGIN_SUCCESS: { color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', label: 'Connexion' },
+  APPROVE_ACCOUNT: { color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', label: 'Approbation' },
+  VALIDATE_CONTRIBUTION: { color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', label: 'Validation' },
+  DEFAULT: { color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', label: 'Action' },
 };
 
 function ActionPill({ action }: { action: string }) {
-  const t = ACTION_TONE[actionTone(action)];
+  const theme = ACTION_THEMES[action] || ACTION_THEMES.DEFAULT;
   return (
     <span style={{
-      display: 'inline-block', padding: '.2rem .55rem', borderRadius: 7,
-      fontFamily: "'DM Mono',monospace", fontSize: '.72rem', fontWeight: 700,
-      background: t.bg, border: `1px solid ${t.border}`, color: t.color,
-      whiteSpace: 'nowrap',
+      display: 'inline-flex', alignItems: 'center', padding: '.2rem .5rem', borderRadius: 6,
+      fontFamily: "'DM Sans', sans-serif", fontSize: '.68rem', fontWeight: 800,
+      background: theme.bg, border: `1px solid ${theme.border}`, color: theme.color,
+      textTransform: 'uppercase', letterSpacing: '0.02em'
     }}>
-      {action}
+      {theme.label}
     </span>
   );
 }
 
-/* ══════════════════════════════════════════════════════ SKELETON ROW */
-function SkeletonRow() {
-  const skel = (w: number) => (
-    <div style={{
-      height: 13, width: w, borderRadius: 6,
-      background: 'linear-gradient(90deg,#F0F4F8 25%,#FAFBFC 50%,#F0F4F8 75%)',
-      backgroundSize: '200% 100%', animation: 'sashimmer 1.4s infinite',
-    }} />
-  );
-  return (
-    <tr>
-      <td style={{ padding: '.9rem 1.2rem' }}>{skel(96)}</td>
-      <td style={{ padding: '.9rem 1.2rem' }}>{skel(130)}</td>
-      <td style={{ padding: '.9rem 1.2rem' }}>{skel(220)}</td>
-      <td style={{ padding: '.9rem 1.2rem' }}>{skel(100)}</td>
-    </tr>
-  );
+/* ══════════════════════════════════════════════════════ LOGIC: STYLED DESCRIPTION */
+function getAuditDescription(item: ExtendedAuditItem): React.ReactNode {
+  // Nom et Prénom en BLEU et en Gras
+  const actorNode = item.actorUser ? (
+    <span className="sau-actor-name">{`${item.actorUser.firstName} ${item.actorUser.lastName}`}</span>
+  ) : <span className="sau-normal-text">Système</span>;
+  
+  const entityName = item.entity || item.targetModel || 'élément';
+
+  switch (item.action) {
+    case 'LOGIN_SUCCESS':
+      return <>{actorNode} <span className="sau-normal-text">s&apos;est connecté à la plateforme.</span></>;
+    
+    case 'UPDATE':
+      const fields = item.details?.updatedFields;
+      let fieldNodeList: React.ReactNode = 'des informations';
+      
+      if (Array.isArray(fields) && fields.length > 0) {
+        // 🔥 Correction : On type 'field' en 'unknown' pour éviter l'erreur 'any'
+        fieldNodeList = fields.map((field: unknown, index: number) => (
+          <span key={index} className="sau-mono-inline">
+            {String(field)}{index < fields.length - 1 ? ', ' : ''}
+          </span>
+        ));
+      }
+      return (
+        <>
+          {actorNode} <span className="sau-normal-text">a modifié [</span> {fieldNodeList} <span className="sau-normal-text">] sur</span> {entityName}.
+        </>
+      );
+      
+    case 'CREATE':
+      return <>{actorNode} <span className="sau-normal-text">a créé un nouveau dossier</span> {entityName}.</>;
+    case 'APPROVE_ACCOUNT':
+      return <>{actorNode} <span className="sau-normal-text">a approuvé un compte membre.</span></>;
+    case 'VALIDATE_CONTRIBUTION':
+      return <>{actorNode} <span className="sau-normal-text">a validé une cotisation.</span></>;
+    case 'DELETE':
+      return <>{actorNode} <span className="sau-normal-text">a supprimé</span> {entityName}.</>;
+    default:
+      return <>{actorNode} <span className="sau-normal-text">action :</span> {item.action} <span className="sau-normal-text">sur</span> {entityName}.</>;
+  }
 }
 
 /* ══════════════════════════════════════════════════════ PAGE */
 export default function SuperAdminAuditPage() {
-  const [items,   setItems]   = useState<AuditItem[]>([]);
-  const [action,  setAction]  = useState('');
-  const [error,   setError]   = useState<string | null>(null);
+  const [items, setItems] = useState<ExtendedAuditItem[]>([]);
+  const [actionFilter, setActionFilter] = useState('');
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async (filter?: string) => {
-    setLoading(true); setError(null);
+    setLoading(true);
     try {
       const res = await api.listAudit({
-        action: (filter ?? action) || undefined,
+        action: filter || undefined,
         page: 1, pageSize: 100,
       });
-      setItems(res.items);
+      setItems(res.items as unknown as ExtendedAuditItem[]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      console.error(err);
     } finally {
       setLoading(false);
     }
-  }, [action]);
+  }, []);
 
-  useEffect(() => { void load(''); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [load]);
 
-  function handleClear() { setAction(''); void load(''); }
-
-  /* stats */
   const uniqueActions = new Set(items.map(i => i.action)).size;
-  const today         = new Date().toDateString();
-  const todayCount    = items.filter(i => new Date(i.createdAt).toDateString() === today).length;
-  const deleteCount   = items.filter(i => actionTone(i.action) === 'delete').length;
-
-  const thStyle: React.CSSProperties = {
-    padding: '.75rem 1.2rem', fontSize: '.63rem', fontWeight: 900,
-    letterSpacing: '.11em', textTransform: 'uppercase', color: '#374151',
-    background: 'rgba(254,242,242,.35)', textAlign: 'left', whiteSpace: 'nowrap',
-  };
-  const tdStyle: React.CSSProperties = {
-    padding: '.9rem 1.2rem', fontSize: '.82rem', color: '#111827', verticalAlign: 'middle',
-  };
+  const todayCount    = items.filter(i => new Date(i.createdAt).toDateString() === new Date().toDateString()).length;
+  const deleteCount   = items.filter(i => i.action === 'DELETE').length;
 
   return (
     <AppShell title="Journal d'audit">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
-        .sau-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1200px;margin:0 auto}
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+        
+        .sau-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 1100px; margin: 0 auto; }
+        .sau-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.8rem, 4vw, 2.2rem); font-weight: 700; color: #111827; margin-bottom: 1.5rem; }
+        .sau-title span { color: #DC2626; }
 
-        /* Header */
-        .sau-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:sauin .5s .04s cubic-bezier(.22,1,.36,1) forwards;display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem}
-        .sau-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
-        .sau-dot{width:6px;height:6px;background:#EF4444;border-radius:50%;animation:saupulse 2s ease-in-out infinite}
-        @keyframes saupulse{0%,100%{opacity:1}50%{opacity:.3}}
-        .sau-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
-        .sau-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .sau-sub{font-size:.8rem;font-weight:600;color:#6B7280;margin-top:.25rem}
-        .sau-live{display:inline-flex;align-items:center;gap:.45rem;background:rgba(220,38,38,.07);border:1px solid rgba(220,38,38,.18);border-radius:99px;padding:.4rem .9rem;font-size:.72rem;font-weight:800;color:#B91C1C;white-space:nowrap;align-self:flex-start}
-        .sau-live-dot{width:7px;height:7px;border-radius:50%;background:#DC2626;box-shadow:0 0 8px rgba(220,38,38,.6);animation:saupulse 2s infinite}
+        /* Stats - Une seule ligne mobile */
+        .sau-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1.25rem; }
+        .sau-stat { background: white; border-radius: 14px; border: 1px solid #F1F5F9; border-top: 3px solid; padding: 0.7rem 0.4rem; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
+        .sau-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.4rem; font-weight: 700; line-height: 1; margin-bottom: 2px; }
+        .sau-stat-lbl { font-size: 0.55rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
 
-        /* Stats */
-        .sau-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.7rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:sauin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
-        @media(max-width:700px){.sau-stats{grid-template-columns:repeat(2,1fr)}}
-        .sau-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.8rem 1rem}
-        .sau-stat-val{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:700;line-height:1;margin-bottom:.2rem}
-        .sau-stat-lbl{font-size:.64rem;font-weight:900;color:#6B7280;text-transform:uppercase;letter-spacing:.07em}
+        .sau-panel { background: white; border-radius: 24px; border: 1px solid rgba(220,38,38,0.1); box-shadow: 0 10px 25px rgba(0,0,0,0.03); overflow: hidden; }
+        
+        /* Header - Titre + Icone Refresh sur une ligne */
+        .sau-panel-head { padding: 1rem 1.25rem; border-bottom: 1px solid #F1F5F9; background: #FAFBFD; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+        .sau-panel-titlerow { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+        .sau-panel-title { font-size: 0.7rem; font-weight: 900; letter-spacing: 0.05em; text-transform: uppercase; color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .sau-reload-btn { width: 38px; height: 38px; border-radius: 10px; background: white; border: 1.5px solid #E2E8F0; color: #DC2626; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+        .sau-reload-btn:active { transform: rotate(90deg); background: #FEF2F2; }
 
-        /* Toolbar */
-        .sau-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.9rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07)}
-        .sau-sw{position:relative;flex:1;min-width:220px}
-        .sau-si{position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
-        .sau-input{width:100%;height:40px;border-radius:11px;border:1px solid rgba(220,38,38,.15);background:rgba(255,255,255,.88);padding:0 .9rem 0 2.5rem;font-family:'DM Mono',monospace;font-size:.8rem;font-weight:600;color:#111827;outline:none;transition:border-color .2s,box-shadow .2s}
-        .sau-input:focus{border-color:rgba(220,38,38,.4);box-shadow:0 0 0 3px rgba(220,38,38,.08);background:white}
-        .sau-input::placeholder{color:rgba(107,114,128,.45);font-family:'DM Sans',sans-serif;font-weight:400}
-        .sau-filter-btn{height:40px;padding:0 1.1rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:800;display:flex;align-items:center;gap:.4rem;box-shadow:0 3px 10px rgba(220,38,38,.3);transition:all .18s;white-space:nowrap}
-        .sau-filter-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(220,38,38,.4)}
-        .sau-clear-btn{height:40px;padding:0 .9rem;border-radius:11px;border:1.5px solid rgba(220,38,38,.18);background:rgba(254,242,242,.5);color:#B91C1C;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.35rem;transition:all .18s;white-space:nowrap}
-        .sau-clear-btn:hover{background:#FEE2E2;border-color:rgba(220,38,38,.35)}
+        /* Toolbar - Recherche + Bouton Filtrer sur une ligne */
+        .sau-toolbar { display: flex; gap: 0.5rem; align-items: center; padding: 0.8rem 1rem; border-bottom: 1px solid #F1F5F9; flex-wrap: nowrap; }
+        .sau-sw { position: relative; flex: 1; min-width: 0; }
+        .sau-si { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #94A3B8; }
+        .sau-input { width: 100%; height: 42px; border-radius: 11px; border: 1.5px solid #E2E8F0; background: white; padding: 0 0.5rem 0 2.2rem; font-size: 0.82rem; font-weight: 600; outline: none; transition: all 0.2s; }
+        .sau-filter-btn { height: 42px; padding: 0 1rem; border-radius: 11px; background: #DC2626; border: none; color: white; cursor: pointer; font-size: 0.8rem; font-weight: 800; display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0; }
 
-        /* Panel */
-        .sau-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:sauin .5s .14s cubic-bezier(.22,1,.36,1) forwards}
-        .sau-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
-        .sau-panel-titlerow{display:flex;align-items:center;gap:.55rem}
-        .sau-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
-        .sau-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
-        .sau-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
-        .sau-reload-btn{height:34px;padding:0 .9rem;border-radius:9px;background:rgba(254,242,242,.7);border:1.5px solid rgba(220,38,38,.18);color:#B91C1C;font-family:'DM Sans',sans-serif;font-size:.75rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.35rem;transition:all .18s;white-space:nowrap}
-        .sau-reload-btn:hover{background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
+        /* Style des textes demandés */
+        .sau-summary { font-size: 0.9rem; color: #1E293B; line-height: 1.4; }
+        .sau-actor-name { color: #2563EB; font-weight: 800; } /* BLEU et Gras */
+        .sau-normal-text { font-weight: 400; color: #475569; } /* NON-Gras */
+        .sau-mono-inline { font-family: 'DM Mono', monospace; font-weight: 400; color: #1E293B; background: #F8FAFC; padding: 0 2px; border-radius: 4px; } /* Autre police, NON-Gras */
 
-        /* Table */
-        .sau-tw{overflow-x:auto}
-        .sau-table{width:100%;border-collapse:collapse;min-width:580px}
-        .sau-table thead tr{border-bottom:2px solid rgba(220,38,38,.1)}
-        .sau-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:sauin .4s cubic-bezier(.22,1,.36,1) both}
-        .sau-table tbody tr:last-child{border-bottom:none}
-        .sau-table tbody tr:hover{background:rgba(220,38,38,.02)}
-        .sau-target{font-family:'DM Mono',monospace;font-size:.73rem;font-weight:700;color:#6B7280}
-        .sau-summary{font-size:.82rem;font-weight:700;color:#111827;max-width:320px}
-        .sau-date{font-family:'DM Mono',monospace;font-size:.73rem;font-weight:600;color:#9CA3AF;white-space:nowrap}
-        .sau-dash{color:#D1D5DB}
+        .sau-mc { padding: 1.25rem; border-bottom: 1px solid #F8FAFC; }
+        .sau-mc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+        .sau-date { font-family: 'DM Mono', monospace; font-size: 0.7rem; font-weight: 600; color: #94A3B8; }
+        .sau-meta { font-size: 0.72rem; color: #64748B; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem; }
 
-        /* Mobile cards */
-        .sau-mob{display:none;flex-direction:column}
-        @media(max-width:640px){.sau-tw{display:none}.sau-mob{display:flex}}
-        .sau-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sauin .4s cubic-bezier(.22,1,.36,1) both}
-        .sau-mc:last-child{border-bottom:none}
-        .sau-mc-row1{display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem}
-        .sau-mc-meta{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+        .sau-table-wrap { display: none; }
+        @media (min-width: 768px) {
+          .sau-mob-list { display: none; }
+          .sau-table-wrap { display: block; }
+          .sau-table { width: 100%; border-collapse: collapse; }
+          .sau-table th { padding: 1rem 1.25rem; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; color: #64748B; text-align: left; background: #FAFBFD; border-bottom: 1px solid #F1F5F9; }
+          .sau-table td { padding: 1.25rem; border-bottom: 1px solid #F8FAFC; }
+        }
 
-        /* States */
-        .sau-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
-        .sau-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:sauspin .8s linear infinite}
-        .sau-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
-        .sau-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1rem;gap:.75rem;color:#9CA3AF}
-        .sau-empty-title{font-size:.9rem;font-weight:800;color:#374151}
-        .sau-empty-sub{font-size:.78rem;font-weight:600}
-
-        @keyframes sauin{to{opacity:1;transform:translateY(0)}}
-        @keyframes sauspin{to{transform:rotate(360deg)}}
-        @keyframes sashimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .spinner { width: 24px; height: 24px; border: 3px solid rgba(220,38,38,0.1); border-top-color: #DC2626; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 4rem auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="sau-wrap">
-
-        {/* Header */}
-        <div className="sau-header">
-          <div>
-            <div className="sau-eyebrow"><div className="sau-dot" />Super Admin &middot; Syst&egrave;me</div>
-            <h1 className="sau-title">Journal d&apos;<span>audit</span></h1>
-            <p className="sau-sub">Historique complet des actions syst&egrave;me</p>
-          </div>
-          <div className="sau-live">
-            <div className="sau-live-dot" />
-            Temps r&eacute;el
-          </div>
-        </div>
-
-        {/* Stats */}
+        <h1 className="sau-title">Journal d&apos;<span>audit</span></h1>
+        
+        {/* Stats - Forcés sur une ligne */}
         <div className="sau-stats">
-          {([
-            { label: '\u00c9v\u00e9nements',     value: loading ? '—' : items.length,        color: '#DC2626' },
-            { label: 'Actions uniques',          value: loading ? '—' : uniqueActions,        color: '#2563EB' },
-            { label: 'Aujourd\u2019hui',         value: loading ? '—' : todayCount,           color: '#059669' },
-            { label: 'Suppressions',             value: loading ? '—' : deleteCount,          color: '#D97706' },
-          ] as const).map(s => (
+          {[
+            { label: 'Événements', value: items.length, color: '#DC2626' },
+            { label: 'Uniques',    value: uniqueActions, color: '#2563EB' },
+            { label: 'Aujourd’hui', value: todayCount, color: '#059669' },
+            { label: 'Suppressions', value: deleteCount, color: '#D97706' },
+          ].map(s => (
             <div key={s.label} className="sau-stat" style={{ borderTopColor: s.color }}>
-              <div className="sau-stat-val" style={{ color: s.color }}>{s.value}</div>
+              <div className="sau-stat-val" style={{ color: s.color }}>{loading ? '…' : s.value}</div>
               <div className="sau-stat-lbl">{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Panel */}
         <div className="sau-panel">
           <div className="sau-panel-head">
             <div className="sau-panel-titlerow">
-              <div className="sau-panel-ico">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.3">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', flexShrink: 0 }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
               </div>
               <span className="sau-panel-title">Historique des actions</span>
-              {!loading && items.length > 0 && <span className="sau-count-chip">{items.length}</span>}
             </div>
-            <button className="sau-reload-btn" onClick={() => void load(action)}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Actualiser
+            <button className="sau-reload-btn" onClick={() => void load(actionFilter)}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
           </div>
 
-          {/* Toolbar */}
           <div className="sau-toolbar">
             <div className="sau-sw">
-              <span className="sau-si">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-                </svg>
-              </span>
-              <input
-                className="sau-input"
-                placeholder="Filtrer par action (ex&nbsp;: UPLOAD_FILE)&#8230;"
-                value={action}
-                onChange={e => setAction(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && void load(action)}
+              <span className="sau-si"><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></span>
+              <input 
+                className="sau-input" 
+                placeholder="Filtrer (ex: UPDATE)..." 
+                value={actionFilter} 
+                onChange={e => setActionFilter(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && void load(actionFilter)}
               />
             </div>
-            <button className="sau-filter-btn" onClick={() => void load(action)}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" />
-              </svg>
-              Filtrer
-            </button>
-            {action && (
-              <button className="sau-clear-btn" onClick={handleClear}>
-                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                R&eacute;initialiser
-              </button>
-            )}
+            <button className="sau-filter-btn" onClick={() => void load(actionFilter)}>Filtrer</button>
           </div>
 
-          {/* Error */}
-          {error && (
-            <div className="sau-error">
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-              </svg>
-              {error}
-            </div>
-          )}
-
-          {/* Table */}
           {loading ? (
-            <div className="sau-loader"><div className="sau-ring" />Chargement&#8230;</div>
-          ) : items.length === 0 && !error ? (
-            <div className="sau-empty">
-              <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
-                <path strokeLinecap="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-              <div className="sau-empty-title">Aucune entr&eacute;e trouv&eacute;e</div>
-              <div className="sau-empty-sub">Essayez de r&eacute;initialiser le filtre.</div>
-            </div>
+            <div className="spinner" />
           ) : (
             <>
-              {/* ── Desktop ── */}
-              <div className="sau-tw">
+              <div className="sau-mob-list">
+                {items.map(item => (
+                  <div key={item.id} className="sau-mc">
+                    <div className="sau-mc-top">
+                      <ActionPill action={item.action} />
+                      <span className="sau-date">{formatDate(item.createdAt)}</span>
+                    </div>
+                    <div className="sau-summary">{getAuditDescription(item)}</div>
+                    <div className="sau-meta">
+                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                      {item.antenna?.name || 'Direction Générale'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="sau-table-wrap">
                 <table className="sau-table">
                   <thead>
                     <tr>
-                      <th style={thStyle}>Action</th>
-                      <th style={thStyle}>Cible</th>
-                      <th style={thStyle}>R&eacute;sum&eacute;</th>
-                      <th style={thStyle}>Date</th>
+                      <th>Action</th>
+                      <th>Détails de l&apos;événement</th>
+                      <th>Antenne</th>
+                      <th>Date</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((a, idx) => (
-                      <tr key={a.id} style={{ animationDelay: `${idx * 30}ms` }}>
-                        <td style={tdStyle}><ActionPill action={a.action} /></td>
-                        <td style={tdStyle}>
-                          <span className="sau-target">
-                            {[a.targetModel, a.targetId].filter(Boolean).join(' / ') || <span className="sau-dash">—</span>}
-                          </span>
+                    {items.map(item => (
+                      <tr key={item.id}>
+                        <td><ActionPill action={item.action} /></td>
+                        <td className="sau-summary">
+                          {getAuditDescription(item)}
                         </td>
-                        <td style={tdStyle}>
-                          <span className="sau-summary">{a.summary || <span className="sau-dash">—</span>}</span>
-                        </td>
-                        <td style={tdStyle}>
-                          <span className="sau-date">{formatDate(a.createdAt)}</span>
-                        </td>
+                        <td style={{ color: '#64748B', fontWeight: 600 }}>{item.antenna?.name || 'Direction'}</td>
+                        <td className="sau-date">{formatDate(item.createdAt)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* ── Mobile cards ── */}
-              <div className="sau-mob">
-                {items.map((a, idx) => (
-                  <div key={a.id} className="sau-mc" style={{ animationDelay: `${idx * 30}ms` }}>
-                    <div className="sau-mc-row1">
-                      <ActionPill action={a.action} />
-                      <span className="sau-date">{formatDate(a.createdAt)}</span>
-                    </div>
-                    <div className="sau-mc-meta">
-                      {[a.targetModel, a.targetId].filter(Boolean).length > 0 && (
-                        <span className="sau-target">{[a.targetModel, a.targetId].filter(Boolean).join(' / ')}</span>
-                      )}
-                    </div>
-                    {a.summary && <div className="sau-summary" style={{ marginTop: '.4rem', fontSize: '.8rem' }}>{a.summary}</div>}
-                  </div>
-                ))}
-              </div>
+              {items.length === 0 && (
+                <div style={{ textAlign: 'center', padding: '5rem 1rem', color: '#94A3B8', fontSize: '0.9rem', fontWeight: 600 }}>
+                  <div style={{fontSize:'2rem', marginBottom:'1rem'}}>🍃</div>
+                  Aucun journal d&apos;audit trouvé.
+                </div>
+              )}
             </>
           )}
         </div>
@@ -339,13 +276,3 @@ export default function SuperAdminAuditPage() {
     </AppShell>
   );
 }
-
-/* shared th style defined outside JSX to avoid recreation */
-const thStyle: React.CSSProperties = {
-  padding: '.75rem 1.2rem', fontSize: '.63rem', fontWeight: 900,
-  letterSpacing: '.11em', textTransform: 'uppercase', color: '#374151',
-  background: 'rgba(254,242,242,.35)', textAlign: 'left', whiteSpace: 'nowrap',
-};
-const tdStyle: React.CSSProperties = {
-  padding: '.9rem 1.2rem', fontSize: '.82rem', color: '#111827', verticalAlign: 'middle',
-};

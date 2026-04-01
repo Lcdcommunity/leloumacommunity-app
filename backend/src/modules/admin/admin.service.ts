@@ -306,9 +306,17 @@ export class AdminService {
       this.prisma.contribution.count({ where }),
     ]);
 
+    // 🔥 CORRECTION ICI : On fusionne le résultat mappé avec l'objet `member` complet (avec les champs demandés).
     return {
       items: items.map(c => ({ 
-        ...memberMapper.contribution(c), 
+        ...memberMapper.contribution(c),
+        member: c.member ? {
+          id: c.member.id,
+          firstName: c.member.firstName,
+          lastName: c.member.lastName,
+          email: c.member.email,
+          phone: c.member.phone
+        } : null,
         memberName: c.member ? `${c.member.firstName} ${c.member.lastName}` : 'Inconnu' 
       })),
       total, page, pageSize

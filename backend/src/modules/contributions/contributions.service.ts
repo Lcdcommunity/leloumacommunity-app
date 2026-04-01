@@ -285,29 +285,53 @@ export class ContributionsService {
     }));
   }
 
+  /**
+   * 🔥 ENRICHI : Liste globale avec tous les détails membres nécessaires
+   */
   async findAll(associationId: string, antennaId?: string) {
     return this.prisma.contribution.findMany({
       where: { associationId, antennaId: antennaId || undefined },
       include: {
-        member: { select: { firstName: true, lastName: true, email: true } },
+        member: { 
+          select: { 
+            firstName: true, 
+            lastName: true, 
+            email: true,
+            phone: true,
+            professionalStatus: true,
+            function: true
+          } 
+        },
         antenna: { select: { name: true } },
       },
       orderBy: { submittedAt: 'desc' },
     });
   }
 
+  /**
+   * 🔥 ENRICHI : Détail unitaire avec infos membres complètes pour la modale
+   */
   async findOne(id: string, associationId: string) {
     const contribution = await this.prisma.contribution.findFirst({
       where: { id, associationId },
       include: {
-        member: { select: { firstName: true, lastName: true, email: true, phone: true } },
+        member: { 
+          select: { 
+            firstName: true, 
+            lastName: true, 
+            email: true, 
+            phone: true,
+            professionalStatus: true,
+            function: true
+          } 
+        },
         antenna: { select: { name: true, code: true } },
         proofFile: true,
       },
     });
     if (!contribution) throw new NotFoundException('Cotisation introuvable');
     return contribution;
-  }  
+  }
 
   async cancelContribution(id: string, actor: AuthUser) {
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -349,7 +373,7 @@ export class ContributionsService {
             lastName: true,
             email: true,
             contributions: {
-              where: { status: ContributionStatus.VALIDATED }, // ✅ CORRECTION ICI : suppression de "associationId" qui faisait crasher Prisma
+              where: { status: ContributionStatus.VALIDATED },
               orderBy: { validatedAt: 'desc' },
               take: 1,
               select: { id: true, amount: true, validatedAt: true, currency: true },
@@ -379,7 +403,7 @@ export class ContributionsService {
     });
     if (!antenna) throw new ForbiddenException('Cette antenne ne fait pas partie de votre association');
 
-    if (actor.role === UserRole.SUPER_ADMIN) return;
+    if (actor.role === UserRole.SUPER_ADMIN || actor.role === UserRole.SYSTEM_ADMIN) return;
     if (actor.role !== UserRole.ANTENNA_ADMIN) throw new ForbiddenException('Non autorisé');
 
     const assignment = await this.prisma.antennaAdminAssignment.findFirst({

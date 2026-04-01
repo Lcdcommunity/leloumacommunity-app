@@ -11,13 +11,13 @@ import { formatDate, formatDateTime } from '../../../../lib/format';
 function FileTypeBadge({ mimeType }: { mimeType?: string | null }) {
   const mime = mimeType ?? '';
   let ext = 'FILE'; let color = '#6B7280'; let bg = '#F3F4F6'; let border = '#E5E7EB';
-  if (mime.includes('pdf'))                                    { ext = 'PDF';  color = '#DC2626'; bg = '#FEF2F2'; border = '#FECACA'; }
+  if (mime.includes('pdf'))                                     { ext = 'PDF';  color = '#DC2626'; bg = '#FEF2F2'; border = '#FECACA'; }
   else if (mime.includes('word') || mime.includes('document')) { ext = 'DOC';  color = '#2563EB'; bg = '#EFF6FF'; border = '#BFDBFE'; }
   else if (mime.includes('sheet') || mime.includes('excel'))   { ext = 'XLS';  color = '#059669'; bg = '#ECFDF5'; border = '#A7F3D0'; }
   else if (mime.includes('image'))                             { ext = 'IMG';  color = '#7C3AED'; bg = '#F5F3FF'; border = '#DDD6FE'; }
   else if (mime.includes('zip') || mime.includes('compress'))  { ext = 'ZIP';  color = '#D97706'; bg = '#FFFBEB'; border = '#FDE68A'; }
   return (
-    <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.65rem', fontWeight: 700, color, background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: '.15rem .45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
+    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '.62rem', fontWeight: 800, color, background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: '.15rem .45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
       {ext}
     </span>
   );
@@ -26,13 +26,13 @@ function FileTypeBadge({ mimeType }: { mimeType?: string | null }) {
 /* ══════════════════════════════════════════════════════ VISIBILITY BADGE */
 function VisibilityBadge({ visibility }: { visibility?: string | null }) {
   if (!visibility || visibility === 'ALL') {
-    return <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#6B7280', background: '#F3F4F6', padding: '.15rem .5rem', borderRadius: '99px', display: 'inline-block' }}>Public</span>;
+    return <span style={{ fontSize: '.65rem', fontWeight: 700, color: '#6B7280', background: '#F3F4F6', padding: '.15rem .5rem', borderRadius: '99px', display: 'inline-block' }}>Public</span>;
   }
   if (visibility === 'ADMIN') {
-    return <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#DC2626', background: '#FEF2F2', padding: '.15rem .5rem', borderRadius: '99px', border: '1px solid #FECACA', display: 'inline-block' }}>Admins</span>;
+    return <span style={{ fontSize: '.65rem', fontWeight: 700, color: '#DC2626', background: '#FEF2F2', padding: '.15rem .5rem', borderRadius: '99px', border: '1px solid #FECACA', display: 'inline-block' }}>Admins</span>;
   }
   if (visibility === 'MEMBER') {
-    return <span style={{ fontSize: '.68rem', fontWeight: 700, color: '#2563EB', background: '#EFF6FF', padding: '.15rem .5rem', borderRadius: '99px', border: '1px solid #BFDBFE', display: 'inline-block' }}>Membres</span>;
+    return <span style={{ fontSize: '.65rem', fontWeight: 700, color: '#2563EB', background: '#EFF6FF', padding: '.15rem .5rem', borderRadius: '99px', border: '1px solid #BFDBFE', display: 'inline-block' }}>Membres</span>;
   }
   return null;
 }
@@ -40,7 +40,7 @@ function VisibilityBadge({ visibility }: { visibility?: string | null }) {
 /* ══════════════════════════════════════════════════════ FORMAT BYTES */
 function formatSize(bytes?: number | null): string {
   if (!bytes) return '—';
-  if (bytes < 1024)        return `${bytes} o`;
+  if (bytes < 1024)         return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
@@ -180,7 +180,6 @@ function DocumentDetailsModal({
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }} onClick={onClose} />
       <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 101, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)', width: 'min(550px,calc(100vw - 2rem))', border: '1px solid rgba(220,38,38,.15)', boxShadow: '0 24px 60px rgba(220,38,38,.12)', maxHeight: '90vh', overflowY: 'auto' }}>
         
-        {/* Header Modale */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.2rem' }}>
           <div>
             <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#111827', lineHeight: 1.1, marginBottom: '.5rem' }}>
@@ -196,7 +195,6 @@ function DocumentDetailsModal({
           </button>
         </div>
 
-        {/* Corps / Description */}
         <div style={{ background: 'rgba(249,250,251,.8)', border: '1px solid #E5E7EB', borderRadius: 14, padding: '1rem', marginBottom: '1.2rem' }}>
           <h4 style={{ fontSize: '.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.08em', color: '#9CA3AF', marginBottom: '.4rem' }}>Description du document</h4>
           <p style={{ fontSize: '.86rem', color: '#374151', lineHeight: 1.5, whiteSpace: 'pre-wrap', margin: 0, fontWeight: 500 }}>
@@ -204,7 +202,6 @@ function DocumentDetailsModal({
           </p>
         </div>
 
-        {/* Infos / Métadonnées */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', padding: '0 .5rem' }}>
           <div>
             <div style={{ fontSize: '.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.08em', color: '#9CA3AF', marginBottom: '.2rem' }}>Fichier original</div>
@@ -226,12 +223,10 @@ function DocumentDetailsModal({
           </div>
         </div>
 
-        {/* Footer Actions */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1.2rem', borderTop: '1px solid rgba(220,38,38,.08)', gap: '1rem', flexWrap: 'wrap' }}>
-          {/* Bouton de suppression déplacé ici */}
           <button onClick={onDelete} style={{ background: 'rgba(254,242,242,.8)', border: '1px solid rgba(220,38,38,.2)', padding: '0 1rem', height: 38, borderRadius: 10, color: '#DC2626', fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', transition: 'all .15s' }} className="sd-btn-del-modal">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            Supprimer le document
+            Supprimer
           </button>
 
           <div style={{ display: 'flex', gap: '.6rem' }}>
@@ -251,23 +246,21 @@ function DocumentDetailsModal({
 
 /* ══════════════════════════════════════════════════════ PAGE */
 export default function SuperAdminDocumentsPage() {
-  const [items,        setItems]        = useState<DocumentItem[]>([]);
-  const [q,            setQ]            = useState('');
-  const [error,        setError]        = useState<string | null>(null);
-  const [uploading,    setUploading]    = useState(false);
-  const [loading,      setLoading]      = useState(true);
-  const [busyId,       setBusyId]       = useState<string | null>(null);
+  const [items, setItems] = useState<DocumentItem[]>([]);
+  const [q, setQ] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
   
-  // États des modales
   const [deleteTarget, setDeleteTarget] = useState<DocumentItem | null>(null);
-  const [viewingDoc,   setViewingDoc]   = useState<DocumentItem | null>(null);
+  const [viewingDoc, setViewingDoc] = useState<DocumentItem | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [uploadMsg,    setUploadMsg]    = useState<string | null>(null);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
 
   const load = useCallback(async (searchQuery?: string) => {
     setError(null); setLoading(true);
     try {
-      // On utilise searchQuery s'il est fourni, sinon on évite de dépendre de 'q'
       const res = await api.listDocuments({ q: searchQuery || undefined, page: 1, pageSize: 100 });
       setItems(res.items);
     } catch (err) {
@@ -275,11 +268,11 @@ export default function SuperAdminDocumentsPage() {
     } finally {
       setLoading(false);
     }
-  }, []); // <-- La dépendance à 'q' est retirée, la fonction est stable
+  }, []);
 
   useEffect(() => {
     void load('');
-  }, [load]); // <-- ESLint est content
+  }, [load]);
 
   async function handleModalUpload(data: { file: File; title: string; visibility: string; description: string }) {
     setUploading(true); setError(null); setUploadMsg(null);
@@ -326,9 +319,8 @@ export default function SuperAdminDocumentsPage() {
     <AppShell title="Documents / médias">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
-        .sd-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1200px;margin:0 auto}
+        .sd-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1rem,3vw,2rem);max-width:1200px;margin:0 auto}
 
-        /* Header */
         .sd-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:sdin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
         .sd-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
         .sd-dot{width:6px;height:6px;background:#EF4444;border-radius:50%;animation:sdpulse 2s ease-in-out infinite}
@@ -336,14 +328,12 @@ export default function SuperAdminDocumentsPage() {
         .sd-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .sd-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
-        /* Stats */
-        .sd-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:sdin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
-        @media(max-width:540px){.sd-stats{grid-template-columns:1fr 1fr}}
-        .sd-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.8rem 1rem}
-        .sd-stat-val{font-family:'Cormorant Garamond',serif;font-size:1.65rem;font-weight:700;line-height:1;margin-bottom:.2rem}
-        .sd-stat-lbl{font-size:.64rem;font-weight:900;color:#6B7280;text-transform:uppercase;letter-spacing:.07em}
+        /* Stats - Forcé sur une ligne sur mobile */
+        .sd-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:sdin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
+        .sd-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.7rem .5rem;text-align:center}
+        .sd-stat-val{font-family:'Cormorant Garamond',serif;font-size:1.45rem;font-weight:700;line-height:1;margin-bottom:.2rem}
+        .sd-stat-lbl{font-size:.58rem;font-weight:900;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
 
-        /* Panel */
         .sd-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:sdin .5s .14s cubic-bezier(.22,1,.36,1) forwards}
         .sd-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
         .sd-panel-titlerow{display:flex;align-items:center;gap:.55rem}
@@ -351,55 +341,39 @@ export default function SuperAdminDocumentsPage() {
         .sd-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
         .sd-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
 
-        /* Upload btn */
         .sd-btn-upload{height:38px;padding:0 1rem;border-radius:10px;background:rgba(254,242,242,.6);border:1.5px solid rgba(220,38,38,.2);color:#B91C1C;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.45rem;transition:all .18s;white-space:nowrap}
         .sd-btn-upload:hover{background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
-        .sd-btn-upload:disabled{opacity:.6;cursor:not-allowed}
 
-        /* Toolbar */
-        .sd-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.9rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07)}
-        .sd-sw{position:relative;flex:1;min-width:200px}
-        .sd-si{position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
-        .sd-input{width:100%;height:40px;border-radius:11px;border:1px solid rgba(220,38,38,.15);background:rgba(255,255,255,.88);padding:0 .9rem 0 2.5rem;font-family:'DM Sans',sans-serif;font-size:.84rem;font-weight:600;color:#111827;outline:none;transition:border-color .2s,box-shadow .2s}
+        /* Toolbar - Forcé sur une ligne sur mobile */
+        .sd-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap;padding:.9rem 1.1rem;border-bottom:1px solid rgba(220,38,38,.07)}
+        .sd-sw{position:relative;flex:1;min-width:0}
+        .sd-si{position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
+        .sd-input{width:100%;height:40px;border-radius:11px;border:1px solid rgba(220,38,38,.15);background:rgba(255,255,255,.88);padding:0 .7rem 0 2.2rem;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;color:#111827;outline:none;transition:border-color .2s}
         .sd-input:focus{border-color:rgba(220,38,38,.4);box-shadow:0 0 0 3px rgba(220,38,38,.08);background:white}
-        .sd-input::placeholder{color:rgba(107,114,128,.45);font-weight:400}
-        .sd-search-btn{height:40px;padding:0 1.1rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:800;display:flex;align-items:center;gap:.4rem;box-shadow:0 3px 10px rgba(220,38,38,.3);transition:all .18s;white-space:nowrap}
-        .sd-search-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(220,38,38,.4)}
+        .sd-input::placeholder{color:rgba(107,114,128,.45)}
+        .sd-search-btn{height:40px;padding:0 .85rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:.35rem;box-shadow:0 3px 10px rgba(220,38,38,.3);transition:all .18s;flex-shrink: 0}
 
-        /* Upload success toast */
         .sd-upload-success{display:flex;align-items:center;gap:.55rem;padding:.75rem 1.4rem;background:rgba(236,253,245,.8);border-bottom:1px solid rgba(5,150,105,.15);font-size:.8rem;font-weight:700;color:#059669}
 
-        /* Table */
         .sd-tw{overflow-x:auto}
         .sd-table{width:100%;border-collapse:collapse;min-width:700px}
         .sd-table thead tr{border-bottom:2px solid rgba(220,38,38,.1)}
         .sd-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:sdin .4s cubic-bezier(.22,1,.36,1) both}
-        .sd-table tbody tr:last-child{border-bottom:none}
-        
-        /* Lignes cliquables */
         .sd-row-clickable { cursor: pointer; }
         .sd-row-clickable:hover { background: rgba(220,38,38,.03) !important; }
 
-        /* Cell helpers */
         .sd-doc-title{font-weight:800;font-size:.88rem;color:#0F172A;margin-bottom:4px}
         .sd-doc-desc{font-size:.74rem;font-weight:500;color:#6B7280;margin-top:4px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
         .sd-filename{font-family:'DM Mono',monospace;font-size:.75rem;font-weight:600;color:#2563EB;text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;transition:color .15s; padding: .2rem .4rem; border-radius: 6px; margin-left: -.4rem;}
         .sd-filename:hover{color:#1D4ED8; background: rgba(37,99,235,.08);}
-        .sd-dash{color:#D1D5DB;font-weight:700}
 
-        /* Mobile cards */
         .sd-mob{display:none;flex-direction:column}
         @media(max-width:768px){.sd-tw{display:none}.sd-mob{display:flex}}
         .sd-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sdin .4s cubic-bezier(.22,1,.36,1) both; cursor: pointer; transition: background .15s;}
         .sd-mc:last-child{border-bottom:none}
         .sd-mc:hover{background: rgba(220,38,38,.02);}
         .sd-mc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem;margin-bottom:.5rem}
-        .sd-mc-meta{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}
 
-        /* Delete button (in modal only now) */
-        .sd-btn-del-modal:hover { background: #FEE2E2 !important; border-color: rgba(220,38,38,.4) !important; transform: translateY(-1px); }
-
-        /* States */
         .sd-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .sd-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:sdspin .8s linear infinite}
         .sd-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
@@ -409,6 +383,11 @@ export default function SuperAdminDocumentsPage() {
 
         @keyframes sdin{to{opacity:1;transform:translateY(0)}}
         @keyframes sdspin{to{transform:rotate(360deg)}}
+
+        @media (max-width: 400px) {
+          .sd-search-btn span { display: none; }
+          .sd-search-btn { width: 44px; padding: 0; }
+        }
       `}</style>
 
       <div className="sd-wrap">
@@ -419,7 +398,7 @@ export default function SuperAdminDocumentsPage() {
           <h1 className="sd-title">Documents <span>&amp; m&eacute;dias</span></h1>
         </div>
 
-        {/* Stats */}
+        {/* Stats - Forcés sur une ligne */}
         <div className="sd-stats">
           {([
             { label: 'Documents',    value: items.length,                                      color: '#DC2626' },
@@ -456,16 +435,7 @@ export default function SuperAdminDocumentsPage() {
             </button>
           </div>
           
-          {/* Upload success */}
-          {uploadMsg && (
-            <div className="sd-upload-success">
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              {uploadMsg}
-              <button onClick={() => setUploadMsg(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#059669', fontSize: '.85rem', lineHeight: 1, padding: 0 }}>✕</button>
-            </div>
-          )}
-
-          {/* Toolbar */}
+          {/* Toolbar - Forcée sur une ligne */}
           <div className="sd-toolbar">
             <div className="sd-sw">
               <span className="sd-si">
@@ -481,10 +451,19 @@ export default function SuperAdminDocumentsPage() {
               />
             </div>
             <button className="sd-search-btn" onClick={() => void load(q)}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
-              Rechercher
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
+              <span>Rechercher</span>
             </button>
           </div>
+
+          {/* Success msg */}
+          {uploadMsg && (
+            <div className="sd-upload-success">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {uploadMsg}
+              <button onClick={() => setUploadMsg(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#059669', fontSize: '.85rem', lineHeight: 1, padding: 0 }}>✕</button>
+            </div>
+          )}
 
           {/* Error */}
           {error && (
@@ -507,7 +486,7 @@ export default function SuperAdminDocumentsPage() {
             </div>
           ) : !error ? (
             <>
-              {/* ── Desktop table ── */}
+              {/* Desktop table */}
               <div className="sd-tw">
                 <table className="sd-table">
                   <thead>
@@ -540,24 +519,24 @@ export default function SuperAdminDocumentsPage() {
                                 href={d.fileAsset.url} 
                                 target="_blank" 
                                 rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()} // Évite d'ouvrir la modale si on clique juste sur le lien
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                                 Télécharger
                               </a>
                             )
-                            : <span className="sd-dash">—</span>
+                            : <span style={{color:'#D1D5DB', fontWeight:700}}>—</span>
                           }
                         </td>
                         <td style={tdStyle}><VisibilityBadge visibility={d.visibility} /></td>
-                        <td style={tdStyle}><span className="sd-date">{formatDate(d.createdAt)}</span></td>
+                        <td style={tdStyle}><span style={{whiteSpace:'nowrap', fontSize:'.78rem', fontWeight:600, color:'#374151'}}>{formatDate(d.createdAt)}</span></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* ── Mobile cards ── */}
+              {/* Mobile cards */}
               <div className="sd-mob">
                 {items.map((d, i) => (
                   <div 
@@ -577,16 +556,10 @@ export default function SuperAdminDocumentsPage() {
                     
                     <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '.8rem' }}>
                       {d.fileAsset?.url && (
-                        <a 
-                          className="sd-filename" 
-                          href={d.fileAsset.url} 
-                          target="_blank" 
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div className="sd-filename">
                           <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                          T&eacute;l&eacute;charger
-                        </a>
+                          Détails / Téléchargement
+                        </div>
                       )}
                     </div>
                   </div>

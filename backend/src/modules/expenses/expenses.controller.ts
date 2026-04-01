@@ -15,13 +15,13 @@ export class ExpensesController {
   constructor(private readonly expensesService: ExpensesService) {}
 
   @Post('admin/expenses')
-  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   createAdminExpense(@CurrentUser() user: AuthUser, @Body() dto: CreateExpenseDto) {
     return this.expensesService.createAntennaExpense(user.id, dto);
   }
 
   @Get('admin/expenses')
-  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   listAdminExpenses(
     @CurrentUser() user: AuthUser,
     @Query('page') page?: string,
@@ -32,13 +32,13 @@ export class ExpensesController {
   }
 
   @Delete('admin/expenses/:id')
-  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   deleteAdminExpense(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.expensesService.deleteAntennaExpense(user.id, user.associationId, id);
   }
 
   @Get('super-admin/expenses')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN) // 🔥 AJOUT SYSTEM_ADMIN
   listSuperAdminExpenses(
     @CurrentUser() user: AuthUser,
     @Query('page') page?: string,
@@ -50,19 +50,19 @@ export class ExpensesController {
   }
 
   @Patch('super-admin/expenses/:id/validate')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN) // 🔥 AJOUT SYSTEM_ADMIN
   validateExpense(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.expensesService.validateExpense(user.id, user.associationId, id);
   }
 
   @Patch('super-admin/expenses/:id/reject')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN) // 🔥 AJOUT SYSTEM_ADMIN
   rejectExpense(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: RejectExpenseDto) {
     return this.expensesService.rejectExpense(user.id, user.associationId, id, dto.rejectionReason);
   }
 
   @Get('member/expenses')
-  @Roles(UserRole.MEMBER, UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  @Roles(UserRole.MEMBER, UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   listMemberExpenses(
     @CurrentUser() user: AuthUser,
     @Query('page') page?: string,
