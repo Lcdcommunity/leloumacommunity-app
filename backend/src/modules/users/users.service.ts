@@ -10,7 +10,7 @@ import { AuditService } from '../audit/audit.service';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { CloudinaryService } from '../uploads/cloudinary.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import * as bcrypt from 'bcrypt'; // 👈 AJOUT POUR LE HACHAGE DU MOT DE PASSE
+import * as bcrypt from 'bcryptjs'; // 👈 CORRECTION ICI : bcryptjs au lieu de bcrypt
 
 type RequestMeta = {
   ipAddress?: string;
@@ -105,7 +105,7 @@ export class UsersService {
     return this.toMeResponse(updatedUser);
   }
 
-  // ⚡ NOUVELLE MÉTHODE POUR CHANGER LE MOT DE PASSE
+  // ⚡ MÉTHODE POUR CHANGER LE MOT DE PASSE
   async updatePassword(userId: string, newPasswordRaw: string) {
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(newPasswordRaw, saltRounds);
