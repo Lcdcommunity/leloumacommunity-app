@@ -24,7 +24,8 @@ import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.SUPER_ADMIN)
+// 🔥 AJOUT CHIRURGICAL : On autorise le SYSTEM_ADMIN à accéder à tout le panel Super Admin
+@Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
 export class SuperAdminController {
   constructor(private readonly service: SuperAdminService) {}
 

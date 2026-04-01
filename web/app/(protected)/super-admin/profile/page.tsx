@@ -66,7 +66,6 @@ export default function SuperAdminProfilePage() {
   const [assocCity, setAssocCity] = useState('');
   const [assocCountry, setAssocCountry] = useState('');
   const [assocCurrency, setAssocCurrency] = useState('GNF');
-  const [assocFoundedAt, setAssocFoundedAt] = useState('');
   const [assocWebsite, setAssocWebsite] = useState('');
   const [assocDescription, setAssocDescription] = useState('');
 
@@ -83,9 +82,9 @@ export default function SuperAdminProfilePage() {
         setAssociation(assocData);
         populateUserFields(user);
         populateAssocFields(assocData);
-      } catch (err) {
+      } catch {
         if (!isMounted) return;
-        setMessage({ text: err instanceof Error ? err.message : 'Erreur de chargement', ok: false });
+        setMessage({ text: 'Erreur lors du chargement des informations', ok: false });
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -103,7 +102,6 @@ export default function SuperAdminProfilePage() {
     setLastName(user.lastName || '');
     setPhone(user.phone || '');
     setAssociationTitle(user.associationTitle || user.function || 'Super Administrateur');
-    // Séparation addressLine1 en numéro + libellé (ex: "12 Rue des Acacias")
     const line1 = user.addressLine1 || '';
     const numMatch = line1.match(/^(\S+)\s+(.*)/);
     if (numMatch) { setAddrNum(numMatch[1]); setAddrLabel(numMatch[2]); }
@@ -115,7 +113,6 @@ export default function SuperAdminProfilePage() {
     setOriginSubPrefecture(user.originSubPrefecture || '');
   }
 
-  // ✅ CORRECTION ICI : La fonction est complète et fermée proprement
   function populateAssocFields(assoc: Association | null) {
     if (!assoc) return;
     setAssocName(assoc.name || '');
@@ -123,7 +120,6 @@ export default function SuperAdminProfilePage() {
     setAssocRegNumber(assoc.registrationNumber || '');
     setAssocEmail(assoc.email || '');
     setAssocPhone(assoc.phone || '');
-    // Même split pour adresse association
     const a1 = assoc.addressLine1 || '';
     const nm = a1.match(/^(\S+)\s+(.*)/);
     if (nm) { setAssocAddrNum(nm[1]); setAssocAddrLabel(nm[2]); }
@@ -134,12 +130,6 @@ export default function SuperAdminProfilePage() {
     setAssocCurrency(assoc.defaultCurrency || 'GNF');
     setAssocWebsite(assoc.websiteUrl || '');
     setAssocDescription(assoc.description || '');
-    if (assoc.foundedAt) {
-      const d = new Date(assoc.foundedAt);
-      setAssocFoundedAt(d.toISOString().slice(0, 10));
-    } else {
-      setAssocFoundedAt('');
-    }
   }
 
   function handleCancel() {
@@ -147,6 +137,7 @@ export default function SuperAdminProfilePage() {
     populateAssocFields(association);
     setIsEditing(false);
     setMessage(null);
+    setAvatarPreview(null);
   }
 
   async function uploadAvatar(file: File) {
@@ -161,9 +152,10 @@ export default function SuperAdminProfilePage() {
       setAvatarPreview(null);
       setMessage({ text: 'Photo de profil mise à jour !', ok: true });
       if (fileInputRef.current) fileInputRef.current.value = '';
-    } catch (err) {
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Échec du téléchargement.';
+      setMessage({ text: errorMsg, ok: false });
       setAvatarPreview(null);
-      setMessage({ text: err instanceof Error ? err.message : 'Erreur lors du téléchargement.', ok: false });
     } finally {
       setAvatarUploading(false);
     }
@@ -184,11 +176,9 @@ export default function SuperAdminProfilePage() {
     setSaving(true);
     setMessage(null);
     try {
-      // Reconstruction addressLine1 à partir des deux champs
       const addressLine1 = [addrNum.trim(), addrLabel.trim()].filter(Boolean).join(' ') || undefined;
       const assocAddressLine1 = [assocAddrNum.trim(), assocAddrLabel.trim()].filter(Boolean).join(' ') || undefined;
 
-      // Sauvegarde profil utilisateur
       const userPayload: Partial<FullUserProfile> = {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
@@ -201,11 +191,11 @@ export default function SuperAdminProfilePage() {
         country: country.trim() || undefined,
         originSubPrefecture: originSubPrefecture.trim() || undefined,
       };
-      const updated = await api.updateMyProfile(userPayload);
-      setMe(updated);
-      populateUserFields(updated);
 
-      // Sauvegarde association
+      const updatedUser = await api.updateMyProfile(userPayload);
+      setMe(updatedUser);
+      populateUserFields(updatedUser);
+
       if (association?.id) {
         const assocPayload = {
           name: assocName.trim() || undefined,
@@ -220,17 +210,17 @@ export default function SuperAdminProfilePage() {
           defaultCurrency: assocCurrency || undefined,
           website: assocWebsite.trim() || undefined,
           description: assocDescription.trim() || undefined,
-          foundedAt: assocFoundedAt || undefined,
         };
-        const updatedAssoc = await api.updateAssociation(assocPayload); // ✅ CORRECTION DE L'APPEL API
+        const updatedAssoc = await api.updateAssociation(assocPayload);
         setAssociation(updatedAssoc);
         populateAssocFields(updatedAssoc);
       }
 
       setIsEditing(false);
       setMessage({ text: 'Profil et association mis à jour avec succès.', ok: true });
-    } catch (err) {
-      setMessage({ text: err instanceof Error ? err.message : 'Erreur de sauvegarde', ok: false });
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : 'Erreur de sauvegarde';
+      setMessage({ text: errorMsg, ok: false });
     } finally {
       setSaving(false);
     }
@@ -245,7 +235,7 @@ export default function SuperAdminProfilePage() {
 
   if (loading) {
     return (
-      <AppShell title="Mon profil Super Admin">
+      <AppShell title="Profil Direction">
         <style>{`@keyframes saprfspin { to { transform: rotate(360deg); } }`}</style>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem', color: '#B91C1C', fontFamily: "'DM Sans', sans-serif", gap: '0.75rem' }}>
           <div style={{ width: 22, height: 22, border: '2.5px solid rgba(185,28,28,0.15)', borderTopColor: '#B91C1C', borderRadius: '50%', animation: 'saprfspin 0.8s linear infinite' }} />
@@ -256,7 +246,7 @@ export default function SuperAdminProfilePage() {
   }
 
   return (
-    <AppShell title="Mon profil Super Admin">
+    <AppShell title="Profil Direction">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@500&display=swap');
 
@@ -300,7 +290,6 @@ export default function SuperAdminProfilePage() {
 
         /* Grilles */
         .saprf-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.25rem; }
-        /* Numéro étroit + libellé large */
         .saprf-grid-num { display: grid; grid-template-columns: 90px 1fr; gap: 1rem 1.25rem; }
 
         .saprf-field { display: flex; flex-direction: column; gap: 0.38rem; min-width: 0; }
@@ -321,16 +310,13 @@ export default function SuperAdminProfilePage() {
         .saprf-input-readonly { background: #FAFAFA !important; color: #64748B !important; border-color: rgba(220,38,38,0.08) !important; }
         .saprf-input.mono, .saprf-select.mono { font-family: 'DM Mono', monospace; }
 
-        /* Select custom arrow */
         .saprf-select { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B91C1C' stroke-width='2'><path d='m6 9 6 6 6-6'/></svg>"); background-repeat: no-repeat; background-position: right 0.85rem center; padding-right: 2.5rem; cursor: pointer; }
         .saprf-select:disabled { background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'><path d='m6 9 6 6 6-6'/></svg>"); cursor: default; }
 
-        /* Textarea */
         .saprf-textarea { width: 100%; min-height: 88px; padding: 0.75rem 1rem; border-radius: 11px; border: 1.5px solid rgba(220,38,38,0.15); background: #ffffff; font-family: 'DM Sans', sans-serif; font-size: 0.875rem; color: #000000; font-weight: 500; outline: none; resize: vertical; transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box; }
         .saprf-textarea:focus { border-color: rgba(220,38,38,0.55); box-shadow: 0 0 0 3px rgba(220,38,38,0.10); }
         .saprf-textarea:disabled { background: #ffffff; color: #000000; cursor: default; border-color: rgba(220,38,38,0.10); }
 
-        /* Footer */
         .saprf-footer { padding: 1.25rem 1.75rem; border-top: 1px solid rgba(220,38,38,0.07); display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; background: rgba(254,242,242,0.35); }
         .saprf-btn-primary { height: 46px; padding: 0 1.5rem; background: linear-gradient(135deg, #991B1B, #DC2626); border: none; border-radius: 11px; color: white; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 0.45rem; box-shadow: 0 4px 16px rgba(220,38,38,0.28); transition: transform 0.15s, box-shadow 0.2s; white-space: nowrap; }
         .saprf-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(220,38,38,0.38); }
@@ -566,17 +552,9 @@ export default function SuperAdminProfilePage() {
                 </div>
               </div>
 
-              <div className="saprf-grid-2" style={{ marginBottom: '1rem' }}>
-                <div className="saprf-field">
-                  <label className="saprf-label">N° Enregistrement</label>
-                  <input className="saprf-input mono" value={assocRegNumber} onChange={e => setAssocRegNumber(e.target.value)} disabled={!isEditing} placeholder="Ex : W751234567" />
-                </div>
-                <div className="saprf-field">
-                  <label className="saprf-label">Date de fondation</label>
-                  <input className="saprf-input" type={isEditing ? 'date' : 'text'}
-                    value={isEditing ? assocFoundedAt : (assocFoundedAt ? new Date(assocFoundedAt).toLocaleDateString('fr-FR') : '—')}
-                    onChange={e => setAssocFoundedAt(e.target.value)} disabled={!isEditing} />
-                </div>
+              <div className="saprf-field" style={{ marginBottom: '1rem' }}>
+                <label className="saprf-label">N° Enregistrement</label>
+                <input className="saprf-input mono" value={assocRegNumber} onChange={e => setAssocRegNumber(e.target.value)} disabled={!isEditing} placeholder="Ex : W751234567" />
               </div>
 
               <div className="saprf-field">

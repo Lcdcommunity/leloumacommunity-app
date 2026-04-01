@@ -2,32 +2,30 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, CurrencyCode } from '@prisma/client';
+import { UpdateAssociationDto } from './dto/update-association.dto';
 
 @Injectable()
 export class AssociationsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService, // Injecté chirurgicalement
+    private readonly notifications: NotificationsService,
   ) {}
 
-  /**
-   * Récupère les informations de l'association actuelle.
-   */
   async getCurrent() {
     const assoc = await this.prisma.association.findFirst({
-      include: { logoFile: true }, // Inclusion du logo pour le front
+      include: { logoFile: true },
     });
     if (!assoc) throw new NotFoundException("Association non configurée.");
     return assoc;
   }
 
-  /**
-   * Met à jour les paramètres globaux de l'association.
-   */
-  async updateCurrent(data: any) {
+  async updateCurrent(data: UpdateAssociationDto) {
     const assoc = await this.getCurrent();
-    
+
+    // ✅ Nous avons retiré la tentative de sauvegarde de "foundedAt" 
+    // car ce champ n'existe pas dans le modèle Prisma Association.
+
     const updated = await this.prisma.association.update({
       where: { id: assoc.id },
       data: {
@@ -43,13 +41,11 @@ export class AssociationsService {
         ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
         ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
         ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
-        ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency } : {}),
+        ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency as CurrencyCode } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
-        ...(data.logoFileId !== undefined ? { logoFileId: data.logoFileId } : {}),
       },
     });
 
-    // ✅ NOTIFICATION : Alerter les Super Admins du changement de configuration globale
     await this.notifications.notifySuperAdmins(
       updated.id,
       `Les informations générales de l'association "${updated.name}" ont été mises à jour.`,

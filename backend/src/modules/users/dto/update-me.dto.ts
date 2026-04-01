@@ -61,13 +61,19 @@ export class UpdateMeDto {
   @MaxLength(120)
   country?: string;
 
-  // 👇 L'AJOUT CHIRURGICAL EST LÀ 👇
   @IsOptional()
   @IsString()
   @MaxLength(120)
   function?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(120)
   professionalStatus?: string;
+
+  // ✅ AJOUT POUR LA FONCTION OFFICIELLE (Super Admin)
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  associationTitle?: string;
 }

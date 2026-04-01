@@ -1,4 +1,5 @@
 // backend/src/modules/projects/projects.controller.ts
+// backend/src/modules/projects/projects.controller.ts
 import { Controller, Get, Post, Patch, Delete, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { ProjectsService } from './projects.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -13,7 +14,8 @@ export class ProjectsController {
   constructor(private readonly service: ProjectsService) {}
 
   @Get()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ANTENNA_ADMIN, UserRole.MEMBER)
+  // 🔥 AJOUT CHIRURGICAL : Le rôle SYSTEM_ADMIN est maintenant autorisé à lister les projets
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN, UserRole.ANTENNA_ADMIN, UserRole.MEMBER)
   list(@CurrentUser() user: AuthUser, @Query() query: any) {
     return this.service.listProjects({
       associationId: user.associationId,
@@ -32,29 +34,30 @@ export class ProjectsController {
   }
 
   @Patch('proposal/:id/approve')
-  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  // 🔥 AJOUT CHIRURGICAL : SYSTEM_ADMIN autorisé à approuver
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN, UserRole.ANTENNA_ADMIN)
   approve(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body('comment') comment: string) {
-    // 🔥 AJOUT CHIRURGICAL : Passage de user.associationId
     return this.service.approveProposal(id, user.associationId, user.id, comment);
   }
 
   @Patch('proposal/:id/reject')
-  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  // 🔥 AJOUT CHIRURGICAL : SYSTEM_ADMIN autorisé à rejeter
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN, UserRole.ANTENNA_ADMIN)
   reject(@Param('id') id: string, @CurrentUser() user: AuthUser, @Body('comment') comment: string) {
-    // 🔥 AJOUT CHIRURGICAL : Passage de user.associationId
     return this.service.rejectProposal(id, user.associationId, user.id, comment);
   }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN, UserRole.ANTENNA_ADMIN)
+  // 🔥 AJOUT CHIRURGICAL : SYSTEM_ADMIN autorisé à créer directement un projet
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN, UserRole.ANTENNA_ADMIN)
   create(@CurrentUser() user: AuthUser, @Body() body: any) {
     return this.service.createProject(user.id, user.associationId, body.antennaId || user.antennaId, body);
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  // 🔥 AJOUT CHIRURGICAL : SYSTEM_ADMIN autorisé à supprimer un projet
+  @Roles(UserRole.SYSTEM_ADMIN, UserRole.SUPER_ADMIN)
   delete(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    // 🔥 AJOUT CHIRURGICAL : Passage de user.associationId
     return this.service.deleteProject(id, user.associationId);
   }
 }

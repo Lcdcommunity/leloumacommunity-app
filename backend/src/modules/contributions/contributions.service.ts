@@ -174,11 +174,10 @@ export class ContributionsService {
    * Validation d'une cotisation
    */
   async validateContribution(id: string, dto: ValidateContributionDto, actor: AuthUser) {
-    // 🔒 Cloisonnement strict : On cherche la cotisation SEULEMENT dans l'asso de l'acteur
     const contribution = await this.prisma.contribution.findFirst({ 
       where: { id, associationId: actor.associationId } 
     });
-    
+
     if (!contribution) throw new NotFoundException('Cotisation introuvable dans votre association');
 
     await this.assertAntennaAdminCanValidate(actor, contribution.antennaId);
@@ -299,7 +298,7 @@ export class ContributionsService {
 
   async findOne(id: string, associationId: string) {
     const contribution = await this.prisma.contribution.findFirst({
-      where: { id, associationId }, // 🔒 Protection multi-tenant
+      where: { id, associationId },
       include: {
         member: { select: { firstName: true, lastName: true, email: true, phone: true } },
         antenna: { select: { name: true, code: true } },
@@ -308,13 +307,13 @@ export class ContributionsService {
     });
     if (!contribution) throw new NotFoundException('Cotisation introuvable');
     return contribution;
-  }
+  }  
 
   async cancelContribution(id: string, actor: AuthUser) {
     const contribution = await this.prisma.contribution.findFirst({ 
       where: { id, associationId: actor.associationId, memberUserId: actor.id } 
     });
-    
+
     if (!contribution) throw new NotFoundException('Cotisation introuvable');
     if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
       throw new BadRequestException('Impossible d\'annuler une cotisation déjà traitée');
@@ -350,7 +349,7 @@ export class ContributionsService {
             lastName: true,
             email: true,
             contributions: {
-              where: { status: ContributionStatus.VALIDATED, associationId },
+              where: { status: ContributionStatus.VALIDATED }, // ✅ CORRECTION ICI : suppression de "associationId" qui faisait crasher Prisma
               orderBy: { validatedAt: 'desc' },
               take: 1,
               select: { id: true, amount: true, validatedAt: true, currency: true },
@@ -375,7 +374,6 @@ export class ContributionsService {
   }
 
   private async assertAntennaAdminCanValidate(actor: AuthUser, antennaId: string): Promise<void> {
-    // 🔒 Même le SUPER_ADMIN doit appartenir à la même association que l'antenne
     const antenna = await this.prisma.antenna.findFirst({
         where: { id: antennaId, associationId: actor.associationId }
     });

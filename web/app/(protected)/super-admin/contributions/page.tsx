@@ -30,58 +30,12 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <div
-      style={{
-        background: 'rgba(253,253,255,.93)',
-        borderRadius: 14,
-        border: '1px solid rgba(220,38,38,.09)',
-        borderTop: `3px solid ${color}`,
-        boxShadow: '0 2px 8px rgba(220,38,38,.04)',
-        padding: '.8rem 1rem',
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyItems: 'space-between',
-        gap: '.5rem',
-      }}
-    >
-      <div style={{ flex: 1 }}>
-        <div
-          style={{
-            fontFamily: "'Cormorant Garamond',serif",
-            fontSize: '1.55rem',
-            fontWeight: 700,
-            color,
-            lineHeight: 1,
-            marginBottom: '.22rem',
-          }}
-        >
-          {value}
-        </div>
-        <div
-          style={{
-            fontSize: '.64rem',
-            fontWeight: 900,
-            color: '#6B7280',
-            textTransform: 'uppercase',
-            letterSpacing: '.07em',
-          }}
-        >
-          {label}
-        </div>
+    <div className="stat-card" style={{ borderTop: `3px solid ${color}` }}>
+      <div style={{ flex: 1, textAlign: 'center' }}>
+        <div className="stat-val" style={{ color }}>{value}</div>
+        <div className="stat-lbl">{label}</div>
       </div>
-      <div
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 9,
-          background: `${color}18`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color,
-          flexShrink: 0,
-        }}
-      >
+      <div className="stat-ico" style={{ background: `${color}18`, color }}>
         {icon}
       </div>
     </div>
@@ -101,7 +55,7 @@ function renderCurrencyBucket(bucket: CurrencyBucket, color?: string) {
   if (entries.length === 0) return null;
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.45rem' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.45rem', justifyContent: 'center' }}>
       {entries.map(([currency, amount]) => (
         <span
           key={currency}
@@ -195,9 +149,39 @@ export default function SuperAdminContributionsPage() {
         .sc-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .sc-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
-        .sc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:scin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
-        @media(max-width:700px){.sc-stats{grid-template-columns:repeat(2,1fr)}}
-        @media(max-width:420px){.sc-stats{grid-template-columns:1fr}}
+        /* STAT CARDS - SUR UNE LIGNE SANS COUPURE */
+        .sc-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.7rem;
+            margin-bottom: 1.4rem;
+            opacity: 0;
+            transform: translateY(10px);
+            animation: scin 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards;
+        }
+        .stat-card {
+            background: rgba(253,253,255,.93);
+            border-radius: 14px;
+            border: 1px solid rgba(220,38,38,.09);
+            box-shadow: 0 2px 8px rgba(220,38,38,.04);
+            padding: 0.8rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+        }
+        .stat-val { font-family: 'Cormorant Garamond',serif; font-size: 1.55rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
+        .stat-lbl { font-size: 0.64rem; font-weight: 900; color: #6B7280; text-transform: uppercase; letter-spacing: 0.07em; line-height: 1.2; }
+        .stat-ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+        @media(max-width: 600px) {
+            .sc-stats { gap: 0.4rem; }
+            .stat-card { padding: 0.6rem 0.4rem; gap: 0.25rem; flex-direction: column-reverse; justify-content: center; }
+            .stat-val { font-size: 1.3rem; margin-bottom: 0.1rem; }
+            .stat-lbl { font-size: 0.55rem; letter-spacing: 0; text-align: center; }
+            .stat-ico { width: 26px; height: 26px; margin-bottom: 0.2rem; }
+            .stat-ico svg { width: 14px; height: 14px; }
+        }
 
         .sc-urgent{display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1.1rem;background:linear-gradient(135deg,rgba(217,119,6,.07),rgba(245,158,11,.04));border:1px solid rgba(217,119,6,.2);border-radius:13px;margin-bottom:1.25rem;opacity:0;transform:translateY(8px);animation:scin .5s .12s cubic-bezier(.22,1,.36,1) forwards}
         .sc-urgent-ico{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#92400E,#D97706);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 8px rgba(217,119,6,.3)}
@@ -205,20 +189,101 @@ export default function SuperAdminContributionsPage() {
         .sc-urgent-text span{font-size:.75rem;font-weight:600;color:#6B7280}
 
         .sc-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:scin .5s .16s cubic-bezier(.22,1,.36,1) forwards}
-        .sc-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
-        .sc-panel-titlerow{display:flex;align-items:center;gap:.55rem}
+        .sc-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:nowrap; overflow: hidden;}
+        .sc-panel-titlerow{display:flex;align-items:center;gap:.55rem; min-width: 0;}
         .sc-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
-        .sc-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
-        .sc-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
+        
+        /* TITRE FORCÉ SUR UNE LIGNE */
+        .sc-panel-title {
+            font-size: clamp(0.7rem, 2.5vw, 0.75rem);
+            font-weight: 900;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            color: #1F2937;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .sc-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA; flex-shrink:0;}
 
-        .sc-toolbar{display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;padding:.9rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07)}
-        .sc-field{display:flex;flex-direction:column;gap:.35rem;flex:1;min-width:200px}
-        .sc-label{font-size:.7rem;font-weight:900;color:#374151;letter-spacing:.07em;text-transform:uppercase}
-        .sc-select{height:40px;border-radius:11px;border:1px solid rgba(220,38,38,.18);background:rgba(255,255,255,.9);padding:0 2rem 0 .85rem;font-family:'DM Sans',sans-serif;font-size:.84rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .65rem center;transition:border-color .2s,box-shadow .2s}
-        .sc-select:focus{border-color:rgba(220,38,38,.42);box-shadow:0 0 0 3px rgba(220,38,38,.09);outline:none}
-        .sc-filter-btn{height:40px;padding:0 1.2rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.84rem;font-weight:800;display:flex;align-items:center;gap:.45rem;box-shadow:0 3px 10px rgba(220,38,38,.3);transition:all .18s;white-space:nowrap;align-self:flex-end}
-        .sc-filter-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 5px 16px rgba(220,38,38,.42)}
-        .sc-filter-btn:disabled{opacity:.6;cursor:not-allowed}
+        /* TOOLBAR (FILTRES) - SUR UNE LIGNE */
+        .sc-toolbar {
+            display: flex;
+            flex-direction: row;
+            gap: 0.6rem;
+            align-items: center;
+            flex-wrap: nowrap;
+            padding: 0.9rem 1.4rem;
+            border-bottom: 1px solid rgba(220,38,38,.07);
+        }
+        .sc-field {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+            min-width: 0;
+        }
+        .sc-label {
+            font-size: 0.7rem;
+            font-weight: 900;
+            color: #374151;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .sc-select {
+            flex: 1;
+            height: 40px;
+            border-radius: 11px;
+            border: 1px solid rgba(220,38,38,.18);
+            background: rgba(255,255,255,.9);
+            padding: 0 1.8rem 0 .85rem;
+            font-family: 'DM Sans',sans-serif;
+            font-size: .84rem;
+            font-weight: 700;
+            color: #111827;
+            outline: none;
+            appearance: none;
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right .65rem center;
+            transition: border-color .2s,box-shadow .2s;
+            min-width: 0;
+            text-overflow: ellipsis;
+        }
+        .sc-select:focus { border-color: rgba(220,38,38,.42); box-shadow: 0 0 0 3px rgba(220,38,38,.09); }
+        .sc-filter-btn {
+            height: 40px;
+            padding: 0 1.2rem;
+            border-radius: 11px;
+            background: linear-gradient(135deg,#991B1B,#DC2626);
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-family: 'DM Sans',sans-serif;
+            font-size: .84rem;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: .45rem;
+            box-shadow: 0 3px 10px rgba(220,38,38,.3);
+            transition: all .18s;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .sc-filter-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(220,38,38,.42); }
+        .sc-filter-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+        @media(max-width: 500px) {
+            .sc-toolbar { padding: 0.7rem 0.8rem; gap: 0.4rem; }
+            .sc-field { gap: 0.35rem; }
+            .sc-label { font-size: 0.6rem; letter-spacing: 0; }
+            .sc-select { padding: 0 1.2rem 0 0.5rem; font-size: 0.75rem; background-position: right 0.4rem center; }
+            .sc-filter-btn { padding: 0 0.8rem; font-size: 0.75rem; }
+        }
 
         .sc-status-chips{display:flex;gap:.5rem;flex-wrap:wrap;padding:.75rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.06);background:rgba(254,242,242,.18)}
         .sc-chip{display:inline-flex;align-items:center;gap:.28rem;font-size:.68rem;font-weight:800;border-radius:99px;padding:.22rem .6rem;border:1px solid;cursor:pointer;transition:all .15s}
@@ -232,10 +297,10 @@ export default function SuperAdminContributionsPage() {
         .sc-empty-title{font-size:.9rem;font-weight:800;color:#374151}
         .sc-empty-sub{font-size:.78rem;font-weight:600}
 
-        .sc-amounts{display:flex;gap:1.25rem;flex-direction:column;padding:.95rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.06);background:rgba(253,253,255,.6)}
-        .sc-amount-item{display:flex;flex-direction:column;gap:.3rem}
-        .sc-amount-lbl{font-size:.62rem;font-weight:900;color:#9CA3AF;text-transform:uppercase;letter-spacing:.08em}
-        .sc-amount-val{font-family:'DM Mono',monospace;font-size:.86rem;font-weight:700;color:#0F172A}
+        .sc-amounts{display:flex; flex-direction: row; justify-content: space-around; align-items: center; gap:1.25rem; padding:1.25rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.06);background:rgba(253,253,255,.6)}
+        .sc-amount-item{display:flex;flex-direction:column; align-items: center; justify-content: center; gap:.3rem; text-align: center; flex: 1}
+        .sc-amount-lbl{font-size:.68rem;font-weight:900;color:#9CA3AF;text-transform:uppercase;letter-spacing:.08em}
+        .sc-amount-val{font-family:'DM Mono',monospace;font-size:1.1rem;font-weight:700;color:#0F172A}
 
         @keyframes scin{to{opacity:1;transform:translateY(0)}}
         @keyframes scspin{to{transform:rotate(360deg)}}
@@ -247,6 +312,7 @@ export default function SuperAdminContributionsPage() {
           <h1 className="sc-title">Cotisations <span>globales</span></h1>
         </div>
 
+        {/* STATS CARDS EN LIGNE */}
         <div className="sc-stats">
           <StatCard
             label="Total cotisations"
@@ -290,7 +356,7 @@ export default function SuperAdminContributionsPage() {
             <div className="sc-urgent-text">
               <strong>{pending} cotisation{pending > 1 ? 's' : ''} en attente</strong>
               {renderCurrencyBucket(pendingByCurrency, '#92400E')}
-              <span>Ces cotisations n&apos;ont pas encore été validées par les administrateurs d&apos;antenne.</span>
+              <span style={{ display: 'block', marginTop: '0.4rem' }}>Ces cotisations n&apos;ont pas encore été validées par les administrateurs d&apos;antenne.</span>
             </div>
           </div>
         )}
@@ -303,14 +369,15 @@ export default function SuperAdminContributionsPage() {
                   <path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                 </svg>
               </div>
-              <span className="sc-panel-title">Suivi des cotisations — toutes antennes</span>
+              <span className="sc-panel-title">Suivi des cotisations</span>
               {items.length > 0 && <span className="sc-count-chip">{items.length}</span>}
             </div>
           </div>
 
+          {/* TOOLBAR FILTRES EN LIGNE */}
           <div className="sc-toolbar">
             <div className="sc-field">
-              <label className="sc-label">Filtrer par statut</label>
+              <label className="sc-label">Statut</label>
               <select
                 className="sc-select"
                 value={status}
@@ -404,6 +471,7 @@ export default function SuperAdminContributionsPage() {
             </div>
           )}
 
+          {/* AMOUNTS CENTRES ET SUR UNE LIGNE */}
           {!loading && items.length > 0 && (
             <div className="sc-amounts">
               <div className="sc-amount-item">

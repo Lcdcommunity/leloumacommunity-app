@@ -1,4 +1,3 @@
-// web/components/super-admin/ContributionsTable.tsx
 'use client';
 
 import { useState } from 'react';
@@ -32,11 +31,19 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
     );
   }
 
+  // ✅ CORRECTION MÉTHODE DE PAIEMENT : Gère les deux noms de champs possibles du backend
+  const getDisplayMethod = (item: Contribution) => {
+    const rawMethod = item.paymentMethod || item.method || '';
+    return methodLabels[rawMethod] || rawMethod || '—';
+  };
+
   return (
     <>
       <style>{`
         .sct-wrap {
           width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .sct-table {
@@ -83,7 +90,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
         }
 
         .sct-member { display: flex; flex-direction: column; gap: .18rem; }
-        .sct-member-name { font-size: .87rem; font-weight: 800; color: #111827; }
+        .sct-member-name { font-size: .87rem; font-weight: 800; color: #111827; white-space: nowrap; }
         .sct-member-email { font-size: .72rem; color: #9CA3AF; font-weight: 500; }
         .sct-amount { font-family: 'DM Mono', monospace; font-size: .84rem; font-weight: 800; color: #111827; white-space: nowrap; }
         
@@ -101,7 +108,6 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
         }
         .sct-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-        /* ── RESPONSIVE: Masquer les colonnes secondaires sur mobile ── */
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
           .sct-table td, .sct-table th { padding: 0.75rem 0.6rem; }
@@ -113,30 +119,46 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
           z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem;
           animation: sctFadeIn 0.2s ease-out;
         }
+
         .sct-modal {
           background: white; width: 100%; max-width: 500px; border-radius: 20px;
-          box-shadow: 0 10px 30px rgba(220,38,38,0.1); overflow: hidden;
+          box-shadow: 0 10px 30px rgba(220,38,38,0.1);
           animation: sctSlideUp 0.3s cubic-bezier(.22,1,.36,1);
+          
+          /* 🔥 CORRECTION SCROLL : On structure la modale en colonne */
+          display: flex;
+          flex-direction: column;
+          max-height: calc(100vh - 2rem); /* Garde une marge avec les bords de l'écran */
         }
+
         .sct-modal-header {
           display: flex; justify-content: space-between; align-items: center;
-          padding: 1.25rem 1.5rem; background: rgba(254,242,242,0.6); border-bottom: 1px solid rgba(220,38,38,0.1);
+          padding: 1.25rem 1.5rem; background: rgba(254,242,242,0.95); border-bottom: 1px solid rgba(220,38,38,0.1);
+          flex-shrink: 0; /* Empêche le header de s'écraser */
         }
+
         .sct-modal-title {
           font-weight: 900; font-size: 0.85rem; color: #DC2626; text-transform: uppercase; letter-spacing: 0.08em;
           display: flex; align-items: center; gap: 0.5rem;
         }
+
         .sct-modal-close {
           background: white; border: 1px solid #E5E7EB; width: 32px; height: 32px; border-radius: 50%;
           display: flex; justify-content: center; align-items: center; cursor: pointer; color: #6B7280;
           transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
+
         .sct-modal-close:hover { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
         
-        .sct-modal-body { padding: 1.5rem; }
+        .sct-modal-body { 
+          padding: 1.5rem; 
+          /* 🔥 CORRECTION SCROLL : Seul le contenu défile */
+          overflow-y: auto; 
+          flex: 1;
+        }
+
         .sct-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
         
-        /* Sur très petits écrans, le modal passe en 1 colonne */
         @media (max-width: 480px) { .sct-grid { grid-template-columns: 1fr; gap: 1rem; } }
 
         .sct-field { display: flex; flex-direction: column; gap: 0.25rem; }
@@ -188,7 +210,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
 
                   <td className="hide-mobile">
                     <span className="sct-method">
-                      {methodLabels[contribution.method ?? ''] ?? contribution.method ?? '-'}
+                      {getDisplayMethod(contribution)}
                     </span>
                   </td>
 
@@ -273,7 +295,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
 
                 <div className="sct-field">
                   <label>Méthode de paiement</label>
-                  <span>{methodLabels[selectedItem.method ?? ''] ?? selectedItem.method ?? '—'}</span>
+                  <span>{getDisplayMethod(selectedItem)}</span>
                 </div>
 
                 <div className="sct-field">
@@ -283,7 +305,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
 
                 <div className="sct-field">
                   <label>Référence de transaction</label>
-                  <span className="mono" style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                  <span className="mono" style={{ fontSize: '0.8rem', color: '#6B7280', wordBreak: 'break-all' }}>
                     {selectedItem.id}
                   </span>
                 </div>
