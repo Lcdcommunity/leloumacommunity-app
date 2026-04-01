@@ -109,8 +109,6 @@ function DetailPanel({
         }
         @keyframes dppopin { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
 
-
-
         .dp-header {
           padding: 1rem 1.25rem 0.75rem;
           border-bottom: 1px solid #F3F4F6;
@@ -204,13 +202,13 @@ function DetailPanel({
             {/* Méthode */}
             <div className="dp-row">
               <span className="dp-row-label">Méthode</span>
-              <span className="dp-row-value">{getMethodLabel(item.method)}</span>
+              <span className="dp-row-value">{getMethodLabel(item.paymentMethod)}</span>
             </div>
 
             {/* Date de dépôt */}
             <div className="dp-row">
               <span className="dp-row-label">Date du dépôt</span>
-              <span className="dp-row-value">{formatDate(item.depositedAt || item.createdAt)}</span>
+              <span className="dp-row-value">{formatDate(item.contributionDate || item.createdAt)}</span>
             </div>
 
             {/* Date de validation */}
@@ -246,10 +244,10 @@ function DetailPanel({
             </div>
 
             {/* Commentaire */}
-            {item.note && (
+            {item.memberComment && (
               <div style={{ paddingTop: '0.75rem' }}>
                 <div className="dp-row-label" style={{ marginBottom: '0.4rem' }}>Commentaire</div>
-                <div className="dp-note-box">&ldquo;{item.note}&rdquo;</div>
+                <div className="dp-note-box">&ldquo;{item.memberComment}&rdquo;</div>
               </div>
             )}
           </div>
@@ -319,9 +317,9 @@ function MobileList({
             <div className="ml-left">
               <span className="ml-amount">{formatCurrency(item.amount, item.currency)}</span>
               <div className="ml-meta">
-                <span>{formatDate(item.depositedAt || item.createdAt)}</span>
+                <span>{formatDate(item.contributionDate || item.createdAt)}</span>
                 <span className="ml-meta-sep">·</span>
-                <span className="ml-method-chip">{getMethodLabelShort(item.method)}</span>
+                <span className="ml-method-chip">{getMethodLabelShort(item.paymentMethod)}</span>
               </div>
             </div>
             <div className="ml-right">
@@ -417,7 +415,7 @@ function DesktopTable({ items }: { items: ExtendedContribution[] }) {
                     )}
                   </td>
                   <td>
-                    <span className="cht-method-chip">{getMethodLabel(c.method)}</span>
+                    <span className="cht-method-chip">{getMethodLabel(c.paymentMethod)}</span>
                   </td>
                   <td>
                     {c.reference
@@ -425,7 +423,7 @@ function DesktopTable({ items }: { items: ExtendedContribution[] }) {
                       : <span className="cht-muted">—</span>}
                   </td>
                   <td><StatusBadge status={c.status} /></td>
-                  <td className="cht-muted">{formatDate(c.depositedAt || c.createdAt)}</td>
+                  <td className="cht-muted">{formatDate(c.contributionDate || c.createdAt)}</td>
                   <td className="cht-muted">{formatDate(c.validatedAt ?? null)}</td>
                 </tr>
               );

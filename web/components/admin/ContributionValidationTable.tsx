@@ -57,13 +57,15 @@ export function ContributionValidationTable({
           <tr key={c.id}>
             <td className="font-medium text-gray-900">{c.memberName || 'Inconnu'}</td>
             <td>{formatCurrency(c.amount, c.currency)}</td>
-            <td>{getMethodLabel(c.method || '') || '—'}</td>
+            {/* 👇 CORRECTION 1 : 'method' remplacé par 'paymentMethod' */}
+            <td>{getMethodLabel(c.paymentMethod || '') || '—'}</td>
             <td>
               <Badge tone={getStatusTone(c.status)}>
                 {getStatusLabel(c.status)}
               </Badge>
             </td>
-            <td>{formatDate(c.depositedAt || c.createdAt)}</td>
+            {/* 👇 CORRECTION 2 : 'depositedAt' remplacé par 'contributionDate' */}
+            <td>{formatDate(c.contributionDate || c.createdAt)}</td>
             <td>
               {/* 👇 CONDITION D'AFFICHAGE ADAPTÉE */}
               {isHistoryView ? (

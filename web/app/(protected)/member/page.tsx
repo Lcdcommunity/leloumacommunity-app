@@ -64,6 +64,7 @@ type ExtendedContribution = Contribution & {
   method?: string | null;
   validatedAt?: string | null;
   note?: string | null;
+  depositedAt?: string | null;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

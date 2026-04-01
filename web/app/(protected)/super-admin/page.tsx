@@ -204,7 +204,8 @@ function AdminContributionDetailModal({ item, onClose }: { item: Contribution; o
                 <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{`${item.member.firstName} ${item.member.lastName}`}</span>
               </div>
             ) : (
-              <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>ID: {item.memberId}</span>
+              // Correction ici : memberId -> memberUserId
+              <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>ID: {item.memberUserId}</span>
             )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #F3F4F6' }}>
@@ -701,7 +702,8 @@ export default function SuperAdminDashboardPage() {
                             {c.member ? getInitials(`${c.member.firstName} ${c.member.lastName}`) : '??'}
                           </div>
                           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>
-                            {c.member ? `${c.member.firstName} ${c.member.lastName}` : c.memberId}
+                            {/* Correction ici : memberId -> memberUserId */}
+                            {c.member ? `${c.member.firstName} ${c.member.lastName}` : c.memberUserId}
                           </span>
                         </div>
                       </td>

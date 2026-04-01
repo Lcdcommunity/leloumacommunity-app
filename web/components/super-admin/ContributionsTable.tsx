@@ -1,3 +1,4 @@
+// web/components/super-admin/ContributionsTable.tsx
 'use client';
 
 import { useState } from 'react';
@@ -31,9 +32,9 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
     );
   }
 
-  // ✅ CORRECTION MÉTHODE DE PAIEMENT : Gère les deux noms de champs possibles du backend
+  // ✅ CORRECTION MÉTHODE DE PAIEMENT : Utilisation stricte de paymentMethod
   const getDisplayMethod = (item: Contribution) => {
-    const rawMethod = item.paymentMethod || item.method || '';
+    const rawMethod = item.paymentMethod || '';
     return methodLabels[rawMethod] || rawMethod || '—';
   };
 
@@ -215,7 +216,8 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
                   </td>
 
                   <td className="sct-date hide-mobile">
-                    {formatDate(contribution.depositedAt || contribution.createdAt)}
+                    {/* 👇 CORRECTION: depositedAt -> contributionDate */}
+                    {formatDate(contribution.contributionDate || contribution.createdAt)}
                   </td>
 
                   <td>
@@ -300,7 +302,8 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
 
                 <div className="sct-field">
                   <label>Date de dépôt</label>
-                  <span>{formatDate(selectedItem.depositedAt || selectedItem.createdAt)}</span>
+                  {/* 👇 CORRECTION: depositedAt -> contributionDate */}
+                  <span>{formatDate(selectedItem.contributionDate || selectedItem.createdAt)}</span>
                 </div>
 
                 <div className="sct-field">
