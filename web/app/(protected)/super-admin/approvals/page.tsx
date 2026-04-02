@@ -145,22 +145,21 @@ export default function SuperAdminApprovalsPage() {
     <AppShell title="Validation des comptes membres">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
-        .sp-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1100px;margin:0 auto}
+        .sp-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1100px;margin:0 auto;box-sizing:border-box}
 
         /* Header */
         .sp-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:spin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
         .sp-eyebrow{font-size:.67rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
         .sp-dot{width:6px;height:6px;background:#EF4444;border-radius:50%;animation:sppulse 2s ease-in-out infinite}
         @keyframes sppulse{0%,100%{opacity:1}50%{opacity:.3}}
-        .sp-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
+        .sp-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15;margin:0}
         .sp-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
-        /* Stats */
-        .sp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:spin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
-        @media(max-width:480px){.sp-stats{grid-template-columns:1fr 1fr}}
-        .sp-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.8rem 1rem}
+        /* Stats - MAINTEANT SUR UNE LIGNE FIXE */
+        .sp-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:spin .5s .08s cubic-bezier(.22,1,.36,1) forwards;width:100%}
+        .sp-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.8rem 1rem;display:flex;flex-direction:column;justify-content:center}
         .sp-stat-val{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:700;line-height:1;margin-bottom:.2rem}
-        .sp-stat-lbl{font-size:.65rem;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.07em}
+        .sp-stat-lbl{font-size:.65rem;font-weight:800;color:#6B7280;text-transform:uppercase;letter-spacing:.07em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
         /* Urgency banner */
         .sp-urgent{display:flex;align-items:center;gap:.7rem;padding:.85rem 1.1rem;background:linear-gradient(135deg,rgba(220,38,38,.07),rgba(239,68,68,.04));border:1px solid rgba(220,38,38,.2);border-radius:13px;margin-bottom:1.25rem;opacity:0;transform:translateY(8px);animation:spin .5s .1s cubic-bezier(.22,1,.36,1) forwards}
@@ -170,14 +169,16 @@ export default function SuperAdminApprovalsPage() {
 
         /* Panel */
         .sp-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:spin .5s .14s cubic-bezier(.22,1,.36,1) forwards}
-        .sp-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem}
-        .sp-panel-titlerow{display:flex;align-items:center;gap:.55rem}
+        
+        /* Panel Head - FORCÉ SUR UNE LIGNE */
+        .sp-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:.5rem}
+        .sp-panel-titlerow{display:flex;align-items:center;gap:.55rem;min-width:0;flex:1}
         .sp-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
-        .sp-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
-        .sp-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
+        .sp-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .sp-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA;flex-shrink:0}
 
         /* Reload btn */
-        .sp-reload-btn{height:34px;padding:0 .9rem;border-radius:9px;background:rgba(254,242,242,.7);border:1.5px solid rgba(220,38,38,.18);color:#B91C1C;font-family:'DM Sans',sans-serif;font-size:.75rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.35rem;transition:all .18s;white-space:nowrap}
+        .sp-reload-btn{flex-shrink:0;height:34px;padding:0 .9rem;border-radius:9px;background:rgba(254,242,242,.7);border:1.5px solid rgba(220,38,38,.18);color:#B91C1C;font-family:'DM Sans',sans-serif;font-size:.75rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.35rem;transition:all .18s;white-space:nowrap}
         .sp-reload-btn:hover{background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
 
         /* Error */
@@ -187,6 +188,19 @@ export default function SuperAdminApprovalsPage() {
         .sp-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1rem;gap:.75rem;color:#9CA3AF}
         .sp-empty-title{font-size:.9rem;font-weight:800;color:#374151}
         .sp-empty-sub{font-size:.78rem;font-weight:600;color:#9CA3AF}
+
+        /* Responsive Mobile Ajustements Chirurgicaux */
+        @media(max-width:540px){
+          .sp-stats{gap:0.4rem; margin-bottom:1rem;}
+          .sp-stat{padding:0.7rem 0.4rem;}
+          .sp-stat-val{font-size:1.3rem;}
+          .sp-stat-lbl{font-size:0.5rem;}
+          
+          .sp-panel-head{padding:0.8rem 0.6rem; gap:0.4rem;}
+          .sp-panel-title{font-size:0.65rem;}
+          .sp-reload-btn{padding:0 0.6rem; height:32px; font-size:0.7rem;}
+          .btn-text{display:none;} /* Cache le mot 'Actualiser' */
+        }
 
         @keyframes spin{to{opacity:1;transform:translateY(0)}}
         @keyframes spspin{to{transform:rotate(360deg)}}
@@ -205,11 +219,11 @@ export default function SuperAdminApprovalsPage() {
           {([
             { label: 'En attente',   value: items.length,  color: '#DC2626' },
             { label: 'À approuver',  value: items.length,  color: '#D97706' },
-            { label: 'Traités aujourd\u2019hui', value: 0, color: '#059669' },
+            { label: 'Traités',      value: 0,             color: '#059669' }, // "Aujourd'hui" retiré pour faire plus propre
           ] as const).map(s => (
             <div key={s.label} className="sp-stat" style={{ borderTopColor: s.color }}>
               <div className="sp-stat-val" style={{ color: s.color }}>{s.value}</div>
-              <div className="sp-stat-lbl">{s.label}</div>
+              <div className="sp-stat-lbl" title={s.label}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -245,7 +259,7 @@ export default function SuperAdminApprovalsPage() {
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              Actualiser
+              <span className="btn-text">Actualiser</span>
             </button>
           </div>
 
