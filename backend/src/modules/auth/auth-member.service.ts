@@ -10,14 +10,14 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { UserRole, UserStatus, TokenType } from '@prisma/client';
-import { AuthMailerService } from './auth.mailer.service'; // 💉 INJECTION CHIRURGICALE
+import { AuthMailerService } from './auth.mailer.service';
 import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AuthMemberService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly authMailer: AuthMailerService, // 💉 INJECTION CHIRURGICALE
+    private readonly authMailer: AuthMailerService,
     private readonly config: ConfigService,
   ) {}
 
@@ -66,6 +66,8 @@ export class AuthMemberService {
           country: dto.country?.trim() || null,
           addressLine1: dto.addressLine1?.trim() || null,
           addressLine2: dto.addressLine2?.trim() || null,
+          // 👇 NOUVEAU CHAMP : Trace légale de l'acceptation
+          termsAcceptedAt: new Date(), 
         },
       });
 

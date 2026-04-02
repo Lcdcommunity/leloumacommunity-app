@@ -75,7 +75,7 @@ function DetailModal({
     <>
       <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', backdropFilter:'blur(5px)', zIndex:300 }} onClick={onClose} />
       <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:301, background:'rgba(253,253,255,0.98)', borderRadius:22, width:'100%', maxWidth:580, maxHeight:'90vh', display:'flex', flexDirection:'column', boxShadow:'0 25px 50px rgba(15,23,42,0.2)', animation:'modalPop .3s cubic-bezier(.22,1,.36,1)' }}>
-        
+
         <div style={{ padding:'1.5rem', borderBottom:'1px solid rgba(37,99,235,0.09)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'1rem', background:'#F8FAFC', borderRadius:'22px 22px 0 0' }}>
           <div>
             <div style={{ display:'flex', alignItems:'center', gap:'.5rem', marginBottom:'.6rem' }}>
@@ -115,7 +115,7 @@ function DetailModal({
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             Supprimer
           </button>
-          
+
           {document.fileAsset?.url ? (
             <a 
               href={document.fileAsset.url} 
@@ -203,15 +203,22 @@ export default function AdminDocumentsPage() {
         .ad-form-wrapper.open { max-height: 1500px; opacity: 1; overflow: visible; }
         .ad-form-body{padding:1.25rem 1.3rem}
 
-        /* Toolbar */
-        .ad-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:1rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07)}
-        .ad-sw{position:relative;flex:1;min-width:160px}
+        /* Toolbar - AJUSTÉ POUR FORCER SUR UNE LIGNE */
+        .ad-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:nowrap;padding:1rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);width:100%;box-sizing:border-box}
+        .ad-sw{position:relative;flex:1;min-width:0;}
         .ad-si{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
-        .ad-search{width:100%;height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 .85rem 0 2.3rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;outline:none;transition:border-color .2s,box-shadow .2s}
+        .ad-search{width:100%;height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 .85rem 0 2.3rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;outline:none;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
         .ad-search:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08);background:white}
         .ad-search::placeholder{color:rgba(107,114,128,.45)}
-        .ad-search-btn{height:38px;padding:0 1rem;border-radius:10px;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;display:flex;align-items:center;gap:.35rem;box-shadow:0 3px 10px rgba(37,99,235,.28);transition:all .18s;white-space:nowrap}
+        .ad-search-btn{height:38px;padding:0 1rem;border-radius:10px;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;display:flex;align-items:center;gap:.35rem;box-shadow:0 3px 10px rgba(37,99,235,.28);transition:all .18s;white-space:nowrap;flex-shrink:0;}
         .ad-search-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(37,99,235,.38)}
+
+        @media(max-width:500px){
+          .ad-toolbar { padding: 0.8rem 1rem; gap: 0.4rem; }
+          .ad-search { font-size: 0.75rem; padding: 0 0.5rem 0 1.8rem; }
+          .ad-si { left: 0.5rem; }
+          .ad-search-btn { padding: 0 0.6rem; font-size: 0.75rem; }
+        }
 
         /* Table */
         .ad-tw{overflow-x:auto}
@@ -290,7 +297,7 @@ export default function AdminDocumentsPage() {
                 <DocumentForm onCreated={() => { void load(); setFormOpen(false); }} />
               </div>
             </div>
-          </div>
+          </div>          
 
           {/* RIGHT — Library */}
           <div className="ad-panel ad-panel-right">

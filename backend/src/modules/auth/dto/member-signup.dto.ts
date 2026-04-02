@@ -1,4 +1,4 @@
-//backend/src/modules/auth/dto/member-signup.dto.ts
+// backend/src/modules/auth/dto/member-signup.dto.ts
 import {
   IsEmail,
   IsOptional,
@@ -6,6 +6,8 @@ import {
   IsUUID,
   MinLength,
   MaxLength,
+  IsBoolean,
+  Equals,
 } from 'class-validator';
 
 export class MemberSignupDto {
@@ -52,4 +54,9 @@ export class MemberSignupDto {
   @IsString()
   @MaxLength(255)
   addressLine2?: string;
+
+  // 👇 NOUVEAU CHAMP : Validation stricte pour les mentions légales
+  @IsBoolean()
+  @Equals(true, { message: 'Vous devez accepter les mentions légales et la politique de confidentialité.' })
+  termsAccepted!: boolean;
 }

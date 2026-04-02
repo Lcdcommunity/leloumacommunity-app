@@ -69,6 +69,8 @@ export default function MemberDocumentsPage() {
           font-family: 'DM Sans', sans-serif;
           padding: clamp(1.25rem, 3vw, 2rem);
           max-width: 1200px; margin: 0 auto;
+          box-sizing: border-box; /* Empêcher le dépassement */
+          width: 100%;
         }
 
         /* ── Header ── */
@@ -91,20 +93,27 @@ export default function MemberDocumentsPage() {
           font-family: 'Cormorant Garamond', serif;
           font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 500;
           color: #111827; letter-spacing: -0.02em; line-height: 1.15;
+          margin: 0; /* Corriger les marges par défaut */
         }
         .md-title span {
           background: linear-gradient(135deg,#1D4ED8,#3B82F6);
           -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
 
-        /* ── Toolbar ── */
+        /* ── Toolbar REVISITÉE ── */
         .md-toolbar {
-          display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;
+          display: flex; flex-direction: column; gap: 0.75rem;
           margin-bottom: 1.25rem;
           opacity: 0; transform: translateY(10px);
           animation: mdin 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards;
+          width: 100%; box-sizing: border-box;
         }
-        .md-search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 380px; }
+        
+        /* Ligne 1 : Recherche */
+        .md-search-row {
+          display: flex; align-items: center; gap: 0.65rem; width: 100%; flex-wrap: nowrap;
+        }
+        .md-search-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
         .md-search-ico { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
         .md-search-input {
           width: 100%; height: 42px; padding: 0 0.9rem 0 2.5rem;
@@ -112,6 +121,7 @@ export default function MemberDocumentsPage() {
           background: rgba(255,255,255,0.88); font-family: 'DM Sans', sans-serif;
           font-size: 0.83rem; color: #111827; outline: none;
           transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
         }
         .md-search-input:focus {
           border-color: rgba(37,99,235,0.45);
@@ -121,7 +131,7 @@ export default function MemberDocumentsPage() {
         .md-search-input::placeholder { color: rgba(107,114,128,0.45); }
 
         .md-search-btn {
-          height: 42px; padding: 0 1.1rem;
+          flex: 0 0 auto; height: 42px; padding: 0 1.1rem;
           background: linear-gradient(135deg,#1D4ED8,#2563EB);
           color: white; border: none; border-radius: 11px;
           font-family: 'DM Sans', sans-serif;
@@ -133,13 +143,17 @@ export default function MemberDocumentsPage() {
         }
         .md-search-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.38); }
 
+        /* Ligne 2 : Filtres & Vues */
+        .md-filters-row {
+          display: flex; justify-content: space-between; align-items: center; width: 100%;
+        }
         .md-count-chip {
           font-size: 0.72rem; font-weight: 700;
           padding: 0.28rem 0.7rem; border-radius: 99px;
           background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
         }
 
-        .md-view-toggle { display: flex; gap: 0.3rem; margin-left: auto; }
+        .md-view-toggle { display: flex; gap: 0.3rem; }
         .md-view-btn {
           width: 36px; height: 36px; border-radius: 10px;
           border: 1.5px solid rgba(37,99,235,0.13);
@@ -149,6 +163,17 @@ export default function MemberDocumentsPage() {
         }
         .md-view-btn.active { background: #EFF6FF; border-color: #2563EB; color: #2563EB; }
         .md-view-btn:hover:not(.active) { background: #F8FAFC; color: #374151; }
+
+        @media (max-width: 500px) {
+          .md-search-row { gap: 0.4rem; }
+          .md-search-input { height: 38px; font-size: 0.75rem; padding-left: 2.2rem; }
+          .md-search-ico { left: 0.6rem; width: 14px; height: 14px; }
+          .md-search-btn { height: 38px; padding: 0 0.8rem; font-size: 0.75rem; }
+          .btn-text { display: none; } /* Sur très petit écran, le texte 'Rechercher' saute, juste la loupe reste */
+          
+          .md-view-btn { width: 34px; height: 34px; }
+          .md-count-chip { font-size: 0.65rem; padding: 0.2rem 0.5rem; }
+        }
 
         /* ── Grid View ── */
         .md-grid {
@@ -202,7 +227,7 @@ export default function MemberDocumentsPage() {
           background: #EFF6FF; color: #1D4ED8; text-decoration: none;
           font-size: 0.73rem; font-weight: 700;
           transition: background 0.15s, border-color 0.15s, transform 0.15s;
-          width: 100%; justify-content: center;
+          width: 100%; justify-content: center; box-sizing: border-box;
         }
         .md-dl-btn:hover { background: #DBEAFE; border-color: #2563EB; transform: translateY(-1px); }
         .md-no-file {
@@ -275,7 +300,7 @@ export default function MemberDocumentsPage() {
           background: #F9FAFB; border: 1px solid #E5E7EB;
           display: flex; align-items: center; justify-content: center;
         }
-        .md-empty p { font-size: 0.82rem; font-weight: 500; }
+        .md-empty p { font-size: 0.82rem; font-weight: 500; margin: 0; }
         .md-empty small { font-size: 0.72rem; color: #CBD5E1; }
 
         .md-loader {
@@ -288,8 +313,8 @@ export default function MemberDocumentsPage() {
           border-top-color: #2563EB; border-radius: 50%;
           animation: mdspin 0.8s linear infinite;
         }
-        @keyframes mdspin { to { transform: rotate(360deg); } }
-
+        @keyframes mdspin { to { transform: rotate(360deg); } }        
+        
         .md-error {
           display: flex; align-items: center; gap: 0.6rem;
           padding: 1rem; color: #B91C1C; font-size: 0.8rem;
@@ -308,47 +333,54 @@ export default function MemberDocumentsPage() {
           <h1 className="md-title">Documents <span>&amp; photos</span></h1>
         </div>
 
-        {/* Toolbar */}
+        {/* Toolbar - NOUVELLE STRUCTURE */}
         <div className="md-toolbar">
-          <div className="md-search-wrap">
-            <span className="md-search-ico">
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          
+          {/* Ligne 1: Recherche */}
+          <div className="md-search-row">
+            <div className="md-search-wrap">
+              <span className="md-search-ico">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
+                </svg>
+              </span>
+              <input
+                className="md-search-input"
+                placeholder="Rechercher un document&#8230;"
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && void loadData(q)}
+              />
+            </div>
+
+            <button className="md-search-btn" onClick={() => void loadData(q)}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
                 <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
               </svg>
-            </span>
-            <input
-              className="md-search-input"
-              placeholder="Rechercher un document&#8230;"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && void loadData(q)}
-            />
+              <span className="btn-text">Rechercher</span>
+            </button>
           </div>
 
-          <button className="md-search-btn" onClick={() => void loadData(q)}>
-            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-              <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
-            </svg>
-            Rechercher
-          </button>
+          {/* Ligne 2: Boutons vue & Compteur */}
+          <div className="md-filters-row">
+            {!loading ? (
+              <span className="md-count-chip">
+                {filtered.length} document{filtered.length !== 1 ? 's' : ''}
+              </span>
+            ) : <div/>}
 
-          {!loading && (
-            <span className="md-count-chip">
-              {filtered.length} document{filtered.length !== 1 ? 's' : ''}
-            </span>
-          )}
-
-          <div className="md-view-toggle">
-            <button className={`md-view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Vue grille">
-              <svg width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M1 2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1V2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1V2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V2zM1 7a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1V7zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1V7zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V7zM1 12a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1v-2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2z"/>
-              </svg>
-            </button>
-            <button className={`md-view-btn${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')} title="Vue liste">
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16"/>
-              </svg>
-            </button>
+            <div className="md-view-toggle">
+              <button className={`md-view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Vue grille">
+                <svg width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M1 2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1V2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1V2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V2zM1 7a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1V7zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1V7zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V7zM1 12a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1v-2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2z"/>
+                </svg>
+              </button>
+              <button className={`md-view-btn${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')} title="Vue liste">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -404,7 +436,7 @@ export default function MemberDocumentsPage() {
                   {d.fileAsset?.url ? (
                     <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="md-dl-btn">
                       <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"/>
                       </svg>
                       {d.fileAsset.fileName ?? 'T\u00e9l\u00e9charger'}
                     </a>
@@ -445,7 +477,7 @@ export default function MemberDocumentsPage() {
                     {d.fileAsset?.url ? (
                       <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="md-list-dl">
                         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"/>
                         </svg>
                         T&eacute;l&eacute;charger
                       </a>

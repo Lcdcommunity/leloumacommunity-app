@@ -35,6 +35,7 @@ export interface VirtualCardData {
     birthCountry?: string | null;
     originSubPrefecture?: string | null;
     originCommune?: string | null;
+    originVillage?: string | null; // 👈 AJOUTÉ ICI
     country?: string | null;
     city?: string | null;
     postalCode?: string | null;

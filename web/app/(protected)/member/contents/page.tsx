@@ -42,7 +42,7 @@ function ContentDetailModal({ content, onClose }: { content: ContentPost; onClos
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', animation: 'mbin2 0.2s ease' }} onClick={onClose}>
       <div style={{ width: '100%', maxWidth: 580, background: '#fff', borderRadius: 24, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 32px 72px rgba(0,0,0,0.18)', animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)' }} onClick={e => e.stopPropagation()}>
         <div style={{ height: 4, background: typeCfg.color, borderRadius: '24px 24px 0 0' }} />
-        
+
         <div style={{ padding: '1.25rem 1.5rem 1rem', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem' }}>
           <div style={{ flex: 1 }}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.65rem', fontWeight: 700, color: typeCfg.color, background: typeCfg.bg, border: `1px solid ${typeCfg.border}`, borderRadius: 99, padding: '0.2rem 0.6rem', marginBottom: '0.5rem' }}>
@@ -55,7 +55,7 @@ function ContentDetailModal({ content, onClose }: { content: ContentPost; onClos
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
-        
+
         <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
           {imageUrl && (
             <div style={{ marginBottom: '1.5rem', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)', background: 'linear-gradient(135deg, #F8FAFC, #F1F5F9)' }}>
@@ -145,6 +145,8 @@ export default function MemberContentsPage() {
           font-family: 'DM Sans', sans-serif;
           padding: clamp(1.25rem, 3vw, 2rem);
           max-width: 900px; margin: 0 auto;
+          box-sizing: border-box;
+          width: 100%;
         }
 
         /* ── Header ── */
@@ -173,14 +175,21 @@ export default function MemberContentsPage() {
           -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
         }
 
-        /* ── Toolbar ── */
+        /* ── Toolbar REVISITÉE POUR MOBILE ── */
         .mc-toolbar {
-          display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;
+          display: flex; flex-direction: column; gap: 0.65rem;
           margin-bottom: 1.25rem;
           opacity: 0; transform: translateY(10px);
           animation: mcin 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards;
+          width: 100%; box-sizing: border-box;
         }
-        .mc-search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 400px; }
+        
+        .mc-search-row {
+          display: flex; align-items: center; gap: 0.65rem;
+          flex-wrap: nowrap; width: 100%;
+        }
+        
+        .mc-search-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
         .mc-search-ico { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
         .mc-search-input {
           width: 100%; height: 42px; padding: 0 0.9rem 0 2.5rem;
@@ -188,6 +197,7 @@ export default function MemberContentsPage() {
           background: rgba(255,255,255,0.88); font-family: 'DM Sans', sans-serif;
           font-size: 0.83rem; color: #111827; outline: none;
           transition: border-color 0.2s, box-shadow 0.2s;
+          box-sizing: border-box;
         }
         .mc-search-input:focus {
           border-color: rgba(37,99,235,0.45);
@@ -197,7 +207,7 @@ export default function MemberContentsPage() {
         .mc-search-input::placeholder { color: rgba(107,114,128,0.45); }
 
         .mc-search-btn {
-          height: 42px; padding: 0 1.1rem;
+          flex: 0 0 auto; height: 42px; padding: 0 1.1rem;
           background: linear-gradient(135deg,#1D4ED8,#2563EB);
           color: white; border: none; border-radius: 11px;
           font-family: 'DM Sans', sans-serif;
@@ -208,11 +218,24 @@ export default function MemberContentsPage() {
         }
         .mc-search-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.38); }
 
+        .mc-count-row {
+          display: flex; justify-content: flex-end; width: 100%;
+        }
+
         .mc-count-chip {
           font-size: 0.72rem; font-weight: 700;
           padding: 0.28rem 0.7rem; border-radius: 99px;
           background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
           white-space: nowrap;
+        }
+        
+        @media (max-width: 500px) {
+          .mc-search-row { gap: 0.4rem; }
+          .mc-search-input { height: 38px; font-size: 0.75rem; padding-left: 2rem; }
+          .mc-search-ico { left: 0.6rem; width: 14px; height: 14px; }
+          .mc-search-btn { height: 38px; padding: 0 0.8rem; font-size: 0.75rem; }
+          .btn-text { display: none; } /* Cache "Rechercher" pour gagner de la place */
+          .mc-count-chip { font-size: 0.65rem; padding: 0.2rem 0.5rem; }
         }
 
         /* ── Error ── */
@@ -260,7 +283,6 @@ export default function MemberContentsPage() {
           display: flex; flex-direction: column; gap: 0.85rem;
           opacity: 0; animation: mcin 0.5s 0.16s cubic-bezier(.22,1,.36,1) forwards;
         }
-
         .mc-article {
           background: rgba(253,253,255,0.92);
           backdrop-filter: blur(10px);
@@ -346,33 +368,39 @@ export default function MemberContentsPage() {
 
         {/* Toolbar */}
         <div className="mc-toolbar">
-          <div className="mc-search-wrap">
-            <span className="mc-search-ico">
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          
+          <div className="mc-search-row">
+            <div className="mc-search-wrap">
+              <span className="mc-search-ico">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
+                </svg>
+              </span>
+              <input
+                className="mc-search-input"
+                placeholder="Rechercher une annonce&#8230;"
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && void loadData(q)}
+              />
+            </div>
+
+            <button className="mc-search-btn" onClick={() => void loadData(q)}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
                 <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
               </svg>
-            </span>
-            <input
-              className="mc-search-input"
-              placeholder="Rechercher une annonce&#8230;"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && void loadData(q)}
-            />
+              <span className="btn-text">Rechercher</span>
+            </button>
           </div>
 
-          <button className="mc-search-btn" onClick={() => void loadData(q)}>
-            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-              <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
-            </svg>
-            Rechercher
-          </button>
-
-          {!loading && (
-            <span className="mc-count-chip">
-              {filtered.length} publication{filtered.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          <div className="mc-count-row">
+            {!loading && (
+              <span className="mc-count-chip">
+                {filtered.length} publication{filtered.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          
         </div>
 
         {/* Error */}
@@ -395,7 +423,7 @@ export default function MemberContentsPage() {
                 <path strokeLinecap="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
               </svg>
             </div>
-            <p>Aucune publication{q ? ' pour cette recherche' : ''}</p>
+            <p>Aucun contenu pour le moment</p>
           </div>
         ) : (
 

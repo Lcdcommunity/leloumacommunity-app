@@ -131,7 +131,15 @@ export default function MemberExpensesPage() {
         .me-title span { background: linear-gradient(135deg, #047857, #10B981); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
         .me-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: mein 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards; }
-        @media (max-width: 540px) { .me-stats { grid-template-columns: 1fr; } }
+        
+        /* 👇 CORRECTION ICI POUR MOBILE : On garde 2 colonnes (repeat(2, 1fr)) et on adapte les marges/polices */
+        @media (max-width: 540px) { 
+          .me-stats { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; } 
+          .me-stat { padding: 0.8rem 0.5rem !important; }
+          .me-stat-val { font-size: 1.4rem !important; }
+          .me-stat-lbl { font-size: 0.55rem !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        }
+        
         .me-stat { background: rgba(253,253,255,0.9); backdrop-filter: blur(12px); border-radius: 16px; border: 1px solid rgba(5,150,105,0.09); border-top: 3px solid; padding: 1.1rem 1.25rem; box-shadow: 0 4px 12px rgba(5,150,105,0.04); }
         .me-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.85rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
         .me-stat-lbl { font-size: 0.65rem; font-weight: 800; color: #6B7280; text-transform: uppercase; letter-spacing: 0.08em; }

@@ -1,5 +1,4 @@
 // web/app/(public)/signup/page.tsx
-// web/app/(public)/signup/page.tsx
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
@@ -43,6 +42,39 @@ export const PROFESSION_LIST = [
   'Autre',
 ];
 
+export const COMMUNES_ORIGINE = [
+  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
+];
+
+export const COUNTRIES = [
+  { name: 'Guinée', code: 'GN', dial: '+224', phoneLength: 9 },
+  { name: 'France', code: 'FR', dial: '+33', phoneLength: 9 },
+  { name: 'Sénégal', code: 'SN', dial: '+221', phoneLength: 9 },
+  { name: 'Côte d\'Ivoire', code: 'CI', dial: '+225', phoneLength: 10 },
+  { name: 'Mali', code: 'ML', dial: '+223', phoneLength: 8 },
+  { name: 'Maroc', code: 'MA', dial: '+212', phoneLength: 9 },
+  { name: 'Canada', code: 'CA', dial: '+1', phoneLength: 10 },
+  { name: 'États-Unis', code: 'US', dial: '+1', phoneLength: 10 },
+  { name: 'Belgique', code: 'BE', dial: '+32', phoneLength: 9 },
+  { name: 'Suisse', code: 'CH', dial: '+41', phoneLength: 9 },
+  { name: 'Allemagne', code: 'DE', dial: '+49', phoneLength: 10 },
+  { name: 'Royaume-Uni', code: 'GB', dial: '+44', phoneLength: 10 },
+  { name: 'Espagne', code: 'ES', dial: '+34', phoneLength: 9 },
+  { name: 'Italie', code: 'IT', dial: '+39', phoneLength: 10 },
+  { name: 'Sierra Leone', code: 'SL', dial: '+232', phoneLength: 8 },
+  { name: 'Libéria', code: 'LR', dial: '+231', phoneLength: 8 },
+  { name: 'Guinée-Bissau', code: 'GW', dial: '+245', phoneLength: 9 },
+  { name: 'Gambie', code: 'GM', dial: '+220', phoneLength: 7 },
+  { name: 'Angola', code: 'AO', dial: '+244', phoneLength: 9 },
+  { name: 'Cameroun', code: 'CM', dial: '+237', phoneLength: 9 },
+  { name: 'Niger', code: 'NE', dial: '+227', phoneLength: 8 },
+  { name: 'Afrique du Sud', code: 'ZA', dial: '+27', phoneLength: 9 },
+  { name: 'Mozambique', code: 'MZ', dial: '+258', phoneLength: 9 },
+  { name: 'Portugal', code: 'PT', dial: '+351', phoneLength: 9 },
+  { name: 'Autre (Non listé)', code: 'OTHER', dial: '+', phoneLength: 0 }
+].sort((a, b) => a.name.localeCompare(b.name));
+
 export default function MemberSignupPage() {
   const [antennas, setAntennas] = useState<PublicAntenna[]>([]);
   const [loadingAntennas, setLoadingAntennas] = useState(true);
@@ -67,7 +99,6 @@ export default function MemberSignupPage() {
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
   const [profession, setProfession] = useState('');
-  // ── NOUVEAU : Poste occupé dans l'association ──
   const [associationRole, setAssociationRole] = useState('');
 
   // ── Étape 2 : Photo ──
@@ -81,6 +112,7 @@ export default function MemberSignupPage() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [showPwd2, setShowPwd2] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -105,6 +137,24 @@ export default function MemberSignupPage() {
   useEffect(() => {
     return () => { if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); };
   }, [photoPreviewUrl]);
+
+  // Logique de mise à jour dynamique de l'indicatif téléphonique
+  useEffect(() => {
+    if (country) {
+      const selectedCountry = COUNTRIES.find(c => c.name === country);
+      if (selectedCountry) {
+        if (!phone || phone.trim() === '' || !phone.includes(' ')) {
+          setPhone(`${selectedCountry.dial} `);
+        } else {
+          const phoneParts = phone.split(' ');
+          if (phoneParts.length > 1) {
+            phoneParts[0] = selectedCountry.dial;
+            setPhone(phoneParts.join(' '));
+          }
+        }
+      }
+    }
+  }, [country]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBirthDateChange = (e: ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
@@ -157,13 +207,25 @@ export default function MemberSignupPage() {
     if (s === 1) {
       if (!email.trim()) return "L'email est requis.";
       if (!/\S+@\S+\.\S+/.test(email)) return "Format d'email invalide.";
-      if (!originSubPrefecture.trim()) return "La commune d'origine est requise.";
+      if (!originSubPrefecture) return "La commune d'origine est requise.";
       if (birthDate && birthDate.length < 10) return "La date de naissance doit être complète (JJ/MM/AAAA).";
+      
+      // Validation dynamique du téléphone
+      if (phone && country) {
+        const selectedCountry = COUNTRIES.find(c => c.name === country);
+        if (selectedCountry && selectedCountry.phoneLength > 0) {
+          const numberPart = phone.split(' ')[1] ? phone.split(' ')[1].replace(/\D/g, '') : '';
+          if (numberPart.length !== selectedCountry.phoneLength) {
+             return `Pour ${selectedCountry.name}, le numéro (sans l'indicatif) doit faire exactement ${selectedCountry.phoneLength} chiffres.`;
+          }
+        }
+      }
     }
     if (s === 3) {
       if (!password) return 'Le mot de passe est requis.';
       if (password.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères.';
       if (password !== passwordConfirm) return 'Les mots de passe ne correspondent pas.';
+      if (!termsAccepted) return 'Vous devez accepter les Mentions Légales et la Politique de Confidentialité pour continuer.';
     }
     return null;
   }
@@ -195,7 +257,7 @@ export default function MemberSignupPage() {
         phone: phone || undefined,
         password,
         antennaId,
-        originSubPrefecture: originSubPrefecture.trim(),
+        originSubPrefecture,
         birthDate: convertDateToISO(birthDate),
         placeOfBirth: placeOfBirth || undefined,
         birthCountry: birthCountry || undefined,
@@ -204,9 +266,11 @@ export default function MemberSignupPage() {
         postalCode: postalCode || undefined,
         addressLine1: addressLine1 || undefined,
         addressLine2: addressLine2 || undefined,
-        // Poste occupé en priorité, sinon profession générale
         function: associationRole || profession || undefined,
-      });
+        termsAccepted,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any); 
+
       if (selectedPhotoFile) {
         const formData = new FormData();
         formData.append('avatar', selectedPhotoFile);
@@ -298,9 +362,8 @@ export default function MemberSignupPage() {
         .sp-input, .sp-select { width: 100%; min-height: 48px; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #FFFFFF; padding: 0 1rem; color: #111827; font-weight: 500; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
         .sp-input:focus, .sp-select:focus { border-color: var(--theme-blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
         .sp-input.has-icon { padding-right: 2.8rem; }
-        .sp-select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; padding-right: 2rem; appearance: none; }
+        .sp-select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; appearance: none; }
         .sp-eye-btn { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94A3B8; cursor: pointer; padding: 4px; display: flex; align-items: center; }
-
         .sp-pwd-strength { display: flex; gap: 4px; margin-top: 0.4rem; align-items: center; }
         .sp-pwd-bar { flex: 1; height: 4px; border-radius: 99px; background: #E2E8F0; overflow: hidden; }
         .sp-pwd-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.4s; }
@@ -331,7 +394,6 @@ export default function MemberSignupPage() {
         .sp-file-label { min-height: 46px; padding: 0 1.25rem; border-radius: 12px; border: 1.5px solid #CBD5E1; background: white; color: var(--theme-blue-dark); font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; }
         .sp-file-input { display: none; }
         .sp-photo-remove-btn { min-height: 46px; padding: 0 1rem; border-radius: 12px; border: 1.5px solid rgba(220,38,38,0.2); background: rgba(254,242,242,0.6); color: #DC2626; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; }
-        .sp-photo-skip { background: none; border: none; padding: 0; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 700; color: #64748B; display: inline-flex; align-items: center; gap: 0.35rem; }
 
         /* ── Highlight du champ Poste occupé ── */
         .sp-role-select {
@@ -355,6 +417,35 @@ export default function MemberSignupPage() {
           -webkit-background-clip: text; -webkit-text-fill-color: transparent;
           background-clip: text;
           display: flex; align-items: center; gap: 0.4rem;
+        }
+        
+        /* ── Case à cocher Légale ── */
+        .sp-checkbox-wrapper {
+          display: flex; align-items: flex-start; gap: 0.75rem;
+          margin-top: 1.5rem; padding: 1rem; background: #F8FAFC;
+          border: 1px solid #E2E8F0; border-radius: 12px;
+        }
+        .sp-checkbox {
+          appearance: none; width: 20px; height: 20px;
+          border: 2px solid #CBD5E1; border-radius: 6px;
+          background-color: white; cursor: pointer;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; margin-top: 0.1rem; transition: all 0.2s;
+        }
+        .sp-checkbox:checked {
+          background-color: var(--theme-blue); border-color: var(--theme-blue);
+        }
+        .sp-checkbox:checked::after {
+          content: ''; width: 5px; height: 10px;
+          border: solid white; border-width: 0 2px 2px 0;
+          transform: rotate(45deg); margin-bottom: 2px;
+        }
+        .sp-checkbox:focus { box-shadow: 0 0 0 3px rgba(37,99,235,0.15); outline: none; }
+        .sp-legal-label {
+          font-size: 0.8rem; color: #475569; line-height: 1.5; cursor: pointer;
+        }
+        .sp-legal-link {
+          color: var(--theme-blue); font-weight: 700; text-decoration: underline;
         }
 
         @media (max-width: 540px) {
@@ -468,12 +559,15 @@ export default function MemberSignupPage() {
 
                   <div className="sp-field">
                     <label className="sp-label">Commune d&apos;origine</label>
-                    <input className="sp-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} placeholder="Ex : Lafou" required />
+                    {/* Transformation en SELECT */}
+                    <select className="sp-select" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} required>
+                      <option value="">Sélectionnez votre commune...</option>
+                      {COMMUNES_ORIGINE.map(commune => (
+                        <option key={commune} value={commune}>{commune}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  {/* ════════════════════════════════════════
-                      NOUVEAU CHAMP : Poste occupé dans l'association
-                  ════════════════════════════════════════ */}
                   <div className="sp-field">
                     <label className="sp-role-label">
                       <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
@@ -516,10 +610,28 @@ export default function MemberSignupPage() {
 
                   <div className="sp-field">
                     <label className="sp-label">Pays de naissance <span className="sp-opt">(optionnel)</span></label>
-                    <input className="sp-input" value={birthCountry} onChange={e => setBirthCountry(e.target.value)} placeholder="Ex : Guinée" />
+                    {/* Transformation en SELECT avec liste des pays */}
+                    <select className="sp-select" value={birthCountry} onChange={e => setBirthCountry(e.target.value)}>
+                      <option value="">Sélectionnez un pays...</option>
+                      {COUNTRIES.map(c => (
+                        <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <p className="sp-section-title">Coordonnées &amp; Profession</p>
+                  
+                  {/* Le choix du pays de résidence vient AVANT le téléphone pour injecter l'indicatif */}
+                  <div className="sp-field">
+                    <label className="sp-label">Pays de résidence</label>
+                    <select className="sp-select" value={country} onChange={e => setCountry(e.target.value)} required>
+                      <option value="">Sélectionnez votre pays actuel...</option>
+                      {COUNTRIES.map(c => (
+                        <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div className="sp-grid-2">
                     <div className="sp-field">
                       <label className="sp-label">Email</label>
@@ -527,7 +639,12 @@ export default function MemberSignupPage() {
                     </div>
                     <div className="sp-field">
                       <label className="sp-label">Téléphone <span className="sp-opt">(optionnel)</span></label>
-                      <input className="sp-input" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+33 6 …" />
+                      <input 
+                        className="sp-input" 
+                        value={phone} 
+                        onChange={e => setPhone(e.target.value)} 
+                        placeholder={country ? "Entrez le numéro" : "Sélectionnez un pays d'abord"} 
+                      />
                     </div>
                   </div>
 
@@ -541,30 +658,26 @@ export default function MemberSignupPage() {
                     </select>
                   </div>
 
-                  <p className="sp-section-title">Lieu de résidence actuelle</p>
+                  <p className="sp-section-title">Adresse (Optionnelle)</p>
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">Ville <span className="sp-opt">(optionnel)</span></label>
-                      <input className="sp-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Paris" />
+                      <label className="sp-label">Ville</label>
+                      <input className="sp-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Paris, Conakry" />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Code postal <span className="sp-opt">(optionnel)</span></label>
-                      <input className="sp-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="75001" />
+                      <label className="sp-label">Code postal</label>
+                      {/* Ajout du maxLength=5 */}
+                      <input className="sp-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="Ex: 75001" maxLength={5} />
                     </div>
-                  </div>
-
-                  <div className="sp-field">
-                    <label className="sp-label">Pays <span className="sp-opt">(détermine la devise)</span></label>
-                    <input className="sp-input" value={country} onChange={e => setCountry(e.target.value)} placeholder="France" />
                   </div>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">Adresse 1 <span className="sp-opt">(optionnel)</span></label>
+                      <label className="sp-label">Adresse 1</label>
                       <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue..." />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Adresse 2 <span className="sp-opt">(optionnel)</span></label>
+                      <label className="sp-label">Adresse 2</label>
                       <input className="sp-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 3B" />
                     </div>
                   </div>
@@ -590,11 +703,6 @@ export default function MemberSignupPage() {
                         <button type="button" className="sp-photo-remove-btn" onClick={removePhoto}>Supprimer</button>
                       )}
                     </div>
-                    <p style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '0.75rem' }}>Max 5 Mo · JPG, PNG, WEBP</p>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1rem' }}>
-                    <span className="sp-toast-ok" style={{ fontSize: '0.68rem' }}>Requis pour la carte membre</span>
-                    <button type="button" className="sp-photo-skip" onClick={nextStep}>Passer cette étape</button>
                   </div>
                 </div>
               )}
@@ -627,6 +735,21 @@ export default function MemberSignupPage() {
                       <button type="button" className="sp-eye-btn" onClick={() => setShowPwd2(v => !v)}>{showPwd2 ? 'Cacher' : 'Voir'}</button>
                     </div>
                   </div>
+
+                  <div className="sp-checkbox-wrapper">
+                    <input 
+                      type="checkbox" 
+                      id="legal-accept" 
+                      className="sp-checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      required 
+                    />
+                    <label htmlFor="legal-accept" className="sp-legal-label">
+                      J&apos;ai lu et j&apos;accepte sans réserve les <Link href="/mentions-legales" className="sp-legal-link" target="_blank">Mentions Légales</Link> ainsi que la <Link href="/confidentialite" className="sp-legal-link" target="_blank">Politique de Confidentialité</Link> de l&apos;association LCD.
+                    </label>
+                  </div>
+
                 </div>
               )}
 
@@ -639,7 +762,7 @@ export default function MemberSignupPage() {
                 {step < STEPS.length - 1 ? (
                   <button type="button" className="sp-btn-next" onClick={nextStep} disabled={step === 2 && !!photoError}>Continuer</button>
                 ) : (
-                  <button type="submit" className="sp-btn-submit" disabled={submitting}>
+                  <button type="submit" className="sp-btn-submit" disabled={submitting || !termsAccepted}>
                     {submitting ? <div className="sp-spinner" /> : 'Créer mon compte'}
                   </button>
                 )}

@@ -72,7 +72,7 @@ function CreateExpenseModal({ onClose, onSuccess, availableBalance }: { onClose:
 
       // Typage strict pour éviter les erreurs ESLint (au lieu de `as any`)
       await api.createAntennaExpense(payload as Parameters<typeof api.createAntennaExpense>[0]); 
-      
+
       onSuccess();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création de la dépense.');
@@ -170,14 +170,14 @@ function ExpenseDetailModal({ expense, onClose }: { expense: Expense; onClose: (
     <div className="ae-modal-overlay" onClick={onClose}>
       <div className="ae-modal" onClick={(e) => e.stopPropagation()}>
         <div style={{ height: 5, background: `linear-gradient(90deg, ${s.color}, ${s.color}88)` }} />
-        
+
         {/* Entête avec statut centré */}
         <div className="ae-modal-head" style={{ flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.65rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.3rem 0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }} />{s.label}
           </span>
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#0F172A', marginTop: '0.75rem', marginBottom: 0, lineHeight: 1.2 }}>{expense.title}</h2>
-          
+
           <button className="ae-modal-close" onClick={onClose} style={{ position: 'absolute', right: '1.25rem', top: '1.25rem' }}>
             <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
@@ -255,7 +255,7 @@ export default function AntennaAdminExpensesPage() {
         api.listAntennaContributions({ page: 1, pageSize: 1000, status: 'VALIDATED' }),
         api.listAntennaExpenses({ page: 1, pageSize: 1000, status: 'VALIDATED' })
       ]);
-      
+
       // Utilisation d'un type local pour corriger l'erreur "any"
       type ApiItem = { amount: number | string };
       type ApiResponse = { items?: ApiItem[] };
@@ -265,7 +265,7 @@ export default function AntennaAdminExpensesPage() {
 
       const totalIncome = incomeList.reduce((acc, curr) => acc + Number(curr.amount), 0);
       const totalSpent = expenseList.reduce((acc, curr) => acc + Number(curr.amount), 0);
-      
+
       setAvailableBalance(totalIncome - totalSpent);
     } catch (err) {
       console.error('Erreur lors du calcul du solde:', err);
@@ -298,12 +298,14 @@ export default function AntennaAdminExpensesPage() {
 
         .ae-wrap { font-family: 'DM Sans', 'Inter', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 1200px; margin: 0 auto; }
         
-        .ae-header { margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s cubic-bezier(.22,1,.36,1) forwards; }
+        /* ── HEADER MODIFIÉ ── */
+        .ae-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s cubic-bezier(.22,1,.36,1) forwards; }
+        .ae-header-text { display: flex; flex-direction: column; }
         .ae-eyebrow { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem; }
         .ae-eyebrow-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; }
         .ae-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 700; color: #0F172A; letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
         .ae-title span { color: #2563EB; }
-
+        
         .ae-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.05s cubic-bezier(.22,1,.36,1) forwards; }
         .ae-stat { background: white; border-radius: 16px; border: 1px solid #E2E8F0; padding: 1.25rem 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: center; }
         .ae-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: 0.4rem; color: #0F172A; }
@@ -339,15 +341,38 @@ export default function AntennaAdminExpensesPage() {
         .ae-td-amount { font-family: 'DM Mono', monospace; font-weight: 700; font-size: 1rem; }
         .ae-td-date { font-size: 0.8rem; font-weight: 500; color: #475569; }
 
-        /* ── CORRECTIONS MOBILE : Cartes Fintech Épurées ── */
+        /* ── CORRECTIONS MOBILE ── */
         .ae-cards-mobile { display: none; }
 
         @media (max-width: 768px) {
             .hide-mobile { display: none !important; }
             .ae-table { display: none; } 
             
-            .ae-stats { grid-template-columns: 1fr; gap: 0.5rem; margin-bottom: 1rem; }
-            .ae-stat { padding: 1rem; flex-direction: row; justify-content: space-between; align-items: center; border-top: 1px solid #E2E8F0; border-left: 4px solid; }
+            /* Ajustement de l'entête sur mobile pour garder le bouton visible */
+            .ae-header { align-items: center; }
+            .ae-title { font-size: 1.25rem !important; }
+            .ae-new-btn { padding: 0 0.8rem; height: 36px; font-size: 0.8rem; border-radius: 8px; }
+            .btn-text { display: none; } /* Cache le texte du bouton sur très petits écrans pour gagner de la place */
+            
+            /* Ajustement des stats pour qu'elles soient sur une seule ligne */
+            .ae-stats { 
+              grid-template-columns: repeat(3, 1fr); 
+              gap: 0.5rem; 
+              margin-bottom: 1rem; 
+            }
+            .ae-stat { 
+              padding: 0.5rem; 
+              flex-direction: column; 
+              justify-content: center; 
+              align-items: center; 
+              border-top: none; 
+              border-left: 0; 
+              border-bottom: 3px solid; 
+              text-align: center;
+              border-radius: 12px;
+            }
+            .ae-stat-val { font-size: 1rem !important; margin-bottom: 0.2rem; }
+            .ae-stat-lbl { font-size: 0.5rem !important; }
 
             .ae-cards-mobile { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: #F8FAFC; }
 
@@ -419,20 +444,26 @@ export default function AntennaAdminExpensesPage() {
 
       <div className="ae-wrap">
         <div className="ae-header">
-          <div className="ae-eyebrow"><div className="ae-eyebrow-dot" />Admin Antenne</div>
-          <h1 className="ae-title">Gestion des <span>Dépenses</span></h1>
+          <div className="ae-header-text">
+            <div className="ae-eyebrow"><div className="ae-eyebrow-dot" />Admin Antenne</div>
+            <h1 className="ae-title">Gestion des <span>Dépenses</span></h1>
+          </div>
+          <button className="ae-new-btn" onClick={() => setIsCreateOpen(true)}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+            <span className="btn-text hide-mobile">Nouvelle dépense</span>
+          </button>
         </div>
 
         <div className="ae-stats">
-          <div className="ae-stat" style={{ borderLeftColor: '#2563EB' }}>
+          <div className="ae-stat" style={{ borderBottomColor: '#2563EB' }}>
             <div className="ae-stat-val" style={{ color: '#1E3A8A' }}>{items.length}</div>
             <div className="ae-stat-lbl">Enregistrées</div>
           </div>
-          <div className="ae-stat" style={{ borderLeftColor: '#059669' }}>
+          <div className="ae-stat" style={{ borderBottomColor: '#059669' }}>
             <div className="ae-stat-val" style={{ color: '#047857' }}>{formatCurrency(totalAmount, items[0]?.currency || 'EUR')}</div>
             <div className="ae-stat-lbl">Total Validé</div>
           </div>
-          <div className="ae-stat" style={{ borderLeftColor: '#D97706' }}>
+          <div className="ae-stat" style={{ borderBottomColor: '#D97706' }}>
             <div className="ae-stat-val" style={{ color: '#B45309' }}>{pendingCount}</div>
             <div className="ae-stat-lbl">En attente</div>
           </div>
@@ -446,10 +477,7 @@ export default function AntennaAdminExpensesPage() {
               </div>
               <span className="ae-panel-title">Historique</span>
             </div>
-            <button className="ae-new-btn" onClick={() => setIsCreateOpen(true)}>
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
-              <span className="hide-mobile">Nouvelle dépense</span>
-            </button>
+            {/* Le bouton n'est plus ici, il est dans ae-header */}
           </div>
 
           <div className="ae-toolbar">

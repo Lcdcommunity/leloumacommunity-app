@@ -1,5 +1,4 @@
 //web/app/(protected)/admin/projections/page.tsx
-//web/app/(protected)/admin/projections/page.tsx
 'use client';
 
 import { AppShell } from '../../../../components/layout/AppShell';
@@ -13,9 +12,11 @@ export default function AdminProjectionsPage() {
 
         .pj-wrap {
           font-family: 'DM Sans', sans-serif;
-          padding: clamp(1.1rem, 3vw, 2rem);
+          padding: clamp(1rem, 3vw, 2rem);
           max-width: 1100px;
           margin: 0 auto;
+          box-sizing: border-box;
+          width: 100%;
         }
 
         /* ── Header ── */
@@ -36,8 +37,8 @@ export default function AdminProjectionsPage() {
         @keyframes pjpulse { 0%,100%{opacity:1} 50%{opacity:.3} }
         .pj-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700;
-          color: #111827; letter-spacing: -.02em; line-height: 1.15;
+          font-size: clamp(1.45rem, 4vw, 1.9rem); font-weight: 700;
+          color: #111827; letter-spacing: -.02em; line-height: 1.15; margin: 0;
         }
         .pj-title span {
           background: linear-gradient(135deg, #0F766E, #14B8A6);
@@ -46,7 +47,7 @@ export default function AdminProjectionsPage() {
         }
         .pj-subtitle {
           font-size: .82rem; font-weight: 600; color: #64748B;
-          margin-top: .3rem; line-height: 1.5;
+          margin-top: .3rem; line-height: 1.4;
         }
 
         /* ── Info banner ── */
@@ -84,6 +85,8 @@ export default function AdminProjectionsPage() {
           overflow: hidden;
           opacity: 0; transform: translateY(10px);
           animation: pjin .5s .16s cubic-bezier(.22,1,.36,1) forwards;
+          width: 100%;
+          box-sizing: border-box;
         }
         .pj-panel-head {
           padding: .9rem 1.3rem;
@@ -101,9 +104,61 @@ export default function AdminProjectionsPage() {
           font-size: .72rem; font-weight: 900; letter-spacing: .09em;
           text-transform: uppercase; color: #1F2937;
         }
-        .pj-panel-body { padding: clamp(1rem, 2.5vw, 1.6rem); }
+        .pj-panel-body { 
+          padding: clamp(0.75rem, 2.5vw, 1.6rem); 
+          width: 100%;
+          box-sizing: border-box;
+        }
 
         @keyframes pjin { to { opacity: 1; transform: translateY(0) } }
+
+        /* * ── FORCE RESPONSIVE OVERRIDES POUR PROJECTIONFORM ──
+         * (Injectées depuis le parent pour forcer l'enfant à s'adapter) 
+         */
+        
+        @media (max-width: 550px) {
+          /* Réduire les espacements globaux pour donner plus de place au form */
+          .pj-wrap { padding: 0.75rem; }
+          .pj-panel { border-radius: 16px; }
+          .pj-panel-head { padding: 0.75rem; }
+          .pj-panel-title { font-size: 0.65rem; }
+
+          /* Cibler brutalement les conteneurs internes du ProjectionForm pour éviter le débordement */
+          .pj-panel-body * {
+            max-width: 100% !important; /* Rien ne doit dépasser 100% */
+            box-sizing: border-box !important;
+          }
+
+          /* Forcer les boutons de scénarios (Pessimiste, Réaliste, Optimiste) sur plusieurs lignes si besoin, ou réduire drastiquement leur padding/texte */
+          .pj-panel-body button {
+            padding-left: 0.4rem !important;
+            padding-right: 0.4rem !important;
+            font-size: 0.7rem !important;
+            min-width: 0 !important;
+            flex-shrink: 1 !important;
+          }
+
+          /* Forcer les groupes de boutons en flex-wrap pour éviter l'écrasement horizontal */
+          .pj-panel-body [style*="display: flex"] {
+            flex-wrap: wrap !important;
+          }
+
+          /* Garantir que les inputs ne débordent pas */
+          .pj-panel-body input {
+            width: 100% !important;
+            font-size: 0.9rem !important;
+          }
+
+          /* Ajuster les gros blocs de résultats (ex: Simulation financière) */
+          .pj-panel-body [style*="background:"] {
+            padding: 1rem !important; /* Moins de padding interne */
+          }
+          
+          /* Réduire les polices des grands chiffres */
+          .pj-panel-body h2, .pj-panel-body .text-3xl, .pj-panel-body [style*="font-size: 2"] {
+            font-size: 1.5rem !important;
+          }
+        }
       `}</style>
 
       <div className="pj-wrap">

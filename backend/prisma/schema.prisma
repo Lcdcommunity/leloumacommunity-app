@@ -499,6 +499,8 @@ model User {
   timezone          String?      @default("Europe/Paris")
   isPhoneVerified   Boolean      @default(false)
 
+  termsAcceptedAt   DateTime     @default(now())
+
   createdByUserId  String?
   approvedByUserId String?
   approvedAt       DateTime?
@@ -1359,7 +1361,7 @@ model Document {
 
 model FileAsset {
   id               String  @id @default(cuid())
-  associationId    String? // 👈 MODIFIÉ ICI (ajout du '?')
+  associationId    String? 
   uploadedByUserId String?
 
   storageProvider  String 
@@ -1383,7 +1385,7 @@ model FileAsset {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  association    Association? @relation(fields: [associationId], references: [id], onDelete: Cascade) // 👈 MODIFIÉ ICI (ajout du '?')
+  association    Association? @relation(fields: [associationId], references: [id], onDelete: Cascade) 
   uploadedByUser User?        @relation("FileUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull)
 
   associationLogoFor   Association[]  @relation("AssociationLogo")
@@ -1420,8 +1422,8 @@ model Notification {
   message         String
   payload         Json? 
   createdByUserId String?
-  createdAt       DateTime         @default(now())
-
+  createdAt       DateTime         @default(now()) 
+  
   association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
   user          User?       @relation("NotificationUserTarget", fields: [userId], references: [id], onDelete: SetNull)
@@ -1489,8 +1491,8 @@ model ReminderRunLog {
   triggeredByUserId String? 
   triggeredAt       DateTime     @default(now())
 
-  association   Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  antenna       Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  association     Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna         Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
   triggeredByUser User?       @relation("ReminderTriggeredByUser", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
 
   @@index([associationId, kind, triggeredAt])

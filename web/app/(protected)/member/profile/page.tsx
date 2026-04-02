@@ -1,3 +1,4 @@
+//web/app/(protected)/member/profile/page.tsx
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
@@ -34,6 +35,40 @@ export const PROFESSION_LIST = [
   'Retraité(e)',
   'Autre',
 ];
+
+// ── NOUVELLES LISTES DÉROULANTES ──
+export const COMMUNES_ORIGINE = [
+  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
+];
+
+export const COUNTRIES = [
+  { name: 'Guinée', code: 'GN' },
+  { name: 'France', code: 'FR' },
+  { name: 'Sénégal', code: 'SN' },
+  { name: 'Côte d\'Ivoire', code: 'CI' },
+  { name: 'Mali', code: 'ML' },
+  { name: 'Maroc', code: 'MA' },
+  { name: 'Canada', code: 'CA' },
+  { name: 'États-Unis', code: 'US' },
+  { name: 'Belgique', code: 'BE' },
+  { name: 'Suisse', code: 'CH' },
+  { name: 'Allemagne', code: 'DE' },
+  { name: 'Royaume-Uni', code: 'GB' },
+  { name: 'Espagne', code: 'ES' },
+  { name: 'Italie', code: 'IT' },
+  { name: 'Sierra Leone', code: 'SL' },
+  { name: 'Libéria', code: 'LR' },
+  { name: 'Guinée-Bissau', code: 'GW' },
+  { name: 'Gambie', code: 'GM' },
+  { name: 'Angola', code: 'AO' },
+  { name: 'Cameroun', code: 'CM' },
+  { name: 'Niger', code: 'NE' },
+  { name: 'Afrique du Sud', code: 'ZA' },
+  { name: 'Mozambique', code: 'MZ' },
+  { name: 'Portugal', code: 'PT' },
+  { name: 'Autre (Non listé)', code: 'OTHER' }
+].sort((a, b) => a.name.localeCompare(b.name));
 
 export default function MemberProfilePage() {
   const [me, setMe] = useState<FullUserProfile | null>(null);
@@ -95,7 +130,6 @@ export default function MemberProfilePage() {
     setAddressLine1(user.addressLine1 || '');
     setAddressLine2(user.addressLine2 || '');
 
-    // 👇 Les deux champs sont désormais parfaitement indépendants !
     setAssociationRole(user.function || '');
     setProfession(user.professionalStatus || '');
 
@@ -180,8 +214,8 @@ export default function MemberProfilePage() {
         postalCode: postalCode.trim() || undefined,
         addressLine1: addressLine1.trim() || undefined,
         addressLine2: addressLine2.trim() || undefined,
-        function: associationRole || undefined,               // 👈 Envoi séparé
-        professionalStatus: profession || undefined,          // 👈 Envoi séparé
+        function: associationRole || undefined,
+        professionalStatus: profession || undefined,
       };
 
       Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
@@ -218,6 +252,7 @@ export default function MemberProfilePage() {
       birthCountry: birthCountry || null,
       originSubPrefecture: originSubPrefecture || null,
       originCommune: originSubPrefecture || null,
+      originVillage: originSubPrefecture || null, // 👈 Ajout du champ lu par le composant widget
       country: country || null,
       city: city || null,
       postalCode: postalCode || null,
@@ -298,9 +333,19 @@ export default function MemberProfilePage() {
         .mpr-hero-name {
           font-family: 'Cormorant Garamond', serif;
           font-size: 1.85rem; font-weight: 700; line-height: 1;
-          color: #fffdf6; margin-bottom: 0.3rem;
+          color: #fffdf6; margin-bottom: 0.15rem;
         }
         .mpr-hero-name em { font-style: normal; color: #FCD116; }
+        
+        .mpr-hero-id {
+          font-family: 'DM Mono', monospace;
+          font-size: 0.75rem;
+          color: #FCD116;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          margin-bottom: 0.25rem;
+        }
+        
         .mpr-hero-role {
           display: inline-flex; align-items: center; gap: 0.4rem;
           background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2);
@@ -504,6 +549,12 @@ export default function MemberProfilePage() {
             <h2 className="mpr-hero-name">
               {firstName} <em>{lastName}</em>
             </h2>
+            
+            {/* 👇 L'IDENTIFIANT TECHNIQUE TRONQUÉ EST ICI 👇 */}
+            <div className="mpr-hero-id">
+              ID: {me?.id ? me.id.substring(0, 8) : '—'}
+            </div>
+
             <p className="mpr-hero-email">{me?.email}</p>
           </div>
         </div>
@@ -608,11 +659,21 @@ export default function MemberProfilePage() {
             <div className="mpr-grid-2" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
                 <label className="mpr-label">Commune d&apos;origine</label>
-                <input className="mpr-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} disabled={!isEditing} />
+                <select className="mpr-select" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} disabled={!isEditing}>
+                  <option value="">Sélectionnez votre commune...</option>
+                  {COMMUNES_ORIGINE.map(commune => (
+                    <option key={commune} value={commune}>{commune}</option>
+                  ))}
+                </select>
               </div>
               <div className="mpr-field">
                 <label className="mpr-label">Pays de naissance</label>
-                <input className="mpr-input" value={birthCountry} onChange={e => setBirthCountry(e.target.value)} disabled={!isEditing} />
+                <select className="mpr-select" value={birthCountry} onChange={e => setBirthCountry(e.target.value)} disabled={!isEditing}>
+                  <option value="">Sélectionnez un pays...</option>
+                  {COUNTRIES.map(c => (
+                    <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -674,7 +735,12 @@ export default function MemberProfilePage() {
             <div className="mpr-grid-1" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
                 <label className="mpr-label">Pays</label>
-                <input className="mpr-input" value={country} onChange={e => setCountry(e.target.value)} disabled={!isEditing} />
+                <select className="mpr-select" value={country} onChange={e => setCountry(e.target.value)} disabled={!isEditing}>
+                  <option value="">Sélectionnez un pays...</option>
+                  {COUNTRIES.map(c => (
+                    <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>

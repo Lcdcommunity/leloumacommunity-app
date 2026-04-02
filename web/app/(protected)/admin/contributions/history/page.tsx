@@ -108,7 +108,7 @@ function ContributionDetailModal({
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
               Informations du Membre
             </h3>
-            
+
             <div className="ach-grid-2">
               <div className="ach-info-box">
                 <label>Prénom</label>
@@ -139,7 +139,7 @@ function ContributionDetailModal({
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               Détails du versement
             </h3>
-            
+
             <div className="ach-grid-2">
               <div className="ach-info-box ach-box-highlight">
                 <label>Montant</label>
@@ -220,7 +220,7 @@ function ContributionDetailModal({
 
         <div className="ach-modal-footer">
           {!isView && <button className="ach-btn-sec" onClick={() => onConfirm('view', '')}>Annuler</button>}
-          
+
           <div className="ach-footer-actions">
             {isView ? (
               <>
@@ -280,7 +280,7 @@ export default function AdminContributionsHistoryPage() {
 
     const c = modal.contribution;
     if (!c || mode === 'view') return;
-    
+
     setBusyId(c.id);
     try {
       if (mode === 'edit') {
@@ -316,19 +316,26 @@ export default function AdminContributionsHistoryPage() {
         .ach-eyebrow { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
         .ach-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; }
         .ach-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 6vw, 2.2rem); font-weight: 700; color: #0F172A; line-height: 1.2; letter-spacing: -0.02em; margin: 0; }
-        .ach-title span { color: #2563EB; }
-        
+        .ach-title span { color: #2563EB; }        
         .ach-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
         @media(max-width: 640px) { .ach-stats { grid-template-columns: repeat(2, 1fr); } }
         .ach-stat { background: white; border-radius: 14px; border: 1px solid #E2E8F0; padding: 0.9rem 1rem; border-top: 3px solid; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .ach-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
         .ach-stat-lbl { font-size: 0.65rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }
 
-        /* Toolbar */
-        .ach-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-        .ach-select, .ach-search { height: 44px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 500; color: #1E293B; outline: none; background: white; transition: border-color 0.2s, box-shadow 0.2s; }
+        /* Toolbar - AJUSTÉ SUR UNE SEULE LIGNE */
+        .ach-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: nowrap; width: 100%; box-sizing: border-box; align-items: center; }
+        .ach-select, .ach-search { height: 40px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 500; color: #1E293B; outline: none; background: white; transition: border-color 0.2s, box-shadow 0.2s; }
         .ach-select:focus, .ach-search:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
-        .ach-search { flex: 1; min-width: 200px; }
+        
+        .ach-select { flex: 0 1 auto; min-width: 0; padding-right: 1.8rem; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.6rem center; }
+        .ach-search { flex: 1 1 auto; min-width: 0; }
+        
+        @media(max-width: 480px) {
+          .ach-toolbar { gap: 0.3rem; }
+          .ach-select, .ach-search { height: 36px; font-size: 0.75rem; padding: 0 0.5rem; }
+          .ach-select { padding-right: 1.4rem; background-position: right 0.4rem center; }
+        }
         
         /* Cartes (Liste principale) */
         .ach-card { background: white; border-radius: 16px; border: 1px solid #E2E8F0; padding: 1.25rem; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
@@ -426,6 +433,7 @@ export default function AdminContributionsHistoryPage() {
           ))}
         </div>
 
+        {/* TOOLBAR MODIFIÉE ICI */}
         <div className="ach-toolbar">
           <select className="ach-select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Tous les statuts</option>
@@ -475,7 +483,7 @@ export default function AdminContributionsHistoryPage() {
                   <StatusBadge status={c.status} />
                 </div>
               </div>
-              
+
               <div className="ach-card-footer">
                 <div className="ach-card-method">
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>

@@ -78,7 +78,7 @@ function DetailModal({
     <>
       <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', backdropFilter:'blur(5px)', zIndex:300 }} onClick={onClose} />
       <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:301, background:'rgba(253,253,255,0.98)', borderRadius:22, width:'100%', maxWidth:680, maxHeight:'90vh', display:'flex', flexDirection:'column', boxShadow:'0 25px 50px rgba(15,23,42,0.2)', animation:'modalPop .3s cubic-bezier(.22,1,.36,1)' }}>
-        
+
         {/* Header Modale */}
         <div style={{ padding:'1.5rem', borderBottom:'1px solid rgba(37,99,235,0.09)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'1rem', background:'#F8FAFC', borderRadius:'22px 22px 0 0' }}>
           <div>
@@ -130,7 +130,7 @@ function DetailModal({
             <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             Supprimer
           </button>
-          
+
           <div style={{ display:'flex', gap:'0.6rem', flexWrap:'wrap' }}>
             {imageUrl && (
               <a 
@@ -249,17 +249,27 @@ export default function AdminContentsPage() {
         .ac-form-wrapper { max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s ease; }
         .ac-form-wrapper.open { max-height: 1500px; opacity: 1; overflow: visible; }
         .ac-form-body{padding:1.25rem 1.3rem}
-
-        .ac-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:1rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07)}
-        .ac-sw{position:relative;flex:1;min-width:160px}
+        
+        /* ── TOOLBAR AJUSTÉE POUR MOBILE ── */
+        .ac-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:nowrap;padding:1rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);width:100%;box-sizing:border-box}
+        .ac-sw{position:relative;flex:1 1 auto;min-width:0}
         .ac-si{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
-        .ac-search{width:100%;height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 .85rem 0 2.3rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;outline:none;transition:border-color .2s,box-shadow .2s}
+        .ac-search{width:100%;height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 .85rem 0 2.3rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;outline:none;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
         .ac-search:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08);background:white}
         .ac-search::placeholder{color:rgba(107,114,128,.45)}
-        .ac-select{height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 2rem 0 .85rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;font-weight:600;outline:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .65rem center;transition:border-color .2s,box-shadow .2s}
+        .ac-select{flex:0 1 auto;min-width:0;height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 2rem 0 .85rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;font-weight:600;outline:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .65rem center;transition:border-color .2s,box-shadow .2s}
         .ac-select:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
-        .ac-reload-btn{height:38px;padding:0 .85rem;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);display:flex;align-items:center;gap:.35rem;cursor:pointer;color:#374151;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:600;transition:all .18s;white-space:nowrap}
+        .ac-reload-btn{flex:0 0 auto;height:38px;padding:0 .85rem;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);display:flex;align-items:center;gap:.35rem;cursor:pointer;color:#374151;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:600;transition:all .18s;white-space:nowrap}
         .ac-reload-btn:hover{background:#EFF6FF;border-color:rgba(37,99,235,.3);color:#1D4ED8}
+        
+        @media(max-width:500px){
+          .ac-toolbar { padding: 0.8rem 0.5rem; gap: 0.4rem; }
+          .ac-search { font-size: 0.75rem; padding: 0 0.5rem 0 1.8rem; height: 36px; }
+          .ac-si { left: 0.5rem; }
+          .ac-select { font-size: 0.75rem; padding: 0 1.4rem 0 0.5rem; height: 36px; background-position: right 0.4rem center; }
+          .ac-reload-btn { padding: 0 0.6rem; height: 36px; font-size: 0.75rem; }
+          .btn-text { display: none; } /* Cache le mot "Actualiser" pour que tout tienne sur une ligne ! */
+        }
         
         .ac-tw{overflow-x:auto}
         .ac-table{width:100%;border-collapse:collapse;min-width:480px}
@@ -360,7 +370,7 @@ export default function AdminContentsPage() {
               </select>
               <button className="ac-reload-btn" onClick={() => void load(q, status)}>
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Actualiser
+                <span className="btn-text">Actualiser</span>
               </button>
             </div>
 

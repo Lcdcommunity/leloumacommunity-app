@@ -45,7 +45,7 @@ function CoverageGauge({ pct }: { pct: number }) {
   const color = pct >= 100 ? '#10B981' : pct >= 70 ? '#F59E0B' : '#F87171';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+    <div className="pf-gauge-wrapper">
       <div style={{ position: 'relative', width: 110, height: 58, overflow: 'hidden', flexShrink: 0 }}>
         <svg width="110" height="110" viewBox="0 0 110 110" style={{ position: 'absolute', top: 0 }}>
           <path d="M 11 55 A 44 44 0 0 1 99 55" fill="none" stroke="rgba(255,255,255,.15)" strokeWidth="9" strokeLinecap="round" />
@@ -105,6 +105,8 @@ export function ProjectionForm() {
           grid-template-columns: 1fr 1fr;
           gap: 1.5rem;
           align-items: start;
+          width: 100%;
+          box-sizing: border-box;
         }
         @media (max-width: 720px) {
           .pf-root { grid-template-columns: 1fr; gap: 1rem; }
@@ -120,6 +122,8 @@ export function ProjectionForm() {
           opacity: 0;
           transform: translateY(12px);
           animation: pfIn .5s .05s cubic-bezier(.22,1,.36,1) forwards;
+          width: 100%;
+          box-sizing: border-box;
         }
         .pf-card-head {
           padding: .9rem 1.3rem;
@@ -139,14 +143,22 @@ export function ProjectionForm() {
           font-size: .65rem; font-weight: 900; letter-spacing: .1em;
           text-transform: uppercase; color: #334155;
         }
-        .pf-card-body { padding: 1.3rem; display: flex; flex-direction: column; gap: 1.2rem; }
+        .pf-card-body { 
+          padding: 1.3rem; 
+          display: flex; 
+          flex-direction: column; 
+          gap: 1.2rem; 
+          width: 100%;
+          box-sizing: border-box;
+        }
 
         /* ── Field ── */
-        .pf-field { display: flex; flex-direction: column; gap: .35rem; }
+        .pf-field { display: flex; flex-direction: column; gap: .35rem; width: 100%; }
         .pf-label {
           font-size: .67rem; font-weight: 800; color: #475569;
           text-transform: uppercase; letter-spacing: .07em;
           display: flex; align-items: center; justify-content: space-between;
+          flex-wrap: wrap; gap: 0.4rem;
         }
         .pf-badge {
           font-family: 'DM Mono', monospace; font-size: .72rem; font-weight: 700;
@@ -160,6 +172,7 @@ export function ProjectionForm() {
           height: 44px; background: #FAFAFA; border: 1.5px solid #E2E8F0;
           border-radius: 11px; padding: 0 .85rem;
           transition: border-color .18s, box-shadow .18s;
+          width: 100%; box-sizing: border-box;
         }
         .pf-num-wrap:focus-within {
           border-color: #14B8A6;
@@ -170,7 +183,7 @@ export function ProjectionForm() {
         .pf-num {
           flex: 1; border: none; outline: none; background: transparent;
           font-family: 'DM Mono', monospace; font-size: .92rem; font-weight: 700;
-          color: #0F172A; min-width: 0;
+          color: #0F172A; min-width: 0; width: 100%;
         }
         .pf-num::-webkit-outer-spin-button,
         .pf-num::-webkit-inner-spin-button { -webkit-appearance: none; }
@@ -181,7 +194,7 @@ export function ProjectionForm() {
           -webkit-appearance: none; appearance: none; width: 100%;
           height: 6px; border-radius: 5px; outline: none; cursor: pointer;
           background: linear-gradient(to right, #0F766E var(--pct,65%), #E2E8F0 var(--pct,65%));
-          display: block;
+          display: block; margin: 0.5rem 0; /* Ajout d'une marge pour aérer */
         }
         .pf-slider::-webkit-slider-thumb {
           -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
@@ -196,24 +209,40 @@ export function ProjectionForm() {
           border: 3px solid white; box-shadow: 0 2px 8px rgba(15,118,110,.35);
           cursor: pointer;
         }
+        
+        /* 👇 Correction pour empêcher l'écrasement des textes sous les sliders */
         .pf-marks {
           display: flex; justify-content: space-between; margin-top: .25rem;
+          flex-wrap: wrap; /* Autoriser le retour à la ligne sur de très petits écrans */
+          gap: 0.2rem;
         }
         .pf-mark {
           font-size: .59rem; font-weight: 700; color: #94A3B8; cursor: pointer;
           transition: color .15s; background: none; border: none; padding: 0;
-          font-family: 'DM Sans', sans-serif;
+          font-family: 'DM Sans', sans-serif; white-space: nowrap; /* Empêcher la coupure des mots */
         }
         .pf-mark:hover { color: #0F766E; }
         .pf-mark.active { color: #0F766E; font-weight: 900; }
 
         /* ── Preset pills ── */
-        .pf-presets { display: flex; gap: .5rem; }
+        /* 👇 Correction pour les boutons de scénarios */
+        .pf-presets { 
+          display: flex; 
+          gap: .5rem; 
+          flex-wrap: wrap; /* Essentiel pour mobile ! */
+          width: 100%;
+        }
         .pf-preset {
-          flex: 1; height: 32px; border-radius: 8px;
+          flex: 1 1 auto; /* Permet aux boutons de s'adapter ou rétrécir */
+          min-width: 0; /* Permet un meilleur écrasement si nécessaire */
+          height: 32px; border-radius: 8px;
           border: 1.5px solid #E2E8F0; background: white;
           font-family: 'DM Sans', sans-serif; font-size: .7rem; font-weight: 800;
           color: #64748B; cursor: pointer; transition: all .17s;
+          padding: 0 0.5rem;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
         .pf-preset:hover { background: #F0FDF9; border-color: #A7F3D0; color: #0F766E; }
         .pf-preset.active {
@@ -241,6 +270,8 @@ export function ProjectionForm() {
           display: flex;
           flex-direction: column;
           gap: 1.1rem;
+          width: 100%;
+          box-sizing: border-box;
         }
 
         /* Top row inside results */
@@ -257,20 +288,22 @@ export function ProjectionForm() {
         }
         .pf-res-big {
           font-family: 'DM Mono', monospace;
-          font-size: clamp(1.75rem, 5vw, 2.5rem);
+          font-size: clamp(1.5rem, 5vw, 2.5rem);
           font-weight: 700; line-height: 1.1; display: block;
+          word-break: break-word; /* Protège contre les chiffres trop longs */
         }
         .pf-res-pill {
           display: inline-flex; align-items: center; gap: .3rem;
           font-size: .72rem; font-weight: 700;
           background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.15);
           padding: .22rem .7rem; border-radius: 99px; margin-top: .4rem;
+          flex-wrap: wrap;
         }
 
         /* Progress */
         .pf-progress-head {
           display: flex; justify-content: space-between; align-items: center;
-          margin-bottom: .45rem;
+          margin-bottom: .45rem; flex-wrap: wrap; gap: 0.2rem;
         }
         .pf-progress-lbl { font-size: .65rem; font-weight: 800; opacity: .75; }
         .pf-progress-pct {
@@ -292,14 +325,16 @@ export function ProjectionForm() {
           background: rgba(255,255,255,.1);
           border: 1px solid rgba(255,255,255,.1);
           border-radius: 13px; padding: .85rem .95rem;
+          display: flex; flex-direction: column; justify-content: center;
+          min-width: 0; /* Crucial pour le grid sur mobile */
         }
         .pf-stat.ok  { background: rgba(16,185,129,.2); border-color: rgba(16,185,129,.3); }
         .pf-stat.bad { background: rgba(248,113,113,.15); border-color: rgba(248,113,113,.25); }
-        .pf-stat-lbl { font-size: .6rem; font-weight: 800; opacity: .75; text-transform: uppercase; letter-spacing: .07em; display: block; margin-bottom: .28rem; }
-        .pf-stat-val { font-family: 'DM Mono',monospace; font-size: 1.1rem; font-weight: 700; display: block; }
+        .pf-stat-lbl { font-size: .6rem; font-weight: 800; opacity: .75; text-transform: uppercase; letter-spacing: .07em; display: block; margin-bottom: .28rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pf-stat-val { font-family: 'DM Mono',monospace; font-size: 1.1rem; font-weight: 700; display: block; word-break: break-word; }
         .pf-stat-val.ok  { color: #6EE7B7; }
         .pf-stat-val.bad { color: #FCA5A5; }
-
+        
         /* Verdict */
         .pf-verdict {
           display: flex; align-items: flex-start; gap: .6rem;
@@ -307,6 +342,26 @@ export function ProjectionForm() {
         }
         .pf-verdict.ok  { background: rgba(16,185,129,.15); border: 1px solid rgba(16,185,129,.25); }
         .pf-verdict.bad { background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.22); }
+        
+        .pf-gauge-wrapper { display: flex; flex-direction: column; align-items: center; }
+
+        /* 👇 Media query spécifique pour les très petits écrans (mobile) */
+        @media (max-width: 480px) {
+          .pf-card-body { padding: 1rem; gap: 1rem; }
+          .pf-results { padding: 1rem; gap: 0.9rem; }
+          .pf-res-big { font-size: 1.6rem; }
+          .pf-stat { padding: 0.6rem; }
+          .pf-stat-val { font-size: 0.95rem; }
+          
+          /* Réduire légèrement la jauge si elle manque de place */
+          .pf-gauge-wrapper { transform: scale(0.85); transform-origin: top right; }
+          
+          /* Les inputs numériques prennent moins de hauteur */
+          .pf-num-wrap { height: 40px; }
+          
+          /* Les pilules du bas dans les résultats s'adaptent mieux */
+          .pf-mini-recap-item { flex: 1 1 45% !important; padding: 0.4rem !important; }
+        }
       `}</style>
 
       <div className="pf-root">
@@ -434,7 +489,7 @@ export function ProjectionForm() {
         {/* ════════ RIGHT — Results ════════ */}
         <div className="pf-results">
           {/* Title row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.5rem', paddingBottom: '.9rem', borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+          <div className="pf-res-top" style={{ paddingBottom: '.9rem', borderBottom: '1px solid rgba(255,255,255,.12)' }}>
             <div>
               <span style={{ fontSize: '.6rem', fontWeight: 900, opacity: .65, textTransform: 'uppercase', letterSpacing: '.1em', display: 'block', marginBottom: '.2rem' }}>
                 Résultats projetés
@@ -518,7 +573,7 @@ export function ProjectionForm() {
               { label: 'Cotis.', value: `${averageContribution}€` },
               { label: 'Base', value: `${totalMembers} mbr` },
             ].map((s) => (
-              <div key={s.label} style={{ flex: '1 1 60px', background: 'rgba(255,255,255,.08)', borderRadius: 9, padding: '.5rem .65rem', border: '1px solid rgba(255,255,255,.08)' }}>
+              <div key={s.label} className="pf-mini-recap-item" style={{ flex: '1 1 60px', background: 'rgba(255,255,255,.08)', borderRadius: 9, padding: '.5rem .65rem', border: '1px solid rgba(255,255,255,.08)' }}>
                 <span style={{ fontSize: '.58rem', fontWeight: 800, opacity: .65, textTransform: 'uppercase', letterSpacing: '.07em', display: 'block', marginBottom: '.18rem' }}>{s.label}</span>
                 <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.88rem', fontWeight: 700 }}>{s.value}</span>
               </div>

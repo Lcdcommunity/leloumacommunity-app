@@ -1,4 +1,4 @@
-//web/app/(protected)/member/late-members/page.tsx
+// web/app/(protected)/member/late-members/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -30,17 +30,22 @@ export default function MemberLateMembersPage() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
 
+  // Fonction pour recharger les données avec la recherche
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.listLateMembersVisible({ page: 1, pageSize: 100 });
+      setItems(res.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur chargement');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    void (async () => {
-      try {
-        const res = await api.listLateMembersVisible({ page: 1, pageSize: 100 });
-        setItems(res.items);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erreur chargement');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void loadData();
   }, []);
 
   const filtered = q
@@ -53,16 +58,18 @@ export default function MemberLateMembersPage() {
   const maxMonths = Math.max(...items.map(m => m.lateMonths ?? 0), 1);
   const critical = items.filter(m => (m.lateMonths ?? 0) >= 12).length;
   const moderate = items.filter(m => (m.lateMonths ?? 0) >= 6 && (m.lateMonths ?? 0) < 12).length;
+  const slight = items.length - moderate - critical;
 
   return (
     <AppShell title="Retardataires">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500;700&display=swap');
 
         .lm-wrap {
           font-family: 'DM Sans', sans-serif;
           padding: clamp(1.25rem, 3vw, 2rem);
           max-width: 900px; margin: 0 auto;
+          box-sizing: border-box; width: 100%;
         }
 
         /* Header */
@@ -74,7 +81,7 @@ export default function MemberLateMembersPage() {
         .lm-eyebrow { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #DC2626; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
         .lm-eyebrow-dot { width: 6px; height: 6px; background: #EF4444; border-radius: 50%; animation: lmpulse 2s ease-in-out infinite; }
         @keyframes lmpulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
-        .lm-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 500; color: #111827; letter-spacing: -0.02em; line-height: 1.15; }
+        .lm-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 700; color: #111827; letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
         .lm-title span { background: linear-gradient(135deg,#DC2626,#F97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
         /* Notice */
@@ -82,42 +89,71 @@ export default function MemberLateMembersPage() {
           display: flex; gap: 0.65rem; align-items: flex-start;
           background: rgba(255,251,235,0.9); border: 1px solid #FDE68A;
           border-radius: 14px; padding: 0.9rem 1.1rem;
-          margin-bottom: 1.25rem;
+          margin-bottom: 1.5rem;
           opacity: 0; transform: translateY(10px);
           animation: lmin 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards;
         }
         .lm-notice p { font-size: 0.78rem; color: #78350F; line-height: 1.6; margin: 0; }
 
-        /* Summary chips */
-        .lm-chips {
-          display: flex; gap: 0.65rem; flex-wrap: wrap;
-          margin-bottom: 1.25rem;
+        /* ── NOUVELLES CARTES STATISTIQUES ── */
+        .lm-stats {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 1rem;
+          margin-bottom: 1.5rem;
           opacity: 0; transform: translateY(10px);
           animation: lmin 0.5s 0.12s cubic-bezier(.22,1,.36,1) forwards;
         }
-        .lm-chip { display: flex; align-items: center; gap: 0.4rem; padding: 0.42rem 0.85rem; border-radius: 10px; font-size: 0.74rem; font-weight: 600; border: 1px solid; }
-        .lm-chip-dot { width: 6px; height: 6px; border-radius: 50%; }
-        .lm-chip-count { font-family: 'Cormorant Garamond', serif; font-size: 1rem; font-weight: 600; }
+        .lm-stat-card {
+          background: white; border-radius: 16px; border: 1px solid #E2E8F0;
+          padding: 1.2rem 1rem; display: flex; flex-direction: column; 
+          align-items: center; justify-content: center; text-align: center; 
+          border-bottom: 4px solid; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .lm-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
+        .lm-stat-lbl { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; }
 
-        /* Toolbar */
+        /* Toolbar REVISITÉE */
         .lm-toolbar {
-          display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;
-          margin-bottom: 1.25rem;
+          display: flex; flex-direction: column; gap: 0.65rem;
+          margin-bottom: 1.5rem;
           opacity: 0; transform: translateY(10px);
           animation: lmin 0.5s 0.15s cubic-bezier(.22,1,.36,1) forwards;
+          width: 100%; box-sizing: border-box;
         }
-        .lm-search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 380px; }
+        
+        .lm-search-row {
+          display: flex; align-items: center; gap: 0.65rem;
+          flex-wrap: nowrap; width: 100%;
+        }
+
+        .lm-search-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
         .lm-search-ico { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
         .lm-search-input {
           width: 100%; height: 42px; padding: 0 0.9rem 0 2.5rem;
           border-radius: 11px; border: 1px solid rgba(220,38,38,0.14);
           background: rgba(255,255,255,0.88); font-family: 'DM Sans', sans-serif;
           font-size: 0.83rem; color: #111827; outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
+          transition: border-color 0.2s, box-shadow 0.2s; box-sizing: border-box;
         }
         .lm-search-input:focus { border-color: rgba(220,38,38,0.4); box-shadow: 0 0 0 3px rgba(220,38,38,0.08); background: white; }
         .lm-search-input::placeholder { color: rgba(107,114,128,0.45); }
 
+        .lm-search-btn {
+          flex: 0 0 auto; height: 42px; padding: 0 1.1rem;
+          background: linear-gradient(135deg,#DC2626,#F97316);
+          color: white; border: none; border-radius: 11px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em;
+          cursor: pointer; display: flex; align-items: center; gap: 0.4rem;
+          box-shadow: 0 4px 12px rgba(220,38,38,0.28);
+          transition: transform 0.15s, box-shadow 0.2s; white-space: nowrap;
+        }
+        .lm-search-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(220,38,38,0.38); }
+
+        .lm-count-row {
+          display: flex; justify-content: flex-end; width: 100%;
+        }
         .lm-count-chip { font-size: 0.72rem; font-weight: 700; padding: 0.28rem 0.7rem; border-radius: 99px; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; white-space: nowrap; }
 
         /* Panel */
@@ -139,10 +175,6 @@ export default function MemberLateMembersPage() {
           border-bottom: 1px solid rgba(220,38,38,0.07);
         }
         .lm-list-head span { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #9CA3AF; }
-        @media (max-width: 600px) {
-          .lm-list-head { grid-template-columns: auto 1fr 80px; }
-          .lm-list-head span:nth-child(3) { display: none; }
-        }
 
         /* Row */
         .lm-row {
@@ -153,10 +185,6 @@ export default function MemberLateMembersPage() {
         }
         .lm-row:last-child { border-bottom: none; }
         .lm-row:hover { background: rgba(220,38,38,0.02); }
-        @media (max-width: 600px) {
-          .lm-row { grid-template-columns: auto 1fr 80px; }
-          .lm-row > *:nth-child(3) { display: none; }
-        }
 
         /* Avatar */
         .lm-avatar {
@@ -191,7 +219,35 @@ export default function MemberLateMembersPage() {
         .lm-error { display: flex; align-items: center; gap: 0.6rem; padding: 1rem; color: #B91C1C; font-size: 0.8rem; background: #FEF2F2; border-radius: 12px; border: 1px solid #FECACA; margin-bottom: 1rem; }
         .lm-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem 1rem; gap: 0.8rem; color: #9CA3AF; }
         .lm-empty-ico { width: 52px; height: 52px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; }
-        .lm-empty p { font-size: 0.82rem; font-weight: 500; }
+        .lm-empty p { font-size: 0.82rem; font-weight: 500; margin: 0; }
+
+        /* ── RESPONSIVE MOBILE ── */
+        @media (max-width: 640px) {
+          .lm-header { align-items: center; margin-bottom: 1.25rem; }
+          .lm-title { font-size: 1.5rem !important; }
+          
+          /* Grille de stats : 2 par ligne */
+          .lm-stats { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1.5rem; }
+          .lm-stat-card { padding: 0.85rem 0.5rem; border-radius: 12px; }
+          .lm-stat-val { font-size: 1.5rem; }
+          .lm-stat-lbl { font-size: 0.55rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+          .lm-list-head { grid-template-columns: auto 1fr 80px; }
+          .lm-list-head span:nth-child(3) { display: none; }
+          
+          .lm-row { grid-template-columns: auto 1fr 80px; }
+          .lm-row > *:nth-child(3) { display: none; }
+        }
+
+        @media (max-width: 500px) {
+          /* Force la ligne unique pour recherche & bouton */
+          .lm-search-row { gap: 0.4rem; }
+          .lm-search-input { height: 38px; font-size: 0.75rem; padding-left: 2rem; }
+          .lm-search-ico { left: 0.6rem; width: 14px; height: 14px; }
+          .lm-search-btn { height: 38px; padding: 0 0.8rem; font-size: 0.75rem; }
+          .btn-text { display: none; } /* Cache "Rechercher" pour gagner de la place */
+          .lm-count-chip { font-size: 0.65rem; padding: 0.2rem 0.5rem; }
+        }
 
         @keyframes lmin { to { opacity: 1; transform: translateY(0); } }
       `}</style>
@@ -212,44 +268,63 @@ export default function MemberLateMembersPage() {
           <p>Affichage informatif pour la <strong>transparence communautaire</strong>. Cette liste est en lecture seule et visible uniquement par les membres actifs.</p>
         </div>
 
-        {/* Summary chips */}
+        {/* NOUVELLES CARTES STATISTIQUES */}
         {!loading && (
-          <div className="lm-chips">
-            {[
-              { label: 'Total',        count: items.length, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-              { label: '3&#8211;5 mois',   count: items.length - moderate - critical, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-              { label: '6&#8211;11 mois',  count: moderate,     color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-              { label: '12+ mois',     count: critical,     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-            ].map(c => (
-              <div key={c.label} className="lm-chip" style={{ background: c.bg, borderColor: c.border, color: c.color }}>
-                <span className="lm-chip-dot" style={{ background: c.color }} />
-                <span className="lm-chip-count">{c.count}</span>
-                <span style={{ fontSize: '0.72rem', opacity: 0.85 }} dangerouslySetInnerHTML={{ __html: c.label }} />
-              </div>
-            ))}
+          <div className="lm-stats">
+            <div className="lm-stat-card" style={{ borderBottomColor: '#6B7280' }}>
+              <span className="lm-stat-val" style={{ color: '#374151' }}>{items.length}</span>
+              <span className="lm-stat-lbl">Total</span>
+            </div>
+            <div className="lm-stat-card" style={{ borderBottomColor: '#2563EB' }}>
+              <span className="lm-stat-val" style={{ color: '#1D4ED8' }}>{slight}</span>
+              <span className="lm-stat-lbl">3-5 mois</span>
+            </div>
+            <div className="lm-stat-card" style={{ borderBottomColor: '#D97706' }}>
+              <span className="lm-stat-val" style={{ color: '#B45309' }}>{moderate}</span>
+              <span className="lm-stat-lbl">6-11 mois</span>
+            </div>
+            <div className="lm-stat-card" style={{ borderBottomColor: '#DC2626' }}>
+              <span className="lm-stat-val" style={{ color: '#B91C1C' }}>{critical}</span>
+              <span className="lm-stat-lbl">12+ mois</span>
+            </div>
           </div>
         )}
 
-        {/* Search */}
+        {/* TOOLBAR REVISITÉE */}
         <div className="lm-toolbar">
-          <div className="lm-search-wrap">
-            <span className="lm-search-ico">
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          
+          <div className="lm-search-row">
+            <div className="lm-search-wrap">
+              <span className="lm-search-ico">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
+                </svg>
+              </span>
+              <input
+                className="lm-search-input"
+                placeholder="Rechercher un membre&#8230;"
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && void loadData()}
+              />
+            </div>
+
+            <button className="lm-search-btn" onClick={() => void loadData()}>
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
                 <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
               </svg>
-            </span>
-            <input
-              className="lm-search-input"
-              placeholder="Rechercher un membre&#8230;"
-              value={q}
-              onChange={e => setQ(e.target.value)}
-            />
+              <span className="btn-text">Rechercher</span>
+            </button>
           </div>
-          {!loading && (
-            <span className="lm-count-chip">
-              {filtered.length} membre{filtered.length !== 1 ? 's' : ''}
-            </span>
-          )}
+
+          <div className="lm-count-row">
+            {!loading && (
+              <span className="lm-count-chip">
+                {filtered.length} membre{filtered.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          
         </div>
 
         {/* Error */}
@@ -300,8 +375,8 @@ export default function MemberLateMembersPage() {
                     <div>
                       <div className="lm-name">{m.firstName} {m.lastName}</div>
                       <div className="lm-antenna">{m.antennaName ?? '—'}</div>
-                    </div>
-
+                    </div>                    
+                    
                     {/* Antenna (hidden on mobile) */}
                     <div className="lm-antenna-col">{m.antennaName ?? '—'}</div>
 
