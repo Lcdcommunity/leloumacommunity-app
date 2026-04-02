@@ -110,6 +110,18 @@ export default function SuperAdminContributionsPage() {
     void load('');
   }, [load]);
 
+  // 🔥 SOLUTION CHIRURGICALE : Filtrage local instantané
+  // Protège l'UI si le backend ignore le paramètre de filtrage
+  const displayedItems = useMemo(() => {
+    if (!status) return items;
+    return items.filter((c) => {
+      if (status === 'PENDING_VALIDATION' || status === 'PENDING') {
+        return c.status === 'PENDING_VALIDATION' || c.status === 'PENDING';
+      }
+      return c.status === status;
+    });
+  }, [items, status]);
+
   const total = items.length;
   const pending = items.filter((c) => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION').length;
   const validated = items.filter((c) => c.status === 'VALIDATED').length;
@@ -149,7 +161,6 @@ export default function SuperAdminContributionsPage() {
         .sc-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .sc-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
-        /* STAT CARDS - SUR UNE LIGNE SANS COUPURE */
         .sc-stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -193,7 +204,6 @@ export default function SuperAdminContributionsPage() {
         .sc-panel-titlerow{display:flex;align-items:center;gap:.55rem; min-width: 0;}
         .sc-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
         
-        /* TITRE FORCÉ SUR UNE LIGNE */
         .sc-panel-title {
             font-size: clamp(0.7rem, 2.5vw, 0.75rem);
             font-weight: 900;
@@ -206,7 +216,6 @@ export default function SuperAdminContributionsPage() {
         }
         .sc-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA; flex-shrink:0;}
 
-        /* TOOLBAR (FILTRES) - SUR UNE LIGNE */
         .sc-toolbar {
             display: flex;
             flex-direction: row;
@@ -289,7 +298,6 @@ export default function SuperAdminContributionsPage() {
         .sc-chip{display:inline-flex;align-items:center;gap:.28rem;font-size:.68rem;font-weight:800;border-radius:99px;padding:.22rem .6rem;border:1px solid;cursor:pointer;transition:all .15s}
 
         .sc-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
-
         .sc-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .sc-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:scspin .8s linear infinite}
 
@@ -312,7 +320,6 @@ export default function SuperAdminContributionsPage() {
           <h1 className="sc-title">Cotisations <span>globales</span></h1>
         </div>
 
-        {/* STATS CARDS EN LIGNE */}
         <div className="sc-stats">
           <StatCard
             label="Total cotisations"
@@ -370,11 +377,11 @@ export default function SuperAdminContributionsPage() {
                 </svg>
               </div>
               <span className="sc-panel-title">Suivi des cotisations</span>
-              {items.length > 0 && <span className="sc-count-chip">{items.length}</span>}
+              {/* Compteur aligné sur les éléments filtrés */}
+              {displayedItems.length > 0 && <span className="sc-count-chip">{displayedItems.length}</span>}
             </div>
           </div>
 
-          {/* TOOLBAR FILTRES EN LIGNE */}
           <div className="sc-toolbar">
             <div className="sc-field">
               <label className="sc-label">Statut</label>
@@ -415,7 +422,7 @@ export default function SuperAdminContributionsPage() {
                   <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
                   </svg>
-                  Filtrer
+                  Actualiser
                 </>
               )}
             </button>
@@ -471,8 +478,7 @@ export default function SuperAdminContributionsPage() {
             </div>
           )}
 
-          {/* AMOUNTS CENTRES ET SUR UNE LIGNE */}
-          {!loading && items.length > 0 && (
+          {!loading && displayedItems.length > 0 && (
             <div className="sc-amounts">
               <div className="sc-amount-item">
                 <span className="sc-amount-lbl">Total validé</span>
@@ -513,16 +519,16 @@ export default function SuperAdminContributionsPage() {
 
           {loading ? (
             <div className="sc-loader"><div className="sc-ring" />Chargement…</div>
-          ) : !error && items.length === 0 ? (
+          ) : !error && displayedItems.length === 0 ? (
             <div className="sc-empty">
               <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
                 <path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
-              <div className="sc-empty-title">Aucune cotisation trouvée</div>
-              <div className="sc-empty-sub">Essayez de modifier le filtre de statut.</div>
+              <div className="sc-empty-title">Aucune cotisation trouvée pour ce statut</div>
+              <div className="sc-empty-sub">Essayez de modifier le filtre ou de réinitialiser.</div>
             </div>
           ) : !error ? (
-            <ContributionsTable items={items} />
+            <ContributionsTable items={displayedItems} />
           ) : null}
         </div>
       </div>

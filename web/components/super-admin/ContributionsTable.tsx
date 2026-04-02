@@ -32,7 +32,6 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
     );
   }
 
-  // ✅ CORRECTION MÉTHODE DE PAIEMENT : Utilisation stricte de paymentMethod
   const getDisplayMethod = (item: Contribution) => {
     const rawMethod = item.paymentMethod || '';
     return methodLabels[rawMethod] || rawMethod || '—';
@@ -114,28 +113,43 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
           .sct-table td, .sct-table th { padding: 0.75rem 0.6rem; }
         }
 
-        /* ── MODAL STYLES ── */
+        /* ── MODAL STYLES (SOLUTION ULTIME) ── */
         .sct-modal-overlay {
-          position: fixed; inset: 0; background: rgba(15,23,42,0.5); backdrop-filter: blur(4px);
-          z-index: 100; display: flex; align-items: center; justify-content: center; padding: 1rem;
-          animation: sctFadeIn 0.2s ease-out;
+          position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px);
+          z-index: 9999;
+          
+          /* 🔥 C'EST ICI QUE LA MAGIE OPÈRE : L'overlay entier devient la zone de défilement */
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          display: flex;
+          flex-direction: column;
+        }
+
+        /* Astuce CSS avancée : Ces pseudo-éléments centrent la modale verticalement 
+           s'il y a de la place, sans bloquer le défilement si la modale est géante */
+        .sct-modal-overlay::before,
+        .sct-modal-overlay::after {
+          content: '';
+          flex: 1 0 auto;
         }
 
         .sct-modal {
-          background: white; width: 100%; max-width: 500px; border-radius: 20px;
-          box-shadow: 0 10px 30px rgba(220,38,38,0.1);
+          background: white; 
+          width: calc(100% - 2rem); /* 100% moins un peu de marge sur les côtés */
+          max-width: 500px; 
+          border-radius: 20px;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.15);
           animation: sctSlideUp 0.3s cubic-bezier(.22,1,.36,1);
           
-          /* 🔥 CORRECTION SCROLL : On structure la modale en colonne */
-          display: flex;
-          flex-direction: column;
-          max-height: calc(100vh - 2rem); /* Garde une marge avec les bords de l'écran */
+          /* Marge de sécurité en haut et en bas pour ne pas coller aux bords de l'écran */
+          margin: 2.5rem auto; 
+          flex-shrink: 0; /* Interdit à Flexbox d'écraser la modale, elle garde sa vraie taille */
+          overflow: hidden; /* Garde les bords arrondis propres */
         }
 
         .sct-modal-header {
           display: flex; justify-content: space-between; align-items: center;
           padding: 1.25rem 1.5rem; background: rgba(254,242,242,0.95); border-bottom: 1px solid rgba(220,38,38,0.1);
-          flex-shrink: 0; /* Empêche le header de s'écraser */
         }
 
         .sct-modal-title {
@@ -153,9 +167,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
         
         .sct-modal-body { 
           padding: 1.5rem; 
-          /* 🔥 CORRECTION SCROLL : Seul le contenu défile */
-          overflow-y: auto; 
-          flex: 1;
+          /* On a tout retiré ici ! Le scroll est géré par l'overlay gris ! */
         }
 
         .sct-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
@@ -216,7 +228,6 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
                   </td>
 
                   <td className="sct-date hide-mobile">
-                    {/* 👇 CORRECTION: depositedAt -> contributionDate */}
                     {formatDate(contribution.contributionDate || contribution.createdAt)}
                   </td>
 
@@ -253,7 +264,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
                 </svg>
               </button>
             </div>
-            
+
             <div className="sct-modal-body">
               <div className="sct-grid">
                 <div className="sct-field" style={{ gridColumn: '1 / -1' }}>
@@ -281,8 +292,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
                       style={{ 
                         color: getStatusStyles(selectedItem.status).color, 
                         background: getStatusStyles(selectedItem.status).bg, 
-                        border: `1px solid ${getStatusStyles(selectedItem.status).border}` 
-                      }}
+                        border: `1px solid ${getStatusStyles(selectedItem.status).border}`                       }}
                     >
                       <span className="sct-status-dot" style={{ background: getStatusStyles(selectedItem.status).color }} />
                       {statusLabels[selectedItem.status] ?? selectedItem.status}
@@ -302,11 +312,10 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
 
                 <div className="sct-field">
                   <label>Date de dépôt</label>
-                  {/* 👇 CORRECTION: depositedAt -> contributionDate */}
                   <span>{formatDate(selectedItem.contributionDate || selectedItem.createdAt)}</span>
                 </div>
 
-                <div className="sct-field">
+                <div className="sct-field" style={{ gridColumn: '1 / -1' }}>
                   <label>Référence de transaction</label>
                   <span className="mono" style={{ fontSize: '0.8rem', color: '#6B7280', wordBreak: 'break-all' }}>
                     {selectedItem.id}
@@ -321,7 +330,6 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
   );
 }
 
-// Helper pour éviter la répétition du style de statut
 function getStatusStyles(status: ContributionStatus) {
   if (status === 'VALIDATED') return { color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
   if (status === 'REJECTED') return { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
