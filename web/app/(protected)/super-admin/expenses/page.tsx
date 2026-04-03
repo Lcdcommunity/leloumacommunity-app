@@ -286,6 +286,10 @@ export default function SuperAdminExpensesPage() {
 
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
+  
+  // 🔥 ÉTAT POUR LA MODALE DE SUPPRESSION
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const load = useCallback(async (st = status, start = startDate, end = endDate) => {
     setLoading(true);
@@ -301,14 +305,22 @@ export default function SuperAdminExpensesPage() {
   
   useEffect(() => { void load(); }, [load]);
 
-  const handleDelete = async (expense: Expense) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer définitivement la dépense "${expense.title}" ?`)) return;
+  const handleDeleteRequest = (expense: Expense) => {
+    setExpenseToDelete(expense);
+  };
+
+  const confirmDelete = async () => {
+    if (!expenseToDelete) return;
+    setIsDeleting(true);
     try {
-      await adminApi.deleteExpenseSuperAdmin(expense.id);
-      setSelectedExpense(null); 
+      await adminApi.deleteExpenseSuperAdmin(expenseToDelete.id);
+      setExpenseToDelete(null);
+      setSelectedExpense(null);
       void load();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Erreur lors de la suppression');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -333,75 +345,21 @@ export default function SuperAdminExpensesPage() {
         .sae-panel { background: white; border-radius: 24px; border: 1px solid rgba(220,38,38,0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.04); overflow: hidden; opacity: 0; transform: translateY(10px); animation: saeFade 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards; }
         .sae-panel-head { padding: 1.25rem 1.5rem; border-bottom: 1px solid #F1F5F9; background: #FAFBFD; display: flex; align-items: center; gap: 0.75rem; }
         
-        /* ── TOOLBAR DE FILTRES REFAITE ── */
-        .sae-toolbar { 
-          display: flex; 
-          flex-direction: column; 
-          gap: 0.75rem; 
-          padding: 1rem 1.5rem; 
-          border-bottom: 1px solid #F1F5F9; 
-          background: white; 
-        }
+        .sae-toolbar { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem 1.5rem; border-bottom: 1px solid #F1F5F9; background: white; }
         
-        /* 🔥 NOUVEAU BLOC DATES EN LIGNE INTÉGRÉ */
-        .sae-dates-row {
-          display: flex;
-          flex-direction: row;
-          gap: 0.5rem;
-          width: 100%;
-        }
-        .sae-date-wrapper {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 0.4rem;
-          height: 42px;
-          border-radius: 12px;
-          border: 1.5px solid #E2E8F0;
-          padding: 0 0.5rem;
-          background: white;
-          min-width: 0;
-          transition: all 0.2s;
-        }
-        .sae-date-wrapper:focus-within {
-          border-color: #DC2626; 
-          box-shadow: 0 0 0 4px rgba(220,38,38,0.1);
-        }
-        .sae-date-lbl {
-          font-size: 0.65rem; 
-          font-weight: 800; 
-          color: #475569; 
-          text-transform: uppercase;
-          white-space: nowrap;
-        }
-        .sae-date-input {
-          flex: 1; 
-          border: none; 
-          background: transparent; 
-          outline: none;
-          font-family: 'DM Sans', sans-serif; 
-          font-size: 0.8rem; 
-          font-weight: 600; 
-          color: #1E293B;
-          min-width: 0;
-          padding: 0;
-        }
+        .sae-dates-row { display: flex; flex-direction: row; gap: 0.5rem; width: 100%; }
+        .sae-date-wrapper { flex: 1; display: flex; align-items: center; gap: 0.4rem; height: 42px; border-radius: 12px; border: 1.5px solid #E2E8F0; padding: 0 0.5rem; background: white; min-width: 0; transition: all 0.2s; }
+        .sae-date-wrapper:focus-within { border-color: #DC2626; box-shadow: 0 0 0 4px rgba(220,38,38,0.1); }
+        .sae-date-lbl { font-size: 0.65rem; font-weight: 800; color: #475569; text-transform: uppercase; white-space: nowrap; }
+        .sae-date-input { flex: 1; border: none; background: transparent; outline: none; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; color: #1E293B; min-width: 0; padding: 0; }
 
         .sae-filter-field { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }
         .sae-filter-lbl { font-size: 0.65rem; font-weight: 800; color: #475569; letter-spacing: 0.05em; text-transform: uppercase; }
         
-        /* Wrapper pour l'icône dans le select */
         .sae-select-wrapper { position: relative; width: 100%; }
         .sae-select-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748B; pointer-events: none; display: flex; }
         
-        .sae-filter-select { 
-          width: 100%; height: 42px; border-radius: 12px; border: 1.5px solid #E2E8F0; padding: 0 1rem; 
-          font-family: 'DM Sans'; font-size: 0.85rem; font-weight: 600; color: #1E293B; outline: none; transition: all 0.2s; box-sizing: border-box;
-          appearance: none; 
-          background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); 
-          background-repeat: no-repeat; background-position: right 1rem center; 
-          cursor: pointer; background-color: white; 
-        }
+        .sae-filter-select { width: 100%; height: 42px; border-radius: 12px; border: 1.5px solid #E2E8F0; padding: 0 1rem; font-family: 'DM Sans'; font-size: 0.85rem; font-weight: 600; color: #1E293B; outline: none; transition: all 0.2s; box-sizing: border-box; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; cursor: pointer; background-color: white; }
         .sae-filter-select.with-icon { padding-left: 2.3rem; }
         .sae-filter-select:focus { border-color: #DC2626; box-shadow: 0 0 0 4px rgba(220,38,38,0.1); }
         
@@ -411,41 +369,25 @@ export default function SuperAdminExpensesPage() {
           .sae-filter-field { flex: 1.5; min-width: 140px; }
         }
         
-        /* TABLEAU DESKTOP */
         .sae-table-wrap { display: none; }
         
-        /* BOUTONS ACTIONS (Modale) */
         .sae-action-btn { width: 34px; height: 34px; border-radius: 8px; border: none; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; }
         .sae-action-edit { background: #EFF6FF; color: #2563EB; }
         .sae-action-edit:hover { background: #DBEAFE; color: #1D4ED8; }
         .sae-action-del { background: #FEF2F2; color: #DC2626; }
         .sae-action-del:hover { background: #FECACA; color: #B91C1C; }
 
-        /* CARTES MOBILE MODERNES ET JAUNES */
         .sae-cards-list { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: #F8FAFC; }
-        .sae-expense-card { 
-          background: rgba(250, 204, 21, 0.08);
-          border: 1px solid rgba(250, 204, 21, 0.2);
-          border-radius: 16px; padding: 1rem; 
-          transition: all 0.2s; cursor: pointer; position: relative; overflow: hidden;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        }
+        .sae-expense-card { background: rgba(250, 204, 21, 0.08); border: 1px solid rgba(250, 204, 21, 0.2); border-radius: 16px; padding: 1rem; transition: all 0.2s; cursor: pointer; position: relative; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
         .sae-expense-card:active { transform: scale(0.98); background: rgba(250, 204, 21, 0.15); border-color: rgba(250, 204, 21, 0.3); }
         .sae-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem; gap: 0.5rem; }
-        .sae-card-title { 
-          font-weight: 800; color: #0F172A; font-size: 0.95rem; line-height: 1.2; flex: 1;
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
+        .sae-card-title { font-weight: 800; color: #0F172A; font-size: 0.95rem; line-height: 1.2; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .sae-card-amount { font-family: 'DM Mono', monospace; font-weight: 800; font-size: 1rem; flex-shrink: 0; }
         .sae-card-meta { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
         .sae-tag { background: white; color: #475569; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.65rem; font-weight: 700; border: 1px solid #E2E8F0; }
-        .sae-tag-motif { 
-          color: #475569; font-size: 0.75rem; font-weight: 600; 
-          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-        }
+        .sae-tag-motif { color: #475569; font-size: 0.75rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .sae-card-date { font-size: 0.7rem; color: #94A3B8; font-weight: 700; text-align: right; margin-top: 0.6rem; }
 
-        /* RESPONSIVE DESKTOP AVEC LIGNES JAUNES */
         @media (min-width: 768px) {
           .sae-cards-list { display: none; }
           .sae-table-wrap { display: block; overflow-x: auto; }
@@ -456,7 +398,6 @@ export default function SuperAdminExpensesPage() {
           .sae-row:hover { background: rgba(250, 204, 21, 0.12); }
         }
 
-        /* OVERLAY MODALE AVEC SCROLL */
         .sae-modal-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); display: flex; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 1rem; animation: saeFade 0.2s ease; }
         .sae-modal-overlay::before, .sae-modal-overlay::after { content: ''; flex: 1 0 auto; }
         .sae-modal { background: white; width: 100%; max-width: 500px; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); margin: 2rem auto; flex-shrink: 0; overflow: hidden; display: flex; flex-direction: column; }
@@ -532,7 +473,7 @@ export default function SuperAdminExpensesPage() {
           </div>
 
           <div className="sae-toolbar">
-            <div className="sae-filter-field">
+            <div className="sae-filter-field" style={{ flex: 1.5 }}>
               <label className="sae-filter-lbl">Statut</label>
               <div className="sae-select-wrapper">
                 <div className="sae-select-icon">
@@ -547,7 +488,6 @@ export default function SuperAdminExpensesPage() {
               </div>
             </div>
             
-            {/* 🔥 LE NOUVEAU BLOC COMPACT POUR LES DATES */}
             <div className="sae-dates-row">
               <div className="sae-date-wrapper">
                 <label className="sae-date-lbl">Du</label>
@@ -585,7 +525,6 @@ export default function SuperAdminExpensesPage() {
                   return (
                     <div key={e.id} className="sae-expense-card" onClick={() => setSelectedExpense(e)}>
                       <div className="sae-card-header">
-                        {/* 🔥 TITRE ET MOTIF INVERSÉS */}
                         <div className="sae-card-title" title={CATEGORY_MAP[e.category] || e.category}>
                           {CATEGORY_MAP[e.category] || e.category}
                         </div>
@@ -597,7 +536,6 @@ export default function SuperAdminExpensesPage() {
                           {s.label}
                         </span>
                         <span className="sae-tag">{e.antenna?.name || 'Assoc.'}</span>
-                        {/* 🔥 Le motif de la dépense devient le tag en dessous */}
                         <span className="sae-tag-motif" title={e.title}>{e.title}</span>
                       </div>
                       <div className="sae-card-date">
@@ -625,7 +563,6 @@ export default function SuperAdminExpensesPage() {
                       return (
                         <tr key={e.id} className="sae-row" onClick={() => setSelectedExpense(e)}>
                           <td>
-                            {/* 🔥 TITRE ET MOTIF INVERSÉS ÉGALEMENT ICI */}
                             <div style={{ fontWeight: 800, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '280px' }} title={CATEGORY_MAP[e.category] || e.category}>
                               {CATEGORY_MAP[e.category] || e.category}
                             </div>
@@ -656,7 +593,7 @@ export default function SuperAdminExpensesPage() {
           onClose={() => setSelectedExpense(null)} 
           onSuccess={() => { setSelectedExpense(null); void load(); }} 
           onEdit={() => { setSelectedExpense(null); setExpenseToEdit(selectedExpense); }}
-          onDelete={() => handleDelete(selectedExpense)}
+          onDelete={() => handleDeleteRequest(selectedExpense)}
         />
       )}
 
@@ -666,6 +603,29 @@ export default function SuperAdminExpensesPage() {
           onClose={() => setExpenseToEdit(null)}
           onSuccess={() => { setExpenseToEdit(null); void load(); }}
         />
+      )}
+
+      {/* 🔥 MODALE DE CONFIRMATION DE SUPPRESSION (Correction des guillemets) */}
+      {expenseToDelete && (
+        <div className="sae-modal-overlay" onClick={() => !isDeleting && setExpenseToDelete(null)} style={{ zIndex: 10000 }}>
+          <div className="sae-modal" style={{ maxWidth: 400, margin: 'auto', textAlign: 'center', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ width: 60, height: 60, background: '#FEF2F2', color: '#DC2626', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+              <svg width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#111827', marginBottom: '0.5rem', marginTop: 0 }}>Supprimer la dépense ?</h3>
+            <p style={{ fontSize: '0.9rem', color: '#64748B', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+              Êtes-vous sûr de vouloir supprimer définitivement la dépense <strong>&quot;{expenseToDelete.title}&quot;</strong> ? Cette action est irréversible.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+              <button className="sae-btn-cancel" onClick={() => setExpenseToDelete(null)} disabled={isDeleting} style={{ flex: 1 }}>Annuler</button>
+              <button className="sae-btn-reject" onClick={confirmDelete} disabled={isDeleting} style={{ flex: 1, border: 'none', background: '#DC2626', color: 'white' }}>
+                {isDeleting ? 'Suppression...' : 'Oui, supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AppShell>
   );
