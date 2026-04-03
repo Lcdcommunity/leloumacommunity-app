@@ -1,4 +1,3 @@
-//web/app/(protected)/super-admin/antennas/[id]/page.tsx
 // web/app/(protected)/super-admin/antennas/[id]/page.tsx
 'use client';
 
@@ -305,7 +304,7 @@ export default function AntennaDetailPage() {
             {/* ══ VIEW MODE ══ */}
             {!isEditing && (
               <>
-                {/* Identification */}
+                {/* Identification & Contact */}
                 <div className="ea-panel">
                   <div className="ea-panel-head">
                     <div className="ea-panel-ico" style={{ background: 'rgba(254,242,242,.8)', color: '#DC2626' }}>
@@ -313,7 +312,7 @@ export default function AntennaDetailPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
                       </svg>
                     </div>
-                    <span className="ea-panel-title">Identification</span>
+                    <span className="ea-panel-title">Identification & Contact</span>
                   </div>
                   <div className="ea-panel-body">
                     <div className="ea-grid-3">
@@ -322,10 +321,9 @@ export default function AntennaDetailPage() {
                       <InfoRow label="Devise"           value={antenna.defaultCurrency ?? 'EUR'} mono />
                     </div>
                     <div className="ea-divider" />
-                    <div className="ea-grid-3">
-                      <InfoRow label="ID"         value={antenna.id} mono />
-                      <InfoRow label="Créée le"   value={formatDate(antenna.createdAt)} />
-                      <InfoRow label="Modifiée le" value={formatDate(antenna.updatedAt)} />
+                    <div className="ea-grid-2">
+                      <InfoRow label="Email de contact" value={antenna.email} />
+                      <InfoRow label="Téléphone"        value={antenna.phone} />
                     </div>
                   </div>
                 </div>
@@ -339,17 +337,23 @@ export default function AntennaDetailPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                       </svg>
                     </div>
-                    <span className="ea-panel-title">Localisation</span>
+                    <span className="ea-panel-title">Localisation complète</span>
                   </div>
                   <div className="ea-panel-body">
                     <div className="ea-grid-2">
+                      <InfoRow label="Adresse 1" value={antenna.addressLine1} />
+                      <InfoRow label="Adresse 2" value={antenna.addressLine2} />
+                    </div>
+                    <div className="ea-divider" />
+                    <div className="ea-grid-3">
+                      <InfoRow label="Code Postal" value={antenna.postalCode} />
                       <InfoRow label="Ville"   value={antenna.city} />
                       <InfoRow label="Pays"    value={antenna.country} />
                     </div>
                   </div>
                 </div>
 
-                {/* Statut */}
+                {/* Statut & Infos Techniques */}
                 <div className="ea-panel">
                   <div className="ea-panel-head">
                     <div className="ea-panel-ico" style={{ background: antenna.isActive ? 'rgba(236,253,245,.9)' : 'rgba(254,242,242,.9)', color: antenna.isActive ? '#059669' : '#DC2626' }}>
@@ -357,10 +361,10 @@ export default function AntennaDetailPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                     </div>
-                    <span className="ea-panel-title">Statut de l&apos;antenne</span>
+                    <span className="ea-panel-title">Statut & Infos techniques</span>
                   </div>
                   <div className="ea-panel-body">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.25rem' }}>
                       <StatusBadge active={antenna.isActive} />
                       <span style={{ fontSize: '.82rem', color: '#6B7280', fontWeight: 600 }}>
                         {antenna.isActive
@@ -368,23 +372,11 @@ export default function AntennaDetailPage() {
                           : 'Cette antenne est désactivée et non visible des membres.'}
                       </span>
                     </div>
-                  </div>
-                </div>
-
-                {/* Association */}
-                <div className="ea-panel">
-                  <div className="ea-panel-head">
-                    <div className="ea-panel-ico" style={{ background: 'rgba(239,246,255,.9)', color: '#1D4ED8' }}>
-                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <span className="ea-panel-title">Informations techniques</span>
-                  </div>
-                  <div className="ea-panel-body">
-                    <div className="ea-grid-2">
+                    <div className="ea-divider" />
+                    <div className="ea-grid-3">
+                      <InfoRow label="ID de l'antenne"  value={antenna.id} mono />
                       <InfoRow label="Association ID" value={antenna.associationId} mono />
-                      <InfoRow label="Dernière modification" value={formatDate(antenna.updatedAt)} />
+                      <InfoRow label="Dernière modif." value={formatDate(antenna.updatedAt)} />
                     </div>
                   </div>
                 </div>
@@ -406,9 +398,15 @@ export default function AntennaDetailPage() {
                 </div>
                 <div className="ea-edit-body">
                   <AntennaForm
+                    isEditMode={true}
                     initialValues={{
                       name:            antenna.name,
-                      city:            antenna.city    || '',
+                      email:           antenna.email || '',
+                      phone:           antenna.phone || '',
+                      addressLine1:    antenna.addressLine1 || '',
+                      addressLine2:    antenna.addressLine2 || '',
+                      postalCode:      antenna.postalCode || '',
+                      city:            antenna.city || '',
                       country:         antenna.country || '',
                       isActive:        antenna.isActive,
                       defaultCurrency: antenna.defaultCurrency || 'EUR',
@@ -418,7 +416,10 @@ export default function AntennaDetailPage() {
                     onSubmit={async (values) => {
                       setBusy(true); setError(null); setSaveSuccess(false);
                       try {
-                        const updated = await api.updateAntenna(id, values);
+                        // On nettoie les objets inutiles pour le backend (ex: admin)
+                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                        const { admin, ...cleanValues } = values; 
+                        const updated = await api.updateAntenna(id, cleanValues);
                         setAntenna(updated);
                         setIsEditing(false);
                         setSaveSuccess(true);
@@ -448,4 +449,4 @@ export default function AntennaDetailPage() {
       )}
     </AppShell>
   );
-} 
+}

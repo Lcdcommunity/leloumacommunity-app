@@ -271,10 +271,19 @@ export default function MemberSignupPage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any); 
 
+      // NOTE SUR L'UPLOAD D'AVATAR:
+      // L'appel api.uploadAvatar nécessite d'être authentifié (Token JWT). Lors du signup, l'utilisateur
+      // n'a pas encore de token (compte en attente de validation). L'upload renverra donc une erreur 401.
+      // La photo de profil devra être rajoutée par le membre lors de sa première connexion dans "Mon Profil",
+      // à moins de modifier le backend pour accepter le FormData directement dans l'endpoint de signup.
       if (selectedPhotoFile) {
         const formData = new FormData();
         formData.append('avatar', selectedPhotoFile);
-        try { await api.uploadAvatar(formData); } catch { /* ignore */ }
+        try { 
+          await api.uploadAvatar(formData); 
+        } catch (uploadErr) { 
+          console.warn("La photo ne peut pas être uploadée sans authentification (401). Elle sera demandée plus tard.", uploadErr);
+        }
       }
       setSuccess(true);
     } catch (err) {
@@ -303,7 +312,6 @@ export default function MemberSignupPage() {
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
         :root {
           --theme-blue: #2563EB;
           --theme-blue-dark: #1D4ED8;
@@ -559,7 +567,6 @@ export default function MemberSignupPage() {
 
                   <div className="sp-field">
                     <label className="sp-label">Commune d&apos;origine</label>
-                    {/* Transformation en SELECT */}
                     <select className="sp-select" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} required>
                       <option value="">Sélectionnez votre commune...</option>
                       {COMMUNES_ORIGINE.map(commune => (
@@ -610,7 +617,6 @@ export default function MemberSignupPage() {
 
                   <div className="sp-field">
                     <label className="sp-label">Pays de naissance <span className="sp-opt">(optionnel)</span></label>
-                    {/* Transformation en SELECT avec liste des pays */}
                     <select className="sp-select" value={birthCountry} onChange={e => setBirthCountry(e.target.value)}>
                       <option value="">Sélectionnez un pays...</option>
                       {COUNTRIES.map(c => (
@@ -621,7 +627,6 @@ export default function MemberSignupPage() {
 
                   <p className="sp-section-title">Coordonnées &amp; Profession</p>
                   
-                  {/* Le choix du pays de résidence vient AVANT le téléphone pour injecter l'indicatif */}
                   <div className="sp-field">
                     <label className="sp-label">Pays de résidence</label>
                     <select className="sp-select" value={country} onChange={e => setCountry(e.target.value)} required>
@@ -666,7 +671,6 @@ export default function MemberSignupPage() {
                     </div>
                     <div className="sp-field">
                       <label className="sp-label">Code postal</label>
-                      {/* Ajout du maxLength=5 */}
                       <input className="sp-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="Ex: 75001" maxLength={5} />
                     </div>
                   </div>
@@ -688,6 +692,14 @@ export default function MemberSignupPage() {
               {step === 2 && (
                 <div className="sp-panel sp-stack">
                   <p className="sp-section-title">Photo de profil</p>
+                  
+                  <div className="sp-notice" style={{ marginBottom: '1.25rem', padding: '0.65rem 0.85rem', fontSize: '0.75rem', border: '1px solid #FDE68A', background: '#FEF3C7', color: '#92400E' }}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: '2px' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Attention: Pour des raisons de sécurité, la photo de profil définitive devra être re-sauvegardée depuis votre tableau de bord lors de votre première connexion.
+                  </div>
+
                   <div className="sp-photo-box">
                     <div className="sp-photo-avatar">
                       {photoPreviewUrl

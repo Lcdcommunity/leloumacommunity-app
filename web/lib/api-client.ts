@@ -570,12 +570,30 @@ export const api = {
   deleteAntennaExpense: (id: string) =>
     http(`/admin/expenses/${id}`, { method: 'DELETE' }),
 
-  listSuperAdminExpenses: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string }) =>
-    http<ApiListResponse<Expense>>(
-      `/super-admin/expenses?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
-        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
-      }${params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''}`
-    ),
+  listSuperAdminExpenses: (params?: { page?: number; pageSize?: number; status?: string; startDate?: string; endDate?: string; antennaId?: string }) => {
+    const p = new URLSearchParams();
+    if (params?.page) p.append('page', String(params.page));
+    if (params?.pageSize) p.append('pageSize', String(params.pageSize));
+    if (params?.status) p.append('status', params.status);
+    if (params?.startDate) p.append('startDate', params.startDate);
+    if (params?.endDate) p.append('endDate', params.endDate);
+    if (params?.antennaId) p.append('antennaId', params.antennaId);
+    
+    return http<ApiListResponse<Expense>>(`/super-admin/expenses?${p.toString()}`);
+  },
+
+  updateExpenseSuperAdmin: (id: string, body: Partial<{
+    title: string;
+    amount: number;
+    category: string;
+    expenseDate: string;
+    paymentMethod: string;
+    description: string;
+  }>) =>
+    http<Expense, typeof body>(`/super-admin/expenses/${id}`, { method: 'PATCH', body }),
+
+  deleteExpenseSuperAdmin: (id: string) =>
+    http(`/super-admin/expenses/${id}`, { method: 'DELETE' }),
 
   validateExpenseSuperAdmin: (id: string) =>
     http<{ message: string; expense: Expense }>(`/super-admin/expenses/${id}/validate`, { method: 'PATCH' }),
@@ -589,7 +607,6 @@ export const api = {
         params?.category ? `&category=${encodeURIComponent(params.category)}` : ''
       }`
     ),
-
   // ==========================================
   // PROJETS & PROPOSITIONS
   // ==========================================

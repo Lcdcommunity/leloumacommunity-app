@@ -17,6 +17,7 @@ export interface UserDetail extends UserSummary {
   addressLine2?: string;
   postalCode?: string;
   associationTitle?: string;
+  function?: string; // <-- AJOUT CHIRURGICAL ICI
 }
 
 export type SuperAdminAdminPayload = {
@@ -26,6 +27,7 @@ export type SuperAdminAdminPayload = {
   email: string;
   phone?: string;
   associationTitle?: string;
+  function?: string; // <-- AJOUT CHIRURGICAL ICI
   addressLine1?: string;
   addressLine2?: string;
   postalCode?: string;

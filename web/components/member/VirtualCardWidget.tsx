@@ -23,6 +23,7 @@ export interface VirtualCardData {
     postalCode?: string | null;
     profilePhotoUrl?: string | null;
     function?: string | null;
+    professionalStatus?: string | null;
   };
   antennaName: string;
 }
@@ -166,7 +167,9 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
   const residence = [card?.user?.city, card?.user?.country].filter(Boolean).join(', ') || 'Non renseignée';
   const origin = card?.user?.originVillage || 'Non renseignée';
   const antenna = card?.antennaName || 'Non assignée';
-  const memberProfession = card?.user?.function || 'Non renseignée';
+  
+  // Prise en compte chirurgicale du poste occupé (function) puis du statut pro (professionalStatus)
+  const memberProfession = card?.user?.function || card?.user?.professionalStatus || 'Non renseignée';
 
   const safeFirstName = card?.user?.firstName || '';
   const safeLastName = card?.user?.lastName || '';
@@ -679,7 +682,6 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           align-items: center;
           gap: 0.62rem;
         }
-
         .vcw-back-logo-ring {
           width: 36px;
           height: 36px;
@@ -1145,7 +1147,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                         <span className="vcw-detail-label">Antenne</span>
                         <span className="vcw-detail-val">{antenna}</span>
 
-                        <span className="vcw-detail-label">Profession</span>
+                        <span className="vcw-detail-label">Poste occupé</span>
                         <span className="vcw-detail-val">{memberProfession}</span>
                       </div>
                     </div>

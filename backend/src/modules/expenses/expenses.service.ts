@@ -112,7 +112,7 @@ export class ExpensesService {
   // LOGIQUE SUPER ADMIN
   // ==========================================
 
-  async listSuperAdminExpenses(associationId: string, page = 1, pageSize = 20, status?: string, antennaId?: string) {
+  async listSuperAdminExpenses(associationId: string, page = 1, pageSize = 20, status?: string, antennaId?: string, startDate?: string, endDate?: string) {
     // 🔥 CLOISONNEMENT STRICT : associationId est requis
     const where: Prisma.ExpenseWhereInput = {
       associationId,
@@ -120,11 +120,24 @@ export class ExpensesService {
       ...(antennaId ? { antennaId } : {})
     };
 
+    // Gestion du filtre par période de date
+    if (startDate || endDate) {
+      where.expenseDate = {};
+      if (startDate) {
+        where.expenseDate.gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.expenseDate.lte = end;
+      }
+    }
+
     const [total, items] = await Promise.all([
       this.prisma.expense.count({ where }),
       this.prisma.expense.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { expenseDate: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: { 
@@ -199,6 +212,32 @@ export class ExpensesService {
     });
 
     return { message: "Dépense rejetée.", expense: updated };
+  }
+
+  async updateSuperAdminExpense(expenseId: string, associationId: string, dto: any) {
+    const expense = await this.prisma.expense.findFirst({ where: { id: expenseId, associationId } });
+    if (!expense) throw new NotFoundException("Dépense introuvable.");
+
+    return this.prisma.expense.update({
+      where: { id: expenseId },
+      data: {
+        title: dto.title,
+        amount: dto.amount,
+        category: dto.category,
+        expenseDate: dto.expenseDate ? new Date(dto.expenseDate) : undefined,
+        paymentMethod: dto.paymentMethod,
+        description: dto.description
+      }
+    });
+  }
+
+  async deleteSuperAdminExpense(expenseId: string, associationId: string) {
+    const expense = await this.prisma.expense.findFirst({ where: { id: expenseId, associationId } });
+    if (!expense) throw new NotFoundException("Dépense introuvable.");
+
+    // Note : Prisma se chargera de supprimer la LedgerEntry associée si la relation onDelete Cascade est bien paramétrée. 
+    // Sinon, on supprime explicitement la dépense.
+    return this.prisma.expense.delete({ where: { id: expenseId } });
   }
 
   // ==========================================

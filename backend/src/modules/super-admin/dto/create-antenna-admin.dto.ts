@@ -1,4 +1,4 @@
-//backend/src/modules/super-admin/dto/create-antenna-admin.dto.ts
+// backend/src/modules/super-admin/dto/create-antenna-admin.dto.ts
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
@@ -32,6 +32,12 @@ export class CreateAntennaAdminDto {
   @IsString()
   @MaxLength(160)
   associationTitle?: string;
+
+  // 🔥 AJOUT CHIRURGICAL : On autorise le champ 'function' pour le poste occupé
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  function?: string;
 
   @IsOptional()
   @IsString()

@@ -44,9 +44,38 @@ export class ExpensesController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('status') status?: string,
-    @Query('antennaId') antennaId?: string
+    @Query('antennaId') antennaId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
   ) {
-    return this.expensesService.listSuperAdminExpenses(user.associationId, Number(page || 1), Number(pageSize || 20), status, antennaId);
+    return this.expensesService.listSuperAdminExpenses(
+      user.associationId, 
+      Number(page || 1), 
+      Number(pageSize || 20), 
+      status, 
+      antennaId, 
+      startDate, 
+      endDate
+    );
+  }
+
+  @Patch('super-admin/expenses/:id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
+  updateSuperAdminExpense(
+    @CurrentUser() user: AuthUser, 
+    @Param('id') id: string, 
+    @Body() dto: any
+  ) {
+    return this.expensesService.updateSuperAdminExpense(id, user.associationId, dto);
+  }
+
+  @Delete('super-admin/expenses/:id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
+  deleteSuperAdminExpense(
+    @CurrentUser() user: AuthUser, 
+    @Param('id') id: string
+  ) {
+    return this.expensesService.deleteSuperAdminExpense(id, user.associationId);
   }
 
   @Patch('super-admin/expenses/:id/validate')

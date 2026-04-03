@@ -242,7 +242,7 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
         <div className="sauf-grid">
           <div style={{ gridColumn: '1 / -1' }}>
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
-              Fonction dans l&apos;association
+              Poste occupé
             </label>
             <select
               value={associationTitle}
@@ -259,7 +259,7 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
                 boxShadow: roleFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
               }}
             >
-              <option value="">Sélectionnez une fonction</option>
+              <option value="">Sélectionnez un poste</option>
               {ASSOCIATION_TITLES.map((title) => (
                 <option key={title} value={title}>
                   {title}

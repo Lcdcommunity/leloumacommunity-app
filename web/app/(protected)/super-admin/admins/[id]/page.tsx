@@ -8,6 +8,24 @@ import { AppShell } from '../../../../../components/layout/AppShell';
 import { superAdminApi, type UserDetail } from '../../../../../lib/super-admin-api';
 import { fullName } from '../../../../../lib/format';
 
+const ASSOCIATION_TITLES = [
+  'Président',
+  'Vice-président',
+  'Secrétaire général',
+  'Secrétaire adjoint',
+  "Secrétaire à l'information",
+  "Secrétaire à l'organisation",
+  'Trésorier',
+  'Trésorier adjoint',
+  'Responsable jeunesse',
+  'Responsable des femmes',
+  'Coordinateur',
+  'Conseiller',
+  'Chargé de mission',
+  'Commissaire aux comptes',
+  'Autre',
+];
+
 export default function AdminDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
@@ -30,6 +48,7 @@ export default function AdminDetailPage() {
   const [fOriginSubPrefecture, setFOriginSubPrefecture] = useState('');
   const [fAddressLine1, setFAddressLine1] = useState('');
   const [fAddressLine2, setFAddressLine2] = useState('');
+  const [fAssociationTitle, setFAssociationTitle] = useState('');
 
   useEffect(() => {
     async function fetchUser() {
@@ -67,6 +86,8 @@ export default function AdminDetailPage() {
     setFOriginSubPrefecture(found.originSubPrefecture ?? '');
     setFAddressLine1(found.addressLine1 ?? '');
     setFAddressLine2(found.addressLine2 ?? '');
+    // SOLUTION : On écoute function OU associationTitle
+    setFAssociationTitle(found.function || found.associationTitle || '');
   }
 
   async function reloadUser() {
@@ -116,6 +137,9 @@ export default function AdminDetailPage() {
         originSubPrefecture: fOriginSubPrefecture.trim() || undefined,
         addressLine1: fAddressLine1.trim() || undefined,
         addressLine2: fAddressLine2.trim() || undefined,
+        // SOLUTION : On envoie la valeur dans les deux clés possibles
+        function: fAssociationTitle.trim() || undefined,
+        associationTitle: fAssociationTitle.trim() || undefined,
       });
 
       await reloadUser();
@@ -763,7 +787,7 @@ export default function AdminDetailPage() {
           color: #B91C1C;
         }
 
-        .sadd-edit-input {
+        .sadd-edit-input, .sadd-edit-select {
           width: 100%;
           min-height: 46px;
           border-radius: 11px;
@@ -779,7 +803,7 @@ export default function AdminDetailPage() {
           box-sizing: border-box;
         }
 
-        .sadd-edit-input:focus {
+        .sadd-edit-input:focus, .sadd-edit-select:focus {
           border-color: rgba(220,38,38,.5);
           box-shadow: 0 0 0 3px rgba(220,38,38,.08);
           background: #ffffff;
@@ -1312,7 +1336,7 @@ export default function AdminDetailPage() {
                     />
                   </div>
 
-                  <div className="sadd-edit-field">
+                  <div className="sadd-edit-field sadd-col-span-2">
                     <label className="sadd-edit-label">Téléphone</label>
                     <input
                       className="sadd-edit-input"
@@ -1325,7 +1349,7 @@ export default function AdminDetailPage() {
               </div>
 
               <div className="sadd-edit-section">
-                <div className="sadd-edit-section-title">Adresse</div>
+                <div className="sadd-edit-section-title">Localisation &amp; Origine</div>
                 <div className="sadd-edit-grid">
                   <div className="sadd-edit-field sadd-col-span-2">
                     <label className="sadd-edit-label">Adresse 1</label>
@@ -1386,6 +1410,24 @@ export default function AdminDetailPage() {
                       placeholder="Ex : Sagalé"
                     />
                   </div>
+
+                  {/* NOUVEAU CHAMP : Poste occupé */}
+                  <div className="sadd-edit-field sadd-col-span-2">
+                    <label className="sadd-edit-label">Poste occupé</label>
+                    <select
+                      className="sadd-edit-select"
+                      value={fAssociationTitle}
+                      onChange={(e) => setFAssociationTitle(e.target.value)}
+                    >
+                      <option value="">Sélectionnez un poste…</option>
+                      {ASSOCIATION_TITLES.map((title) => (
+                        <option key={title} value={title}>
+                          {title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                 </div>
               </div>
 
@@ -1538,7 +1580,7 @@ export default function AdminDetailPage() {
                 />
               </svg>
             </div>
-            <span className="sadd-card-title">Localisation &amp; Origine</span>
+            <span className="sadd-card-title">Localisation, Origine &amp; Poste</span>
             <div className="sadd-section-divider" />
           </div>
 
@@ -1581,6 +1623,16 @@ export default function AdminDetailPage() {
                 {user.originSubPrefecture ?? '—'}
               </span>
             </div>
+
+            <div className="sadd-field sadd-col-span-2">
+              <span className="sadd-field-label">Poste occupé</span>
+              <span
+                className={`sadd-field-value${user.function || user.associationTitle ? '' : ' empty'}`}
+              >
+                {user.function || user.associationTitle || 'Non défini'}
+              </span>
+            </div>
+
           </div>
         </div>
 

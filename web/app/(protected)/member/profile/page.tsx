@@ -1,4 +1,4 @@
-//web/app/(protected)/member/profile/page.tsx
+// web/app/(protected)/member/profile/page.tsx
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
@@ -36,7 +36,6 @@ export const PROFESSION_LIST = [
   'Autre',
 ];
 
-// ── NOUVELLES LISTES DÉROULANTES ──
 export const COMMUNES_ORIGINE = [
   'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
   'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
@@ -217,7 +216,7 @@ export default function MemberProfilePage() {
         function: associationRole || undefined,
         professionalStatus: profession || undefined,
       };
-
+      
       Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
       const nextUser = await api.updateMyProfile(payload);
@@ -238,6 +237,7 @@ export default function MemberProfilePage() {
     : false;
   const currentPhoto = photoPreviewUrl || me?.avatarUrl || me?.profilePhotoUrl || '';
 
+  // Suppression de professionalStatus ici pour satisfaire le type VirtualCardData de api-client.ts
   const liveCardData: VirtualCardData | null = me ? {
     cardNumber: me.virtualCard?.cardNumber || me.cardNumber || 'EN ATTENTE',
     isLocked: isLocked,
@@ -252,7 +252,7 @@ export default function MemberProfilePage() {
       birthCountry: birthCountry || null,
       originSubPrefecture: originSubPrefecture || null,
       originCommune: originSubPrefecture || null,
-      originVillage: originSubPrefecture || null, // 👈 Ajout du champ lu par le composant widget
+      originVillage: originSubPrefecture || null,
       country: country || null,
       city: city || null,
       postalCode: postalCode || null,
@@ -550,7 +550,6 @@ export default function MemberProfilePage() {
               {firstName} <em>{lastName}</em>
             </h2>
             
-            {/* 👇 L'IDENTIFIANT TECHNIQUE TRONQUÉ EST ICI 👇 */}
             <div className="mpr-hero-id">
               ID: {me?.id ? me.id.substring(0, 8) : '—'}
             </div>

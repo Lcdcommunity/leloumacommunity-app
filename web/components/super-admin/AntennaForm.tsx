@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/AntennaForm.tsx
+// web/components/super-admin/AntennaForm.tsx
 'use client';
 
 import { FormEvent, useState } from 'react';
@@ -13,7 +13,7 @@ export interface AntennaFormValues {
   phone?: string;
   email?: string;
   isActive: boolean;
-  defaultCurrency?: string; // <-- Ajout de la devise
+  defaultCurrency?: string;
   admin: {
     firstName: string;
     lastName: string;
@@ -55,7 +55,7 @@ function Field({
   required = false,
   type = 'text',
   placeholder,
-  readOnly = false, // <-- Ajout pour le mode lecture seule
+  readOnly = false,
 }: {
   label: string;
   value: string;
@@ -103,13 +103,15 @@ export function AntennaForm({
   submitLabel = 'Créer l’antenne',
   onSubmit,
   busy = false,
-  readOnly = false, // <-- Ajout de la prop readOnly
+  readOnly = false,
+  isEditMode = false, // <-- NOUVEAU : Mode Édition
 }: {
   initialValues?: Partial<AntennaFormValues>;
   submitLabel?: string;
   onSubmit: (values: AntennaFormValues) => Promise<void>;
   busy?: boolean;
   readOnly?: boolean;
+  isEditMode?: boolean; // <-- NOUVEAU
 }) {
   const [values, setValues] = useState<AntennaFormValues>({
     name: initialValues?.name ?? '',
@@ -121,7 +123,7 @@ export function AntennaForm({
     phone: initialValues?.phone ?? '',
     email: initialValues?.email ?? '',
     isActive: initialValues?.isActive ?? true,
-    defaultCurrency: initialValues?.defaultCurrency ?? 'EUR', // <-- Initialisation de la devise
+    defaultCurrency: initialValues?.defaultCurrency ?? 'EUR',
     admin: {
       firstName: initialValues?.admin?.firstName ?? '',
       lastName: initialValues?.admin?.lastName ?? '',
@@ -186,11 +188,9 @@ export function AntennaForm({
           <Field readOnly={readOnly} label="Pays" value={values.country ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, country: v }))} placeholder="France" />
         </div>
 
-        {/* NOUVEAU : Sélection de la devise */}
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
           <div style={{ flex: 1, minWidth: 220 }}>
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
-              {/* CORRECTION ESLINT ICI */}
               Devise de l&apos;antenne
               {!readOnly && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
             </label>
@@ -210,82 +210,85 @@ export function AntennaForm({
         </div>
       </div>
 
-      <div style={{ padding: '1rem 1.1rem', borderRadius: 16, border: '1px solid rgba(220,38,38,.12)', background: 'rgba(254,242,242,.4)' }}>
-        <div style={{ fontSize: '.86rem', fontWeight: 900, color: '#1F2937', marginBottom: '1rem' }}>Admin principal de l’antenne</div>
+      {/* NOUVEAU : On masque complètement l'admin en mode édition */}
+      {!isEditMode && (
+        <div style={{ padding: '1rem 1.1rem', borderRadius: 16, border: '1px solid rgba(220,38,38,.12)', background: 'rgba(254,242,242,.4)' }}>
+          <div style={{ fontSize: '.86rem', fontWeight: 900, color: '#1F2937', marginBottom: '1rem' }}>Admin principal de l’antenne</div>
 
-        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-          <Field readOnly={readOnly} label="Prénom" value={values.admin.firstName} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, firstName: v } }))} required placeholder="Ex: Jean" />
-          <Field readOnly={readOnly} label="Nom" value={values.admin.lastName} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, lastName: v } }))} required placeholder="Ex: Dupont" />
-        </div>
-
-        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <Field readOnly={readOnly} label="Adresse email" type="email" value={values.admin.email} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, email: v } }))} required placeholder="admin@email.com" />
-          <Field readOnly={readOnly} label="Téléphone" value={values.admin.phone ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, phone: v } }))} placeholder="+33 ..." />
-        </div>
-
-        <div style={{ marginTop: '1rem' }}>
-          <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
-            Fonction dans l&apos;association
-          </label>
-          <select
-            disabled={readOnly}
-            value={values.admin.associationTitle ?? ''}
-            onChange={(e) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, associationTitle: e.target.value } }))}
-            style={selectStyle}
-          >
-            <option value="">Sélectionnez une fonction</option>
-            {ASSOCIATION_TITLES.map((title) => (
-              <option key={title} value={title}>
-                {title}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <Field readOnly={readOnly} label="Adresse complète" value={values.admin.addressLine1 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, addressLine1: v } }))} placeholder="Rue, avenue..." />
-          <Field readOnly={readOnly} label="Complément d'adresse" value={values.admin.addressLine2 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, addressLine2: v } }))} placeholder="Appartement, quartier..." />
-        </div>
-
-        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <Field readOnly={readOnly} label="Code postal" value={values.admin.postalCode ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, postalCode: v } }))} placeholder="75000" />
-          <Field readOnly={readOnly} label="Ville" value={values.admin.city ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, city: v } }))} placeholder="Paris" />
-        </div>
-
-        <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <Field readOnly={readOnly} label="Pays" value={values.admin.country ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, country: v } }))} placeholder="France" />
-          <Field readOnly={readOnly} label="Ville d'origine" value={values.admin.originSubPrefecture ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, originSubPrefecture: v } }))} placeholder="Labé, Dakar, Kindia..." />
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.1rem', background: 'rgba(255,255,255,.7)', border: '1px solid rgba(37,99,235,.12)', borderRadius: '12px', marginTop: '1rem', opacity: readOnly ? 0.6 : 1 }}>
-          <div>
-            <div style={{ fontSize: '.84rem', fontWeight: 800, color: '#111827', marginBottom: '.15rem' }}>Envoyer l’email d’invitation</div>
-            <div style={{ fontSize: '.72rem', fontWeight: 600, color: '#6B7280', lineHeight: 1.4 }}>
-              L’admin recevra un mot de passe provisoire.
-            </div>
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
+            <Field readOnly={readOnly} label="Prénom" value={values.admin.firstName} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, firstName: v } }))} required placeholder="Ex: Jean" />
+            <Field readOnly={readOnly} label="Nom" value={values.admin.lastName} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, lastName: v } }))} required placeholder="Ex: Dupont" />
           </div>
-          <button
-            type="button"
-            role="switch"
-            disabled={readOnly}
-            aria-checked={values.admin.sendInvite}
-            onClick={() => setValues((prev) => ({ ...prev, admin: { ...prev.admin, sendInvite: !prev.admin.sendInvite } }))}
-            style={{
-              width: 44,
-              height: 24,
-              borderRadius: 99,
-              border: 'none',
-              cursor: readOnly ? 'default' : 'pointer',
-              background: values.admin.sendInvite ? 'linear-gradient(135deg,#1D4ED8,#3B82F6)' : '#D1D5DB',
-              position: 'relative',
-              transition: 'background .25s',
-              flexShrink: 0,
-            }}
-          >
-            <span style={{ position: 'absolute', top: 3, left: values.admin.sendInvite ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: 'white', transition: 'left .22s cubic-bezier(.22,1,.36,1)', boxShadow: '0 1px 4px rgba(0,0,0,.18)' }} />
-          </button>
+
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+            <Field readOnly={readOnly} label="Adresse email" type="email" value={values.admin.email} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, email: v } }))} required placeholder="admin@email.com" />
+            <Field readOnly={readOnly} label="Téléphone" value={values.admin.phone ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, phone: v } }))} placeholder="+33 ..." />
+          </div>
+
+          <div style={{ marginTop: '1rem' }}>
+            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
+              Fonction dans l&apos;association
+            </label>
+            <select
+              disabled={readOnly}
+              value={values.admin.associationTitle ?? ''}
+              onChange={(e) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, associationTitle: e.target.value } }))}
+              style={selectStyle}
+            >
+              <option value="">Sélectionnez une fonction</option>
+              {ASSOCIATION_TITLES.map((title) => (
+                <option key={title} value={title}>
+                  {title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+            <Field readOnly={readOnly} label="Adresse complète" value={values.admin.addressLine1 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, addressLine1: v } }))} placeholder="Rue, avenue..." />
+            <Field readOnly={readOnly} label="Complément d'adresse" value={values.admin.addressLine2 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, addressLine2: v } }))} placeholder="Appartement, quartier..." />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+            <Field readOnly={readOnly} label="Code postal" value={values.admin.postalCode ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, postalCode: v } }))} placeholder="75000" />
+            <Field readOnly={readOnly} label="Ville" value={values.admin.city ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, city: v } }))} placeholder="Paris" />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+            <Field readOnly={readOnly} label="Pays" value={values.admin.country ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, country: v } }))} placeholder="France" />
+            <Field readOnly={readOnly} label="Ville d'origine" value={values.admin.originSubPrefecture ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, originSubPrefecture: v } }))} placeholder="Labé, Dakar, Kindia..." />
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.1rem', background: 'rgba(255,255,255,.7)', border: '1px solid rgba(37,99,235,.12)', borderRadius: '12px', marginTop: '1rem', opacity: readOnly ? 0.6 : 1 }}>
+            <div>
+              <div style={{ fontSize: '.84rem', fontWeight: 800, color: '#111827', marginBottom: '.15rem' }}>Envoyer l’email d’invitation</div>
+              <div style={{ fontSize: '.72rem', fontWeight: 600, color: '#6B7280', lineHeight: 1.4 }}>
+                L’admin recevra un mot de passe provisoire.
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              disabled={readOnly}
+              aria-checked={values.admin.sendInvite}
+              onClick={() => setValues((prev) => ({ ...prev, admin: { ...prev.admin, sendInvite: !prev.admin.sendInvite } }))}
+              style={{
+                width: 44,
+                height: 24,
+                borderRadius: 99,
+                border: 'none',
+                cursor: readOnly ? 'default' : 'pointer',
+                background: values.admin.sendInvite ? 'linear-gradient(135deg,#1D4ED8,#3B82F6)' : '#D1D5DB',
+                position: 'relative',
+                transition: 'background .25s',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{ position: 'absolute', top: 3, left: values.admin.sendInvite ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: 'white', transition: 'left .22s cubic-bezier(.22,1,.36,1)', boxShadow: '0 1px 4px rgba(0,0,0,.18)' }} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {!readOnly && (
         <div style={{ paddingTop: '1rem', borderTop: '1px solid rgba(37,99,235,.1)', marginTop: '.5rem', display: 'flex', justifyContent: 'flex-end' }}>

@@ -399,9 +399,7 @@ export default function AdminProfilePage() {
           color: #64748B !important;
           border-color: rgba(37,99,235,0.06) !important;
           font-style: italic;
-        }
-
-        /* ── Antenna cards (read-only) ── */
+        } /* ── Antenna cards (read-only) ── */
         .aprf-info-card {
           background: linear-gradient(135deg, #EFF6FF, #F0F9FF);
           border: 1px solid #BFDBFE; border-radius: 12px;
@@ -596,8 +594,8 @@ export default function AdminProfilePage() {
                 </div>
                 <div className="aprf-field">
                   <label className="aprf-label">
-                    Titre dans l&apos;association
-                    <span className="opt">Super Admin</span>
+                    Poste occupé
+                    <span className="opt">Admin</span>
                   </label>
                   <input className="aprf-input aprf-input-readonly" value={associationTitle || 'Non défini'} disabled />
                 </div>
