@@ -7,7 +7,7 @@ import { AppShell } from '../../../../../components/layout/AppShell';
 import { ContributionCreateForm } from '../../../../../components/member/ContributionCreateForm';
 import { api } from '../../../../../lib/api-client';
 
-type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF';
+type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | '';
 
 type ContributionFormData = {
   amount: number;
@@ -19,18 +19,10 @@ type ContributionFormData = {
   receiptFileAssetId?: string;
 };
 
-function normalizeCurrency(value?: string | null): SupportedCurrency {
-  if (value === 'GNF' || value === 'EUR' || value === 'USD' || value === 'XOF') {
-    return value;
-  }
-  return 'EUR';
-}
-
 export default function MemberNewContributionPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBootLoading, setIsBootLoading] = useState(true);
-  const [defaultCurrency, setDefaultCurrency] = useState<SupportedCurrency>('EUR');
   const [pricing, setPricing] = useState<{ monthlyQuota: number; membershipCard: number }>({ monthlyQuota: 0, membershipCard: 0 });
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -40,18 +32,14 @@ export default function MemberNewContributionPage() {
 
     async function bootstrap() {
       try {
-        const [dashboard, allPricing] = await Promise.all([
-          api.dashboardMember(),
+        const [allPricing] = await Promise.all([
           api.getAssociationPricing().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)), 
         ]);
         
         if (!mounted) return;
 
-        const currentCurrency = normalizeCurrency(dashboard?.stats?.currency);
-        setDefaultCurrency(currentCurrency);
-        
-        // On extrait le prix de LA devise du membre et on l'envoie au formulaire
-        const localPricing = allPricing[currentCurrency] || { monthlyQuota: 0, membershipCard: 0 };
+        // On récupère les tarifs par défaut (en EUR ou GNF par ex) pour les afficher en suggestion si besoin
+        const localPricing = allPricing['EUR'] || allPricing['GNF'] || { monthlyQuota: 0, membershipCard: 0 };
         setPricing({
           monthlyQuota: Number(localPricing.monthlyQuota) || 0,
           membershipCard: Number(localPricing.membershipCard) || 0,
@@ -59,8 +47,6 @@ export default function MemberNewContributionPage() {
 
       } catch (error) {
         console.error('Erreur récupération infos:', error);
-        if (!mounted) return;
-        setDefaultCurrency('EUR');
       } finally {
         if (mounted) setIsBootLoading(false);
       }
@@ -77,10 +63,16 @@ export default function MemberNewContributionPage() {
     setIsSubmitting(true);
     setErrorMsg(null);
 
+    if (!values.currency) {
+      setErrorMsg("Veuillez sélectionner une devise.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       await api.createContributionMember({
         amount: values.amount,
-        currency: values.currency,
+        currency: values.currency as 'GNF' | 'EUR' | 'USD' | 'XOF',
         method: values.method,
         depositedAt: values.depositedAt,
         note: values.note,
@@ -211,17 +203,6 @@ export default function MemberNewContributionPage() {
         }
         .nc-notice p { font-size: 0.76rem; color: #78350F; line-height: 1.55; }
 
-        .nc-currency-box {
-          background: #ECFDF5;
-          border: 1px solid #A7F3D0;
-          border-radius: 12px;
-          padding: 0.85rem 1rem;
-          display: flex;
-          gap: 0.6rem;
-          align-items: flex-start;
-        }
-        .nc-currency-box p { font-size: 0.76rem; color: #065F46; line-height: 1.55; }
-
         .nc-error-box {
           background: #FEF2F2;
           border: 1px solid #FECACA;
@@ -328,7 +309,6 @@ export default function MemberNewContributionPage() {
                   <ContributionCreateForm
                     onSubmit={handleSubmit}
                     isSubmitting={isSubmitting}
-                    defaultCurrency={defaultCurrency}
                     pricing={pricing}
                   />
                 </>
@@ -337,16 +317,6 @@ export default function MemberNewContributionPage() {
           </div>
 
           <div className="nc-info">
-            <div className="nc-currency-box">
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="1.8" style={{ flexShrink: 0, marginTop: 1 }}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-              <p>
-                La devise de votre dépôt est automatiquement alignée sur celle de votre antenne :
-                <strong> {defaultCurrency}</strong>.
-              </p>
-            </div>
-
             <div className="nc-info-card">
               <div className="nc-info-title">
                 <div className="nc-info-ico" style={{ background: '#EFF6FF', color: '#2563EB' }}>
@@ -359,7 +329,7 @@ export default function MemberNewContributionPage() {
 
               {[
                 { n: '1', text: <>Remplissez le formulaire avec le <strong>motif</strong>, le <strong>montant</strong> et la <strong>méthode de paiement</strong>.</> },
-                { n: '2', text: <>La <strong>devise est imposée automatiquement</strong> selon l’antenne à laquelle vous appartenez.</> },
+                { n: '2', text: <>Le mode &quot;Carte Bancaire&quot; permet un paiement en ligne rapide et sécurisé.</> },
                 { n: '3', text: <>Votre dépôt est enregistré au statut <strong>En attente</strong>.</> },
                 { n: '4', text: <>L&apos;administrateur de votre antenne <strong>valide ou rejette</strong> la cotisation après vérification.</> },
               ].map((s) => (
@@ -375,7 +345,7 @@ export default function MemberNewContributionPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <p>
-                Le dépôt est une <strong>déclaration</strong>. La cotisation est validée uniquement après confirmation de réception par votre administrateur.
+                Le dépôt manuel est une <strong>déclaration</strong>. La cotisation est validée uniquement après confirmation de réception par votre administrateur.
               </p>
             </div>
           </div>

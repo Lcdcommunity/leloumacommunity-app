@@ -8,20 +8,7 @@ import type { UserSummary, UserStatus, UserRole } from '../../../../types/user';
 import { fullName, formatDate } from '../../../../lib/format';
 import Image from 'next/image';
 
-/* ══════════════════════════════════════════════════════ EXTENDED TYPE */
-type ExtendedUser = UserSummary & {
-  birthDate?: string | null;
-  originSubPrefecture?: string | null;
-  phone?: string | null;
-  city?: string | null;
-  country?: string | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
-  profilePhotoUrl?: string | null;
-  cardNumber?: string | null;
-  function?: string | null;
-};
-
+/* ══════════════════════════════════════════════════════ CONSTANTES */
 const ASSOCIATION_ROLES = [
   'Membre (simple)',
   "Secrétaire à l'organisation",
@@ -33,6 +20,51 @@ const ASSOCIATION_ROLES = [
   'Conseiller / Conseillère',
   'Autre',
 ];
+
+const PROFESSION_LIST = [
+  'Étudiant(e)',
+  'Employé(e)',
+  'Fonctionnaire',
+  'Indépendant / Entrepreneur',
+  'Profession libérale',
+  'Cadre / Dirigeant',
+  'Artisan / Commerçant',
+  'Agriculteur',
+  'Sans emploi',
+  'Retraité(e)',
+  'Autre',
+];
+
+const COMMUNES_ORIGINE = [
+  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
+];
+
+const COUNTRIES = [
+  { name: 'Guinée', code: 'GN' }, { name: 'France', code: 'FR' }, { name: 'Sénégal', code: 'SN' },
+  { name: 'Côte d\'Ivoire', code: 'CI' }, { name: 'Mali', code: 'ML' }, { name: 'Maroc', code: 'MA' },
+  { name: 'Canada', code: 'CA' }, { name: 'États-Unis', code: 'US' }, { name: 'Belgique', code: 'BE' },
+  { name: 'Suisse', code: 'CH' }, { name: 'Allemagne', code: 'DE' }, { name: 'Royaume-Uni', code: 'GB' },
+  { name: 'Espagne', code: 'ES' }, { name: 'Italie', code: 'IT' }, { name: 'Autre (Non listé)', code: 'OTHER' }
+].sort((a, b) => a.name.localeCompare(b.name));
+
+/* ══════════════════════════════════════════════════════ EXTENDED TYPE */
+type ExtendedUser = UserSummary & {
+  birthDate?: string | null;
+  placeOfBirth?: string | null;
+  countryOfBirth?: string | null;
+  originSubPrefecture?: string | null;
+  phone?: string | null;
+  city?: string | null;
+  country?: string | null;
+  postalCode?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  professionalStatus?: string | null;
+  profilePhotoUrl?: string | null;
+  cardNumber?: string | null;
+  function?: string | null;
+};
 
 /* ══════════════════════════════════════════════════════ BADGES */
 const STATUS_MAP: Record<UserStatus, { label: string; color: string; bg: string; border: string }> = {
@@ -154,7 +186,21 @@ function MemberModal({
     setEditValues((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Convert YYYY-MM-DD input date to ISO string
+    const dateVal = e.target.value;
+    if (dateVal) {
+      handleChange('birthDate', new Date(dateVal).toISOString());
+    } else {
+      handleChange('birthDate', '');
+    }
+  };
+
   const canApprove = user.status === 'PENDING_APPROVAL' || user.status === 'EMAIL_UNVERIFIED';
+  
+  const formattedBirthDateForInput = editValues.birthDate 
+    ? new Date(editValues.birthDate).toISOString().split('T')[0] 
+    : '';
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -187,6 +233,7 @@ function MemberModal({
             )}
           </div>
 
+          <div className="sm-section-divider">Identité & Contact</div>
           <div className="sm-dp-grid">
              <div className="sm-dp-field">
                 <label>Prénom</label>
@@ -198,16 +245,75 @@ function MemberModal({
              </div>
              <div className="sm-dp-field full">
                 <label>Email</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.email || ''} onChange={e => handleChange('email', e.target.value)} /> : <div className="sm-dp-value">{user.email}</div>}
+                {isEditing ? <input className="sm-dp-input" type="email" value={editValues.email || ''} onChange={e => handleChange('email', e.target.value)} /> : <div className="sm-dp-value">{user.email}</div>}
              </div>
              <div className="sm-dp-field">
                 <label>Téléphone</label>
                 {isEditing ? <input className="sm-dp-input" value={editValues.phone || ''} onChange={e => handleChange('phone', e.target.value)} /> : <div className="sm-dp-value">{user.phone || '-'}</div>}
              </div>
+          </div>
+
+          <div className="sm-section-divider">Naissance & Origine</div>
+          <div className="sm-dp-grid">
+             <div className="sm-dp-field">
+                <label>Date de naissance</label>
+                {isEditing ? <input type="date" className="sm-dp-input" value={formattedBirthDateForInput} onChange={handleDateChange} /> : <div className="sm-dp-value">{user.birthDate ? formatDate(user.birthDate) : '-'}</div>}
+             </div>
+             <div className="sm-dp-field">
+                <label>Lieu de naissance</label>
+                {isEditing ? <input className="sm-dp-input" value={editValues.placeOfBirth || ''} onChange={e => handleChange('placeOfBirth', e.target.value)} /> : <div className="sm-dp-value">{user.placeOfBirth || '-'}</div>}
+             </div>
+             <div className="sm-dp-field">
+                <label>Pays de naissance</label>
+                {isEditing ? (
+                  <select className="sm-dp-input" value={editValues.countryOfBirth || ''} onChange={e => handleChange('countryOfBirth', e.target.value)}>
+                    <option value="">Sélectionner...</option>
+                    {COUNTRIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                  </select>
+                ) : <div className="sm-dp-value">{user.countryOfBirth || '-'}</div>}
+             </div>
              <div className="sm-dp-field">
                 <label>Commune d&apos;origine</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.originSubPrefecture || ''} onChange={e => handleChange('originSubPrefecture', e.target.value)} /> : <div className="sm-dp-value">{user.originSubPrefecture || '-'}</div>}
+                {isEditing ? (
+                  <select className="sm-dp-input" value={editValues.originSubPrefecture || ''} onChange={e => handleChange('originSubPrefecture', e.target.value)}>
+                    <option value="">Sélectionner...</option>
+                    {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                ) : <div className="sm-dp-value">{user.originSubPrefecture || '-'}</div>}
              </div>
+          </div>
+
+          <div className="sm-section-divider">Résidence & Adresse</div>
+          <div className="sm-dp-grid">
+             <div className="sm-dp-field">
+                <label>Pays actuel</label>
+                {isEditing ? (
+                  <select className="sm-dp-input" value={editValues.country || ''} onChange={e => handleChange('country', e.target.value)}>
+                    <option value="">Sélectionner...</option>
+                    {COUNTRIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
+                  </select>
+                ) : <div className="sm-dp-value">{user.country || '-'}</div>}
+             </div>
+             <div className="sm-dp-field">
+                <label>Ville actuelle</label>
+                {isEditing ? <input className="sm-dp-input" value={editValues.city || ''} onChange={e => handleChange('city', e.target.value)} /> : <div className="sm-dp-value">{user.city || '-'}</div>}
+             </div>
+             <div className="sm-dp-field">
+                <label>Code Postal</label>
+                {isEditing ? <input className="sm-dp-input" value={editValues.postalCode || ''} onChange={e => handleChange('postalCode', e.target.value)} /> : <div className="sm-dp-value">{user.postalCode || '-'}</div>}
+             </div>
+             <div className="sm-dp-field full">
+                <label>Adresse (Ligne 1)</label>
+                {isEditing ? <input className="sm-dp-input" value={editValues.addressLine1 || ''} onChange={e => handleChange('addressLine1', e.target.value)} /> : <div className="sm-dp-value">{user.addressLine1 || '-'}</div>}
+             </div>
+             <div className="sm-dp-field full">
+                <label>Adresse (Ligne 2)</label>
+                {isEditing ? <input className="sm-dp-input" value={editValues.addressLine2 || ''} onChange={e => handleChange('addressLine2', e.target.value)} /> : <div className="sm-dp-value">{user.addressLine2 || '-'}</div>}
+             </div>
+          </div>
+
+          <div className="sm-section-divider">Poste & Profession</div>
+          <div className="sm-dp-grid">
              <div className="sm-dp-field">
                 <label>Poste Asso</label>
                 {isEditing ? (
@@ -218,10 +324,16 @@ function MemberModal({
                 ) : <div className="sm-dp-value" style={{color:'#DC2626', fontWeight:700}}>{user.function || 'Membre'}</div>}
              </div>
              <div className="sm-dp-field">
-                <label>Ville actuelle</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.city || ''} onChange={e => handleChange('city', e.target.value)} /> : <div className="sm-dp-value">{user.city || '-'}</div>}
+                <label>Profession / Statut</label>
+                {isEditing ? (
+                  <select className="sm-dp-input" value={editValues.professionalStatus || ''} onChange={e => handleChange('professionalStatus', e.target.value)}>
+                    <option value="">Sélectionner...</option>
+                    {PROFESSION_LIST.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                ) : <div className="sm-dp-value">{user.professionalStatus || '-'}</div>}
              </div>
           </div>
+
         </div>
       </div>
     </div>
@@ -360,12 +472,13 @@ export default function SuperAdminMembersPage() {
         .modal-close { width:32px; height:32px; border-radius:50%; border:1.5px solid #e2e8f0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
         .modal-body { padding:1.25rem; }
         .modal-actions-bar { margin-bottom:1.5rem; display:flex; gap:.5rem; }
+        .sm-section-divider { font-size:0.7rem; font-weight:800; color:#DC2626; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid #FECACA; padding-bottom:0.4rem; margin:1.5rem 0 0.75rem 0; }
         .sm-dp-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
         .sm-dp-field { display:flex; flex-direction:column; gap:4px; }
         .sm-dp-field.full { grid-column: span 2; }
         .sm-dp-field label { font-size:.65rem; font-weight:800; color:#94a3b8; text-transform:uppercase; }
         .sm-dp-value { font-size:.9rem; font-weight:600; color:#1e293b; padding:4px 0; }
-        .sm-dp-input { height:38px; border-radius:8px; border:1px solid #e2e8f0; padding:0 .75rem; font-size:.85rem; font-weight:600; width: 100%; }
+        .sm-dp-input { height:38px; border-radius:8px; border:1px solid #e2e8f0; padding:0 .75rem; font-size:.85rem; font-weight:600; width: 100%; background: white; }
         .btn-save { flex:1; height:40px; background:#059669; color:white; border:none; border-radius:10px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px; cursor: pointer; }
         .btn-cancel { height:40px; padding:0 1rem; border:1.5px solid #e2e8f0; border-radius:10px; font-weight:700; cursor: pointer; }
         .sp-icon-btn { width:34px; height:34px; border-radius:9px; border:1.5px solid var(--border); background:var(--bg); color:var(--color); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; }

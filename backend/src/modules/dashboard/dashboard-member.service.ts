@@ -7,7 +7,7 @@ import {
   PostStatus, 
   UserRole, 
   UserStatus,
-  ExpenseStatus // <-- Requis pour lire les dépenses !
+  ExpenseStatus 
 } from '@prisma/client';
 
 @Injectable()
@@ -15,7 +15,6 @@ export class DashboardMemberService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getMemberDashboard(userId: string) {
-    // 1. Récupération des informations du membre
     const me = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -29,7 +28,11 @@ export class DashboardMemberService {
         associationId: true,
         memberships: {
           where: { isPrimary: true },
-          select: { antennaId: true },
+          select: { 
+            antennaId: true,
+            // 🔥 CORRECTION : On récupère aussi la devise par défaut de l'antenne pour le dashboard
+            antenna: { select: { defaultCurrency: true } }
+          },
         },
         createdAt: true,
         updatedAt: true,
@@ -39,8 +42,8 @@ export class DashboardMemberService {
     if (!me) throw new Error('Utilisateur introuvable');
 
     const primaryAntennaId = me.memberships[0]?.antennaId ?? null;
+    const primaryAntennaCurrency = me.memberships[0]?.antenna?.defaultCurrency || 'EUR';
 
-    // 2. Agrégations des contributions du membre
     const [aggAll, aggValidated, pendingCount, lastContribution] =
       await Promise.all([
         this.prisma.contribution.aggregate({
@@ -61,7 +64,6 @@ export class DashboardMemberService {
         }),
       ]);
 
-    // 👇 CORRECTION DÉFINITIVE : VRAI SOLDE (Cotisations historiques - Dépenses historiques)
     const allAntennas = await this.prisma.antenna.findMany({
       where: { associationId: me.associationId, isActive: true },
       select: { id: true, name: true, defaultCurrency: true }
@@ -72,12 +74,10 @@ export class DashboardMemberService {
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
         const [aggC, aggE] = await Promise.all([
-          // Toutes les entrées d'argent
           this.prisma.contribution.aggregate({
             where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
             _sum: { amount: true }
           }),
-          // Toutes les sorties d'argent (dépenses)
           this.prisma.expense.aggregate({
             where: { antennaId: ant.id, status: ExpenseStatus.VALIDATED },
             _sum: { amount: true }
@@ -90,13 +90,12 @@ export class DashboardMemberService {
         return {
           id: ant.id,
           name: ant.name,
-          balance: localBalance, // Le solde parfait !
+          balance: localBalance,
           currency: ant.defaultCurrency || 'EUR' 
         };
       })
     );
 
-    // 3. Dernières contributions du membre
     const recentContributions = await this.prisma.contribution.findMany({
       where: { memberUserId: userId },
       orderBy: [{ createdAt: 'desc' }],
@@ -114,7 +113,6 @@ export class DashboardMemberService {
       },
     });
 
-    // 4. Projets en cours dans l'association
     const projectsInProgress = await this.prisma.project.findMany({
       where: {
         associationId: me.associationId,
@@ -134,7 +132,6 @@ export class DashboardMemberService {
       },
     });
 
-    // 5. Dernières actualités (NewsPosts)
     const latestContents = await this.prisma.newsPost.findMany({
       where: {
         associationId: me.associationId,
@@ -152,7 +149,6 @@ export class DashboardMemberService {
       },
     });
 
-    // 6. Aperçu des membres en retard
     const lateMembersPreviewRaw = await this.prisma.user.findMany({
       where: {
         associationId: me.associationId,
@@ -188,7 +184,6 @@ export class DashboardMemberService {
       .sort((a, b) => b.lateMonths - a.lateMonths)
       .slice(0, 10);
 
-    // 7. Formatage de la réponse
     return {
       stats: {
         myContributionsTotal: Number(aggAll._sum.amount ?? 0),
@@ -196,7 +191,8 @@ export class DashboardMemberService {
         myPendingContributionsCount: pendingCount,
         myLastContributionAt: lastContribution?.createdAt?.toISOString() ?? null,
         associationTotalBalance: totalAssociationBalance, 
-        currency: 'EUR',
+        // 🔥 CORRECTION : On renvoie la devise de l'antenne au lieu de 'EUR'
+        currency: primaryAntennaCurrency,
         lateMonths: (() => {
           const mine = recentContributions[0]?.createdAt ?? null;
           return mine ? monthDiff(mine, now) : 999;

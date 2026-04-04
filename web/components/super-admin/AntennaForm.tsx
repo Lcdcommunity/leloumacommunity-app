@@ -48,6 +48,29 @@ const ASSOCIATION_TITLES = [
   'Autre',
 ];
 
+// 🔥 NOUVEAU : Liste stricte des pays avec leur devise associée pour l'automatisation
+const COUNTRIES = [
+  { name: 'Guinée', code: 'GN', currency: 'GNF' },
+  { name: 'Sénégal', code: 'SN', currency: 'XOF' },
+  { name: 'Côte d\'Ivoire', code: 'CI', currency: 'XOF' },
+  { name: 'Mali', code: 'ML', currency: 'XOF' },
+  { name: 'Burkina Faso', code: 'BF', currency: 'XOF' },
+  { name: 'Togo', code: 'TG', currency: 'XOF' },
+  { name: 'Bénin', code: 'BJ', currency: 'XOF' },
+  { name: 'Niger', code: 'NE', currency: 'XOF' },
+  { name: 'Guinée-Bissau', code: 'GW', currency: 'XOF' },
+  { name: 'France', code: 'FR', currency: 'EUR' },
+  { name: 'Belgique', code: 'BE', currency: 'EUR' },
+  { name: 'Suisse', code: 'CH', currency: 'EUR' },
+  { name: 'Allemagne', code: 'DE', currency: 'EUR' },
+  { name: 'Espagne', code: 'ES', currency: 'EUR' },
+  { name: 'Italie', code: 'IT', currency: 'EUR' },
+  { name: 'États-Unis', code: 'US', currency: 'USD' },
+  { name: 'Canada', code: 'CA', currency: 'USD' },
+  { name: 'Royaume-Uni', code: 'GB', currency: 'EUR' }, // Si GBP n'est pas dans la liste, on fallback sur EUR/USD selon le besoin
+  { name: 'Autre (Non listé)', code: 'OTHER', currency: 'EUR' }
+].sort((a, b) => a.name.localeCompare(b.name));
+
 function Field({
   label,
   value,
@@ -104,14 +127,14 @@ export function AntennaForm({
   onSubmit,
   busy = false,
   readOnly = false,
-  isEditMode = false, // <-- NOUVEAU : Mode Édition
+  isEditMode = false,
 }: {
   initialValues?: Partial<AntennaFormValues>;
   submitLabel?: string;
   onSubmit: (values: AntennaFormValues) => Promise<void>;
   busy?: boolean;
   readOnly?: boolean;
-  isEditMode?: boolean; // <-- NOUVEAU
+  isEditMode?: boolean;
 }) {
   const [values, setValues] = useState<AntennaFormValues>({
     name: initialValues?.name ?? '',
@@ -119,7 +142,7 @@ export function AntennaForm({
     addressLine2: initialValues?.addressLine2 ?? '',
     postalCode: initialValues?.postalCode ?? '',
     city: initialValues?.city ?? '',
-    country: initialValues?.country ?? 'France',
+    country: initialValues?.country ?? '',
     phone: initialValues?.phone ?? '',
     email: initialValues?.email ?? '',
     isActive: initialValues?.isActive ?? true,
@@ -134,7 +157,7 @@ export function AntennaForm({
       addressLine2: initialValues?.admin?.addressLine2 ?? '',
       postalCode: initialValues?.admin?.postalCode ?? '',
       city: initialValues?.admin?.city ?? '',
-      country: initialValues?.admin?.country ?? 'France',
+      country: initialValues?.admin?.country ?? '',
       originSubPrefecture: initialValues?.admin?.originSubPrefecture ?? '',
       sendInvite: initialValues?.admin?.sendInvite ?? true,
     },
@@ -184,8 +207,35 @@ export function AntennaForm({
         </div>
 
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <Field readOnly={readOnly} label="Ville" value={values.city ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, city: v }))} placeholder="Paris" />
-          <Field readOnly={readOnly} label="Pays" value={values.country ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, country: v }))} placeholder="France" />
+          <Field readOnly={readOnly} label="Ville" value={values.city ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, city: v }))} placeholder="Ex: Conakry, Paris..." />
+          
+          {/* 🔥 NOUVEAU : Pays en select qui pilote automatiquement la devise */}
+          <div style={{ flex: 1, minWidth: 220 }}>
+            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
+              Pays de l&apos;antenne
+              {!readOnly && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
+            </label>
+            <select
+              disabled={readOnly}
+              value={values.country ?? ''}
+              required
+              onChange={(e) => {
+                const selectedCountryName = e.target.value;
+                const countryData = COUNTRIES.find(c => c.name === selectedCountryName);
+                
+                setValues((prev) => ({ 
+                  ...prev, 
+                  country: selectedCountryName,
+                  // ⚡ Automatisation : la devise s'ajuste instantanément
+                  defaultCurrency: countryData ? countryData.currency : prev.defaultCurrency
+                }));
+              }}
+              style={selectStyle}
+            >
+              <option value="">Sélectionnez un pays</option>
+              {COUNTRIES.map(c => <option key={`ant-${c.code}`} value={c.name}>{c.name}</option>)}
+            </select>
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
@@ -201,16 +251,16 @@ export function AntennaForm({
               style={selectStyle}
             >
               <option value="GNF">GNF (Franc Guinéen)</option>
+              <option value="XOF">XOF (Franc CFA)</option>
               <option value="USD">DOLLAR (USD)</option>
               <option value="EUR">EURO (EUR)</option>
-              <option value="XOF">XOF (Franc CFA)</option>
             </select>
+            <p style={{ fontSize: '0.65rem', color: '#6B7280', marginTop: '0.3rem', fontStyle: 'italic' }}>*Définie automatiquement selon le pays choisi.</p>
           </div>
           <div style={{ flex: 1, minWidth: 220 }}></div>
         </div>
       </div>
 
-      {/* NOUVEAU : On masque complètement l'admin en mode édition */}
       {!isEditMode && (
         <div style={{ padding: '1rem 1.1rem', borderRadius: 16, border: '1px solid rgba(220,38,38,.12)', background: 'rgba(254,242,242,.4)' }}>
           <div style={{ fontSize: '.86rem', fontWeight: 900, color: '#1F2937', marginBottom: '1rem' }}>Admin principal de l’antenne</div>
@@ -255,7 +305,22 @@ export function AntennaForm({
           </div>
 
           <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-            <Field readOnly={readOnly} label="Pays" value={values.admin.country ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, country: v } }))} placeholder="France" />
+            {/* 🔥 NOUVEAU : Pays de l'admin en Select également */}
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
+                Pays de résidence
+              </label>
+              <select
+                disabled={readOnly}
+                value={values.admin.country ?? ''}
+                onChange={(e) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, country: e.target.value } }))}
+                style={selectStyle}
+              >
+                <option value="">Sélectionnez un pays</option>
+                {COUNTRIES.map(c => <option key={`adm-${c.code}`} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+            
             <Field readOnly={readOnly} label="Ville d'origine" value={values.admin.originSubPrefecture ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, originSubPrefecture: v } }))} placeholder="Labé, Dakar, Kindia..." />
           </div>
 

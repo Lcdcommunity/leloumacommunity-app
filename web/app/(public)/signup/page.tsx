@@ -92,9 +92,15 @@ export default function MemberSignupPage() {
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
+  
   const [birthCountry, setBirthCountry] = useState('');
+  const [customBirthCountry, setCustomBirthCountry] = useState(''); // 🔥 GESTION "AUTRE"
+
   const [city, setCity] = useState('');
+  
   const [country, setCountry] = useState('');
+  const [customCountry, setCustomCountry] = useState(''); // 🔥 GESTION "AUTRE"
+
   const [postalCode, setPostalCode] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
@@ -140,7 +146,7 @@ export default function MemberSignupPage() {
 
   // Logique de mise à jour dynamique de l'indicatif téléphonique
   useEffect(() => {
-    if (country) {
+    if (country && country !== 'Autre (Non listé)') {
       const selectedCountry = COUNTRIES.find(c => c.name === country);
       if (selectedCountry) {
         if (!phone || phone.trim() === '' || !phone.includes(' ')) {
@@ -205,13 +211,41 @@ export default function MemberSignupPage() {
       if (!antennaId) return 'Veuillez sélectionner une antenne.';
     }
     if (s === 1) {
+      if (!associationRole) return "Le poste occupé est requis.";
+      if (!originSubPrefecture) return "La commune d'origine est requise.";
+      
+      // Validation de l'âge (16 à 80 ans)
+      if (!birthDate || birthDate.length < 10) return "La date de naissance est requise (JJ/MM/AAAA).";
+      const parts = birthDate.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const bDate = new Date(year, month, day);
+        const today = new Date();
+        let age = today.getFullYear() - bDate.getFullYear();
+        const m = today.getMonth() - bDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+          age--;
+        }
+        if (age < 16) return "Vous devez avoir au moins 16 ans pour vous inscrire.";
+        if (age > 80) return "L'âge maximum autorisé est de 80 ans.";
+      } else {
+        return "Format de date de naissance invalide.";
+      }
+
+      if (!placeOfBirth.trim()) return "Le lieu de naissance est requis.";
+      if (!birthCountry) return "Le pays de naissance est requis.";
+      if (birthCountry === 'Autre (Non listé)' && !customBirthCountry.trim()) return "Veuillez préciser votre pays de naissance.";
+      
+      if (!country) return "Le pays de résidence est requis.";
+      if (country === 'Autre (Non listé)' && !customCountry.trim()) return "Veuillez préciser votre pays de résidence.";
+      
       if (!email.trim()) return "L'email est requis.";
       if (!/\S+@\S+\.\S+/.test(email)) return "Format d'email invalide.";
-      if (!originSubPrefecture) return "La commune d'origine est requise.";
-      if (birthDate && birthDate.length < 10) return "La date de naissance doit être complète (JJ/MM/AAAA).";
       
-      // Validation dynamique du téléphone
-      if (phone && country) {
+      if (!phone.trim()) return "Le téléphone est requis.";
+      if (phone && country && country !== 'Autre (Non listé)') {
         const selectedCountry = COUNTRIES.find(c => c.name === country);
         if (selectedCountry && selectedCountry.phoneLength > 0) {
           const numberPart = phone.split(' ')[1] ? phone.split(' ')[1].replace(/\D/g, '') : '';
@@ -220,6 +254,10 @@ export default function MemberSignupPage() {
           }
         }
       }
+
+      if (!profession) return "La profession / situation est requise.";
+      if (!city.trim()) return "La ville de résidence est requise.";
+      if (!addressLine1.trim()) return "L'adresse (Ligne 1) est requise.";
     }
     if (s === 3) {
       if (!password) return 'Le mot de passe est requis.';
@@ -250,6 +288,9 @@ export default function MemberSignupPage() {
     setSubmitting(true);
 
     try {
+      const finalBirthCountry = birthCountry === 'Autre (Non listé)' ? customBirthCountry : birthCountry;
+      const finalCountry = country === 'Autre (Non listé)' ? customCountry : country;
+
       await api.memberSignup({
         firstName,
         lastName,
@@ -260,29 +301,26 @@ export default function MemberSignupPage() {
         originSubPrefecture,
         birthDate: convertDateToISO(birthDate),
         placeOfBirth: placeOfBirth || undefined,
-        birthCountry: birthCountry || undefined,
+        birthCountry: finalBirthCountry || undefined,
         city: city || undefined,
-        country: country || undefined,
+        country: finalCountry || undefined,
         postalCode: postalCode || undefined,
         addressLine1: addressLine1 || undefined,
         addressLine2: addressLine2 || undefined,
-        function: associationRole || profession || undefined,
+        function: associationRole || undefined,
+        professionalStatus: profession || undefined,
         termsAccepted,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any); 
 
-      // NOTE SUR L'UPLOAD D'AVATAR:
-      // L'appel api.uploadAvatar nécessite d'être authentifié (Token JWT). Lors du signup, l'utilisateur
-      // n'a pas encore de token (compte en attente de validation). L'upload renverra donc une erreur 401.
-      // La photo de profil devra être rajoutée par le membre lors de sa première connexion dans "Mon Profil",
-      // à moins de modifier le backend pour accepter le FormData directement dans l'endpoint de signup.
+      // On tente l'upload si une photo a été sélectionnée (attention: le backend doit accepter ça sans token JWT finalisé)
       if (selectedPhotoFile) {
         const formData = new FormData();
         formData.append('avatar', selectedPhotoFile);
         try { 
           await api.uploadAvatar(formData); 
         } catch (uploadErr) { 
-          console.warn("La photo ne peut pas être uploadée sans authentification (401). Elle sera demandée plus tard.", uploadErr);
+          console.warn("La photo ne peut pas être uploadée (401). Elle sera demandée plus tard.", uploadErr);
         }
       }
       setSuccess(true);
@@ -360,7 +398,6 @@ export default function MemberSignupPage() {
 
         .sp-section-title { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--theme-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
         .sp-section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, #A7F3D0, transparent); }
-
         .sp-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; }
         .sp-stack { display: flex; flex-direction: column; gap: 0.2rem; }
         .sp-field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
@@ -581,12 +618,12 @@ export default function MemberSignupPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       </svg>
                       Poste occupé dans l&apos;association
-                      <span style={{ fontWeight: 500, color: '#94A3B8', textTransform: 'none', letterSpacing: 0, fontSize: '0.65rem', WebkitTextFillColor: '#94A3B8' }}>(optionnel)</span>
                     </label>
                     <select
                       className="sp-role-select"
                       value={associationRole}
                       onChange={e => setAssociationRole(e.target.value)}
+                      required
                     >
                       <option value="">Sélectionnez un poste…</option>
                       {ASSOCIATION_ROLES.map(r => (
@@ -607,34 +644,40 @@ export default function MemberSignupPage() {
                   <div className="sp-grid-2">
                     <div className="sp-field">
                       <label className="sp-label">Date de naissance <span className="sp-opt">(JJ/MM/AAAA)</span></label>
-                      <input className="sp-input" type="text" value={birthDate} onChange={handleBirthDateChange} placeholder="12/05/1990" />
+                      <input className="sp-input" type="text" value={birthDate} onChange={handleBirthDateChange} placeholder="12/05/1990" required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Lieu de naissance <span className="sp-opt">(optionnel)</span></label>
-                      <input className="sp-input" value={placeOfBirth} onChange={e => setPlaceOfBirth(e.target.value)} placeholder="Ex : Lélouma" />
+                      <label className="sp-label">Lieu de naissance</label>
+                      <input className="sp-input" value={placeOfBirth} onChange={e => setPlaceOfBirth(e.target.value)} placeholder="Ex : Lélouma" required />
                     </div>
                   </div>
 
                   <div className="sp-field">
-                    <label className="sp-label">Pays de naissance <span className="sp-opt">(optionnel)</span></label>
-                    <select className="sp-select" value={birthCountry} onChange={e => setBirthCountry(e.target.value)}>
+                    <label className="sp-label">Pays de naissance</label>
+                    <select className="sp-select" value={birthCountry} onChange={e => { setBirthCountry(e.target.value); if (e.target.value !== 'Autre (Non listé)') setCustomBirthCountry(''); }} required>
                       <option value="">Sélectionnez un pays...</option>
                       {COUNTRIES.map(c => (
                         <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
+                    {birthCountry === 'Autre (Non listé)' && (
+                      <input className="sp-input" value={customBirthCountry} onChange={e => setCustomBirthCountry(e.target.value)} placeholder="Précisez votre pays de naissance" required style={{ marginTop: '0.4rem' }} />
+                    )}
                   </div>
 
                   <p className="sp-section-title">Coordonnées &amp; Profession</p>
                   
                   <div className="sp-field">
                     <label className="sp-label">Pays de résidence</label>
-                    <select className="sp-select" value={country} onChange={e => setCountry(e.target.value)} required>
+                    <select className="sp-select" value={country} onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre (Non listé)') setCustomCountry(''); }} required>
                       <option value="">Sélectionnez votre pays actuel...</option>
                       {COUNTRIES.map(c => (
                         <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
+                    {country === 'Autre (Non listé)' && (
+                      <input className="sp-input" value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder="Précisez votre pays de résidence" required style={{ marginTop: '0.4rem' }} />
+                    )}
                   </div>
 
                   <div className="sp-grid-2">
@@ -643,19 +686,20 @@ export default function MemberSignupPage() {
                       <input className="sp-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@exemple.com" required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Téléphone <span className="sp-opt">(optionnel)</span></label>
+                      <label className="sp-label">Téléphone</label>
                       <input 
                         className="sp-input" 
                         value={phone} 
                         onChange={e => setPhone(e.target.value)} 
                         placeholder={country ? "Entrez le numéro" : "Sélectionnez un pays d'abord"} 
+                        required
                       />
                     </div>
                   </div>
 
                   <div className="sp-field">
-                    <label className="sp-label">Profession / Situation <span className="sp-opt">(optionnel)</span></label>
-                    <select className="sp-select" value={profession} onChange={e => setProfession(e.target.value)}>
+                    <label className="sp-label">Profession / Situation</label>
+                    <select className="sp-select" value={profession} onChange={e => setProfession(e.target.value)} required>
                       <option value="">Sélectionnez une profession</option>
                       {PROFESSION_LIST.map(p => (
                         <option key={p} value={p}>{p}</option>
@@ -663,14 +707,14 @@ export default function MemberSignupPage() {
                     </select>
                   </div>
 
-                  <p className="sp-section-title">Adresse (Optionnelle)</p>
+                  <p className="sp-section-title">Adresse de résidence</p>
                   <div className="sp-grid-2">
                     <div className="sp-field">
                       <label className="sp-label">Ville</label>
-                      <input className="sp-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Paris, Conakry" />
+                      <input className="sp-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Paris, Conakry" required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Code postal</label>
+                      <label className="sp-label">Code postal <span className="sp-opt">(optionnel)</span></label>
                       <input className="sp-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="Ex: 75001" maxLength={5} />
                     </div>
                   </div>
@@ -678,10 +722,10 @@ export default function MemberSignupPage() {
                   <div className="sp-grid-2">
                     <div className="sp-field">
                       <label className="sp-label">Adresse 1</label>
-                      <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue..." />
+                      <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue..." required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Adresse 2</label>
+                      <label className="sp-label">Adresse 2 <span className="sp-opt">(optionnel)</span></label>
                       <input className="sp-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 3B" />
                     </div>
                   </div>

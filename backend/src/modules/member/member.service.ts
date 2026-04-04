@@ -15,7 +15,8 @@ import {
   PaymentMethod,
   ContributionPurpose,
   NotificationType,
-  ExpenseStatus, 
+  ExpenseStatus,
+  CurrencyCode, // 🔥 IMPORT DE L'ENUM POUR CORRIGER L'ERREUR DE TYPE
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { memberMapper } from './member.mapper';
@@ -73,7 +74,7 @@ export class MemberService {
       },
     });
 
-    if (!user || !user.associationId) { // 🔥 CORRECTION: On vérifie aussi l'associationId
+    if (!user || !user.associationId) {
       throw new NotFoundException('Utilisateur ou association introuvable');
     }
 
@@ -91,7 +92,7 @@ export class MemberService {
     const [totalMyContributions, activeProjects, virtualCard, allAntennas] = await Promise.all([
       this.prisma.contribution.aggregate({
         where: {
-          associationId: me.associationId, // 🔥 CLOISON
+          associationId: me.associationId,
           memberUserId: userId,
           status: ContributionStatus.VALIDATED,
         },
@@ -99,7 +100,7 @@ export class MemberService {
       }),
       this.prisma.project.count({
         where: {
-          associationId: me.associationId, // 🔥 CLOISON
+          associationId: me.associationId,
           status: ProjectStatus.IN_PROGRESS,
         },
       }),
@@ -119,7 +120,7 @@ export class MemberService {
         },
       }),
       this.prisma.antenna.findMany({
-        where: { associationId: me.associationId, isActive: true }, // 🔥 CLOISON
+        where: { associationId: me.associationId, isActive: true },
         select: { id: true, name: true, defaultCurrency: true }
       })
     ]);
@@ -128,11 +129,11 @@ export class MemberService {
       allAntennas.map(async (ant) => {
         const [aggC, aggE] = await Promise.all([
           this.prisma.contribution.aggregate({
-            where: { associationId: me.associationId, antennaId: ant.id, status: ContributionStatus.VALIDATED }, // 🔥 CLOISON
+            where: { associationId: me.associationId, antennaId: ant.id, status: ContributionStatus.VALIDATED },
             _sum: { amount: true }
           }),
           this.prisma.expense.aggregate({
-            where: { associationId: me.associationId, antennaId: ant.id, status: ExpenseStatus.VALIDATED }, // 🔥 CLOISON
+            where: { associationId: me.associationId, antennaId: ant.id, status: ExpenseStatus.VALIDATED },
             _sum: { amount: true }
           })
         ]);
@@ -148,7 +149,7 @@ export class MemberService {
 
     let cardData = null;
 
-    if (virtualCard && virtualCard.user.associationId === me.associationId) { // 🔥 Double check de sécurité
+    if (virtualCard && virtualCard.user.associationId === me.associationId) {
       cardData = {
         cardNumber: virtualCard.cardNumber,
         isLocked: virtualCard.isLocked,
@@ -188,10 +189,10 @@ export class MemberService {
   }
 
   async updateProfile(userId: string, dto: MemberProfileUpdateDto) {
-    const me = await this.getMeOrThrow(userId); // Vérifie que l'user existe bien
+    const me = await this.getMeOrThrow(userId);
 
     const updated = await this.prisma.user.update({
-      where: { id: userId, associationId: me.associationId }, // 🔥 CLOISON (sécurité supplémentaire)
+      where: { id: userId, associationId: me.associationId },
       data: {
         ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
         ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
@@ -253,11 +254,12 @@ export class MemberService {
 
     const created = await this.prisma.contribution.create({
       data: {
-        associationId: me.associationId, // 🔥 CLOISON
+        associationId: me.associationId,
         antennaId: me.antennaId,
         memberUserId: me.id,
         amount: new Prisma.Decimal(dto.amount),
-        currency: 'EUR', 
+        // 🔥 CORRECTION DU TYPE : On force en 'CurrencyCode' pour satisfaire Prisma
+        currency: (dto.currency as CurrencyCode) || CurrencyCode.EUR, 
         paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
         externalReference: autoReference,
         contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
@@ -271,7 +273,7 @@ export class MemberService {
     await this.notifications.notifyAntennaAdmins(
       me.antennaId,
       me.associationId,
-      `Un nouveau versement de ${dto.amount} EUR a été déclaré par ${me.firstName} ${me.lastName}.`,
+      `Un nouveau versement de ${dto.amount} ${dto.currency || 'EUR'} a été déclaré par ${me.firstName} ${me.lastName}.`,
       NotificationType.CONTRIBUTION_SUBMITTED,
       { contributionId: created.id },
     );
@@ -289,7 +291,7 @@ export class MemberService {
     const pageSize = query.pageSize ?? 50;
 
     const where: Prisma.ContributionWhereInput = {
-      associationId: me.associationId, // 🔥 CLOISON
+      associationId: me.associationId,
       memberUserId: userId,
       ...(query.status ? { status: query.status as ContributionStatus } : {}),
     };
@@ -305,7 +307,10 @@ export class MemberService {
     ]);
 
     return {
-      items: items.map(memberMapper.contribution),
+      items: items.map(c => ({
+        ...memberMapper.contribution(c),
+        currency: c.currency
+      })),
       total,
       page,
       pageSize,
@@ -321,7 +326,7 @@ export class MemberService {
       }),
       this.prisma.contribution.aggregate({
         where: {
-          associationId: me.associationId, // 🔥 CLOISON
+          associationId: me.associationId,
           status: ContributionStatus.VALIDATED,
         },
         _sum: { amount: true },
@@ -336,7 +341,7 @@ export class MemberService {
       associationId: association.id,
       associationName: association.name,
       totalValidatedContributionsAmount: Number(agg._sum.amount ?? 0),
-      currency: 'EUR',
+      currency: association.defaultCurrency || 'EUR',
       lastUpdatedAt: new Date().toISOString(),
     };
   }
@@ -351,7 +356,7 @@ export class MemberService {
 
     const members = await this.prisma.user.findMany({
       where: {
-        associationId: me.associationId, // 🔥 CLOISON
+        associationId: me.associationId,
         role: 'MEMBER',
         status: 'ACTIVE',
       },
@@ -366,7 +371,7 @@ export class MemberService {
           },
         },
         contributions: {
-          where: { status: 'VALIDATED', associationId: me.associationId }, // 🔥 CLOISON
+          where: { status: 'VALIDATED', associationId: me.associationId },
           orderBy: [{ validatedAt: 'desc' }],
           take: 1,
           select: {
@@ -447,7 +452,7 @@ export class MemberService {
       : [];
 
     const where: Prisma.ProjectWhereInput = {
-      associationId: me.associationId, // 🔥 CLOISON
+      associationId: me.associationId,
       isPublicToMembers: true,
       ...(query.status ? { status: query.status as ProjectStatus } : {}),
       ...(projectSearchOr.length > 0 ? { OR: projectSearchOr } : {}),
@@ -505,7 +510,7 @@ export class MemberService {
 
     const created = await this.prisma.projectProposal.create({
       data: {
-        associationId: me.associationId, // 🔥 CLOISON
+        associationId: me.associationId,
         antennaId: me.antennaId,
         authorUserId: me.id,
         title: dto.title.trim(),
@@ -548,7 +553,7 @@ export class MemberService {
     const pageSize = query.pageSize ?? 50;
 
     const where: Prisma.ProjectProposalWhereInput = {
-      associationId: me.associationId, // 🔥 CLOISON
+      associationId: me.associationId,
       authorUserId: me.id,
       ...(query.status ? { status: query.status as ProposalStatus } : {}),
     };
@@ -582,13 +587,11 @@ export class MemberService {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
 
-    // 🔥 CORRECTION DE LA LOGIQUE DE FILTRAGE DES DOCUMENTS
     const visibilityOr: Prisma.DocumentWhereInput[] = [
       { visibility: { in: ['ALL', 'MEMBER'] } }
     ];
 
     if (me.antennaId) {
-      // S'il a une antenne, il peut aussi voir les documents RESTREINTS à son antenne
       visibilityOr.push({
         antennaId: me.antennaId,
         visibility: { in: ['ALL', 'MEMBER', 'ANTENNA'] } 
@@ -596,7 +599,7 @@ export class MemberService {
     }
 
     const andFilters: Prisma.DocumentWhereInput[] = [
-      { associationId: me.associationId }, // 🔥 CLOISON MAÎTRESSE
+      { associationId: me.associationId },
       { publishedAt: { not: null } },
       { OR: visibilityOr },
     ];
@@ -670,7 +673,7 @@ export class MemberService {
       : [];
 
     const where: Prisma.NewsPostWhereInput = {
-      associationId: me.associationId, // 🔥 CLOISON
+      associationId: me.associationId,
       status: PostStatus.PUBLISHED,
       ...(contentSearchOr.length > 0 ? { OR: contentSearchOr } : {}),
     };

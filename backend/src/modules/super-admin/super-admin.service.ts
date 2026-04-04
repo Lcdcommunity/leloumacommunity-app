@@ -367,6 +367,12 @@ export class SuperAdminService {
         country: data.country,
         addressLine1: data.addressLine1,
         addressLine2: data.addressLine2,
+        // 🔥 AJOUTS CHIRURGICAUX DES NOUVEAUX CHAMPS
+        postalCode: data.postalCode,
+        function: data.function,
+        professionalStatus: data.professionalStatus,
+        placeOfBirth: data.placeOfBirth,
+        countryOfBirth: data.countryOfBirth,
       },
     });
   }

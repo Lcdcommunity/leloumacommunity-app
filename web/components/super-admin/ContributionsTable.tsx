@@ -145,6 +145,8 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
           margin: 2.5rem auto; 
           flex-shrink: 0; /* Interdit à Flexbox d'écraser la modale, elle garde sa vraie taille */
           overflow: hidden; /* Garde les bords arrondis propres */
+          display: flex;
+          flex-direction: column;
         }
 
         .sct-modal-header {

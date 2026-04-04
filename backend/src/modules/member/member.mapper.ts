@@ -92,6 +92,15 @@ export const memberMapper = {
       antennaId: u.antennaId ?? null,
       associationId: u.associationId ?? null,
       isActive: u.isActive ?? null,
+      
+      // 🔥 AJOUTS CHIRURGICAUX POUR LE SUPER ADMIN
+      birthDate: toIso(u.birthDate),
+      placeOfBirth: u.placeOfBirth ?? null,
+      countryOfBirth: u.countryOfBirth ?? null,
+      professionalStatus: u.professionalStatus ?? null,
+      function: u.function ?? null,
+      cardNumber: u.virtualCard?.cardNumber ?? u.cardNumber ?? null,
+
       city: u.city ?? null,
       country: u.country ?? null,
       addressLine1: u.addressLine1 ?? null,
