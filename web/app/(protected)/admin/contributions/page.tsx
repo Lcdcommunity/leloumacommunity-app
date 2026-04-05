@@ -9,11 +9,13 @@ import { formatDate } from '../../../../lib/format';
 
 /* ══════════════════════════════════════════════════════ TYPES & EXTRACTEURS */
 
-type ModalMode = 'view' | 'validate' | 'reject' | 'edit';
+type ModalMode = 'view' | 'validate' | 'reject' | 'edit' | 'delete';
 
 interface ModalState { 
   mode: ModalMode | null; 
-  contribution: Contribution | null; 
+  contribution: Contribution & {
+    submitter?: { firstName: string; lastName: string } | null;
+  } | null; 
 }
 
 const getMember = (c: Contribution) => 
@@ -81,6 +83,10 @@ function ContributionDetailModal({
   if (!mode || !c) return null;
 
   const isView = mode === 'view';
+  
+  // 🔥 CORRECTION DE L'ERREUR TYPESCRIPT ICI : On supprime 'SUBMITTED'
+  const isPending = c.status === 'PENDING_VALIDATION' || c.status === 'PENDING';
+
   const member = getMember(c);
   const method = getMethod(c);
   const note = getNote(c);
@@ -106,7 +112,7 @@ function ContributionDetailModal({
             </h3>
             <div className="acv-detail-grid">
               <div className="acv-info-box">
-                <label>Nom complet</label>
+                <label>Bénéficiaire</label>
                 <span style={{color:'#2563EB', fontWeight:800}}>
                   {member ? `${member.firstName || ''} ${member.lastName || ''}`.trim() || 'Nom manquant' : 'Information introuvable'}
                 </span>
@@ -120,6 +126,16 @@ function ContributionDetailModal({
                 <span>{member?.phone || '—'}</span>
               </div>
             </div>
+            
+            {c.submitter && (
+              <div className="acv-info-box" style={{ marginTop: '0.75rem', background: '#ECFDF5', borderColor: '#A7F3D0' }}>
+                <label style={{ color: '#047857' }}>Déclaré / Payé par</label>
+                <span style={{ color: '#065F46', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  {c.submitter.firstName} {c.submitter.lastName}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="acv-detail-section">
@@ -155,9 +171,34 @@ function ContributionDetailModal({
           {!isView && (
             <div className="acv-action-form">
               <label className="acv-form-lbl">
-                {mode === 'reject' ? 'Motif du rejet (Obligatoire)' : mode === 'edit' ? 'Nouveau montant' : 'Note interne (Optionnel)'}
+                {mode === 'delete' ? 'Confirmation de sécurité (Obligatoire)' : mode === 'reject' ? 'Motif du rejet (Obligatoire)' : mode === 'edit' ? 'Nouveau montant' : 'Note interne (Optionnel)'}
               </label>
-              <textarea className="acv-input" value={inputValue} onChange={e => setInputValue(e.target.value)} rows={2} />
+              {mode === 'delete' ? (
+                <>
+                  <input 
+                    type="text" 
+                    className="acv-input" 
+                    value={inputValue} 
+                    onChange={e => setInputValue(e.target.value)} 
+                    placeholder="Tapez SUPPRIMER pour confirmer" 
+                  />
+                  {inputValue !== 'SUPPRIMER' && inputValue.length > 0 && (
+                    <p style={{ fontSize: '0.7rem', color: '#DC2626', marginTop: '0.4rem', fontWeight: 600 }}>
+                      Veuillez taper exactement &quot;SUPPRIMER&quot;.
+                    </p>
+                  )}
+                </>
+              ) : mode === 'edit' ? (
+                <input 
+                  type="number" 
+                  className="acv-input" 
+                  value={inputValue} 
+                  onChange={e => setInputValue(e.target.value)} 
+                  placeholder="Ex: 150" 
+                />
+              ) : (
+                <textarea className="acv-input" value={inputValue} onChange={e => setInputValue(e.target.value)} rows={2} />
+              )}
             </div>
           )}
         </div>
@@ -167,19 +208,29 @@ function ContributionDetailModal({
             {!isView && <button className="acv-btn-sec" onClick={() => onConfirm('view', '')}>← Retour</button>}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '0.6rem', flex: 1 }}>
               {isView ? (
-                <>
-                  <button className="acv-btn acv-btn-blue" style={{flex:1}} onClick={() => onConfirm('edit', '')}>Modifier</button>
-                  <button className="acv-btn acv-btn-red" style={{flex:1}} onClick={() => onConfirm('reject', '')}>Rejeter</button>
-                  <button className="acv-btn acv-btn-green" style={{flex:2}} onClick={() => onConfirm('validate', '')}>Valider</button>
-                </>
+                isPending ? (
+                  <>
+                    <button className="acv-btn acv-btn-blue" style={{flex:1}} onClick={() => onConfirm('edit', '')}>Modifier</button>
+                    <button className="acv-btn acv-btn-red" style={{flex:1}} onClick={() => onConfirm('reject', '')}>Rejeter</button>
+                    <button className="acv-btn acv-btn-green" style={{flex:2}} onClick={() => onConfirm('validate', '')}>Valider</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="acv-btn acv-btn-red" style={{flex:1}} onClick={() => onConfirm('delete', '')}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{marginRight: '0.3rem'}}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      Supprimer
+                    </button>
+                    <button className="acv-btn acv-btn-blue" style={{flex:1}} onClick={() => onConfirm('edit', '')}>Modifier</button>
+                  </>
+                )
               ) : (
                 <button 
-                  className={`acv-btn ${mode === 'reject' ? 'acv-btn-red' : mode === 'edit' ? 'acv-btn-blue' : 'acv-btn-green'}`}
+                  className={`acv-btn ${mode === 'reject' || mode === 'delete' ? 'acv-btn-red' : mode === 'edit' ? 'acv-btn-blue' : 'acv-btn-green'}`}
                   style={{width:'100%'}}
-                  disabled={busy || (mode === 'reject' && !inputValue.trim())}
+                  disabled={busy || (mode === 'reject' && !inputValue.trim()) || (mode === 'delete' && inputValue !== 'SUPPRIMER')}
                   onClick={() => onConfirm(mode, inputValue)}
                 >
-                  {busy ? <div className="acv-spinner" /> : 'Confirmer'}
+                  {busy ? <div className="acv-spinner" /> : mode === 'delete' ? 'Supprimer définitivement' : 'Confirmer'}
                 </button>
               )}
             </div>
@@ -192,7 +243,7 @@ function ContributionDetailModal({
 
 /* ══════════════════════════════════════════════════════ MAIN PAGE */
 export default function AdminContributionsPage() {
-  const [items, setItems] = useState<Contribution[]>([]);
+  const [items, setItems] = useState<(Contribution & { submitter?: { firstName: string; lastName: string } | null })[]>([]);
   const [status, setStatus] = useState('PENDING_VALIDATION');
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
@@ -225,7 +276,13 @@ export default function AdminContributionsPage() {
     try {
       if (mode === 'validate') await api.validateContributionAntenna(c.id, { note: value });
       if (mode === 'reject') await api.rejectContributionAntenna(c.id, { reason: value });
-      if (mode === 'edit') await api.updateContributionAntenna(c.id, { amount: parseFloat(value) });
+      if (mode === 'edit') await api.updateContributionAntenna(c.id, { amount: parseFloat(value.replace(',', '.')) });
+      if (mode === 'delete') {
+        const apiClient = api as unknown as { deleteContributionAntenna?: (id: string) => Promise<void> };
+        if (apiClient.deleteContributionAntenna) {
+          await apiClient.deleteContributionAntenna(c.id);
+        }
+      }
       setModal({ mode: null, contribution: null });
       await load();
     } finally { setBusyId(null); }
@@ -240,9 +297,19 @@ export default function AdminContributionsPage() {
         .acv-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 6vw, 2rem); font-weight: 700; color: #111827; margin-bottom: 1.5rem; white-space: nowrap; }
         .acv-title span { color: #2563EB; }
         
-        .acv-toolbar { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-        .acv-select, .acv-search { height: 42px; border-radius: 12px; border: 1px solid #E2E8F0; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; color: #1E293B; outline: none; background: white; }
-        .acv-search { flex: 1; min-width: 200px; }
+        /* 🔥 FORCÉ SUR LA MÊME LIGNE, MÊME SUR MOBILE */
+        .acv-toolbar { display: flex; flex-direction: row; gap: 0.5rem; margin-bottom: 1.5rem; width: 100%; box-sizing: border-box; align-items: center; flex-wrap: nowrap; }
+        .acv-select { flex: 0 0 auto; max-width: 45%; height: 42px; border-radius: 12px; border: 1px solid #E2E8F0; padding: 0 1.8rem 0 0.8rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; color: #1E293B; outline: none; background: white; appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.6rem center; transition: border-color 0.2s, box-shadow 0.2s; }
+        .acv-search { flex: 1 1 auto; min-width: 0; height: 42px; border-radius: 12px; border: 1px solid #E2E8F0; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; color: #1E293B; outline: none; background: white; transition: border-color 0.2s, box-shadow 0.2s; }
+        
+        .acv-select:focus, .acv-search:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        
+        @media(max-width: 480px) {
+          .acv-toolbar { gap: 0.4rem; }
+          .acv-select, .acv-search { height: 40px; font-size: 0.8rem; border-radius: 10px; }
+          .acv-select { padding-left: 0.5rem; padding-right: 1.5rem; background-position: right 0.4rem center; max-width: 50%; text-overflow: ellipsis; }
+          .acv-search { padding: 0 0.6rem; }
+        }
         
         .acv-card { background: white; border-radius: 20px; border: 1px solid #E2E8F0; padding: 1.25rem; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s; position: relative; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02); }
         .acv-card:hover { border-color: #2563EB; transform: translateY(-2px); box-shadow: 0 10px 20px -5px rgba(37,99,235,0.1); }
@@ -333,13 +400,19 @@ export default function AdminContributionsPage() {
 
           return (
             <div key={c.id} className="acv-card" onClick={() => {
-              console.log("DONNÉES REÇUES PAR LE FRONTEND :", c);
               setModal({ mode: 'view', contribution: c });
             }}>
               <div className="acv-card-inner">
                 <div className="acv-avatar">{initials}</div>
                 <div className="acv-card-content">
                   <div className="acv-card-name">{name}</div>
+                  
+                  {c.submitter && (
+                    <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 800, textTransform: 'uppercase', marginBottom: '2px' }}>
+                      Payé par {c.submitter.firstName}
+                    </div>
+                  )}
+
                   <div className="acv-card-purpose">{PURPOSE_MAP[c.purpose] || c.purpose}</div>
                 </div>
                 <div className="acv-card-right">

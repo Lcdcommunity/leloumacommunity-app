@@ -17,6 +17,7 @@ type ContributionFormData = {
   note?: string;
   purpose?: string;
   receiptFileAssetId?: string;
+  targetMemberId?: string; // 🔥 NOUVEAU
 };
 
 export default function MemberNewContributionPage() {
@@ -35,7 +36,7 @@ export default function MemberNewContributionPage() {
         const [allPricing] = await Promise.all([
           api.getAssociationPricing().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)), 
         ]);
-        
+
         if (!mounted) return;
 
         // On récupère les tarifs par défaut (en EUR ou GNF par ex) pour les afficher en suggestion si besoin
@@ -78,6 +79,7 @@ export default function MemberNewContributionPage() {
         note: values.note,
         purpose: values.purpose,
         receiptFileAssetId: values.receiptFileAssetId ?? null,
+        targetMemberId: values.targetMemberId, // 🔥 NOUVEAU
       });
 
       setSuccess(true);
@@ -284,8 +286,7 @@ export default function MemberNewContributionPage() {
               ) : success ? (
                 <div className="nc-success">
                   <div className="nc-success-icon">
-                    <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2">
-                      <polyline points="20 6 9 17 4 12" />
+                    <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2">                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
                   <p className="nc-success-title">Versement enregistré !</p>

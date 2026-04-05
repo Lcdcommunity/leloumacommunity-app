@@ -475,6 +475,12 @@ export const api = {
       lateMonths?: number;
     }>>(`/member/late-members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
 
+  // 🔥 NOUVEAU : Rechercher un membre pour paiement tiers
+  searchMembers: (q: string) =>
+    http<Array<{ id: string; firstName: string; lastName: string; email: string; phone?: string | null }>>(
+      `/member/search-users?q=${encodeURIComponent(q)}`
+    ),
+
   // ==========================================
   // COTISATIONS
   // ==========================================
@@ -505,6 +511,7 @@ export const api = {
   deleteContributionAntenna: (id: string) =>
     http(`/admin/contributions/${id}`, { method: 'DELETE' }),
 
+  // 🔥 NOUVEAU : Ajout de targetMemberId
   createContributionMember: (body: {
     amount: number;
     currency?: string;
@@ -514,6 +521,7 @@ export const api = {
     note?: string;
     purpose?: string;
     receiptFileAssetId?: string | null;
+    targetMemberId?: string; 
   }) =>
     http<Contribution, typeof body>('/member/contributions', { method: 'POST', body }),
 
@@ -607,6 +615,7 @@ export const api = {
         params?.category ? `&category=${encodeURIComponent(params.category)}` : ''
       }`
     ),
+
   // ==========================================
   // PROJETS & PROPOSITIONS
   // ==========================================

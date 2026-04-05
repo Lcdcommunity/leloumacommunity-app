@@ -486,10 +486,21 @@ export default function SuperAdminMembersPage() {
       `}</style>
 
       <div className="sm-wrap">
-        <header style={{ marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#DC2626', letterSpacing: '.1em', textTransform: 'uppercase' }}>Super Admin</div>
-          <h1 className="sm-title">Membres — <span>vue globale</span></h1>
-        </header>
+  <header style={{ marginBottom: '1.5rem' }}>
+    <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#DC2626', letterSpacing: '.1em', textTransform: 'uppercase' }}>Super Admin</div>
+    <h1 
+      className="sm-title" 
+      style={{ 
+        whiteSpace: 'nowrap', 
+        overflow: 'hidden', 
+        textOverflow: 'ellipsis',
+        // Optionnel : permet au texte de rétrécir sur mobile pour éviter d'être coupé trop vite
+        fontSize: 'clamp(1.3rem, 6vw, 2rem)' 
+      }}
+    >
+      Membres — <span>vue globale</span>
+    </h1>
+  </header>
 
         {error && (
           <div style={{ background: '#FEF2F2', color: '#B91C1C', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #FECACA', fontWeight: 700 }}>

@@ -302,11 +302,20 @@ export class AdminService {
     }
 
     const [items, total] = await Promise.all([
-      this.prisma.contribution.findMany({ where, skip, take: pageSize, orderBy: { createdAt: 'desc' }, include: { member: true } }),
+      this.prisma.contribution.findMany({ 
+        where, 
+        skip, 
+        take: pageSize, 
+        orderBy: { createdAt: 'desc' }, 
+        // 🔥 NOUVEAU : On inclut bien sûr le membre ET le submitter (payeur tiers)
+        include: { 
+          member: true,
+          submitter: { select: { firstName: true, lastName: true } }
+        } 
+      }),
       this.prisma.contribution.count({ where }),
     ]);
 
-    // 🔥 CORRECTION ICI : On fusionne le résultat mappé avec l'objet `member` complet (avec les champs demandés).
     return {
       items: items.map(c => ({ 
         ...memberMapper.contribution(c),

@@ -1,5 +1,4 @@
 // backend/src/modules/member/member.mapper.ts
-
 function toIso(value: unknown): string | null {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
@@ -93,7 +92,6 @@ export const memberMapper = {
       associationId: u.associationId ?? null,
       isActive: u.isActive ?? null,
       
-      // 🔥 AJOUTS CHIRURGICAUX POUR LE SUPER ADMIN
       birthDate: toIso(u.birthDate),
       placeOfBirth: u.placeOfBirth ?? null,
       countryOfBirth: u.countryOfBirth ?? null,
@@ -128,6 +126,16 @@ export const memberMapper = {
       validatedAt: toIso(c.validatedAt),
       note: c.memberComment ?? null,
       purpose: c.purpose ?? 'REGULAR_QUOTA',
+      // Le payeur
+      submitter: c.submitter ? {
+        firstName: c.submitter.firstName,
+        lastName: c.submitter.lastName,
+      } : null,
+      // 🔥 NOUVEAU : Le bénéficiaire (celui pour qui on paie)
+      beneficiary: c.member ? {
+        firstName: c.member.firstName,
+        lastName: c.member.lastName,
+      } : null,
     };
   },
 

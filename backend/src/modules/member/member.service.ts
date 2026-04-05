@@ -16,7 +16,7 @@ import {
   ContributionPurpose,
   NotificationType,
   ExpenseStatus,
-  CurrencyCode, // 🔥 IMPORT DE L'ENUM POUR CORRIGER L'ERREUR DE TYPE
+  CurrencyCode,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { memberMapper } from './member.mapper';
@@ -64,11 +64,11 @@ export class MemberService {
         addressLine2: true,
         postalCode: true,
         originSubPrefecture: true,
-        function: true,              // 🔥 AJOUT
-        professionalStatus: true,    // 🔥 AJOUT
-        birthDate: true,             // 🔥 AJOUT
-        placeOfBirth: true,          // 🔥 AJOUT
-        countryOfBirth: true,        // 🔥 AJOUT
+        function: true,
+        professionalStatus: true,
+        birthDate: true,
+        placeOfBirth: true,
+        countryOfBirth: true,
         createdAt: true,
         updatedAt: true,
         profilePhoto: {
@@ -85,7 +85,6 @@ export class MemberService {
 
     return {
       ...user,
-      // TypeScript safety
       associationId: user.associationId,
       antennaId: user.memberships[0]?.antennaId || null,
     };
@@ -172,8 +171,8 @@ export class MemberService {
           country: virtualCard.user.country,
           city: virtualCard.user.city,
           profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
-          function: virtualCard.user.function,                     // 🔥 AJOUT
-          professionalStatus: virtualCard.user.professionalStatus, // 🔥 AJOUT
+          function: virtualCard.user.function,
+          professionalStatus: virtualCard.user.professionalStatus,
         },
       };
     }
@@ -212,8 +211,6 @@ export class MemberService {
           : {}),
         ...(dto.city !== undefined ? { city: dto.city.trim() || null } : {}),
         ...(dto.country !== undefined ? { country: dto.country.trim() || null } : {}),
-        
-        // 🔥 AJOUTS DES MAPPAGES MANQUANTS
         ...(dto.function !== undefined ? { function: dto.function.trim() || null } : {}),
         ...(dto.professionalStatus !== undefined ? { professionalStatus: dto.professionalStatus.trim() || null } : {}),
         ...(dto.originSubPrefecture !== undefined ? { originSubPrefecture: dto.originSubPrefecture.trim() || null } : {}),
@@ -254,6 +251,29 @@ export class MemberService {
     return { ok: true as const };
   }
 
+  async searchMembers(userId: string, q: string) {
+    const me = await this.getMeOrThrow(userId);
+    if (!q || q.trim().length < 2) return [];
+
+    const members = await this.prisma.user.findMany({
+      where: {
+        associationId: me.associationId,
+        role: 'MEMBER',
+        status: 'ACTIVE',
+        id: { not: me.id },
+        OR: [
+          { firstName: { contains: q, mode: Prisma.QueryMode.insensitive } },
+          { lastName: { contains: q, mode: Prisma.QueryMode.insensitive } },
+          { email: { contains: q, mode: Prisma.QueryMode.insensitive } },
+          { phone: { contains: q, mode: Prisma.QueryMode.insensitive } },
+        ],
+      },
+      take: 10,
+      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+    });
+    return members;
+  }
+
   async createContribution(userId: string, dto: CreateMemberContributionDto) {
     const me = await this.getMeOrThrow(userId);
     this.ensureMemberActiveEnough(me.status);
@@ -264,6 +284,29 @@ export class MemberService {
       );
     }
 
+    let finalMemberId = me.id;
+    let finalAntennaId = me.antennaId; // Par défaut, on va dans l'antenne du payeur
+    let submitterId: string | null = null;
+
+    // 🔥 ROUTAGE PUISSANT POUR BÉNÉFICIAIRE TIERS
+    if (dto.targetMemberId && dto.targetMemberId !== me.id) {
+      const target = await this.prisma.user.findFirst({
+        where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
+        include: { memberships: true } // On récupère TOUTES les memberships de la cible
+      });
+
+      if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
+      
+      finalMemberId = target.id;
+      submitterId = me.id;
+      
+      // On affecte la cotisation à l'antenne principale du bénéficiaire
+      const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
+      if (primaryMembership && primaryMembership.antennaId) {
+        finalAntennaId = primaryMembership.antennaId;
+      }
+    }
+
     const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
     const autoReference = `TR-${datePart}-${randomPart}`;
@@ -271,10 +314,10 @@ export class MemberService {
     const created = await this.prisma.contribution.create({
       data: {
         associationId: me.associationId,
-        antennaId: me.antennaId,
-        memberUserId: me.id,
+        antennaId: finalAntennaId,        // 🔥 Routé vers la bonne antenne !
+        memberUserId: finalMemberId,      
+        submitterUserId: submitterId,     
         amount: new Prisma.Decimal(dto.amount),
-        // 🔥 CORRECTION DU TYPE : On force en 'CurrencyCode' pour satisfaire Prisma
         currency: (dto.currency as CurrencyCode) || CurrencyCode.EUR, 
         paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
         externalReference: autoReference,
@@ -282,14 +325,19 @@ export class MemberService {
         memberComment: dto.note ?? null,
         proofFileId: dto.receiptFileAssetId ?? null,
         status: ContributionStatus.PENDING_VALIDATION,
-        purpose: dto.purpose || ContributionPurpose.REGULAR_QUOTA,
+        purpose: (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA,
       },
+      include: {
+        submitter: { select: { firstName: true, lastName: true } },
+        member: { select: { firstName: true, lastName: true } }
+      }
     });
 
+    const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
     await this.notifications.notifyAntennaAdmins(
-      me.antennaId,
+      finalAntennaId, // Notification envoyée à l'admin de la bonne antenne
       me.associationId,
-      `Un nouveau versement de ${dto.amount} ${dto.currency || 'EUR'} a été déclaré par ${me.firstName} ${me.lastName}.`,
+      `Un nouveau versement de ${dto.amount} ${dto.currency || 'EUR'} a été déclaré pour ${targetName}.`,
       NotificationType.CONTRIBUTION_SUBMITTED,
       { contributionId: created.id },
     );
@@ -308,7 +356,10 @@ export class MemberService {
 
     const where: Prisma.ContributionWhereInput = {
       associationId: me.associationId,
-      memberUserId: userId,
+      OR: [
+        { memberUserId: userId },
+        { submitterUserId: userId }
+      ],
       ...(query.status ? { status: query.status as ContributionStatus } : {}),
     };
 
@@ -319,6 +370,10 @@ export class MemberService {
         orderBy: [{ createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: {
+          submitter: { select: { firstName: true, lastName: true } },
+          member: { select: { firstName: true, lastName: true } }
+        }
       }),
     ]);
 

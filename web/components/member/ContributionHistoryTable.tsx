@@ -9,6 +9,8 @@ type ExtendedContribution = Contribution & {
   reference?: string | null;
   validatedAt?: string | null;
   purpose?: string | null;
+  submitter?: { firstName: string; lastName: string } | null; 
+  beneficiary?: { firstName: string; lastName: string } | null;
 };
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -179,14 +181,12 @@ function DetailPanel({
             </button>
           </div>
 
-          {/* Montant en grand */}
           <div className="dp-amount-block">
             <span className="dp-amount">{formatCurrency(item.amount, item.currency)}</span>
             <StatusBadge status={item.status} />
           </div>
 
           <div className="dp-body">
-            {/* Motif */}
             {purposeCfg && (
               <div className="dp-row">
                 <span className="dp-row-label">Motif</span>
@@ -199,19 +199,16 @@ function DetailPanel({
               </div>
             )}
 
-            {/* Méthode */}
             <div className="dp-row">
               <span className="dp-row-label">Méthode</span>
               <span className="dp-row-value">{getMethodLabel(item.paymentMethod)}</span>
             </div>
 
-            {/* Date de dépôt */}
             <div className="dp-row">
               <span className="dp-row-label">Date du dépôt</span>
               <span className="dp-row-value">{formatDate(item.contributionDate || item.createdAt)}</span>
             </div>
 
-            {/* Date de validation */}
             <div className="dp-row">
               <span className="dp-row-label">Validation</span>
               <span className={`dp-row-value${item.validatedAt ? '' : ' muted'}`}>
@@ -219,7 +216,6 @@ function DetailPanel({
               </span>
             </div>
 
-            {/* Référence */}
             <div className="dp-row">
               <span className="dp-row-label">Référence</span>
               <span className={`dp-row-value${item.reference ? '' : ' muted'}`} style={{ fontFamily: item.reference ? 'monospace' : 'inherit', fontSize: item.reference ? '0.78rem' : '0.83rem' }}>
@@ -227,7 +223,6 @@ function DetailPanel({
               </span>
             </div>
 
-            {/* Antenne */}
             {item.antenna && (
               <div className="dp-row">
                 <span className="dp-row-label">Antenne</span>
@@ -235,7 +230,6 @@ function DetailPanel({
               </div>
             )}
 
-            {/* Statut détaillé */}
             <div className="dp-row">
               <span className="dp-row-label">Statut</span>
               <span className="dp-row-value" style={{ color: statusCfg.color, fontWeight: 700 }}>
@@ -243,11 +237,26 @@ function DetailPanel({
               </span>
             </div>
 
-            {/* Commentaire */}
             {item.memberComment && (
               <div style={{ paddingTop: '0.75rem' }}>
                 <div className="dp-row-label" style={{ marginBottom: '0.4rem' }}>Commentaire</div>
                 <div className="dp-note-box">&ldquo;{item.memberComment}&rdquo;</div>
+              </div>
+            )}
+
+            {item.submitter && item.beneficiary && (
+              <div style={{ paddingTop: '0.75rem', borderTop: '1px dashed #E5E7EB', marginTop: '0.75rem' }}>
+                <div className="dp-row-label" style={{ marginBottom: '0.4rem' }}>Informations complémentaires</div>
+                <div className="dp-note-box" style={{ background: '#ECFDF5', borderColor: '#A7F3D0', color: '#065F46', fontStyle: 'normal', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                    <span>Payé par : <strong>{item.submitter.firstName} {item.submitter.lastName}</strong></span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>Pour : <strong>{item.beneficiary.firstName} {item.beneficiary.lastName}</strong></span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -295,14 +304,15 @@ function MobileList({
           flex-wrap: wrap;
         }
         .ml-meta-sep { color: #D1D5DB; }
+        .ml-meta-label { font-weight: 700; color: #9CA3AF; margin-right: -0.15rem; }
+        
         .ml-method-chip {
           display: inline-flex; align-items: center;
           font-size: 0.68rem; font-weight: 600;
           background: #F3F4F6; color: #374151;
           border: 1px solid #E5E7EB;
           border-radius: 6px; padding: 0.1rem 0.45rem;
-        }
-
+        }        
         .ml-right {
           display: flex; flex-direction: column;
           align-items: flex-end; gap: 0.3rem; flex-shrink: 0;
@@ -319,6 +329,8 @@ function MobileList({
               <div className="ml-meta">
                 <span>{formatDate(item.contributionDate || item.createdAt)}</span>
                 <span className="ml-meta-sep">·</span>
+                {/* 🔥 NOUVEAU : Le label "Méthode" ajouté juste ici */}
+                <span className="ml-meta-label">Méthode :</span>
                 <span className="ml-method-chip">{getMethodLabelShort(item.paymentMethod)}</span>
               </div>
             </div>
@@ -381,6 +393,7 @@ function DesktopTable({ items }: { items: ExtendedContribution[] }) {
           padding: 0.2rem 0.6rem; border-radius: 99px;
         }
         .cht-ref { font-family: monospace; font-size: 0.72rem; color: #6B7280; }
+        .cht-submitter { font-size: 0.7rem; color: #059669; font-weight: 600; margin-top: 0.15rem; display: block; }
       `}</style>
 
       <div className="cht-wrap">
@@ -389,7 +402,8 @@ function DesktopTable({ items }: { items: ExtendedContribution[] }) {
             <tr>
               <th>Montant</th>
               <th>Motif</th>
-              <th>Méthode</th>
+              {/* 🔥 NOUVEAU : Changement de l'en-tête pour la vue PC */}
+              <th>Méthode de paiement</th>
               <th>Référence</th>
               <th>Statut</th>
               <th>Date dépôt</th>
@@ -412,6 +426,9 @@ function DesktopTable({ items }: { items: ExtendedContribution[] }) {
                       </span>
                     ) : (
                       <span className="cht-muted">—</span>
+                    )}
+                    {c.submitter && c.beneficiary && (
+                      <span className="cht-submitter">Par <strong>{c.submitter.firstName}</strong> pour <strong>{c.beneficiary.firstName}</strong></span>
                     )}
                   </td>
                   <td>

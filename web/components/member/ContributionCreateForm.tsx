@@ -1,9 +1,18 @@
-// web/components/member/ContributionCreateForm.tsx
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { api } from '../../lib/api-client';
 
 type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | '';
+
+// 🔥 NOUVELLE INTERFACE POUR RÉSOUDRE L'ERREUR "any"
+export interface SearchMemberResult {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+}
 
 interface ContributionValues {
   amount: number;
@@ -12,6 +21,7 @@ interface ContributionValues {
   method: string;
   note: string;
   purpose: string;
+  targetMemberId?: string;
 }
 
 interface Props {
@@ -88,9 +98,15 @@ export function ContributionCreateForm({
   defaultPurpose,
   pricing,
 }: Props) {
-  
-  // 🔥 Pas de devise par défaut
+
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>('');
+
+  // 🔥 NOUVEAUX ETATS POUR LE PAIEMENT TIERS AVEC LES BONS TYPES !
+  const [paymentTarget, setPaymentTarget] = useState<'ME' | 'OTHER'>('ME');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SearchMemberResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<SearchMemberResult | null>(null);
 
   const [values, setValues] = useState<{
     amount: string;
@@ -120,6 +136,26 @@ export function ContributionCreateForm({
 
   const currencyMeta = useMemo(() => getCurrencyMeta(selectedCurrency), [selectedCurrency]);
 
+  // 🔥 DEBOUNCE POUR LA RECHERCHE DE MEMBRES
+  useEffect(() => {
+    if (paymentTarget === 'ME' || !searchQuery || selectedMember) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await api.searchMembers(searchQuery);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Search error', err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 400); // 400ms debounce
+    return () => clearTimeout(timer);
+  }, [searchQuery, paymentTarget, selectedMember]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -130,25 +166,55 @@ export function ContributionCreateForm({
       method: values.method,
       note: values.note,
       purpose: values.purpose,
+      targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
     });
   };
 
   const amountNum = Number(values.amount);
   const monthlyPrice = pricing?.monthlyQuota ?? 0;
   const isQuota = values.purpose === 'REGULAR_QUOTA' || values.purpose === 'LATE_QUOTA';
-  
+
   const showAdvanceNotice = isQuota && monthlyPrice > 0 && amountNum > monthlyPrice;
   const monthsCovered = monthlyPrice > 0 ? Math.floor(amountNum / monthlyPrice) : 0;
 
-  // Calcul du padding dynamique pour le champ montant en fonction de la devise (F CFA = long)
   const paddingLeftAmount = currencyMeta.prefix 
     ? (currencyMeta.prefix.length > 2 ? '4.2rem' : '2.5rem') 
     : '1rem';
+
+  // Sécurité: Si "OTHER" est coché mais qu'aucun membre n'est sélectionné, on bloque le bouton
+  const isSubmitDisabled = isSubmitting || (paymentTarget === 'OTHER' && !selectedMember);
 
   return (
     <>
       <style>{`
         .ccf-form { display: flex; flex-direction: column; gap: 1.25rem; font-family: 'DM Sans', sans-serif; }
+
+        /* 🔥 AJOUT POUR LA RECHERCHE TIERS */
+        .ccf-target-tabs {
+          display: flex; gap: 0.5rem; background: #F3F4F6; padding: 0.35rem; border-radius: 12px; margin-bottom: 0.5rem;
+        }
+        .ccf-target-tab {
+          flex: 1; padding: 0.6rem; text-align: center; border-radius: 8px; border: none; background: transparent;
+          font-size: 0.8rem; font-weight: 700; color: #6B7280; cursor: pointer; transition: all 0.2s;
+        }
+        .ccf-target-tab.active { background: white; color: #059669; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+        .ccf-search-box { position: relative; }
+        .ccf-search-results {
+          position: absolute; top: calc(100% + 5px); left: 0; right: 0; background: white; z-index: 20;
+          border-radius: 12px; border: 1px solid #E5E7EB; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+          max-height: 220px; overflow-y: auto; padding: 0.5rem;
+        }
+        .ccf-search-item {
+          padding: 0.6rem 0.8rem; border-radius: 8px; cursor: pointer; transition: background 0.15s;
+          display: flex; flex-direction: column; gap: 0.2rem;
+        }
+        .ccf-search-item:hover { background: #F3F4F6; }
+        .ccf-search-name { font-size: 0.82rem; font-weight: 700; color: #111827; }
+        .ccf-search-meta { font-size: 0.7rem; color: #6B7280; }
+        .ccf-selected-member {
+          background: #ECFDF5; border: 1px solid #A7F3D0; padding: 0.85rem 1rem; border-radius: 12px;
+          display: flex; justify-content: space-between; align-items: center;
+        }
 
         .ccf-purpose-grid {
           display: grid;
@@ -202,7 +268,6 @@ export function ContributionCreateForm({
         .ccf-input:focus { border-color: #059669; background: white; box-shadow: 0 0 0 3px rgba(5,150,105,0.15); }
         .ccf-input::placeholder { color: rgba(107,114,128,0.45); font-weight: 500; }
 
-        /* 🔥 NOUVEAU STYLE POUR LE SELECT DE DEVISE */
         .ccf-select {
           cursor: pointer;
           background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
@@ -235,7 +300,6 @@ export function ContributionCreateForm({
           font-size: 0.76rem; color: #1D4ED8; line-height: 1.5;
         }
 
-        /* ── METHODES DE PAIEMENT TRANSPARENTES / PASTEL ── */
         .ccf-method-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
         @media (max-width: 640px) { .ccf-method-row { grid-template-columns: repeat(2, 1fr); } }
 
@@ -248,27 +312,22 @@ export function ContributionCreateForm({
         }
         .ccf-method-btn svg { width: 22px; height: 22px; transition: transform 0.2s ease; stroke-width: 2; }
         
-        /* THEME CASH (Vert) */
         .ccf-method-btn.cash:hover { border-color: #A7F3D0; background: #ECFDF5; color: #059669; }
         .ccf-method-btn.cash.active { border-color: #10B981; background: rgba(16,185,129,0.08); color: #047857; box-shadow: 0 0 0 3px rgba(16,185,129,0.15); }
         .ccf-method-btn.cash.active svg { transform: scale(1.1); color: #10B981; }
 
-        /* THEME BANK (Bleu) */
         .ccf-method-btn.bank:hover { border-color: #BFDBFE; background: #EFF6FF; color: #2563EB; }
         .ccf-method-btn.bank.active { border-color: #3B82F6; background: rgba(59,130,246,0.08); color: #1D4ED8; box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
         .ccf-method-btn.bank.active svg { transform: scale(1.1); color: #3B82F6; }
 
-        /* THEME MOBILE (Orange) */
         .ccf-method-btn.mobile:hover { border-color: #FDE68A; background: #FFFBEB; color: #D97706; }
         .ccf-method-btn.mobile.active { border-color: #F59E0B; background: rgba(245,158,11,0.08); color: #B45309; box-shadow: 0 0 0 3px rgba(245,158,11,0.15); }
         .ccf-method-btn.mobile.active svg { transform: scale(1.1); color: #F59E0B; }
 
-        /* THEME CARD (Emeraude) */
         .ccf-method-btn.card:hover { border-color: #99F6E4; background: #F0FDFA; color: #0D9488; }
         .ccf-method-btn.card.active { border-color: #14B8A6; background: rgba(20,184,166,0.08); color: #0F766E; box-shadow: 0 0 0 3px rgba(20,184,166,0.15); }
         .ccf-method-btn.card.active svg { transform: scale(1.1); color: #14B8A6; }
 
-        /* 🔥 STYLE CARTE BANCAIRE / WALLETS */
         .ccf-card-payment-section { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 16px; padding: 1.25rem; margin-top: 0.5rem; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         .ccf-wallet-row { display: flex; gap: 0.75rem; margin-bottom: 1.25rem; }
@@ -285,7 +344,7 @@ export function ContributionCreateForm({
         .ccf-card-input-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; }
         .ccf-card-input { width: 100%; height: 46px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 1rem 0 2.8rem; font-size: 0.9rem; font-family: 'DM Mono', monospace; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
         .ccf-card-input:focus { border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,0.1); }
-        .ccf-card-input.no-icon { padding-left: 1rem; font-family: 'DM Sans', sans-serif; }
+        .ccf-card-input.no-icon { padding-left: 1rem; font-family: 'DM Sans', sans-serif; }        
 
         .ccf-submit {
           width: 100%; height: 52px;
@@ -305,6 +364,61 @@ export function ContributionCreateForm({
       `}</style>
 
       <form className="ccf-form" onSubmit={handleSubmit}>
+        
+        {/* 🔥 NOUVEAU BLOC : POUR QUI ? */}
+        <div className="ccf-field">
+          <span className="ccf-label">Pour qui effectuez-vous ce versement ?</span>
+          <div className="ccf-target-tabs">
+            <button type="button" className={`ccf-target-tab ${paymentTarget === 'ME' ? 'active' : ''}`} onClick={() => { setPaymentTarget('ME'); setSelectedMember(null); setSearchQuery(''); }}>
+              Pour moi-même
+            </button>
+            <button type="button" className={`ccf-target-tab ${paymentTarget === 'OTHER' ? 'active' : ''}`} onClick={() => setPaymentTarget('OTHER')}>
+              Pour un autre membre
+            </button>
+          </div>
+
+          {paymentTarget === 'OTHER' && (
+            <div className="ccf-search-box">
+              {selectedMember ? (
+                <div className="ccf-selected-member">
+                  <div>
+                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#065F46' }}>{selectedMember.firstName} {selectedMember.lastName}</div>
+                    <div style={{ fontSize: '0.7rem', color: '#047857' }}>{selectedMember.email || selectedMember.phone}</div>
+                  </div>
+                  <button type="button" onClick={() => { setSelectedMember(null); setSearchQuery(''); }} style={{ background: 'white', border: '1px solid #A7F3D0', padding: '0.4rem 0.7rem', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 700, color: '#059669', cursor: 'pointer' }}>
+                    Changer
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    className="ccf-input"
+                    placeholder="Chercher par nom, prénom, email ou téléphone..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && searchResults.length > 0 && (
+                    <div className="ccf-search-results">
+                      {searchResults.map(m => (
+                        <div key={m.id} className="ccf-search-item" onClick={() => setSelectedMember(m)}>
+                          <span className="ccf-search-name">{m.firstName} {m.lastName}</span>
+                          <span className="ccf-search-meta">{[m.email, m.phone].filter(Boolean).join(' • ')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {searchQuery && searchResults.length === 0 && !isSearching && (
+                    <div className="ccf-search-results" style={{ padding: '1rem', textAlign: 'center', color: '#6B7280', fontSize: '0.8rem' }}>
+                      Aucun membre actif trouvé
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="ccf-field">
           <span className="ccf-label">Motif du versement</span>
           <div className="ccf-purpose-grid">
@@ -408,7 +522,6 @@ export function ContributionCreateForm({
             ))}
           </div>
 
-          {/* 🔥 INTERFACE CARTE BANCAIRE */}
           {values.method === 'CARD' && (
             <div className="ccf-card-payment-section">
               <div className="ccf-wallet-row">
@@ -517,13 +630,13 @@ export function ContributionCreateForm({
           <input
             className="ccf-input"
             type="text"
-            placeholder="Ex : Cotisation mars 2025"
+            placeholder="Ex : Cotisation mars 2026"
             value={values.note}
             onChange={(e) => setValues((v) => ({ ...v, note: e.target.value }))}
           />
         </div>
 
-        <button type="submit" className="ccf-submit" disabled={isSubmitting}>
+        <button type="submit" className="ccf-submit" disabled={isSubmitDisabled}>
           {isSubmitting ? (
             <>
               <div className="ccf-spinner" />

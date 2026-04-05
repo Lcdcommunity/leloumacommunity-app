@@ -560,6 +560,9 @@ model User {
   contributionsValidated Contribution[] @relation("ContributionValidatedBy")
   contributionsRejected  Contribution[] @relation("ContributionRejectedBy")
   contributionsCancelled Contribution[] @relation("ContributionCancelledBy")
+  
+  // 🔥 NOUVEAU : Relations pour les cotisations payées par un tiers
+  submittedContributions Contribution[] @relation("ContributionSubmitter")
 
   expensesEngaged   Expense[] @relation("ExpenseEngagedBy")
   expensesValidated Expense[] @relation("ExpenseValidatedBy")
@@ -806,6 +809,9 @@ model Contribution {
   associationId String
   antennaId     String
   memberUserId  String
+  
+  // 🔥 NOUVEAU : ID de celui qui a déclaré/payé la cotisation (si différent du membre)
+  submitterUserId String?
 
   amount            Decimal             @db.Decimal(14, 2)
   currency          CurrencyCode        @default(EUR)
@@ -840,6 +846,9 @@ model Contribution {
   association Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   antenna     Antenna     @relation(fields: [antennaId], references: [id], onDelete: Cascade)
   member      User        @relation("ContributionMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  
+  // 🔥 NOUVEAU : Relation avec celui qui a payé
+  submitter   User?       @relation("ContributionSubmitter", fields: [submitterUserId], references: [id], onDelete: SetNull)
 
   validatedByUser User? @relation("ContributionValidatedBy", fields: [validatedByUserId], references: [id], onDelete: SetNull)
   rejectedByUser  User? @relation("ContributionRejectedBy", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
@@ -851,6 +860,7 @@ model Contribution {
   @@index([associationId, status, submittedAt])
   @@index([antennaId, status, submittedAt])
   @@index([memberUserId, submittedAt])
+  @@index([submitterUserId, submittedAt])
   @@index([yearReference, monthReference])
   @@map("contributions")
 }

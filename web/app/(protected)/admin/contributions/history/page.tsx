@@ -13,7 +13,9 @@ type ModalMode = 'view' | 'edit' | 'delete';
 
 interface ModalState { 
   mode: ModalMode | null; 
-  contribution: Contribution | null; 
+  contribution: Contribution & {
+    submitter?: { firstName: string; lastName: string } | null;
+  } | null; 
 }
 
 const getMember = (c: Contribution) => 
@@ -132,6 +134,16 @@ function ContributionDetailModal({
                 <span className="ach-text-mono">{member?.phone || '—'}</span>
               </div>
             </div>
+
+            {c.submitter && (
+              <div className="ach-info-box" style={{ marginTop: '0.75rem', background: '#ECFDF5', borderColor: '#A7F3D0' }}>
+                <label style={{ color: '#047857' }}>Déclaré / Payé par</label>
+                <span style={{ color: '#065F46', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  {c.submitter.firstName} {c.submitter.lastName}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="ach-detail-section">
@@ -206,7 +218,6 @@ function ContributionDetailModal({
                     onChange={e => setInputValue(e.target.value)} 
                     placeholder="Tapez SUPPRIMER pour confirmer" 
                   />
-                  {/* 🔥 FIX: Remplacement de "SUPPRIMER" par &quot;SUPPRIMER&quot; pour ESLint */}
                   {inputValue !== 'SUPPRIMER' && inputValue.length > 0 && (
                     <p style={{ fontSize: '0.7rem', color: '#DC2626', marginTop: '0.4rem', fontWeight: 600 }}>
                       Veuillez taper exactement &quot;SUPPRIMER&quot;.
@@ -252,7 +263,8 @@ function ContributionDetailModal({
 
 /* ══════════════════════════════════════════════════════ MAIN PAGE */
 export default function AdminContributionsHistoryPage() {
-  const [items, setItems] = useState<Contribution[]>([]);
+  // 🔥 CORRECTION ICI : Remplacement de `any` par un type explicite
+  const [items, setItems] = useState<(Contribution & { submitter?: { firstName: string; lastName: string } | null })[]>([]);
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
@@ -323,7 +335,7 @@ export default function AdminContributionsHistoryPage() {
         .ach-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
         .ach-stat-lbl { font-size: 0.65rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }
 
-        /* Toolbar - AJUSTÉ SUR UNE SEULE LIGNE */
+        /* Toolbar */
         .ach-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: nowrap; width: 100%; box-sizing: border-box; align-items: center; }
         .ach-select, .ach-search { height: 40px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 500; color: #1E293B; outline: none; background: white; transition: border-color 0.2s, box-shadow 0.2s; }
         .ach-select:focus, .ach-search:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
@@ -355,7 +367,7 @@ export default function AdminContributionsHistoryPage() {
         .ach-card-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
         .ach-card-method { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; display: flex; align-items: center; gap: 5px; letter-spacing: 0.03em; }
 
-        /* Modale (Refonte Mobile-First avec wrapper flex pour corriger le z-index) */
+        /* Modale */
         .ach-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.5); backdrop-filter: blur(4px); z-index: 1000; animation: fadeIn 0.2s ease-out; display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .ach-modal { width: 100%; max-width: 480px; background: #FFFFFF; border-radius: 20px; display: flex; flex-direction: column; max-height: calc(100vh - 2rem); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1); position: relative; }
         
@@ -433,7 +445,6 @@ export default function AdminContributionsHistoryPage() {
           ))}
         </div>
 
-        {/* TOOLBAR MODIFIÉE ICI */}
         <div className="ach-toolbar">
           <select className="ach-select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">Tous les statuts</option>
@@ -475,6 +486,13 @@ export default function AdminContributionsHistoryPage() {
                 <div className="ach-avatar">{initials}</div>
                 <div className="ach-card-content">
                   <div className="ach-card-name">{name}</div>
+                  
+                  {c.submitter && (
+                    <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 800, textTransform: 'uppercase', marginBottom: '2px' }}>
+                      Payé par {c.submitter.firstName}
+                    </div>
+                  )}
+
                   <div className="ach-card-ref">{c.id.slice(0, 8)}</div>
                   <div className="ach-card-purpose">{PURPOSE_MAP[c.purpose] || c.purpose}</div>
                 </div>

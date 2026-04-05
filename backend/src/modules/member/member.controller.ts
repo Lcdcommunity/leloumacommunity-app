@@ -48,6 +48,12 @@ export class MemberController {
     return this.service.updatePreferences(user.id, dto);
   }
 
+  // 🔥 NOUVEAU : Rechercher un membre pour le paiement tiers
+  @Get('search-users')
+  searchMembers(@CurrentUser() user: AuthUser, @Query('q') q: string) {
+    return this.service.searchMembers(user.id, q);
+  }
+
   // Cotisations
   @Post('contributions')
   createContribution(@CurrentUser() user: AuthUser, @Body() dto: CreateMemberContributionDto) {
