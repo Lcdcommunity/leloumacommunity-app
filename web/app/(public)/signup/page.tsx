@@ -92,12 +92,12 @@ export default function MemberSignupPage() {
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
-  
+
   const [birthCountry, setBirthCountry] = useState('');
   const [customBirthCountry, setCustomBirthCountry] = useState(''); // 🔥 GESTION "AUTRE"
 
   const [city, setCity] = useState('');
-  
+
   const [country, setCountry] = useState('');
   const [customCountry, setCustomCountry] = useState(''); // 🔥 GESTION "AUTRE"
 
@@ -213,7 +213,7 @@ export default function MemberSignupPage() {
     if (s === 1) {
       if (!associationRole) return "Le poste occupé est requis.";
       if (!originSubPrefecture) return "La commune d'origine est requise.";
-      
+
       // Validation de l'âge (16 à 80 ans)
       if (!birthDate || birthDate.length < 10) return "La date de naissance est requise (JJ/MM/AAAA).";
       const parts = birthDate.split('/');
@@ -237,20 +237,24 @@ export default function MemberSignupPage() {
       if (!placeOfBirth.trim()) return "Le lieu de naissance est requis.";
       if (!birthCountry) return "Le pays de naissance est requis.";
       if (birthCountry === 'Autre (Non listé)' && !customBirthCountry.trim()) return "Veuillez préciser votre pays de naissance.";
-      
+
       if (!country) return "Le pays de résidence est requis.";
       if (country === 'Autre (Non listé)' && !customCountry.trim()) return "Veuillez préciser votre pays de résidence.";
-      
+
       if (!email.trim()) return "L'email est requis.";
       if (!/\S+@\S+\.\S+/.test(email)) return "Format d'email invalide.";
-      
+
       if (!phone.trim()) return "Le téléphone est requis.";
       if (phone && country && country !== 'Autre (Non listé)') {
         const selectedCountry = COUNTRIES.find(c => c.name === country);
-        if (selectedCountry && selectedCountry.phoneLength > 0) {
-          const numberPart = phone.split(' ')[1] ? phone.split(' ')[1].replace(/\D/g, '') : '';
-          if (numberPart.length !== selectedCountry.phoneLength) {
-             return `Pour ${selectedCountry.name}, le numéro (sans l'indicatif) doit faire exactement ${selectedCountry.phoneLength} chiffres.`;
+        if (selectedCountry) {
+          let phoneWithoutDial = phone;
+          if (phone.startsWith(selectedCountry.dial)) {
+            phoneWithoutDial = phone.substring(selectedCountry.dial.length);
+          }
+          const numberPart = phoneWithoutDial.replace(/\D/g, '');
+          if (numberPart.length < 7 || numberPart.length > 11) {
+             return "Le numéro de téléphone (sans l'indicatif) doit faire entre 7 et 11 chiffres.";
           }
         }
       }
@@ -312,7 +316,6 @@ export default function MemberSignupPage() {
         termsAccepted,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any); 
-
       // On tente l'upload si une photo a été sélectionnée (attention: le backend doit accepter ça sans token JWT finalisé)
       if (selectedPhotoFile) {
         const formData = new FormData();
@@ -666,7 +669,7 @@ export default function MemberSignupPage() {
                   </div>
 
                   <p className="sp-section-title">Coordonnées &amp; Profession</p>
-                  
+
                   <div className="sp-field">
                     <label className="sp-label">Pays de résidence</label>
                     <select className="sp-select" value={country} onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre (Non listé)') setCustomCountry(''); }} required>
@@ -736,7 +739,7 @@ export default function MemberSignupPage() {
               {step === 2 && (
                 <div className="sp-panel sp-stack">
                   <p className="sp-section-title">Photo de profil</p>
-                  
+
                   <div className="sp-notice" style={{ marginBottom: '1.25rem', padding: '0.65rem 0.85rem', fontSize: '0.75rem', border: '1px solid #FDE68A', background: '#FEF3C7', color: '#92400E' }}>
                     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: '2px' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -808,7 +811,6 @@ export default function MemberSignupPage() {
 
                 </div>
               )}
-
               {/* Error */}
               {error && <div className="sp-error" style={{ marginTop: '1.25rem' }}>{error}</div>}
 

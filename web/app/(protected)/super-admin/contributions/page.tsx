@@ -55,22 +55,12 @@ function renderCurrencyBucket(bucket: CurrencyBucket, color?: string) {
   if (entries.length === 0) return null;
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.45rem', justifyContent: 'center' }}>
+    <div className="sc-currency-wrap">
       {entries.map(([currency, amount]) => (
         <span
           key={currency}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '.28rem',
-            borderRadius: 999,
-            padding: '.22rem .62rem',
-            fontSize: '.72rem',
-            fontWeight: 800,
-            background: 'rgba(255,255,255,.72)',
-            border: '1px solid rgba(0,0,0,.08)',
-            color: color ?? '#111827',
-          }}
+          className="sc-currency-badge"
+          style={{ color: color ?? '#111827' }}
         >
           {formatCurrency(amount, currency)}
         </span>
@@ -110,8 +100,7 @@ export default function SuperAdminContributionsPage() {
     void load('');
   }, [load]);
 
-  // 🔥 SOLUTION CHIRURGICALE : Filtrage local instantané
-  // Protège l'UI si le backend ignore le paramètre de filtrage
+  // Filtrage local instantané
   const displayedItems = useMemo(() => {
     if (!status) return items;
     return items.filter((c) => {
@@ -125,21 +114,10 @@ export default function SuperAdminContributionsPage() {
   const total = items.length;
   const pending = items.filter((c) => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION').length;
   const validated = items.filter((c) => c.status === 'VALIDATED').length;
-  const rejected = items.filter((c) => c.status === 'REJECTED').length;
-
-  const validatedItems = useMemo(
-    () => items.filter((c) => c.status === 'VALIDATED'),
-    [items],
-  );
 
   const pendingItems = useMemo(
     () => items.filter((c) => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION'),
     [items],
-  );
-
-  const validatedByCurrency = useMemo(
-    () => sumAmountsByCurrency(validatedItems),
-    [validatedItems],
   );
 
   const pendingByCurrency = useMemo(
@@ -285,7 +263,6 @@ export default function SuperAdminContributionsPage() {
         }
         .sc-filter-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(220,38,38,.42); }
         .sc-filter-btn:disabled { opacity: .6; cursor: not-allowed; }
-
         @media(max-width: 500px) {
             .sc-toolbar { padding: 0.7rem 0.8rem; gap: 0.4rem; }
             .sc-field { gap: 0.35rem; }
@@ -294,8 +271,63 @@ export default function SuperAdminContributionsPage() {
             .sc-filter-btn { padding: 0 0.8rem; font-size: 0.75rem; }
         }
 
-        .sc-status-chips{display:flex;gap:.5rem;flex-wrap:wrap;padding:.75rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.06);background:rgba(254,242,242,.18)}
-        .sc-chip{display:inline-flex;align-items:center;gap:.28rem;font-size:.68rem;font-weight:800;border-radius:99px;padding:.22rem .6rem;border:1px solid;cursor:pointer;transition:all .15s}
+        /* LIGNE 1 : Statuts forcés sur une ligne sans scroll */
+        .sc-status-chips {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: center;
+            justify-content: center;
+            gap: clamp(0.2rem, 1.5vw, 0.6rem);
+            padding: 0.75rem clamp(0.3rem, 2vw, 1.4rem);
+            border-bottom: 1px solid rgba(220,38,38,.06);
+            background: rgba(254,242,242,.18);
+            width: 100%;
+            overflow: hidden;
+        }
+        .sc-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.15rem;
+            font-size: clamp(0.5rem, 2.5vw, 0.68rem);
+            font-weight: 800;
+            border-radius: 99px;
+            padding: 0.15rem clamp(0.25rem, 1.5vw, 0.6rem);
+            border: 1px solid;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+            flex-shrink: 1;
+            min-width: 0;
+        }
+        .sc-chip span:last-child {
+            font-family: 'DM Mono', monospace;
+            font-size: clamp(0.5rem, 2.5vw, 0.68rem);
+            margin-left: 0.1rem;
+        }
+
+        /* Gestion de l'affichage des devises multiples - EMPILEMENT VERTICAL */
+        .sc-currency-wrap {
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+        .sc-currency-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            padding: 0.25rem 0.5rem;
+            font-size: clamp(0.55rem, 2.2vw, 0.72rem);
+            font-weight: 800;
+            background: rgba(255,255,255,.9);
+            border: 1px solid rgba(0,0,0,.08);
+            white-space: nowrap;
+            width: max-content;
+            max-width: 100%;
+        }
 
         .sc-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
         .sc-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
@@ -304,11 +336,6 @@ export default function SuperAdminContributionsPage() {
         .sc-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1rem;gap:.75rem;color:#9CA3AF}
         .sc-empty-title{font-size:.9rem;font-weight:800;color:#374151}
         .sc-empty-sub{font-size:.78rem;font-weight:600}
-
-        .sc-amounts{display:flex; flex-direction: row; justify-content: space-around; align-items: center; gap:1.25rem; padding:1.25rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.06);background:rgba(253,253,255,.6)}
-        .sc-amount-item{display:flex;flex-direction:column; align-items: center; justify-content: center; gap:.3rem; text-align: center; flex: 1}
-        .sc-amount-lbl{font-size:.68rem;font-weight:900;color:#9CA3AF;text-transform:uppercase;letter-spacing:.08em}
-        .sc-amount-val{font-family:'DM Mono',monospace;font-size:1.1rem;font-weight:700;color:#0F172A}
 
         @keyframes scin{to{opacity:1;transform:translateY(0)}}
         @keyframes scspin{to{transform:rotate(360deg)}}
@@ -377,7 +404,6 @@ export default function SuperAdminContributionsPage() {
                 </svg>
               </div>
               <span className="sc-panel-title">Suivi des cotisations</span>
-              {/* Compteur aligné sur les éléments filtrés */}
               {displayedItems.length > 0 && <span className="sc-count-chip">{displayedItems.length}</span>}
             </div>
           </div>
@@ -428,6 +454,7 @@ export default function SuperAdminContributionsPage() {
             </button>
           </div>
 
+          {/* GROUPE 1 : Statuts (Ligne forcée sans scroll) */}
           {!loading && items.length > 0 && (
             <div className="sc-status-chips">
               {(Object.entries(STATUS_MAP) as [ContributionStatus, typeof STATUS_MAP[ContributionStatus]][]).map(([key, s]) => {
@@ -444,18 +471,9 @@ export default function SuperAdminContributionsPage() {
                       void load(key);
                     }}
                   >
-                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
                     {s.label}
-                    <span
-                      style={{
-                        fontFamily: "'DM Mono',monospace",
-                        fontSize: '.68rem',
-                        fontWeight: 700,
-                        marginLeft: '.15rem',
-                      }}
-                    >
-                      {count}
-                    </span>
+                    <span>{count}</span>
                   </button>
                 );
               })}
@@ -469,40 +487,11 @@ export default function SuperAdminContributionsPage() {
                     void load('');
                   }}
                 >
-                  <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8">
+                  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8">
                     <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                   Réinitialiser
                 </button>
-              )}
-            </div>
-          )}
-
-          {!loading && displayedItems.length > 0 && (
-            <div className="sc-amounts">
-              <div className="sc-amount-item">
-                <span className="sc-amount-lbl">Total validé</span>
-                <div className="sc-amount-val" style={{ color: '#059669' }}>
-                  {renderCurrencyBucket(validatedByCurrency, '#059669')}
-                </div>
-              </div>
-
-              {Object.keys(pendingByCurrency).length > 0 && (
-                <div className="sc-amount-item">
-                  <span className="sc-amount-lbl">En attente</span>
-                  <div className="sc-amount-val" style={{ color: '#D97706' }}>
-                    {renderCurrencyBucket(pendingByCurrency, '#D97706')}
-                  </div>
-                </div>
-              )}
-
-              {rejected > 0 && (
-                <div className="sc-amount-item">
-                  <span className="sc-amount-lbl">Rejetées</span>
-                  <span className="sc-amount-val" style={{ color: '#DC2626' }}>
-                    {rejected}
-                  </span>
-                </div>
               )}
             </div>
           )}
