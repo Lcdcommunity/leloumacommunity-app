@@ -299,9 +299,7 @@ export class SuperAdminService {
         },
       }),
       this.prisma.user.count({ where }),
-    ]);
-
-    return {
+    ]);    return {
       items,
       total,
       page,
@@ -497,6 +495,8 @@ export class SuperAdminService {
         originSubPrefecture: data.originSubPrefecture,
         addressLine1: data.addressLine1,
         addressLine2: data.addressLine2,
+        // 🔥 AJOUT CHIRURGICAL : On enregistre enfin le poste occupé !
+        function: data.function || data.associationTitle,
       },
     });
   }
@@ -606,9 +606,7 @@ export class SuperAdminService {
     return this.prisma.project.delete({ where: { id, associationId } }); // 🔥 FILTRÉ
   }
 
-  /* ── DOCUMENTS ── */
-
-  async createDocument(data: CreateDocumentInput, actorId: string, associationId: string) {
+  /* ── DOCUMENTS ── */  async createDocument(data: CreateDocumentInput, actorId: string, associationId: string) {
     if (!data.fileAssetId) throw new BadRequestException('Un fichier est requis.');
 
     return this.prisma.document.create({
@@ -712,6 +710,15 @@ export class SuperAdminService {
         emailVerifiedAt: now,
         firstName: payload.firstName,
         lastName: payload.lastName,
+        // 🔥 AJOUTS CHIRURGICAUX : On s'assure que les données ne sont plus perdues à la création
+        phone: payload.phone,
+        city: payload.city,
+        country: payload.country,
+        postalCode: payload.postalCode,
+        addressLine1: payload.addressLine1,
+        addressLine2: payload.addressLine2,
+        originSubPrefecture: payload.originSubPrefecture,
+        function: payload.associationTitle, 
         createdByUserId: actorId,
         approvedByUserId: actorId,
         approvedAt: now,

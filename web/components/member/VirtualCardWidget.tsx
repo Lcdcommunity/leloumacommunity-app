@@ -22,8 +22,8 @@ export interface VirtualCardData {
     city?: string | null;
     postalCode?: string | null;
     profilePhotoUrl?: string | null;
-    function?: string | null;
-    professionalStatus?: string | null;
+    function?: string | null;             // <- AJOUT IMPORTANT
+    professionalStatus?: string | null;   // <- AJOUT IMPORTANT
   };
   antennaName: string;
 }
@@ -165,9 +165,12 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
 
   const cardNum = card?.cardNumber ? card.cardNumber.replace(/[\s-]/g, '') : 'EN ATTENTE';
   const residence = [card?.user?.city, card?.user?.country].filter(Boolean).join(', ') || 'Non renseignée';
-  const origin = card?.user?.originVillage || 'Non renseignée';
-  const antenna = card?.antennaName || 'Non assignée';
   
+  // Utilisation de `originVillage` ou `originCommune`
+  const origin = card?.user?.originVillage || card?.user?.originCommune || 'Non renseignée';
+  
+  const antenna = card?.antennaName || 'Non assignée';
+
   // Prise en compte chirurgicale du poste occupé (function) puis du statut pro (professionalStatus)
   const memberProfession = card?.user?.function || card?.user?.professionalStatus || 'Non renseignée';
 
@@ -290,9 +293,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-minimize-btn:hover {
           background: rgba(255,255,255,0.82);
           color: #0F172A;
-        }
-
-        .vcw-scene {
+        }        .vcw-scene {
           width: 100%;
           aspect-ratio: 1.586;
           perspective: 1600px;
@@ -605,9 +606,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           gap: 0.8rem;
           align-items: end;
           padding-top: 0.65rem;
-        }
-
-        .vcw-card-id-block {
+        }        .vcw-card-id-block {
           min-width: 0;
           display: flex;
           flex-direction: column;
@@ -905,9 +904,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           .vcw-role-tag {
             font-size: 0.52rem;
             margin-bottom: 0.14rem;
-          }
-
-          .vcw-name {
+          }          .vcw-name {
             font-size: 1.08rem;
             line-height: 0.98;
             margin-bottom: 0.28rem;
@@ -1181,7 +1178,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                         </div>
                         <div className="vcw-back-org">LELOUMA COMMUNAUTE</div>
                       </div>
-                      
+
                       <div className="vcw-guinea-flag">
                         <div className="vcw-guinea-flag-mid" />
                       </div>
@@ -1198,8 +1195,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                           size={typeof window !== 'undefined' && window.innerWidth <= 560 ? 80 : 100}
                           level="H"
                           bgColor="#FFFFFF"
-                          fgColor="#111827"
-                        />
+                          fgColor="#111827"                        />
                       ) : (
                         <div
                           style={{

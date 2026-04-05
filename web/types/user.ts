@@ -48,6 +48,7 @@ export interface UserSummary {
 
   // Profession
   professionalStatus?: string | null;
+  function?: string | null; // <-- AJOUT IMPORTANT ICI
 
   // Numéro de carte
   cardNumber?: string | null;

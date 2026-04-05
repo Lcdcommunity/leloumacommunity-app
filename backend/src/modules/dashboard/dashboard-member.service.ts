@@ -1,4 +1,3 @@
-// backend/src/modules/dashboard/dashboard-member.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { 
@@ -26,6 +25,9 @@ export class DashboardMemberService {
         role: true,
         status: true,
         associationId: true,
+        function: true,              // 🔥 AJOUT : Poste occupé
+        professionalStatus: true,    // 🔥 AJOUT : Statut pro
+        originSubPrefecture: true,   // 🔥 AJOUT : Pour la carte
         memberships: {
           where: { isPrimary: true },
           select: { 
@@ -43,6 +45,42 @@ export class DashboardMemberService {
 
     const primaryAntennaId = me.memberships[0]?.antennaId ?? null;
     const primaryAntennaCurrency = me.memberships[0]?.antenna?.defaultCurrency || 'EUR';
+
+    // 🔥 AJOUT : On récupère la carte virtuelle pour qu'elle s'affiche correctement sur le dashboard !
+    const virtualCard = await this.prisma.virtualCard.findUnique({
+      where: { userId },
+      include: {
+        user: {
+          include: {
+            memberships: { include: { antenna: true } },
+            profilePhoto: true,
+          },
+        },
+      },
+    });
+
+    let cardData = null;
+    if (virtualCard && virtualCard.user.associationId === me.associationId) {
+      cardData = {
+        cardNumber: virtualCard.cardNumber,
+        isLocked: virtualCard.isLocked,
+        expiresAt: virtualCard.expiresAt ? virtualCard.expiresAt.toISOString() : null,
+        qrToken: virtualCard.qrToken,
+        antennaName: virtualCard.user.memberships[0]?.antenna?.name || 'Inconnue',
+        user: {
+          firstName: virtualCard.user.firstName,
+          lastName: virtualCard.user.lastName,
+          birthDate: virtualCard.user.birthDate ? virtualCard.user.birthDate.toISOString() : null,
+          placeOfBirth: virtualCard.user.placeOfBirth,
+          originVillage: virtualCard.user.originSubPrefecture,
+          country: virtualCard.user.country,
+          city: virtualCard.user.city,
+          profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
+          function: virtualCard.user.function,                       // 🔥 AJOUT
+          professionalStatus: virtualCard.user.professionalStatus,   // 🔥 AJOUT
+        },
+      };
+    }
 
     const [aggAll, aggValidated, pendingCount, lastContribution] =
       await Promise.all([
@@ -209,7 +247,11 @@ export class DashboardMemberService {
         status: me.status,
         associationId: me.associationId,
         antennaId: primaryAntennaId,
+        function: me.function,                     // 🔥 AJOUT
+        professionalStatus: me.professionalStatus, // 🔥 AJOUT
+        originSubPrefecture: me.originSubPrefecture, // 🔥 AJOUT
       },
+      virtualCard: cardData,                       // 🔥 AJOUT pour le dashboard
       antennaBalances, 
       recentContributions: recentContributions.map((x) => ({
         ...x,

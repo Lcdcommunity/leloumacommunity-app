@@ -64,6 +64,11 @@ export class MemberService {
         addressLine2: true,
         postalCode: true,
         originSubPrefecture: true,
+        function: true,              // 🔥 AJOUT
+        professionalStatus: true,    // 🔥 AJOUT
+        birthDate: true,             // 🔥 AJOUT
+        placeOfBirth: true,          // 🔥 AJOUT
+        countryOfBirth: true,        // 🔥 AJOUT
         createdAt: true,
         updatedAt: true,
         profilePhoto: {
@@ -167,12 +172,14 @@ export class MemberService {
           country: virtualCard.user.country,
           city: virtualCard.user.city,
           profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
+          function: virtualCard.user.function,                     // 🔥 AJOUT
+          professionalStatus: virtualCard.user.professionalStatus, // 🔥 AJOUT
         },
       };
     }
 
     return {
-      user: memberMapper.userSummary(me),
+      user: memberMapper.userSummary(me as any),
       stats: {
         myTotalContributions: Number(totalMyContributions._sum.amount ?? 0),
         activeProjects,
@@ -205,10 +212,19 @@ export class MemberService {
           : {}),
         ...(dto.city !== undefined ? { city: dto.city.trim() || null } : {}),
         ...(dto.country !== undefined ? { country: dto.country.trim() || null } : {}),
+        
+        // 🔥 AJOUTS DES MAPPAGES MANQUANTS
+        ...(dto.function !== undefined ? { function: dto.function.trim() || null } : {}),
+        ...(dto.professionalStatus !== undefined ? { professionalStatus: dto.professionalStatus.trim() || null } : {}),
+        ...(dto.originSubPrefecture !== undefined ? { originSubPrefecture: dto.originSubPrefecture.trim() || null } : {}),
+        ...(dto.placeOfBirth !== undefined ? { placeOfBirth: dto.placeOfBirth.trim() || null } : {}),
+        ...(dto.countryOfBirth !== undefined ? { countryOfBirth: dto.countryOfBirth.trim() || null } : {}),
+        ...(dto.postalCode !== undefined ? { postalCode: dto.postalCode.trim() || null } : {}),
+        ...(dto.birthDate !== undefined ? { birthDate: dto.birthDate ? new Date(dto.birthDate) : null } : {}),
       },
     });
 
-    return memberMapper.userSummary(updated);
+    return memberMapper.userSummary(updated as any);
   }
 
   async updatePreferences(userId: string, dto: MemberPreferencesUpdateDto) {

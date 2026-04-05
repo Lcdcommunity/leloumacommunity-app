@@ -41,6 +41,9 @@ type DashboardData = {
       country?: string | null;
       city?: string | null;
       profilePhotoUrl?: string | null;
+      function?: string | null;             // <- AJOUT IMPORTANT
+      professionalStatus?: string | null;   // <- AJOUT IMPORTANT
+      originVillage?: string | null;        // <- AJOUT IMPORTANT POUR LA CARTE
     };
   } | null;
   recentContributions: Contribution[];
@@ -301,9 +304,7 @@ function ProjectDetailModal({ project, onClose }: { project: Project; onClose: (
   const planned = (project as unknown as { budgetPlanned?: number | null }).budgetPlanned ?? (project as unknown as { budgetAmount?: number | null }).budgetAmount ?? 0;
   const spent   = (project as unknown as { budgetSpent?: number | null }).budgetSpent   ?? (project as unknown as { amountSpent?: number | null }).amountSpent   ?? 0;
   const pct     = planned > 0 ? Math.min(((spent) / planned) * 100, 100) : 0;
-  const over    = spent > planned && planned > 0;
-
-  return (
+  const over    = spent > planned && planned > 0;  return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
       <div style={{ width: '100%', maxWidth: 500, background: '#fff', borderRadius: 24, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 72px rgba(0,0,0,0.18)', animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)' }} onClick={e => e.stopPropagation()}>
         <div style={{ height: 4, background: cfg.bar, borderRadius: '24px 24px 0 0' }} />
@@ -437,7 +438,23 @@ export default function MemberHomePage() {
         ]);
 
         if (dashRes.status === 'fulfilled') {
-          const res = dashRes.value;
+          // 🔥 AJOUT DU TYPAGE "as DashboardData" ICI POUR EVITER L'ERREUR TYPESCRIPT
+          const res = dashRes.value as DashboardData;
+          
+          // 🔥 ON S'ASSURE QUE LE POSTE EST BIEN DANS LA CARTE MÊME SI L'API L'OUBLIE 
+          // (On le récupère de `res.me` si nécessaire)
+          if (res.virtualCard && res.virtualCard.user && res.me) {
+            if (!res.virtualCard.user.function && res.me.function) {
+                res.virtualCard.user.function = res.me.function;
+            }
+            if (!res.virtualCard.user.professionalStatus && res.me.professionalStatus) {
+                res.virtualCard.user.professionalStatus = res.me.professionalStatus;
+            }
+            if (!res.virtualCard.user.originVillage && res.me.originSubPrefecture) {
+              res.virtualCard.user.originVillage = res.me.originSubPrefecture;
+            }
+          }
+
           if (res.virtualCard?.user) {
             const u = res.virtualCard.user as { profilePhotoUrl?: string | null };
             if (u.profilePhotoUrl === null) u.profilePhotoUrl = undefined;
@@ -456,7 +473,7 @@ export default function MemberHomePage() {
             res.lateMembersPreview = lateRes.value.items as Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
           }
 
-          setData(res as DashboardData);
+          setData(res);
         } else {
           setError(dashRes.reason instanceof Error ? dashRes.reason.message : 'Erreur chargement dashboard');
         }
@@ -492,7 +509,7 @@ export default function MemberHomePage() {
       return acc;
     }, {});
   }, [data]);
-  
+
   const stats: StatCard[] = data ? [
     { label: 'Total cotisé', value: formatCurrency(totalCotise, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé', spanClass: 'mb-span-1' },
     { label: 'Cotisations validées', value: formatCurrency(totalValide, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>, color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin", spanClass: 'mb-span-1' },
@@ -567,9 +584,7 @@ export default function MemberHomePage() {
           font-size: 0.8rem; font-weight: 600; color: #374151;
           background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.15);
           border-radius: 8px; padding: 0.5rem 1rem; white-space: nowrap;
-        }
-
-        .mb-stats {
+        }        .mb-stats {
           display: grid; grid-template-columns: repeat(6, 1fr);
           gap: 0.75rem; margin-bottom: 1.5rem;
         }
@@ -697,9 +712,7 @@ export default function MemberHomePage() {
         }
         .mb-late-bar { display: flex; align-items: center; gap: 0.6rem; }
         .mb-late-track { flex: 1; height: 5px; background: #FEE2E2; border-radius: 99px; overflow: hidden; max-width: 65px; }
-        .mb-late-fill  { height: 100%; background: #DC2626; border-radius: 99px; }
-
-        .mb-fab {
+        .mb-late-fill  { height: 100%; background: #DC2626; border-radius: 99px; }.mb-fab {
           position: fixed; bottom: calc(64px + 1rem); right: 1rem; z-index: 100;
           background: linear-gradient(135deg, #10B981 0%, #065F46 100%);
           color: white; border: none; border-radius: 50px;
@@ -778,9 +791,7 @@ export default function MemberHomePage() {
           .mb-status-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
           .mb-motif-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
         }
-      `}</style>
-
-      {!data && !error && (
+      `}</style>      {!data && !error && (
         <div className="mb-loader">
           <div className="mb-ring" />
           <span>Chargement de votre espace…</span>
@@ -995,7 +1006,12 @@ export default function MemberHomePage() {
                 )}
               </div>
               <table className="mb-table">
-                <thead><tr><th>Membre</th><th>Retard</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Membre</th>
+                    <th>Retard</th>
+                  </tr>
+                </thead>
                 <tbody>
                   {(data.lateMembersPreview || []).length === 0 && <EmptyRow cols={2} label="Aucun retardataire — bravo !"/>}
                   {(data.lateMembersPreview || []).map(m => {
