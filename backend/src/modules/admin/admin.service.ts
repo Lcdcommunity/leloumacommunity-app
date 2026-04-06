@@ -1,9 +1,11 @@
 // backend/src/modules/admin/admin.service.ts
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType } from '@prisma/client';
 import { memberMapper } from '../member/member.mapper';
 import { NotificationsService } from '../notifications/notifications.service';
+import * as bcrypt from 'bcryptjs';
+import { CreateMemberDto } from './dto/create-member.dto';
 
 @Injectable()
 export class AdminService {
@@ -199,6 +201,61 @@ export class AdminService {
     };
   }
 
+  // 🔥 CRÉATION DE MEMBRE SANS "originVillage" PUISQU'IL N'EST PAS DANS LE SCHEMA
+  async createMember(adminId: string, data: CreateMemberDto) {
+    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    
+    // Vérifier si l'email existe déjà
+    const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+    if (existing) {
+      throw new ConflictException("Cet email est déjà utilisé.");
+    }
+
+    // Mot de passe temporaire
+    const defaultPassword = "lcd" + Math.floor(10000 + Math.random() * 90000).toString();
+    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+    const newUser = await this.prisma.user.create({
+      data: {
+        email: data.email,
+        passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phone: data.phone,
+        city: data.city,
+        country: data.country,
+        originSubPrefecture: data.originSubPrefecture,
+        // originVillage retiré car inexistant dans ton schema.prisma
+        professionalStatus: data.professionalStatus,
+        function: data.function,
+        role: UserRole.MEMBER,
+        status: UserStatus.ACTIVE, // 🔥 ACTIF IMMÉDIATEMENT
+        associationId,
+        createdByUserId: adminId,
+        approvedByUserId: adminId,
+        approvedAt: new Date(),
+        emailVerifiedAt: new Date(), // Simule un email vérifié
+        memberships: {
+          create: {
+            antennaId,
+            associationId,
+            status: 'APPROVED',
+            isPrimary: true,
+            joinedAt: new Date(),
+            approvedByUserId: adminId,
+            approvedAt: new Date(),
+          }
+        }
+      }
+    });
+
+    return { 
+      message: "Membre créé avec succès.",
+      user: memberMapper.userSummary(newUser),
+      temporaryPassword: defaultPassword
+    };
+  }
+
   async suspendUser(userId: string, adminId: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
@@ -257,6 +314,7 @@ export class AdminService {
     });
   }
 
+  // 🔥 MISE À JOUR SANS "originVillage" PUISQU'IL N'EST PAS DANS LE SCHEMA
   async updateAntennaMember(userId: string, adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
@@ -277,7 +335,6 @@ export class AdminService {
         ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
         ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
         ...(data.originSubPrefecture !== undefined ? { originSubPrefecture: data.originSubPrefecture } : {}),
-        ...(data.originVillage !== undefined ? { originVillage: data.originVillage } : {}),
       } 
     });
   }
@@ -307,7 +364,6 @@ export class AdminService {
         skip, 
         take: pageSize, 
         orderBy: { createdAt: 'desc' }, 
-        // 🔥 NOUVEAU : On inclut bien sûr le membre ET le submitter (payeur tiers)
         include: { 
           member: true,
           submitter: { select: { firstName: true, lastName: true } }
@@ -415,6 +471,13 @@ export class AdminService {
       where: { id: contributionId }, 
       data: { amount: new Prisma.Decimal(amount) } 
     });
+  }
+
+  async deleteContribution(contributionId: string, adminId: string) {
+    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const contribution = await this.prisma.contribution.findFirst({ where: { id: contributionId, antennaId, associationId } });
+    if (!contribution) throw new NotFoundException("Cotisation introuvable.");
+    return this.prisma.contribution.delete({ where: { id: contributionId } });
   }
 
   // --- GESTION DES PROJETS ET PROPOSITIONS ---

@@ -1,4 +1,4 @@
-// backend/src/modules/admin/admin.controller.ts
+//backend/src/modules/admin/dto/create-member.dto.ts
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Header, Res } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -7,6 +7,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Response } from 'express';
+import { CreateMemberDto } from './dto/create-member.dto'; // 🔥 NOUVEL IMPORT
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -55,6 +56,12 @@ export class AdminController {
     return this.service.listLateMembers(user.id, +page, +pageSize);
   }
 
+  // 🔥 NOUVELLE ROUTE POUR CRÉER UN MEMBRE DIRECTEMENT
+  @Post('members')
+  createMember(@CurrentUser() user: AuthUser, @Body() body: CreateMemberDto) {
+    return this.service.createMember(user.id, body);
+  }
+
   @Patch('members/:id/suspend')
   suspendMember(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.service.suspendUser(id, user.id);
@@ -100,6 +107,11 @@ export class AdminController {
   @Patch('contributions/:id')
   updateContribution(@Param('id') id: string, @Body('amount') amount: number, @CurrentUser() user: AuthUser) {
     return this.service.updateContribution(id, user.id, amount);
+  }
+
+  @Delete('contributions/:id')
+  deleteContribution(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.deleteContribution(id, user.id);
   }
 
   // --- GESTION DES PROJETS (ANTENNE) ---
@@ -163,7 +175,6 @@ export class AdminController {
 
   @Post('documents')
   createDocument(@CurrentUser() user: AuthUser, @Body() body: any) {
-    // 🔥 CORRECTION CHIRURGICALE : Normalisation de la payload
     const payload = {
       ...body,
       fileId: body.fileId || body.fileAssetId,

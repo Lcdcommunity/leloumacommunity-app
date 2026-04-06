@@ -1,5 +1,7 @@
 // web/types/contribution.ts
 export type ContributionStatus = 
+  | 'DRAFT'
+  | 'SUBMITTED'
   | 'PENDING' 
   | 'PENDING_VALIDATION' 
   | 'VALIDATED' 

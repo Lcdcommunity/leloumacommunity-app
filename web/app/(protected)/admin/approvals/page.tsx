@@ -1,10 +1,10 @@
-//web/app/(protected)/admin/approvals/page.tsx
+// web/app/(protected)/admin/approvals/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
-import type { UserSummary } from '../../../../types/user';
+import type { UserSummary, UserStatus } from '../../../../types/user';
 import { formatDate } from '../../../../lib/format';
 
 function timeAgo(dateStr: string | null | undefined): string {
@@ -19,6 +19,7 @@ function timeAgo(dateStr: string | null | undefined): string {
   return `il y a ${d}j`;
 }
 
+/* ══════════════════════════════════════════════════════ INITIALS */
 function Initials({ firstName, lastName }: { firstName: string; lastName: string }) {
   const txt = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
   return (
@@ -35,87 +36,45 @@ function Initials({ firstName, lastName }: { firstName: string; lastName: string
   );
 }
 
-function RejectModal({
-  name,
-  onConfirm,
-  onCancel,
-}: {
-  name: string;
-  onConfirm: (reason: string) => void;
-  onCancel: () => void;
-}) {
-  const [reason, setReason] = useState('');
+function BigInitials({ firstName, lastName, color = '#2563EB' }: { firstName: string; lastName: string; color?: string }) {
+  const txt = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
   return (
-    <>
-      <div style={{
-        position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)',
-        backdropFilter: 'blur(4px)', zIndex: 100,
-        animation: 'aafadein 0.2s ease',
-      }} onClick={onCancel} />
-      <div style={{
-        position: 'fixed', top: '50%', left: '50%',
-        transform: 'translate(-50%,-50%)', zIndex: 101,
-        background: 'rgba(255,255,255,0.97)',
-        backdropFilter: 'blur(18px)',
-        borderRadius: 20, padding: 'clamp(1.5rem,4vw,2rem)',
-        width: 'min(440px, calc(100vw - 2rem))',
-        border: '1px solid rgba(37,99,235,0.1)',
-        boxShadow: '0 24px 60px rgba(37,99,235,0.14)',
-        animation: 'aapopin 0.3s cubic-bezier(.22,1,.36,1)',
-      }}>
-        <h2 style={{ fontFamily:"'Cormorant Garamond',serif", fontSize:'1.35rem', fontWeight:600, color:'#111827', marginBottom:'0.35rem' }}>
-          Rejeter ce compte
-        </h2>
-        <p style={{ fontSize:'0.82rem', color:'#6B7280', marginBottom:'1.25rem', fontWeight:500 }}>
-          Compte de <strong style={{ color:'#111827' }}>{name}</strong> — précisez un motif optionnel.
-        </p>
-        <textarea
-          value={reason}
-          onChange={e => setReason(e.target.value)}
-          placeholder="Motif du rejet (optionnel)&#8230;"
-          rows={3}
-          style={{
-            width: '100%', borderRadius: 12, padding: '0.75rem 1rem',
-            border: '1px solid rgba(220,38,38,0.25)',
-            background: 'rgba(254,242,242,0.5)',
-            fontFamily: "'DM Sans',sans-serif", fontSize: '0.84rem',
-            color: '#111827', outline: 'none', resize: 'vertical',
-            transition: 'border-color 0.2s, box-shadow 0.2s',
-          }}
-          onFocus={e => { e.target.style.borderColor='rgba(220,38,38,0.5)'; e.target.style.boxShadow='0 0 0 3px rgba(220,38,38,0.09)'; }}
-          onBlur={e  => { e.target.style.borderColor='rgba(220,38,38,0.25)'; e.target.style.boxShadow='none'; }}
-        />
-        <div style={{ display:'flex', gap:'0.6rem', marginTop:'1.1rem', justifyContent:'flex-end' }}>
-          <button onClick={onCancel} style={{
-            height:40, padding:'0 1.1rem', borderRadius:10,
-            border:'1px solid rgba(37,99,235,0.15)', background:'rgba(249,250,251,0.9)',
-            fontFamily:"'DM Sans',sans-serif", fontSize:'0.8rem', fontWeight:600, color:'#374151',
-            cursor:'pointer',
-          }}>
-            Annuler
-          </button>
-          <button onClick={() => onConfirm(reason.trim())} style={{
-            height:40, padding:'0 1.25rem', borderRadius:10,
-            border:'none', background:'linear-gradient(135deg,#B91C1C,#DC2626)',
-            fontFamily:"'DM Sans',sans-serif", fontSize:'0.8rem', fontWeight:700,
-            color:'white', cursor:'pointer',
-            boxShadow:'0 4px 12px rgba(220,38,38,0.3)',
-          }}>
-            Confirmer le rejet
-          </button>
-        </div>
-      </div>
-    </>
+    <div style={{ width: 64, height: 64, borderRadius: '50%', flexShrink: 0, background: `linear-gradient(135deg,${color},${color}cc)`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: "'Cormorant Garamond',serif", fontSize: '1.5rem', fontWeight: 700, boxShadow: `0 8px 16px ${color}33` }}>
+      {txt}
+    </div>
   );
 }
 
+/* ══════════════════════════════════════════════════════ USER STATUS BADGE */
+const USER_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  ACTIVE:           { label: 'Actif',              color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  PENDING_APPROVAL: { label: 'En attente',         color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  EMAIL_UNVERIFIED: { label: 'Email non vérif.',   color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  SUSPENDED:        { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  REJECTED:         { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  DELETED:          { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+};
+
+function UserStatusBadge({ status }: { status: string }) {
+  const s = USER_STATUS_MAP[status] ?? USER_STATUS_MAP['PENDING_APPROVAL'];
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontSize: 'clamp(0.6rem, 2vw, 0.68rem)', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '.15rem .45rem', whiteSpace: 'nowrap', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</span>
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════ PAGE */
 export default function AdminApprovalsPage() {
   const [items,     setItems]     = useState<UserSummary[]>([]);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error,     setError]     = useState<string | null>(null);
   const [loading,   setLoading]   = useState(true);
   const [search,    setSearch]    = useState('');
-  const [rejectTarget, setRejectTarget] = useState<UserSummary | null>(null);
+  
+  // États pour la modale
+  const [selectedUser, setSelectedUser] = useState<UserSummary | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   async function load() {
     setError(null);
@@ -131,26 +90,49 @@ export default function AdminApprovalsPage() {
 
   useEffect(() => { void load(); }, []);
 
-  async function handleApprove(userId: string) {
-    setLoadingId(userId);
+  /* ── Actions de la modale ── */
+  const handleUpdateStatus = async (newStatus: 'ACTIVE' | 'REJECTED') => {
+    if (!selectedUser) return;
+    setActionLoading(newStatus);
     try {
-      await api.approveMemberAccountAntenna(userId);
+      if (newStatus === 'ACTIVE') {
+        await api.approveMemberAccountAntenna(selectedUser.id);
+      } else if (newStatus === 'REJECTED') {
+        await api.rejectMemberAccountAntenna(selectedUser.id, undefined);
+      }
       await load();
+      setSelectedUser(null);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Erreur lors de l'opération.");
     } finally {
-      setLoadingId(null);
+      setActionLoading(null);
     }
-  }
+  };
 
-  async function handleReject(userId: string, reason?: string) {
-    setLoadingId(userId);
-    setRejectTarget(null);
+  const handleDelete = async () => {
+    if (!selectedUser) return;
+    if (!confirm('Êtes-vous sûr de vouloir supprimer définitivement ce compte en attente ?')) return;
+    setActionLoading('DELETE');
     try {
-      await api.rejectMemberAccountAntenna(userId, reason);
+      await api.deleteUser(selectedUser.id);
       await load();
+      setSelectedUser(null);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Erreur lors de la suppression du compte.");
     } finally {
-      setLoadingId(null);
+      setActionLoading(null);
     }
-  }
+  };
+
+  /* ── Helper pour afficher les valeurs vides ── */
+  const renderInfoValue = (value: string | null | undefined) => {
+    if (!value || value.trim() === '') {
+      return <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontWeight: 500 }}>Non renseigné</span>;
+    }
+    return value;
+  };
 
   const filtered = items.filter(u => {
     if (!search) return true;
@@ -165,11 +147,11 @@ export default function AdminApprovalsPage() {
   return (
     <AppShell title="Validations comptes">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
 
         .aa-wrap {
           font-family: 'DM Sans', sans-serif;
-          padding: clamp(1.25rem, 3vw, 2rem);
+          padding: clamp(1rem, 3vw, 2rem);
           max-width: 980px; margin: 0 auto;
         }
 
@@ -177,8 +159,7 @@ export default function AdminApprovalsPage() {
         .aa-header {
           display: flex; justify-content: space-between; align-items: flex-end;
           flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem;
-          opacity: 0; transform: translateY(10px);
-          animation: aain 0.5s 0.04s cubic-bezier(.22,1,.36,1) forwards;
+          animation: aaFadeInUp 0.5s 0.04s cubic-bezier(.22,1,.36,1) both;
         }
         .aa-eyebrow { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
         .aa-eyebrow-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; animation: aapulse 2s ease-in-out infinite; }
@@ -198,8 +179,7 @@ export default function AdminApprovalsPage() {
         .aa-toolbar {
           display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
           margin-bottom: 1.1rem;
-          opacity: 0; transform: translateY(10px);
-          animation: aain 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards;
+          animation: aaFadeInUp 0.5s 0.1s cubic-bezier(.22,1,.36,1) both;
         }
         .aa-search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 340px; }
         .aa-search-ico { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
@@ -230,8 +210,7 @@ export default function AdminApprovalsPage() {
           border: 1px solid rgba(37,99,235,0.09);
           box-shadow: 0 2px 14px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.85) inset;
           overflow: hidden;
-          opacity: 0; transform: translateY(10px);
-          animation: aain 0.5s 0.15s cubic-bezier(.22,1,.36,1) forwards;
+          animation: aaFadeInUp 0.5s 0.15s cubic-bezier(.22,1,.36,1) both;
         }
 
         /* Table */
@@ -245,57 +224,27 @@ export default function AdminApprovalsPage() {
         }
         .aa-table tbody tr {
           border-bottom: 1px solid rgba(37,99,235,0.055);
-          transition: background 0.15s;
-          animation: aain 0.4s cubic-bezier(.22,1,.36,1) both;
+          transition: background 0.15s; cursor: pointer;
+          animation: aaFadeInUp 0.4s cubic-bezier(.22,1,.36,1) both;
         }
         .aa-table tbody tr:last-child { border-bottom: none; }
-        .aa-table tbody tr:hover { background: rgba(37,99,235,0.025); }
+        .aa-table tbody tr:hover { background: rgba(37,99,235,0.03) !important; }
+        .aa-table tbody tr:active { background: rgba(37,99,235,0.06) !important; }
         .aa-table td { padding: 0.9rem 1.25rem; vertical-align: middle; }
 
         /* Member info */
         .aa-member { display: flex; align-items: center; gap: 0.75rem; }
         .aa-member-name { font-size: 0.88rem; font-weight: 700; color: #0F172A; }
         .aa-member-email { font-size: 0.72rem; color: #6B7280; font-weight: 500; margin-top: 1px; }
-        .aa-member-date { font-size: 0.7rem; color: #9CA3AF; font-weight: 500; margin-top: 2px; }
 
         /* Date column */
         .aa-date { font-size: 0.78rem; color: #4B5563; font-weight: 600; }
         .aa-date-ago { font-size: 0.68rem; color: #9CA3AF; font-weight: 500; margin-top: 2px; }
 
-        /* Actions */
-        .aa-actions { display: flex; gap: 0.45rem; }
-        .aa-approve-btn {
-          height: 34px; padding: 0 0.9rem; border-radius: 9px;
-          border: none; background: linear-gradient(135deg,#059669,#10B981);
-          color: white; font-family: 'DM Sans',sans-serif;
-          font-size: 0.74rem; font-weight: 700; cursor: pointer;
-          display: flex; align-items: center; gap: 0.35rem;
-          box-shadow: 0 2px 8px rgba(5,150,105,0.3);
-          transition: all 0.18s; white-space: nowrap;
-        }
-        .aa-approve-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(5,150,105,0.4); }
-        .aa-approve-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        .aa-reject-btn {
-          height: 34px; padding: 0 0.9rem; border-radius: 9px;
-          border: 1.5px solid rgba(220,38,38,0.25);
-          background: rgba(254,242,242,0.7);
-          color: #DC2626; font-family: 'DM Sans',sans-serif;
-          font-size: 0.74rem; font-weight: 700; cursor: pointer;
-          display: flex; align-items: center; gap: 0.35rem;
-          transition: all 0.18s; white-space: nowrap;
-        }
-        .aa-reject-btn:hover:not(:disabled) { background: #FEE2E2; border-color: rgba(220,38,38,0.45); transform: translateY(-1px); }
-        .aa-reject-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-        /* Spinner */
-        .aa-btn-spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: aaspin 0.7s linear infinite; }
-        @keyframes aaspin { to { transform: rotate(360deg); } }
-
         /* Empty / loader */
         .aa-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3.5rem 1rem; gap: 0.75rem; color: #9CA3AF; }
         .aa-empty-ico { width: 52px; height: 52px; border-radius: 50%; background: #F3F4F6; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; }
-        .aa-empty p { font-size: 0.82rem; font-weight: 600; }
+        .aa-empty p { font-size: 0.82rem; font-weight: 600; text-align: center; }
 
         .aa-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: 0.75rem; color: #6B7280; font-size: 0.82rem; font-weight: 600; }
         .aa-ring { width: 24px; height: 24px; border: 2.5px solid rgba(37,99,235,0.1); border-top-color: #2563EB; border-radius: 50%; animation: aaspin 0.8s linear infinite; }
@@ -311,16 +260,65 @@ export default function AdminApprovalsPage() {
         }
         .aa-mcard {
           padding: 1rem 1.25rem; border-bottom: 1px solid rgba(37,99,235,0.07);
-          animation: aain 0.4s cubic-bezier(.22,1,.36,1) both;
+          animation: aaFadeInUp 0.4s cubic-bezier(.22,1,.36,1) both;
+          cursor: pointer; transition: background 0.15s;
+          display: flex; align-items: center; justify-content: space-between;
         }
         .aa-mcard:last-child { border-bottom: none; }
-        .aa-mcard-top { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
-        .aa-mcard-meta { font-size: 0.72rem; color: #6B7280; font-weight: 500; margin-bottom: 0.75rem; display: flex; gap: 1rem; flex-wrap: wrap; }
-        .aa-mcard-actions { display: flex; gap: 0.5rem; }
+        .aa-mcard:hover { background: rgba(37,99,235,0.03); }
+        .aa-mcard:active { background: rgba(37,99,235,0.06); }
+        
+        .aa-mcard-content { flex: 1; min-width: 0; }
+        .aa-mcard-top { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+        .aa-mcard-meta { font-size: 0.72rem; color: #6B7280; font-weight: 500; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .aa-mcard-chevron { flex-shrink: 0; color: #9CA3AF; margin-left: 1rem; }
 
-        @keyframes aain { to { opacity: 1; transform: translateY(0); } }
-        @keyframes aafadein { from{opacity:0;} to{opacity:1;} }
-        @keyframes aapopin { from{opacity:0;transform:translate(-50%,-50%) scale(0.92);} to{opacity:1;transform:translate(-50%,-50%) scale(1);} }
+        /* ── MODAL STYLES (Repris à l'identique de la page members) ── */
+        .aa-modal-overlay { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: aaFadeIn 0.25s forwards cubic-bezier(.22,1,.36,1) both; }
+        .aa-modal-content { background: white; border-radius: 24px; width: 100%; max-width: 540px; box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(255,255,255,.9) inset; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; animation: aaScaleUp 0.3s forwards cubic-bezier(.22,1,.36,1) both; }
+        .aa-modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; background: #F8FAFC; }
+        .aa-modal-title { font-family: 'DM Sans', sans-serif; font-size: 0.95rem; font-weight: 800; letter-spacing: 0.03em; color: #111827; }
+        .aa-modal-close { background: white; border: 1px solid #E2E8F0; color: #64748B; cursor: pointer; padding: 0.4rem; border-radius: 50%; transition: all 0.2s; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .aa-modal-close:hover { background: #F1F5F9; color: #111827; }
+        .aa-modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+        
+        .aa-user-hero { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed #E2E8F0; }
+        .aa-user-hero-info { display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start; min-width: 0; }
+        .aa-user-hero-name { font-family: 'Cormorant Garamond', serif; font-size: 1.7rem; font-weight: 700; color: #111827; line-height: 1.1; word-break: break-word; }
+        .aa-user-hero-email { font-size: 0.85rem; color: #64748B; font-weight: 500; word-break: break-all; }
+
+        .aa-info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
+        .aa-info-item { display: flex; flex-direction: column; gap: 0.35rem; }
+        .aa-info-label { font-size: 0.68rem; font-weight: 800; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.08em; }
+        .aa-info-value { font-size: 0.88rem; font-weight: 600; color: #1E293B; background: #F8FAFC; padding: 0.65rem 0.85rem; border-radius: 12px; border: 1px solid #F1F5F9; }
+
+        .aa-modal-footer { padding: 1rem 1.25rem; border-top: 1px solid rgba(0,0,0,0.06); display: flex; flex-wrap: nowrap; gap: 0.5rem; justify-content: center; background: #F8FAFC; }
+        .aa-btn { flex: 1; min-width: 0; height: 44px; border-radius: 12px; font-size: clamp(0.7rem, 2vw, 0.82rem); font-weight: 800; letter-spacing: 0.03em; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; font-family: 'DM Sans', sans-serif; border: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 0.5rem; }
+        .aa-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .aa-btn svg { flex-shrink: 0; }
+        
+        .aa-btn-validate { background: linear-gradient(135deg, #059669, #10B981); color: white; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25); }
+        .aa-btn-validate:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(5, 150, 105, 0.35); }
+        
+        .aa-btn-reject { background: linear-gradient(135deg, #D97706, #F59E0B); color: white; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25); }
+        .aa-btn-reject:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(217, 119, 6, 0.35); }
+        
+        .aa-btn-delete { background: white; color: #DC2626; border: 1.5px solid #FECACA; box-shadow: 0 2px 6px rgba(220, 38, 38, 0.05); }
+        .aa-btn-delete:hover:not(:disabled) { background: #FEF2F2; border-color: #F87171; }
+        
+        .aa-btn-ring { width: 14px; height: 14px; border: 2.5px solid; border-radius: 50%; animation: aaspin 0.8s linear infinite; flex-shrink: 0; }
+
+        @media(max-width:768px){
+          .aa-modal-content { border-radius: 20px; }
+          .aa-info-grid { grid-template-columns: 1fr; gap: 0.85rem; }
+          .aa-modal-footer { padding: 0.85rem; gap: 0.35rem; }
+          .aa-btn { height: 40px; }
+        }
+
+        @keyframes aaFadeInUp { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
+        @keyframes aaFadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes aaScaleUp { 0% { transform: scale(0.95) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+        @keyframes aaspin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div className="aa-wrap">
@@ -395,12 +393,12 @@ export default function AdminApprovalsPage() {
                     <tr>
                       <th>Membre</th>
                       <th>Inscription</th>
-                      <th style={{ textAlign:'right' }}>Actions</th>
+                      <th style={{ textAlign:'right' }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filtered.map((u, i) => (
-                      <tr key={u.id} style={{ animationDelay:`${i * 0.04}s` }}>
+                      <tr key={u.id} style={{ animationDelay:`${i * 0.04}s` }} onClick={() => setSelectedUser(u)}>
                         <td>
                           <div className="aa-member">
                             <Initials firstName={u.firstName} lastName={u.lastName} />
@@ -414,28 +412,10 @@ export default function AdminApprovalsPage() {
                           <div className="aa-date">{formatDate(u.createdAt)}</div>
                           <div className="aa-date-ago">{timeAgo(u.createdAt)}</div>
                         </td>
-                        <td>
-                          <div className="aa-actions" style={{ justifyContent:'flex-end' }}>
-                            <button
-                              className="aa-approve-btn"
-                              disabled={loadingId === u.id}
-                              onClick={() => void handleApprove(u.id)}
-                            >
-                              {loadingId === u.id
-                                ? <div className="aa-btn-spinner" />
-                                : <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                              }
-                              Approuver
-                            </button>
-                            <button
-                              className="aa-reject-btn"
-                              disabled={loadingId === u.id}
-                              onClick={() => setRejectTarget(u)}
-                            >
-                              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                              Rejeter
-                            </button>
-                          </div>
+                        <td style={{ textAlign: 'right' }}>
+                          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                          </svg>
                         </td>
                       </tr>
                     ))}
@@ -446,40 +426,24 @@ export default function AdminApprovalsPage() {
               {/* Mobile cards */}
               <div className="aa-mobile-cards">
                 {filtered.map((u, i) => (
-                  <div key={u.id} className="aa-mcard" style={{ animationDelay:`${i * 0.04}s` }}>
-                    <div className="aa-mcard-top">
-                      <Initials firstName={u.firstName} lastName={u.lastName} />
-                      <div>
-                        <div className="aa-member-name">{u.firstName} {u.lastName}</div>
-                        <div className="aa-member-email">{u.email}</div>
+                  <div key={u.id} className="aa-mcard" style={{ animationDelay:`${i * 0.04}s` }} onClick={() => setSelectedUser(u)}>
+                    <div className="aa-mcard-content">
+                      <div className="aa-mcard-top">
+                        <Initials firstName={u.firstName} lastName={u.lastName} />
+                        <div>
+                          <div className="aa-member-name">{u.firstName} {u.lastName}</div>
+                          <div className="aa-member-email">{u.email}</div>
+                        </div>
+                      </div>
+                      <div className="aa-mcard-meta">
+                        <span>Inscrit le {formatDate(u.createdAt)}</span>
+                        <span>{timeAgo(u.createdAt)}</span>
                       </div>
                     </div>
-                    <div className="aa-mcard-meta">
-                      <span>Inscrit le {formatDate(u.createdAt)}</span>
-                      <span>{timeAgo(u.createdAt)}</span>
-                    </div>
-                    <div className="aa-mcard-actions">
-                      <button
-                        className="aa-approve-btn"
-                        disabled={loadingId === u.id}
-                        onClick={() => void handleApprove(u.id)}
-                        style={{ flex:1, justifyContent:'center' }}
-                      >
-                        {loadingId === u.id
-                          ? <div className="aa-btn-spinner" />
-                          : <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                        }
-                        Approuver
-                      </button>
-                      <button
-                        className="aa-reject-btn"
-                        disabled={loadingId === u.id}
-                        onClick={() => setRejectTarget(u)}
-                        style={{ flex:1, justifyContent:'center' }}
-                      >
-                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                        Rejeter
-                      </button>
+                    <div className="aa-mcard-chevron">
+                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
                     </div>
                   </div>
                 ))}
@@ -489,14 +453,104 @@ export default function AdminApprovalsPage() {
         </div>
       </div>
 
-      {/* Reject modal */}
-      {rejectTarget && (
-        <RejectModal
-          name={`${rejectTarget.firstName} ${rejectTarget.lastName}`}
-          onConfirm={reason => void handleReject(rejectTarget.id, reason || undefined)}
-          onCancel={() => setRejectTarget(null)}
-        />
+      {/* ── MODALE DE VALIDATION ── */}
+      {selectedUser && (
+        <div className="aa-modal-overlay" onClick={() => setSelectedUser(null)}>
+          <div className="aa-modal-content" onClick={e => e.stopPropagation()}>
+            
+            <div className="aa-modal-header">
+              <span className="aa-modal-title">Validation du compte</span>
+              <button className="aa-modal-close" onClick={() => setSelectedUser(null)}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="aa-modal-body">
+              <div className="aa-user-hero">
+                <BigInitials firstName={selectedUser.firstName} lastName={selectedUser.lastName} color={USER_STATUS_MAP[selectedUser.status as UserStatus]?.color || '#D97706'} />
+                <div className="aa-user-hero-info">
+                  <div className="aa-user-hero-name">{selectedUser.firstName} {selectedUser.lastName}</div>
+                  <div className="aa-user-hero-email">{selectedUser.email}</div>
+                  <div style={{ marginTop: '0.2rem' }}>
+                    <UserStatusBadge status={selectedUser.status} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="aa-info-grid">
+                <div className="aa-info-item">
+                  <span className="aa-info-label">Date d&apos;inscription</span>
+                  <span className="aa-info-value">{formatDate(selectedUser.createdAt)}</span>
+                </div>
+                <div className="aa-info-item">
+                  <span className="aa-info-label">Téléphone</span>
+                  <span className="aa-info-value">{renderInfoValue(selectedUser.phone)}</span>
+                </div>
+                <div className="aa-info-item">
+                  <span className="aa-info-label">Profession</span>
+                  <span className="aa-info-value">{renderInfoValue(selectedUser.professionalStatus)}</span>
+                </div>
+                <div className="aa-info-item">
+                  <span className="aa-info-label">Poste associatif</span>
+                  <span className="aa-info-value">{renderInfoValue(selectedUser.function)}</span>
+                </div>
+                <div className="aa-info-item">
+                  <span className="aa-info-label">Commune d&apos;origine</span>
+                  <span className="aa-info-value">{renderInfoValue(selectedUser.originSubPrefecture)}</span>
+                </div>
+                <div className="aa-info-item">
+                  <span className="aa-info-label">Lieu de résidence</span>
+                  <span className="aa-info-value">
+                    {renderInfoValue([selectedUser.city, selectedUser.country].filter(Boolean).join(', '))}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="aa-modal-footer">
+              <button 
+                className="aa-btn aa-btn-validate" 
+                onClick={() => handleUpdateStatus('ACTIVE')} 
+                disabled={actionLoading !== null}
+                title="Valider"
+              >
+                {actionLoading === 'ACTIVE' ? <div className="aa-btn-ring" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> : (
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+                Valider
+              </button>
+
+              <button 
+                className="aa-btn aa-btn-reject" 
+                onClick={() => handleUpdateStatus('REJECTED')} 
+                disabled={actionLoading !== null}
+                title="Rejeter"
+              >
+                {actionLoading === 'REJECTED' ? <div className="aa-btn-ring" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }} /> : (
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+                Rejeter
+              </button>
+
+              <button 
+                className="aa-btn aa-btn-delete" 
+                onClick={handleDelete} 
+                disabled={actionLoading !== null}
+                title="Supprimer"
+              >
+                {actionLoading === 'DELETE' ? <div className="aa-btn-ring" style={{ borderColor: 'rgba(220,38,38,0.3)', borderTopColor: '#DC2626' }} /> : (
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                )}
+                Supprimer
+              </button>
+            </div>
+
+          </div>
+        </div>
       )}
+
     </AppShell>
   );
 }

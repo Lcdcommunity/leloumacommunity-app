@@ -35,7 +35,7 @@ export interface VirtualCardData {
     birthCountry?: string | null;
     originSubPrefecture?: string | null;
     originCommune?: string | null;
-    originVillage?: string | null; // 👈 AJOUTÉ ICI
+    originVillage?: string | null; 
     country?: string | null;
     city?: string | null;
     postalCode?: string | null;
@@ -134,6 +134,14 @@ export interface Sponsor {
   isActive: boolean;
   logoFile?: { url: string } | null;
 }
+export interface PushSubscriptionPayload {
+  endpoint: string;
+  expirationTime?: number | null;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT
@@ -208,7 +216,6 @@ export const api = {
   updateMemberProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
 
-  // ⚡ NOUVELLE FONCTION D'APPEL
   updateMyPassword: (password: string) =>
     http<{ message: string }, { password: string }>('/users/me/password', { method: 'PATCH', body: { password } }),
 
@@ -279,6 +286,10 @@ export const api = {
   }) =>
     http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body }),
 
+// 🔥 NOUVEAU : Enregistrement de l'abonnement Push
+  subscribeToPushNotifications: (subscription: PushSubscriptionPayload) =>
+    http<{ message: string }, PushSubscriptionPayload>('/member/push-subscription', { method: 'POST', body: subscription }),
+
   // ==========================================
   // TARIFICATION & SAAS 
   // ==========================================
@@ -316,7 +327,7 @@ export const api = {
   dashboardAntennaAdmin: () =>
     http<{
       stats: AntennaDashboardStats;
-      recentPendingAccounts: UserSummary[];
+      recentPendingAccounts: UserSummary[];      
       recentPendingContributions: Contribution[];
       recentProjects: Project[];
       lateMembers: Array<UserSummary & { lastValidatedContributionAt?: string | null; lateMonths?: number }>;
@@ -428,6 +439,11 @@ export const api = {
       }`
     ),
 
+  searchMembers: (q: string) =>
+    http<Array<{ id: string; firstName: string; lastName: string; email: string; phone?: string | null }>>(
+      `/member/search-users?q=${encodeURIComponent(q)}`
+    ),
+
   approveMemberAccount: (userId: string) =>
     http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),
 
@@ -452,6 +468,20 @@ export const api = {
   rejectMemberAccountAntenna: (userId: string, reason?: string) =>
     http(`/admin/member-approvals/${userId}/reject`, { method: 'PATCH', body: { reason } }),
 
+  createAntennaMember: (body: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone?: string;
+    city?: string;
+    country?: string;
+    originSubPrefecture?: string;
+    originVillage?: string;
+    professionalStatus?: string;
+    function?: string;
+  }) =>
+    http<{ message: string; user: UserSummary; temporaryPassword: string }>('/admin/members', { method: 'POST', body }),
+
   suspendUser: (id: string) =>
     http(`/admin/members/${id}/suspend`, { method: 'PATCH' }),
 
@@ -474,12 +504,6 @@ export const api = {
       antennaName?: string | null;
       lateMonths?: number;
     }>>(`/member/late-members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
-
-  // 🔥 NOUVEAU : Rechercher un membre pour paiement tiers
-  searchMembers: (q: string) =>
-    http<Array<{ id: string; firstName: string; lastName: string; email: string; phone?: string | null }>>(
-      `/member/search-users?q=${encodeURIComponent(q)}`
-    ),
 
   // ==========================================
   // COTISATIONS
@@ -511,7 +535,6 @@ export const api = {
   deleteContributionAntenna: (id: string) =>
     http(`/admin/contributions/${id}`, { method: 'DELETE' }),
 
-  // 🔥 NOUVEAU : Ajout de targetMemberId
   createContributionMember: (body: {
     amount: number;
     currency?: string;

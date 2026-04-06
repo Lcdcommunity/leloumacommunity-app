@@ -6,6 +6,8 @@ import type { Contribution, ContributionStatus } from '../../types/contribution'
 import { formatCurrency, formatDate } from '../../lib/format';
 
 const statusLabels: Record<ContributionStatus, string> = {
+  DRAFT: 'Brouillon',
+  SUBMITTED: 'Soumise',
   PENDING: 'En attente',
   PENDING_VALIDATION: 'En validation',
   VALIDATED: 'Validée',
@@ -113,20 +115,15 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
           .sct-table td, .sct-table th { padding: 0.75rem 0.6rem; }
         }
 
-        /* ── MODAL STYLES (SOLUTION ULTIME) ── */
         .sct-modal-overlay {
           position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px);
           z-index: 9999;
-          
-          /* 🔥 C'EST ICI QUE LA MAGIE OPÈRE : L'overlay entier devient la zone de défilement */
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
           display: flex;
           flex-direction: column;
         }
 
-        /* Astuce CSS avancée : Ces pseudo-éléments centrent la modale verticalement 
-           s'il y a de la place, sans bloquer le défilement si la modale est géante */
         .sct-modal-overlay::before,
         .sct-modal-overlay::after {
           content: '';
@@ -135,16 +132,14 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
 
         .sct-modal {
           background: white; 
-          width: calc(100% - 2rem); /* 100% moins un peu de marge sur les côtés */
+          width: calc(100% - 2rem);
           max-width: 500px; 
           border-radius: 20px;
           box-shadow: 0 10px 40px rgba(0,0,0,0.15);
           animation: sctSlideUp 0.3s cubic-bezier(.22,1,.36,1);
-          
-          /* Marge de sécurité en haut et en bas pour ne pas coller aux bords de l'écran */
           margin: 2.5rem auto; 
-          flex-shrink: 0; /* Interdit à Flexbox d'écraser la modale, elle garde sa vraie taille */
-          overflow: hidden; /* Garde les bords arrondis propres */
+          flex-shrink: 0;
+          overflow: hidden;
           display: flex;
           flex-direction: column;
         }
@@ -167,10 +162,7 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
 
         .sct-modal-close:hover { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
         
-        .sct-modal-body { 
-          padding: 1.5rem; 
-          /* On a tout retiré ici ! Le scroll est géré par l'overlay gris ! */
-        }
+        .sct-modal-body { padding: 1.5rem; }
 
         .sct-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
         
@@ -294,7 +286,8 @@ export function ContributionsTable({ items }: { items: Contribution[] }) {
                       style={{ 
                         color: getStatusStyles(selectedItem.status).color, 
                         background: getStatusStyles(selectedItem.status).bg, 
-                        border: `1px solid ${getStatusStyles(selectedItem.status).border}`                       }}
+                        border: `1px solid ${getStatusStyles(selectedItem.status).border}`
+                      }}
                     >
                       <span className="sct-status-dot" style={{ background: getStatusStyles(selectedItem.status).color }} />
                       {statusLabels[selectedItem.status] ?? selectedItem.status}
@@ -336,5 +329,7 @@ function getStatusStyles(status: ContributionStatus) {
   if (status === 'VALIDATED') return { color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
   if (status === 'REJECTED') return { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
   if (status === 'CANCELLED') return { color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
+  // Style pour DRAFT et SUBMITTED (couleurs bleutées pour ce qui est "en cours")
+  if (status === 'DRAFT' || status === 'SUBMITTED') return { color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
   return { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
 }

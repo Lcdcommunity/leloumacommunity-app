@@ -1,4 +1,5 @@
 // backend/src/modules/member/member.service.ts
+// backend/src/modules/member/member.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -32,6 +33,7 @@ import { MemberDocumentsQueryDto } from './dto/member-documents-query.dto';
 import { MemberContentsQueryDto } from './dto/member-contents-query.dto';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PushSubscriptionDto } from './dto/push-subscription.dto';
 
 @Injectable()
 export class MemberService {
@@ -251,6 +253,25 @@ export class MemberService {
     return { ok: true as const };
   }
 
+  async subscribeToPushNotifications(userId: string, dto: PushSubscriptionDto) {
+    await this.prisma.pushSubscription.upsert({
+      where: { endpoint: dto.endpoint },
+      create: {
+        userId,
+        endpoint: dto.endpoint,
+        p256dh: dto.keys.p256dh,
+        auth: dto.keys.auth,
+      },
+      update: {
+        userId,
+        p256dh: dto.keys.p256dh,
+        auth: dto.keys.auth,
+      },
+    });
+
+    return { message: 'Abonnement push enregistré avec succès.' };
+  }
+
   async searchMembers(userId: string, q: string) {
     const me = await this.getMeOrThrow(userId);
     if (!q || q.trim().length < 2) return [];
@@ -285,14 +306,13 @@ export class MemberService {
     }
 
     let finalMemberId = me.id;
-    let finalAntennaId = me.antennaId; // Par défaut, on va dans l'antenne du payeur
+    let finalAntennaId = me.antennaId;
     let submitterId: string | null = null;
 
-    // 🔥 ROUTAGE PUISSANT POUR BÉNÉFICIAIRE TIERS
     if (dto.targetMemberId && dto.targetMemberId !== me.id) {
       const target = await this.prisma.user.findFirst({
         where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
-        include: { memberships: true } // On récupère TOUTES les memberships de la cible
+        include: { memberships: true }
       });
 
       if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
@@ -300,7 +320,6 @@ export class MemberService {
       finalMemberId = target.id;
       submitterId = me.id;
       
-      // On affecte la cotisation à l'antenne principale du bénéficiaire
       const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
       if (primaryMembership && primaryMembership.antennaId) {
         finalAntennaId = primaryMembership.antennaId;
@@ -314,9 +333,9 @@ export class MemberService {
     const created = await this.prisma.contribution.create({
       data: {
         associationId: me.associationId,
-        antennaId: finalAntennaId,        // 🔥 Routé vers la bonne antenne !
-        memberUserId: finalMemberId,      
-        submitterUserId: submitterId,     
+        antennaId: finalAntennaId,
+        memberUserId: finalMemberId,
+        submitterUserId: submitterId,
         amount: new Prisma.Decimal(dto.amount),
         currency: (dto.currency as CurrencyCode) || CurrencyCode.EUR, 
         paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
@@ -335,7 +354,7 @@ export class MemberService {
 
     const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
     await this.notifications.notifyAntennaAdmins(
-      finalAntennaId, // Notification envoyée à l'admin de la bonne antenne
+      finalAntennaId,
       me.associationId,
       `Un nouveau versement de ${dto.amount} ${dto.currency || 'EUR'} a été déclaré pour ${targetName}.`,
       NotificationType.CONTRIBUTION_SUBMITTED,

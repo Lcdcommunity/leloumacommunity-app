@@ -1,4 +1,3 @@
-// backend/src/modules/member/member.controller.ts
 import {
   Body,
   Controller,
@@ -24,6 +23,7 @@ import { CreateProjectProposalDto } from './dto/create-project-proposal.dto';
 import { MemberProjectProposalsQueryDto } from './dto/member-project-proposals-query.dto';
 import { MemberDocumentsQueryDto } from './dto/member-documents-query.dto';
 import { MemberContentsQueryDto } from './dto/member-contents-query.dto';
+import { PushSubscriptionDto } from './dto/push-subscription.dto';
 
 @Controller('member')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -31,7 +31,6 @@ import { MemberContentsQueryDto } from './dto/member-contents-query.dto';
 export class MemberController {
   constructor(private readonly service: MemberService) {}
 
-  // 👇 NOUVELLE ROUTE : Dashboard Membre
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {
     return this.service.getDashboard(user.id);
@@ -48,7 +47,13 @@ export class MemberController {
     return this.service.updatePreferences(user.id, dto);
   }
 
-  // 🔥 NOUVEAU : Rechercher un membre pour le paiement tiers
+  // 🔥 NOUVELLE ROUTE : Enregistrement des notifications push
+  @Post('push-subscription')
+  subscribeToPush(@CurrentUser() user: AuthUser, @Body() dto: PushSubscriptionDto) {
+    return this.service.subscribeToPushNotifications(user.id, dto);
+  }
+
+  // Rechercher un membre pour le paiement tiers
   @Get('search-users')
   searchMembers(@CurrentUser() user: AuthUser, @Query('q') q: string) {
     return this.service.searchMembers(user.id, q);
@@ -106,7 +111,4 @@ export class MemberController {
   listContents(@CurrentUser() user: AuthUser, @Query() query: MemberContentsQueryDto) {
     return this.service.listContents(user.id, query);
   }
-
-  // NOTE : Les endpoints de notifications ont été retirés d'ici 
-  // car ils sont désormais gérés par le module/contrôleur Notifications dédié.
 }

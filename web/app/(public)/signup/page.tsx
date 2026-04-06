@@ -5,6 +5,7 @@ import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '../../../lib/api-client';
+import { useTranslation } from 'react-i18next';
 
 type PublicAntenna = {
   id: string;
@@ -14,8 +15,7 @@ type PublicAntenna = {
   country?: string;
 };
 
-const STEPS = ['Identité', 'Contact', 'Photo', 'Sécurité'];
-
+// Les listes de valeurs restent en dur car le backend attend probablement ces chaînes exactes.
 export const ASSOCIATION_ROLES = [
   'Membre (simple)',
   "Secrétaire à l'organisation",
@@ -76,6 +76,16 @@ export const COUNTRIES = [
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 export default function MemberSignupPage() {
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.language === 'ar';
+
+  const STEPS = [
+    t('signup.step0', 'Identité'), 
+    t('signup.step1', 'Contact'), 
+    t('signup.step2', 'Photo'), 
+    t('signup.step3', 'Sécurité')
+  ];
+
   const [antennas, setAntennas] = useState<PublicAntenna[]>([]);
   const [loadingAntennas, setLoadingAntennas] = useState(true);
   const [mounted, setMounted] = useState(false);
@@ -94,12 +104,12 @@ export default function MemberSignupPage() {
   const [placeOfBirth, setPlaceOfBirth] = useState('');
 
   const [birthCountry, setBirthCountry] = useState('');
-  const [customBirthCountry, setCustomBirthCountry] = useState(''); // 🔥 GESTION "AUTRE"
+  const [customBirthCountry, setCustomBirthCountry] = useState('');
 
   const [city, setCity] = useState('');
 
   const [country, setCountry] = useState('');
-  const [customCountry, setCustomCountry] = useState(''); // 🔥 GESTION "AUTRE"
+  const [customCountry, setCustomCountry] = useState('');
 
   const [postalCode, setPostalCode] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
@@ -127,6 +137,36 @@ export default function MemberSignupPage() {
   const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
 
   useEffect(() => {
+    // ── RESTAURATION DES DONNÉES AU MONTAGE ──
+    const savedData = sessionStorage.getItem('signupFormState');
+    if (savedData) {
+      try {
+        const parsed = JSON.parse(savedData);
+        if (parsed.step !== undefined) setStep(parsed.step);
+        if (parsed.firstName) setFirstName(parsed.firstName);
+        if (parsed.lastName) setLastName(parsed.lastName);
+        if (parsed.antennaId) setAntennaId(parsed.antennaId);
+        if (parsed.email) setEmail(parsed.email);
+        if (parsed.phone) setPhone(parsed.phone);
+        if (parsed.originSubPrefecture) setOriginSubPrefecture(parsed.originSubPrefecture);
+        if (parsed.birthDate) setBirthDate(parsed.birthDate);
+        if (parsed.placeOfBirth) setPlaceOfBirth(parsed.placeOfBirth);
+        if (parsed.birthCountry) setBirthCountry(parsed.birthCountry);
+        if (parsed.customBirthCountry) setCustomBirthCountry(parsed.customBirthCountry);
+        if (parsed.city) setCity(parsed.city);
+        if (parsed.country) setCountry(parsed.country);
+        if (parsed.customCountry) setCustomCountry(parsed.customCountry);
+        if (parsed.postalCode) setPostalCode(parsed.postalCode);
+        if (parsed.addressLine1) setAddressLine1(parsed.addressLine1);
+        if (parsed.addressLine2) setAddressLine2(parsed.addressLine2);
+        if (parsed.profession) setProfession(parsed.profession);
+        if (parsed.associationRole) setAssociationRole(parsed.associationRole);
+        if (parsed.termsAccepted) setTermsAccepted(parsed.termsAccepted);
+      } catch (e) {
+        console.error("Erreur lors de la restauration du formulaire", e);
+      }
+    }
+
     setMounted(true);
     void (async () => {
       try {
@@ -140,11 +180,22 @@ export default function MemberSignupPage() {
     })();
   }, []);
 
+  // ── SAUVEGARDE EN TEMPS RÉEL ──
+  useEffect(() => {
+    if (!mounted) return;
+    const dataToSave = {
+      step, firstName, lastName, antennaId, email, phone, originSubPrefecture,
+      birthDate, placeOfBirth, birthCountry, customBirthCountry, city, country,
+      customCountry, postalCode, addressLine1, addressLine2, profession, associationRole,
+      termsAccepted
+    };
+    sessionStorage.setItem('signupFormState', JSON.stringify(dataToSave));
+  }, [mounted, step, firstName, lastName, antennaId, email, phone, originSubPrefecture, birthDate, placeOfBirth, birthCountry, customBirthCountry, city, country, customCountry, postalCode, addressLine1, addressLine2, profession, associationRole, termsAccepted]);
+
   useEffect(() => {
     return () => { if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); };
   }, [photoPreviewUrl]);
 
-  // Logique de mise à jour dynamique de l'indicatif téléphonique
   useEffect(() => {
     if (country && country !== 'Autre (Non listé)') {
       const selectedCountry = COUNTRIES.find(c => c.name === country);
@@ -182,12 +233,12 @@ export default function MemberSignupPage() {
     setPhotoError(null);
     if (!file) { setSelectedPhotoFile(null); setPhotoPreviewUrl(null); return; }
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setPhotoError('Formats autorisés : JPG, PNG, WEBP.');
+      setPhotoError(t('signup.errorFormat', 'Formats autorisés : JPG, PNG, WEBP.'));
       e.target.value = '';
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      setPhotoError('La photo ne doit pas dépasser 5 Mo.');
+      setPhotoError(t('signup.errorSize', 'La photo ne doit pas dépasser 5 Mo.'));
       e.target.value = '';
       return;
     }
@@ -206,16 +257,15 @@ export default function MemberSignupPage() {
 
   function validateStep(s: number): string | null {
     if (s === 0) {
-      if (!firstName.trim()) return 'Le prénom est requis.';
-      if (!lastName.trim()) return 'Le nom est requis.';
-      if (!antennaId) return 'Veuillez sélectionner une antenne.';
+      if (!firstName.trim()) return t('signup.errFirstName', 'Le prénom est requis.');
+      if (!lastName.trim()) return t('signup.errLastName', 'Le nom est requis.');
+      if (!antennaId) return t('signup.errAntenna', 'Veuillez sélectionner une antenne.');
     }
     if (s === 1) {
-      if (!associationRole) return "Le poste occupé est requis.";
-      if (!originSubPrefecture) return "La commune d'origine est requise.";
+      if (!associationRole) return t('signup.errRole', 'Le poste occupé est requis.');
+      if (!originSubPrefecture) return t('signup.errCommune', 'La commune d\'origine est requise.');
 
-      // Validation de l'âge (16 à 80 ans)
-      if (!birthDate || birthDate.length < 10) return "La date de naissance est requise (JJ/MM/AAAA).";
+      if (!birthDate || birthDate.length < 10) return t('signup.errBirthdateReq', 'La date de naissance est requise (JJ/MM/AAAA).');
       const parts = birthDate.split('/');
       if (parts.length === 3) {
         const day = parseInt(parts[0], 10);
@@ -228,23 +278,23 @@ export default function MemberSignupPage() {
         if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
           age--;
         }
-        if (age < 16) return "Vous devez avoir au moins 16 ans pour vous inscrire.";
-        if (age > 80) return "L'âge maximum autorisé est de 80 ans.";
+        if (age < 16) return t('signup.errAgeMin', 'Vous devez avoir au moins 16 ans pour vous inscrire.');
+        if (age > 80) return t('signup.errAgeMax', 'L\'âge maximum autorisé est de 80 ans.');
       } else {
-        return "Format de date de naissance invalide.";
+        return t('signup.errBirthdateFmt', 'Format de date de naissance invalide.');
       }
 
-      if (!placeOfBirth.trim()) return "Le lieu de naissance est requis.";
-      if (!birthCountry) return "Le pays de naissance est requis.";
-      if (birthCountry === 'Autre (Non listé)' && !customBirthCountry.trim()) return "Veuillez préciser votre pays de naissance.";
+      if (!placeOfBirth.trim()) return t('signup.errBirthplace', 'Le lieu de naissance est requis.');
+      if (!birthCountry) return t('signup.errBirthCountry', 'Le pays de naissance est requis.');
+      if (birthCountry === 'Autre (Non listé)' && !customBirthCountry.trim()) return t('signup.errBirthCountryOther', 'Veuillez préciser votre pays de naissance.');
 
-      if (!country) return "Le pays de résidence est requis.";
-      if (country === 'Autre (Non listé)' && !customCountry.trim()) return "Veuillez préciser votre pays de résidence.";
+      if (!country) return t('signup.errCountry', 'Le pays de résidence est requis.');
+      if (country === 'Autre (Non listé)' && !customCountry.trim()) return t('signup.errCountryOther', 'Veuillez préciser votre pays de résidence.');
 
-      if (!email.trim()) return "L'email est requis.";
-      if (!/\S+@\S+\.\S+/.test(email)) return "Format d'email invalide.";
+      if (!email.trim()) return t('signup.errEmailReq', 'L\'email est requis.');
+      if (!/\S+@\S+\.\S+/.test(email)) return t('signup.errEmailFmt', 'Format d\'email invalide.');
 
-      if (!phone.trim()) return "Le téléphone est requis.";
+      if (!phone.trim()) return t('signup.errPhoneReq', 'Le téléphone est requis.');
       if (phone && country && country !== 'Autre (Non listé)') {
         const selectedCountry = COUNTRIES.find(c => c.name === country);
         if (selectedCountry) {
@@ -254,20 +304,20 @@ export default function MemberSignupPage() {
           }
           const numberPart = phoneWithoutDial.replace(/\D/g, '');
           if (numberPart.length < 7 || numberPart.length > 11) {
-             return "Le numéro de téléphone (sans l'indicatif) doit faire entre 7 et 11 chiffres.";
+             return t('signup.errPhoneLen', 'Le numéro de téléphone (sans l\'indicatif) doit faire entre 7 et 11 chiffres.');
           }
         }
       }
 
-      if (!profession) return "La profession / situation est requise.";
-      if (!city.trim()) return "La ville de résidence est requise.";
-      if (!addressLine1.trim()) return "L'adresse (Ligne 1) est requise.";
+      if (!profession) return t('signup.errProfession', 'La profession / situation est requise.');
+      if (!city.trim()) return t('signup.errCity', 'La ville de résidence est requise.');
+      if (!addressLine1.trim()) return t('signup.errAddress', 'L\'adresse (Ligne 1) est requise.');
     }
     if (s === 3) {
-      if (!password) return 'Le mot de passe est requis.';
-      if (password.length < 8) return 'Le mot de passe doit contenir au moins 8 caractères.';
-      if (password !== passwordConfirm) return 'Les mots de passe ne correspondent pas.';
-      if (!termsAccepted) return 'Vous devez accepter les Mentions Légales et la Politique de Confidentialité pour continuer.';
+      if (!password) return t('signup.errPwdReq', 'Le mot de passe est requis.');
+      if (password.length < 8) return t('signup.errPwdLen', 'Le mot de passe doit contenir au moins 8 caractères.');
+      if (password !== passwordConfirm) return t('signup.errPwdMatch', 'Les mots de passe ne correspondent pas.');
+      if (!termsAccepted) return t('signup.errTerms', 'Vous devez accepter les Mentions Légales et la Politique de Confidentialité pour continuer.');
     }
     return null;
   }
@@ -316,7 +366,7 @@ export default function MemberSignupPage() {
         termsAccepted,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any); 
-      // On tente l'upload si une photo a été sélectionnée (attention: le backend doit accepter ça sans token JWT finalisé)
+      
       if (selectedPhotoFile) {
         const formData = new FormData();
         formData.append('avatar', selectedPhotoFile);
@@ -327,8 +377,9 @@ export default function MemberSignupPage() {
         }
       }
       setSuccess(true);
+      sessionStorage.removeItem('signupFormState'); 
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inscription');
+      setError(err instanceof Error ? err.message : t('signup.errGlobal', 'Erreur inscription'));
     } finally {
       setSubmitting(false);
     }
@@ -344,7 +395,7 @@ export default function MemberSignupPage() {
     return s;
   })();
 
-  const strengthLabel = ['', 'Faible', 'Moyen', 'Bon', 'Fort'][pwdStrength];
+  const strengthLabel = ['', t('signup.pwdWeak', 'Faible'), t('signup.pwdFair', 'Moyen'), t('signup.pwdGood', 'Bon'), t('signup.pwdStrong', 'Fort')][pwdStrength];
   const strengthColor = ['', '#E05050', '#E09030', '#059669', '#047857'][pwdStrength];
 
   return (
@@ -409,9 +460,9 @@ export default function MemberSignupPage() {
         .sp-input-wrap { position: relative; }
         .sp-input, .sp-select { width: 100%; min-height: 48px; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #FFFFFF; padding: 0 1rem; color: #111827; font-weight: 500; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
         .sp-input:focus, .sp-select:focus { border-color: var(--theme-blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
-        .sp-input.has-icon { padding-right: 2.8rem; }
-        .sp-select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; appearance: none; }
-        .sp-eye-btn { position: absolute; right: 0.85rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94A3B8; cursor: pointer; padding: 4px; display: flex; align-items: center; }
+        .sp-input.has-icon { padding-right: 2.8rem; padding-left: ${isRTL ? '2.8rem' : '1rem'}; }
+        .sp-select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: ${isRTL ? 'left 1rem center' : 'right 1rem center'}; appearance: none; }
+        .sp-eye-btn { position: absolute; right: ${isRTL ? 'auto' : '0.85rem'}; left: ${isRTL ? '0.85rem' : 'auto'}; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94A3B8; cursor: pointer; padding: 4px; display: flex; align-items: center; }
         .sp-pwd-strength { display: flex; gap: 4px; margin-top: 0.4rem; align-items: center; }
         .sp-pwd-bar { flex: 1; height: 4px; border-radius: 99px; background: #E2E8F0; overflow: hidden; }
         .sp-pwd-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.4s; }
@@ -452,7 +503,7 @@ export default function MemberSignupPage() {
           font-family: 'DM Sans', sans-serif; font-size: 0.88rem; outline: none;
           transition: border-color 0.2s, box-shadow 0.2s; cursor: pointer; appearance: none;
           background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-          background-repeat: no-repeat; background-position: right 1rem center;
+          background-repeat: no-repeat; background-position: ${isRTL ? 'left 1rem center' : 'right 1rem center'};
         }
         .sp-role-select:focus {
           border-color: #059669;
@@ -503,7 +554,7 @@ export default function MemberSignupPage() {
         }
       `}</style>
 
-      <div className="sp-root">
+      <div className="sp-root" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="sp-bg-grid" />
         <div className="sp-orb sp-orb-1" />
         <div className="sp-orb sp-orb-2" />
@@ -514,10 +565,10 @@ export default function MemberSignupPage() {
           <div className="sp-header">
             <div className="sp-badge">
               <div className="sp-badge-dot" />
-              Nouveau membre
+              {t('signup.newMember', 'Nouveau membre')}
             </div>
-            <h1 className="sp-title">Rejoindre <span>Lélouma</span></h1>
-            <p className="sp-subtitle">Créez votre compte en 4 étapes · Validation par votre antenne</p>
+            <h1 className="sp-title">{t('signup.join', 'Rejoindre')} <span>Lélouma</span></h1>
+            <p className="sp-subtitle">{t('signup.subtitle', 'Créez votre compte en 4 étapes · Validation par votre antenne')}</p>
           </div>
 
           {/* Stepper */}
@@ -551,15 +602,15 @@ export default function MemberSignupPage() {
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
-              <p className="sp-success-title">Inscription enregistrée !</p>
+              <p className="sp-success-title">{t('signup.successTitle', 'Inscription enregistrée !')}</p>
               <p className="sp-success-text">
-                Vérifiez votre email pour activer votre compte,<br />
-                puis attendez la validation par l&apos;administrateur<br />de votre antenne.
+                {t('signup.successText1', 'Vérifiez votre email pour activer votre compte,')}<br />
+                {t('signup.successText2', 'puis attendez la validation par l\'administrateur')}<br />{t('signup.successText3', 'de votre antenne.')}
               </p>
               <div style={{ marginTop: '1.75rem' }}>
                 <Link href="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--theme-blue-dark)', fontWeight: 800, fontSize: '0.9rem', textDecoration: 'none' }}>
-                  Se connecter
-                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  {t('signup.login', 'Se connecter')}
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                   </svg>
                 </Link>
@@ -575,23 +626,23 @@ export default function MemberSignupPage() {
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0, marginTop: '1px' }}>
                       <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
                     </svg>
-                    Le compte sera activé après vérification email et validation par l&apos;administrateur de votre antenne.
+                    {t('signup.activationNotice', 'Le compte sera activé après vérification email et validation par l\'administrateur de votre antenne.')}
                   </div>
-                  <p className="sp-section-title">Informations personnelles</p>
+                  <p className="sp-section-title">{t('signup.personalInfo', 'Informations personnelles')}</p>
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">Prénom</label>
+                      <label className="sp-label">{t('signup.firstName', 'Prénom')}</label>
                       <input className="sp-input" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Mamadou" required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Nom</label>
+                      <label className="sp-label">{t('signup.lastName', 'Nom')}</label>
                       <input className="sp-input" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Diallo" required />
                     </div>
                   </div>
                   <div className="sp-field">
-                    <label className="sp-label">Antenne de rattachement</label>
+                    <label className="sp-label">{t('signup.antenna', 'Antenne de rattachement')}</label>
                     <select className="sp-select" value={antennaId} onChange={e => setAntennaId(e.target.value)} required>
-                      <option value="">{loadingAntennas ? 'Chargement...' : 'Sélectionnez une antenne'}</option>
+                      <option value="">{loadingAntennas ? t('signup.loading', 'Chargement...') : t('signup.selectAntenna', 'Sélectionnez une antenne')}</option>
                       {antennas.map(a => (
                         <option key={a.id} value={a.id}>{a.name}{a.city ? ` (${a.city})` : ''}</option>
                       ))}
@@ -603,12 +654,12 @@ export default function MemberSignupPage() {
               {/* ── STEP 1 : Contact, Origine & Naissance ── */}
               {step === 1 && (
                 <div className="sp-panel sp-stack">
-                  <p className="sp-section-title">Identité communautaire</p>
+                  <p className="sp-section-title">{t('signup.communityIdentity', 'Identité communautaire')}</p>
 
                   <div className="sp-field">
-                    <label className="sp-label">Commune d&apos;origine</label>
+                    <label className="sp-label">{t('signup.originCommune', 'Commune d\'origine')}</label>
                     <select className="sp-select" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} required>
-                      <option value="">Sélectionnez votre commune...</option>
+                      <option value="">{t('signup.selectCommune', 'Sélectionnez votre commune...')}</option>
                       {COMMUNES_ORIGINE.map(commune => (
                         <option key={commune} value={commune}>{commune}</option>
                       ))}
@@ -620,7 +671,7 @@ export default function MemberSignupPage() {
                       <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       </svg>
-                      Poste occupé dans l&apos;association
+                      {t('signup.associationRole', 'Poste occupé dans l\'association')}
                     </label>
                     <select
                       className="sp-role-select"
@@ -628,7 +679,7 @@ export default function MemberSignupPage() {
                       onChange={e => setAssociationRole(e.target.value)}
                       required
                     >
-                      <option value="">Sélectionnez un poste…</option>
+                      <option value="">{t('signup.selectRole', 'Sélectionnez un poste…')}</option>
                       {ASSOCIATION_ROLES.map(r => (
                         <option key={r} value={r}>{r}</option>
                       ))}
@@ -638,48 +689,48 @@ export default function MemberSignupPage() {
                         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
-                        {associationRole} sélectionné(e)
+                        {associationRole} {t('signup.selected', 'sélectionné(e)')}
                       </div>
                     )}
                   </div>
 
-                  <p className="sp-section-title" style={{ marginTop: '0.25rem' }}>Naissance &amp; Origine</p>
+                  <p className="sp-section-title" style={{ marginTop: '0.25rem' }}>{t('signup.birthOrigin', 'Naissance & Origine')}</p>
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">Date de naissance <span className="sp-opt">(JJ/MM/AAAA)</span></label>
+                      <label className="sp-label">{t('signup.birthDate', 'Date de naissance')} <span className="sp-opt">(JJ/MM/AAAA)</span></label>
                       <input className="sp-input" type="text" value={birthDate} onChange={handleBirthDateChange} placeholder="12/05/1990" required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Lieu de naissance</label>
+                      <label className="sp-label">{t('signup.birthPlace', 'Lieu de naissance')}</label>
                       <input className="sp-input" value={placeOfBirth} onChange={e => setPlaceOfBirth(e.target.value)} placeholder="Ex : Lélouma" required />
                     </div>
                   </div>
 
                   <div className="sp-field">
-                    <label className="sp-label">Pays de naissance</label>
+                    <label className="sp-label">{t('signup.birthCountry', 'Pays de naissance')}</label>
                     <select className="sp-select" value={birthCountry} onChange={e => { setBirthCountry(e.target.value); if (e.target.value !== 'Autre (Non listé)') setCustomBirthCountry(''); }} required>
-                      <option value="">Sélectionnez un pays...</option>
+                      <option value="">{t('signup.selectCountry', 'Sélectionnez un pays...')}</option>
                       {COUNTRIES.map(c => (
                         <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
                     {birthCountry === 'Autre (Non listé)' && (
-                      <input className="sp-input" value={customBirthCountry} onChange={e => setCustomBirthCountry(e.target.value)} placeholder="Précisez votre pays de naissance" required style={{ marginTop: '0.4rem' }} />
+                      <input className="sp-input" value={customBirthCountry} onChange={e => setCustomBirthCountry(e.target.value)} placeholder={t('signup.specifyCountry', 'Précisez votre pays')} required style={{ marginTop: '0.4rem' }} />
                     )}
                   </div>
 
-                  <p className="sp-section-title">Coordonnées &amp; Profession</p>
+                  <p className="sp-section-title">{t('signup.contactProfession', 'Coordonnées & Profession')}</p>
 
                   <div className="sp-field">
-                    <label className="sp-label">Pays de résidence</label>
+                    <label className="sp-label">{t('signup.residenceCountry', 'Pays de résidence')}</label>
                     <select className="sp-select" value={country} onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre (Non listé)') setCustomCountry(''); }} required>
-                      <option value="">Sélectionnez votre pays actuel...</option>
+                      <option value="">{t('signup.selectCountry', 'Sélectionnez votre pays...')}</option>
                       {COUNTRIES.map(c => (
                         <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
                     {country === 'Autre (Non listé)' && (
-                      <input className="sp-input" value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder="Précisez votre pays de résidence" required style={{ marginTop: '0.4rem' }} />
+                      <input className="sp-input" value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder={t('signup.specifyCountry', 'Précisez votre pays')} required style={{ marginTop: '0.4rem' }} />
                     )}
                   </div>
 
@@ -689,46 +740,46 @@ export default function MemberSignupPage() {
                       <input className="sp-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@exemple.com" required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Téléphone</label>
+                      <label className="sp-label">{t('signup.phone', 'Téléphone')}</label>
                       <input 
                         className="sp-input" 
                         value={phone} 
                         onChange={e => setPhone(e.target.value)} 
-                        placeholder={country ? "Entrez le numéro" : "Sélectionnez un pays d'abord"} 
+                        placeholder={country ? t('signup.enterPhone', "Entrez le numéro") : t('signup.phoneHint', "Sélectionnez un pays d'abord")} 
                         required
                       />
                     </div>
                   </div>
 
                   <div className="sp-field">
-                    <label className="sp-label">Profession / Situation</label>
+                    <label className="sp-label">{t('signup.profession', 'Profession / Situation')}</label>
                     <select className="sp-select" value={profession} onChange={e => setProfession(e.target.value)} required>
-                      <option value="">Sélectionnez une profession</option>
+                      <option value="">{t('signup.selectProfession', 'Sélectionnez une profession')}</option>
                       {PROFESSION_LIST.map(p => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>
                   </div>
 
-                  <p className="sp-section-title">Adresse de résidence</p>
+                  <p className="sp-section-title">{t('signup.residenceAddress', 'Adresse de résidence')}</p>
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">Ville</label>
+                      <label className="sp-label">{t('signup.city', 'Ville')}</label>
                       <input className="sp-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Paris, Conakry" required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Code postal <span className="sp-opt">(optionnel)</span></label>
+                      <label className="sp-label">{t('signup.postalCode', 'Code postal')} <span className="sp-opt">({t('signup.optional', 'optionnel')})</span></label>
                       <input className="sp-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="Ex: 75001" maxLength={5} />
                     </div>
                   </div>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">Adresse 1</label>
+                      <label className="sp-label">{t('signup.address1', 'Adresse 1')}</label>
                       <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue..." required />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">Adresse 2 <span className="sp-opt">(optionnel)</span></label>
+                      <label className="sp-label">{t('signup.address2', 'Adresse 2')} <span className="sp-opt">({t('signup.optional', 'optionnel')})</span></label>
                       <input className="sp-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 3B" />
                     </div>
                   </div>
@@ -738,13 +789,13 @@ export default function MemberSignupPage() {
               {/* ── STEP 2 : Photo ── */}
               {step === 2 && (
                 <div className="sp-panel sp-stack">
-                  <p className="sp-section-title">Photo de profil</p>
+                  <p className="sp-section-title">{t('signup.profilePhoto', 'Photo de profil')}</p>
 
                   <div className="sp-notice" style={{ marginBottom: '1.25rem', padding: '0.65rem 0.85rem', fontSize: '0.75rem', border: '1px solid #FDE68A', background: '#FEF3C7', color: '#92400E' }}>
                     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: '2px' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    Attention: Pour des raisons de sécurité, la photo de profil définitive devra être re-sauvegardée depuis votre tableau de bord lors de votre première connexion.
+                    {t('signup.photoWarning', 'Attention: Pour des raisons de sécurité, la photo de profil définitive devra être re-sauvegardée depuis votre tableau de bord lors de votre première connexion.')}
                   </div>
 
                   <div className="sp-photo-box">
@@ -755,11 +806,11 @@ export default function MemberSignupPage() {
                     </div>
                     <div className="sp-photo-actions">
                       <label className="sp-file-label" htmlFor="signup-photo-input">
-                        {photoPreviewUrl ? 'Changer la photo' : 'Choisir une photo'}
+                        {photoPreviewUrl ? t('signup.changePhoto', 'Changer la photo') : t('signup.choosePhoto', 'Choisir une photo')}
                       </label>
                       <input ref={photoInputRef} id="signup-photo-input" className="sp-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoChange} />
                       {photoPreviewUrl && (
-                        <button type="button" className="sp-photo-remove-btn" onClick={removePhoto}>Supprimer</button>
+                        <button type="button" className="sp-photo-remove-btn" onClick={removePhoto}>{t('signup.delete', 'Supprimer')}</button>
                       )}
                     </div>
                   </div>
@@ -769,12 +820,12 @@ export default function MemberSignupPage() {
               {/* ── STEP 3 : Sécurité ── */}
               {step === 3 && (
                 <div className="sp-panel sp-stack">
-                  <p className="sp-section-title">Mot de passe</p>
+                  <p className="sp-section-title">{t('signup.passwordTitle', 'Mot de passe')}</p>
                   <div className="sp-field">
-                    <label className="sp-label">Mot de passe</label>
+                    <label className="sp-label">{t('signup.passwordTitle', 'Mot de passe')}</label>
                     <div className="sp-input-wrap">
-                      <input className="sp-input has-icon" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="8 caractères minimum" required />
-                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd(v => !v)}>{showPwd ? 'Cacher' : 'Voir'}</button>
+                      <input className="sp-input has-icon" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('signup.pwdMin', '8 caractères minimum')} required />
+                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd(v => !v)}>{showPwd ? t('signup.hide', 'Cacher') : t('signup.show', 'Voir')}</button>
                     </div>
                     {password && (
                       <div className="sp-pwd-strength">
@@ -788,10 +839,10 @@ export default function MemberSignupPage() {
                     )}
                   </div>
                   <div className="sp-field">
-                    <label className="sp-label">Confirmer le mot de passe</label>
+                    <label className="sp-label">{t('signup.confirmPwd', 'Confirmer le mot de passe')}</label>
                     <div className="sp-input-wrap">
-                      <input className="sp-input has-icon" type={showPwd2 ? 'text' : 'password'} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} placeholder="Répétez le mot de passe" required />
-                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd2(v => !v)}>{showPwd2 ? 'Cacher' : 'Voir'}</button>
+                      <input className="sp-input has-icon" type={showPwd2 ? 'text' : 'password'} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} placeholder={t('signup.retypePwd', 'Répétez le mot de passe')} required />
+                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd2(v => !v)}>{showPwd2 ? t('signup.hide', 'Cacher') : t('signup.show', 'Voir')}</button>
                     </div>
                   </div>
 
@@ -805,7 +856,7 @@ export default function MemberSignupPage() {
                       required 
                     />
                     <label htmlFor="legal-accept" className="sp-legal-label">
-                      J&apos;ai lu et j&apos;accepte sans réserve les <Link href="/mentions-legales" className="sp-legal-link" target="_blank">Mentions Légales</Link> ainsi que la <Link href="/confidentialite" className="sp-legal-link" target="_blank">Politique de Confidentialité</Link> de l&apos;association LCD.
+                      {t('signup.acceptLegal1', 'J\'ai lu et j\'accepte sans réserve les')} <Link href="/mentions-legales" className="sp-legal-link" target="_blank">{t('signup.legalMentions', 'Mentions Légales')}</Link> {t('signup.acceptLegal2', 'ainsi que la')} <Link href="/confidentialite" className="sp-legal-link" target="_blank">{t('signup.privacyPolicy', 'Politique de Confidentialité')}</Link> {t('signup.acceptLegal3', 'de l\'association LCD.')}
                     </label>
                   </div>
 
@@ -816,12 +867,12 @@ export default function MemberSignupPage() {
 
               {/* Navigation */}
               <div className="sp-nav">
-                {step > 0 && <button type="button" className="sp-btn-back" onClick={prevStep}>Retour</button>}
+                {step > 0 && <button type="button" className="sp-btn-back" onClick={prevStep}>{t('signup.back', 'Retour')}</button>}
                 {step < STEPS.length - 1 ? (
-                  <button type="button" className="sp-btn-next" onClick={nextStep} disabled={step === 2 && !!photoError}>Continuer</button>
+                  <button type="button" className="sp-btn-next" onClick={nextStep} disabled={step === 2 && !!photoError}>{t('signup.continue', 'Continuer')}</button>
                 ) : (
                   <button type="submit" className="sp-btn-submit" disabled={submitting || !termsAccepted}>
-                    {submitting ? <div className="sp-spinner" /> : 'Créer mon compte'}
+                    {submitting ? <div className="sp-spinner" /> : t('signup.createAccount', 'Créer mon compte')}
                   </button>
                 )}
               </div>
@@ -831,8 +882,8 @@ export default function MemberSignupPage() {
           {/* Footer */}
           {!success && (
             <div className="sp-footer">
-              <div>Déjà membre ? <Link href="/login">Se connecter</Link></div>
-              <Link href="/forgot-password" className="sp-footer-sublink">Mot de passe oublié ?</Link>
+              <div>{t('signup.alreadyMember', 'Déjà membre ?')} <Link href="/login">{t('signup.login', 'Se connecter')}</Link></div>
+              <Link href="/forgot-password" className="sp-footer-sublink">{t('signup.forgotPwd', 'Mot de passe oublié ?')}</Link>
             </div>
           )}
 

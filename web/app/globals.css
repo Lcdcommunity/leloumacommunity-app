@@ -16,7 +16,19 @@
   --warning: #d97706;
   --info: #2563eb;
 }
+/* Ajoute ceci juste après ton bloc :root {...} existant */
 
+.dark {
+  --bg: #0f172a; /* Slate 900 */
+  --card: #1e293b; /* Slate 800 */
+  --text: #f8fafc; /* Slate 50 */
+  --muted: #94a3b8; /* Slate 400 */
+  --border: #334155; /* Slate 700 */
+  
+  /* On ajuste légèrement les couleurs primaires pour qu'elles ressortent mieux sur fond sombre */
+  --primary: #3b82f6; 
+  --primary-hover: #60a5fa; 
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: Inter, Arial, sans-serif; }
 a { color: inherit; text-decoration: none; }
