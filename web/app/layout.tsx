@@ -5,15 +5,23 @@ import type { Metadata } from 'next';
 import { ThemeProvider } from '../components/theme-provider';
 
 export const metadata: Metadata = {
-  title: 'Lelouma Community', 
+  title: 'Lelouma Community',
   description: 'Gestion d’association communautaire',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="fr" suppressHydrationWarning>
       <body suppressHydrationWarning={true}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+        >
           {children}
         </ThemeProvider>
       </body>
