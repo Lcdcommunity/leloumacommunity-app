@@ -1,13 +1,17 @@
 // web/app/login/page.tsx
 'use client';
 
-import { FormEvent, useState, useEffect, useMemo } from 'react';
+import { FormEvent, useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { login } from '../../lib/auth';
 import { api } from '../../lib/api-client';
 import { useTranslation } from 'react-i18next';
+import i18n from '../../lib/i18n'; // 🔥 Importe l'instance i18n directement
+
+// Force le rendu côté client pour éviter le flash de langue
+export const dynamic = 'force-dynamic';
 
 // Liste des langues
 const LANGUAGES = [
@@ -21,7 +25,7 @@ const LANGUAGES = [
 
 export default function LoginPage() {
   const router = useRouter();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation(); // 🔥 Retiré i18n d'ici
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,10 +34,8 @@ export default function LoginPage() {
   const [mounted, setMounted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  const currentLang = useMemo(
-    () => i18n.resolvedLanguage || i18n.language || 'fr',
-    [i18n.language, i18n.resolvedLanguage]
-  );
+  // 🔥 Gestion robuste de la langue
+  const [currentLang, setCurrentLang] = useState('fr');
 
   const isRTL = currentLang === 'ar';
 
@@ -49,13 +51,39 @@ export default function LoginPage() {
     logoUrl: '/assets/images/logolcd.jpg',
     primary: '#059669',
     secondary: '#064E3B',
-   // ✅ APRÈS — guillemet fermant manquant ajouté
-   fontFamily: "'DM Sans', sans-serif",
+    fontFamily: "'DM Sans', sans-serif",
   });
 
+  // 🔥 Fonction de mise à jour de la langue (useCallback pour stabilité)
+  const handleLanguageChanged = useCallback((lng: string) => {
+    setCurrentLang(lng);
+    document.documentElement.lang = lng;
+    document.documentElement.dir = lng === 'ar' ? 'rtl' : 'ltr';
+  }, []);
+
+  // --- EFFET DE MONTAGE ET SYNCHRONISATION LANGUE ---
   useEffect(() => {
     setMounted(true);
 
+    // Synchronise la langue avec i18n
+    if (i18n.isInitialized) {
+      const detectedLang =
+        i18n.language ||
+        localStorage.getItem('i18nextLng') ||
+        'fr';
+      setCurrentLang(detectedLang);
+    }
+
+    // Écoute les changements de langue sur l'instance globale
+    i18n.on('languageChanged', handleLanguageChanged);
+
+    return () => {
+      i18n.off('languageChanged', handleLanguageChanged);
+    };
+  }, [handleLanguageChanged]); // 🔥 Dépendance stable
+
+  // --- RÉCUPÉRATION DU THÈME ---
+  useEffect(() => {
     const fetchTheme = async () => {
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -93,16 +121,36 @@ export default function LoginPage() {
           });
         }
       } catch (err) {
-        console.warn(
-          'Thème personnalisé non trouvé.',
-          err
-        );
+        console.warn('Thème personnalisé non trouvé.', err);
       }
     };
 
     fetchTheme();
   }, []);
 
+  // --- SYNCHRONISATION HTML GLOBALE ---
+  useEffect(() => {
+    if (mounted) {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
+    }
+  }, [currentLang, isRTL, mounted]);
+
+  // --- GESTION DU CHANGEMENT DE LANGUE ---
+  const handleLanguageChange = async (lang: string) => {
+    if (!i18n || typeof i18n.changeLanguage !== 'function')
+      return;
+
+    try {
+      await i18n.changeLanguage(lang);
+      // Pas besoin de setCurrentLang ici, l'event listener s'en charge
+      localStorage.setItem('i18nextLng', lang);
+    } catch (err) {
+      console.error('Erreur changement langue:', err);
+    }
+  };
+
+  // --- SOUMISSION DU FORMULAIRE ---
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -127,31 +175,26 @@ export default function LoginPage() {
       setError(
         err instanceof Error
           ? err.message
-          : t(
-              'login.error',
-              'Identifiants incorrects.'
-            )
+          : t('login.error', 'Identifiants incorrects.')
       );
     } finally {
       setLoading(false);
     }
   }
 
-  const getLightColor = (
-    hex: string,
-    opacity: number
-  ) => {
+  // --- UTILITAIRE COULEUR ---
+  const getLightColor = (hex: string, opacity: number) => {
     hex = hex.replace('#', '');
 
-    const r =
-      parseInt(hex.substring(0, 2), 16) || 5;
-    const g =
-      parseInt(hex.substring(2, 4), 16) || 150;
-    const b =
-      parseInt(hex.substring(4, 6), 16) || 105;
+    const r = parseInt(hex.substring(0, 2), 16) || 5;
+    const g = parseInt(hex.substring(2, 4), 16) || 150;
+    const b = parseInt(hex.substring(4, 6), 16) || 105;
 
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
+
+  // Empêche le flash de contenu avant hydratation
+  if (!mounted) return null;
 
   return (
     <>
@@ -262,6 +305,7 @@ export default function LoginPage() {
           font-weight: 700;
           color: var(--text-deep);
           cursor: pointer;
+          direction: ltr;
         }
 
         .lp-logo-wrap {
@@ -357,6 +401,7 @@ export default function LoginPage() {
           border: none;
           color: var(--text-muted);
           cursor: pointer;
+          font-size: 1.2rem;
         }
 
         .lp-forgot {
@@ -382,6 +427,14 @@ export default function LoginPage() {
           font-weight: 700;
           cursor: pointer;
           margin-top: 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .lp-btn:disabled {
+          opacity: 0.7;
+          cursor: not-allowed;
         }
 
         .lp-error {
@@ -467,15 +520,14 @@ export default function LoginPage() {
             mounted ? 'visible' : ''
           }`}
         >
+          {/* Sélecteur de langue */}
           <div className="lp-lang-corner">
             <select
               className="lp-lang-select"
               value={currentLang}
-              onChange={(e) => {
-                const lang = e.target.value;
-                i18n.changeLanguage(lang);
-                document.documentElement.lang = lang;
-              }}
+              onChange={(e) =>
+                handleLanguageChange(e.target.value)
+              }
             >
               {LANGUAGES.map((lang) => (
                 <option
@@ -488,6 +540,7 @@ export default function LoginPage() {
             </select>
           </div>
 
+          {/* Logo et titre */}
           <div className="lp-logo-wrap">
             <div className="lp-logo-box">
               <div className="lp-logo-inner">
@@ -534,12 +587,12 @@ export default function LoginPage() {
             </h1>
           </div>
 
+          {/* Message d'erreur */}
           {error && (
-            <div className="lp-error">
-              {error}
-            </div>
+            <div className="lp-error">{error}</div>
           )}
 
+          {/* Formulaire */}
           <form onSubmit={onSubmit}>
             <div className="lp-field">
               <label className="lp-label">
@@ -579,9 +632,7 @@ export default function LoginPage() {
                 <input
                   className="lp-input"
                   type={
-                    showPassword
-                      ? 'text'
-                      : 'password'
+                    showPassword ? 'text' : 'password'
                   }
                   value={password}
                   onChange={(e) =>
@@ -596,12 +647,10 @@ export default function LoginPage() {
                   type="button"
                   className="lp-toggle-btn"
                   onClick={() =>
-                    setShowPassword(
-                      !showPassword
-                    )
+                    setShowPassword(!showPassword)
                   }
                 >
-                  {showPassword ? '🙈' : '👁'}
+                  {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
 
@@ -631,6 +680,7 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Footer */}
           <footer className="lp-footer">
             <p>
               {t(

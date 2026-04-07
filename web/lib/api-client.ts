@@ -277,18 +277,30 @@ export const api = {
     return api.uploadAvatar(form);
   },
 
-  updateMemberPreferences: (body: {
+  updateMemberPreferences: async (body: {
     emailNotifications?: boolean;
     smsNotifications?: boolean;
     pushNotifications?: boolean;
-    language?: string;
+    language?: 'fr' | 'en' | 'es' | 'pt' | 'ar' | 'ff' | string;
     theme?: 'light' | 'dark' | 'system' | string;
-  }) =>
-    http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body }),
+  }) => {
+    // 🌍 Mise à jour du cookie pour i18next (Middleware & SSR)
+    if (body.language) {
+      document.cookie = `i18next=${body.language}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+    return http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body });
+  },
 
-// 🔥 NOUVEAU : Enregistrement de l'abonnement Push
+  // Enregistrement de l'abonnement Push
   subscribeToPushNotifications: (subscription: PushSubscriptionPayload) =>
     http<{ message: string }, PushSubscriptionPayload>('/member/push-subscription', { method: 'POST', body: subscription }),
+
+  // Désinscription des notifications Push
+  unsubscribePushNotifications: (endpoint: string) =>
+    http<{ message: string }, { endpoint: string }>('/member/push-subscription', {
+      method: 'DELETE',
+      body: { endpoint },
+    }),
 
   // ==========================================
   // TARIFICATION & SAAS 
@@ -554,8 +566,7 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
     ), 
-    
-  runContributionProjection: (body: {
+    runContributionProjection: (body: {
     expectedMembersPaying: number;
     averageContribution: number;
     currency?: string;

@@ -5,6 +5,9 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('accessToken')?.value;
+  
+  // 🌍 Récupération de la langue depuis le cookie (configuré par i18next)
+  const locale = request.cookies.get('i18next')?.value || 'fr';
 
   // 1. Identification des zones
   const isSystemAdminRoute = pathname.startsWith('/system-admin');
@@ -61,7 +64,12 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // 🌍 On injecte la langue dans les headers pour que les Server Components puissent la lire
+  const response = NextResponse.next();
+  if (!request.cookies.has('i18next')) {
+    response.cookies.set('i18next', locale);
+  }
+  return response;
 }
 
 export const config = {

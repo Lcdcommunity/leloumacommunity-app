@@ -1,8 +1,10 @@
 // src/modules/notifications/notifications.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsQueryDto } from './dto/notifications-query.dto';
 import { NotificationType, Prisma } from '@prisma/client';
+import { PushService } from './push.service';
+import { PushSubscriptionDto } from './dto/push-subscription.dto';
 
 type NotificationListItem = {
   id: string;
@@ -15,7 +17,12 @@ type NotificationListItem = {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(NotificationsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pushService: PushService, // Injecte le PushService
+  ) {}
 
   /**
    * Liste les notifications de l'utilisateur connecté
@@ -152,6 +159,124 @@ export class NotificationsService {
           },
         },
       },
+    });
+  }
+
+  /**
+   * 🔥 NOUVEAU : Sauvegarde subscription push
+   */
+  async savePushSubscription(
+    userId: string,
+    associationId: string,
+    dto: PushSubscriptionDto,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.pushService.saveSubscription(userId, associationId, dto);
+  }
+
+  /**
+   * 🔥 NOUVEAU : Crée une notification + envoie push si activé
+   */
+  async createForUserWithPush(params: {
+    associationId: string;
+    userId: string;
+    message: string;
+    type?: NotificationType;
+    metadata?: Prisma.InputJsonValue;
+    title?: string;
+    pushTitle?: string;
+    pushBody?: string;
+  }): Promise<{ id: string; pushSent: boolean }> {
+    // 1. Crée la notification en base
+    const created = await this.prisma.notification.create({
+      data: {
+        associationId: params.associationId,
+        type: params.type || NotificationType.SYSTEM_ALERT,
+        title: params.title || 'Nouvelle notification',
+        message: params.message,
+        payload: params.metadata || Prisma.JsonNull,
+        recipients: {
+          create: { userId: params.userId },
+        },
+      },
+    });
+
+    // 2. Envoie la notification push si l'utilisateur a activé
+    let pushSent = false;
+    try {
+      const userPrefs = await this.prisma.userPreference.findUnique({
+        where: { userId: params.userId },
+      });
+
+      if (userPrefs?.pushNotifications) {
+        const result = await this.pushService.sendToUser(
+          params.userId,
+          params.associationId,
+          {
+            title: params.pushTitle || params.title || 'Notification',
+            body: params.pushBody || params.message,
+            tag: created.id,
+            data: {
+              notificationId: created.id,
+              type: params.type,
+              ...((params.metadata as Record<string, unknown>) || {}),
+            },
+          },
+        );
+        pushSent = result.sent > 0;
+      }
+    } catch (error) {
+      // Ne fait pas échouer la création si le push échoue
+      this.logger.error('Erreur envoi push:', error);
+    }
+
+    return { id: created.id, pushSent };
+  }
+
+  /**
+   * 🔥 NOUVEAU : Notifie admins d'antenne avec push
+   */
+  async notifyAntennaAdminsWithPush(
+    antennaId: string,
+    associationId: string,
+    message: string,
+    type: NotificationType,
+    metadata?: Prisma.InputJsonValue,
+    pushTitle?: string,
+  ): Promise<void> {
+    // 1. Notification en base (méthode existante)
+    await this.notifyAntennaAdmins(antennaId, associationId, message, type, metadata);
+
+    // 2. Push notification
+    await this.pushService.sendToAntennaAdmins(antennaId, associationId, {
+      title: pushTitle || 'Alerte Antenne',
+      body: message,
+      tag: `antenna-${antennaId}-${type}`,
+      data: {
+        antennaId,
+        type,
+        ...(metadata as Record<string, unknown> || {}),
+      },
+    });
+  }
+
+  /**
+   * 🔥 NOUVEAU : Notifie Super Admins avec push
+   */
+  async notifySuperAdminsWithPush(
+    associationId: string,
+    message: string,
+    type: NotificationType,
+    pushTitle?: string,
+  ): Promise<void> {
+    // 1. Notification en base
+    await this.notifySuperAdmins(associationId, message, type);
+
+    // 2. Push notification
+    await this.pushService.sendToSuperAdmins(associationId, {
+      title: pushTitle || 'Alerte Système',
+      body: message,
+      tag: `superadmin-${type}`,
+      data: { type },
     });
   }
 }

@@ -21,6 +21,7 @@ import { PrismaModule } from './prisma/prisma.module';
 // Feature Modules
 import { AuthModule } from './modules/auth/auth.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
+import { PreferencesModule } from './modules/preferences/preferences.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -65,6 +66,7 @@ import { UsersModule } from './modules/users/users.module';
 
     // --- MODULES MÉTIER ---
     PermissionsModule,
+    PreferencesModule,
     AuthModule, // 👈 C'est LUI qui gère AuthMemberController et AuthMemberService
     UploadsModule,
     SchedulerModule,

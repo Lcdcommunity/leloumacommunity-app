@@ -369,7 +369,7 @@ model Association {
   stripeCustomerId      String?   @unique
   subscriptionExpiresAt DateTime?
   domainName            String?   @unique 
-  themeColors           Json?     
+  themeColors            Json?     
   fontFamily            String?   
 
   createdAt DateTime @default(now())
@@ -377,30 +377,30 @@ model Association {
 
   logoFile FileAsset? @relation("AssociationLogo", fields: [logoFileId], references: [id], onDelete: SetNull)
 
-  antennas                Antenna[]
-  users                   User[]
-  newsPosts               NewsPost[]
-  documents               Document[]
-  projects                Project[]
-  projectProposals        ProjectProposal[]
-  ledgerEntries           LedgerEntry[]
-  projections             FinancialProjection[]
-  notifications           Notification[]
-  settings                AssociationSetting[]
-  auditLogs               AuditLog[] @relation("AssociationAudit")
-  Membership              Membership[]
+  antennas                 Antenna[]
+  users                    User[]
+  newsPosts                NewsPost[]
+  documents                Document[]
+  projects                 Project[]
+  projectProposals         ProjectProposal[]
+  ledgerEntries            LedgerEntry[]
+  projections              FinancialProjection[]
+  notifications            Notification[]
+  settings                 AssociationSetting[]
+  auditLogs                AuditLog[] @relation("AssociationAudit")
+  Membership               Membership[]
   AntennaAdminAssignment AntennaAdminAssignment[]
-  AdminInvitation         AdminInvitation[]
-  AuthToken               AuthToken[]
-  Session                 Session[]
-  Contribution            Contribution[]
-  expenses                Expense[]
-  events                  Event[]
-  sponsors                Sponsor[]
-  BalanceSnapshot         BalanceSnapshot[]
-  VoteSession             VoteSession[]
-  FileAsset               FileAsset[]
-  ReminderRunLog          ReminderRunLog[]
+  AdminInvitation          AdminInvitation[]
+  AuthToken                AuthToken[]
+  Session                  Session[]
+  Contribution             Contribution[]
+  expenses                 Expense[]
+  events                   Event[]
+  sponsors                 Sponsor[]
+  BalanceSnapshot          BalanceSnapshot[]
+  VoteSession              VoteSession[]
+  FileAsset                FileAsset[]
+  ReminderRunLog           ReminderRunLog[]
 
   @@index([isActive])
   @@map("associations")
@@ -465,7 +465,7 @@ model Antenna {
 
 model User {
   id                  String     @id @default(cuid())
-  associationId       String?    
+  associationId       String?   
   email               String     @unique
   emailVerifiedAt     DateTime?
   passwordHash        String
@@ -495,28 +495,28 @@ model User {
   postalCode          String?
   profilePhotoFileId  String?
 
-  preferredLanguage   LanguageCode @default(FR)
-  timezone            String?      @default("Europe/Paris")
-  isPhoneVerified     Boolean      @default(false)
+  preferredLanguage    LanguageCode @default(FR)
+  timezone             String?      @default("Europe/Paris")
+  isPhoneVerified      Boolean      @default(false)
 
-  termsAcceptedAt     DateTime     @default(now())
+  termsAcceptedAt      DateTime     @default(now())
 
-  createdByUserId     String?
-  approvedByUserId    String?
-  approvedAt          DateTime?
-  rejectedByUserId    String?
-  rejectedAt          DateTime?
-  rejectionReason     String?
-  suspendedByUserId   String?
-  suspendedAt         DateTime?
-  suspensionReason    String?
-  lastLoginAt         DateTime?
+  createdByUserId      String?
+  approvedByUserId     String?
+  approvedAt           DateTime?
+  rejectedByUserId     String?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  suspendedByUserId    String?
+  suspendedAt          DateTime?
+  suspensionReason     String?
+  lastLoginAt          DateTime?
 
-  deletedAt           DateTime?
-  deletedByUserId     String?
+  deletedAt            DateTime?
+  deletedByUserId      String?
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   association  Association? @relation(fields: [associationId], references: [id], onDelete: Cascade)
   profilePhoto FileAsset?   @relation("UserProfilePhoto", fields: [profilePhotoFileId], references: [id], onDelete: SetNull)
@@ -537,7 +537,7 @@ model User {
   deletedByUser User?  @relation("UserDeletedByUser", fields: [deletedByUserId], references: [id], onDelete: SetNull)
   deletedUsers  User[] @relation("UserDeletedByUser")
 
-  memberships      Membership[]
+  memberships       Membership[]
   adminAssignments AntennaAdminAssignment[]
 
   membershipsApproved Membership[] @relation("MembershipApprovedByUser")
@@ -556,16 +556,17 @@ model User {
   projectProposalComments  ProjectProposalComment[] @relation("ProjectProposalCommentAuthor")
   projectsCreated          Project[]                @relation("ProjectCreatedByUser")
 
-  contributions           Contribution[] @relation("ContributionMember")
-  contributionsValidated  Contribution[] @relation("ContributionValidatedBy")
-  contributionsRejected   Contribution[] @relation("ContributionRejectedBy")
-  contributionsCancelled  Contribution[] @relation("ContributionCancelledBy")
+  contributions            Contribution[] @relation("ContributionMember")
+  contributionsValidated   Contribution[] @relation("ContributionValidatedBy")
+  contributionsRejected    Contribution[] @relation("ContributionRejectedBy")
+  contributionsCancelled   Contribution[] @relation("ContributionCancelledBy")
   
   // 🔥 NOUVEAU : Relations pour les cotisations payées par un tiers
   submittedContributions Contribution[] @relation("ContributionSubmitter")
 
-  // 🔥 NOUVEAU : Relation manquante pour les notifications Push
+  // 🔥 NOUVEAU : Relation manquante pour les notifications Push & Préférences
   pushSubscriptions     PushSubscription[] @relation("UserPushSubscriptions")
+  preferences           UserPreference?
 
   expensesEngaged    Expense[] @relation("ExpenseEngagedBy")
   expensesValidated  Expense[] @relation("ExpenseValidatedBy")
@@ -584,8 +585,8 @@ model User {
   documentsUploaded   Document[]  @relation("DocumentUploadedBy")
   filesUploaded       FileAsset[] @relation("FileUploadedBy")
   notifications       NotificationRecipient[]
-  notificationsCreated Notification[]           @relation("NotificationCreatedBy")
-  notificationsTarget  Notification[]           @relation("NotificationUserTarget")
+  notificationsCreated Notification[]            @relation("NotificationCreatedBy")
+  notificationsTarget  Notification[]            @relation("NotificationUserTarget")
 
   ledgerEntriesCreated LedgerEntry[]         @relation("LedgerEntryCreatedBy")
   projectionsCreated   FinancialProjection[] @relation("ProjectionCreatedBy")
@@ -1082,7 +1083,7 @@ model Project {
   createdByUserId String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
-  archivedAt      DateTime?
+  archivedAt       DateTime?
 
   association    Association @relation(fields: [associationId], references: [id], onDelete: Cascade)
   antenna        Antenna?    @relation(fields: [antennaId], references: [id], onDelete: SetNull)
@@ -1122,15 +1123,15 @@ model ProjectAttachment {
 
 model ProjectUpdate {
   id              String    @id @default(cuid())
-  projectId        String
+  projectId       String
   authorUserId    String
   title           String?
   body            String
   progressPercent Int? 
   published       Boolean   @default(true)
   publishedAt     DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author  User    @relation("ProjectUpdateAuthor", fields: [authorUserId], references: [id], onDelete: Restrict)
@@ -1145,9 +1146,9 @@ model ProjectUpdateAttachment {
   id              String   @id @default(cuid())
   projectUpdateId String
   fileId          String
-  caption          String?
-  sortOrder        Int      @default(0)
-  createdAt        DateTime @default(now())
+  caption         String?
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
 
   projectUpdate ProjectUpdate @relation(fields: [projectUpdateId], references: [id], onDelete: Cascade)
   file          FileAsset     @relation(fields: [fileId], references: [id], onDelete: Cascade)  
@@ -1251,7 +1252,7 @@ model EventAttendance {
   eventId   String
   userId    String
   status    AttendanceStatus @default(INVITED)
-  updatedAt DateTime           @updatedAt
+  updatedAt DateTime         @updatedAt
 
   event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
   user  User  @relation("EventParticipant", fields: [userId], references: [id], onDelete: Cascade)
@@ -1292,7 +1293,7 @@ model NewsPost {
   title    String
   slug     String?
   excerpt  String?
-  content  String 
+  content  String  
   isPinned Boolean @default(false)
 
   coverImageFileId  String?
@@ -1310,7 +1311,7 @@ model NewsPost {
   createdByUser   User  @relation("NewsPostCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
   publishedByUser User? @relation("NewsPostPublishedBy", fields: [publishedByUserId], references: [id], onDelete: SetNull)
 
-  coverImageFile FileAsset?            @relation("NewsPostCoverImage", fields: [coverImageFileId], references: [id], onDelete: SetNull)
+  coverImageFile FileAsset?             @relation("NewsPostCoverImage", fields: [coverImageFileId], references: [id], onDelete: SetNull)
   attachments    NewsPostAttachment[]
 
   @@unique([associationId, slug])
@@ -1411,7 +1412,7 @@ model FileAsset {
   eventCoverFor        Event[]        @relation("EventCover")
   sponsorLogoFor       Sponsor[]      @relation("SponsorLogo")
 
-  proposalAttachments     ProjectProposalAttachment[]
+  proposalAttachments      ProjectProposalAttachment[]
   projectAttachments       ProjectAttachment[]
   projectUpdateAttachments ProjectUpdateAttachment[]
   newsAttachments          NewsPostAttachment[]
@@ -1451,11 +1452,11 @@ model Notification {
 }
 
 model NotificationRecipient {
-  id              String                   @id @default(cuid())
-  notificationId String
+  id               String                   @id @default(cuid())
+  notificationId  String
   userId          String
-  channel         NotificationChannel        @default(IN_APP)
-  deliveryStatus NotificationDeliveryStatus @default(PENDING)
+  channel          NotificationChannel        @default(IN_APP)
+  deliveryStatus  NotificationDeliveryStatus @default(PENDING)
   sentAt          DateTime?
   failedAt        DateTime?
   failureReason   String?
@@ -1544,7 +1545,7 @@ model AntennaSetting {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  antenna        Antenna @relation(fields: [antennaId], references: [id], onDelete: Cascade)
+  antenna       Antenna @relation(fields: [antennaId], references: [id], onDelete: Cascade)
   updatedByUser User?   @relation("AntennaSettingUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([antennaId, key])
@@ -1604,10 +1605,10 @@ model AuditLog {
   targetUser       User?    @relation("AuditTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
 
   associationId    String?
-  association     Association? @relation("AssociationAudit", fields: [associationId], references: [id], onDelete: Cascade)
+  association      Association? @relation("AssociationAudit", fields: [associationId], references: [id], onDelete: Cascade)
 
   antennaId        String?
-  antenna         Antenna?     @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  antenna          Antenna?     @relation(fields: [antennaId], references: [id], onDelete: SetNull)
 
   @@index([associationId, createdAt])
   @@index([actorUserId, createdAt])
@@ -1637,22 +1638,39 @@ model VirtualCard {
 }
 
 /// =========================
-/// PUSH NOTIFICATIONS
+/// PUSH NOTIFICATIONS & PREFERENCES
 /// =========================
 
 model PushSubscription {
-  id        String   @id @default(cuid())
-  userId    String
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  endpoint       String    @unique
+  p256dh         String
+  auth           String
+  expirationTime DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   user User @relation("UserPushSubscriptions", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("push_subscriptions")
+}
+
+model UserPreference {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  emailNotifications Boolean  @default(true)
+  smsNotifications   Boolean  @default(false)
+  pushNotifications  Boolean  @default(false)
+  language           String   @default("fr")
+  theme              String   @default("system")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 //npx prisma generate
 //npx prisma db push

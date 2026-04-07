@@ -1,4 +1,4 @@
-//web/lib/i18n.ts
+// web/lib/i18n.ts
 'use client';
 
 import i18n from 'i18next';
@@ -12,11 +12,10 @@ import es from '../locales/es.json';
 import ff from '../locales/ff.json';
 import ar from '../locales/ar.json';
 
-/**
- * IMPORTANT
- * Évite la double initialisation avec Next.js App Router + HMR
- */
-if (!i18n.isInitialized) {
+// Évite la double initialisation en production (Hot Reload)
+const isInitialized = i18n.isInitialized;
+
+if (!isInitialized) {
   i18n
     .use(LanguageDetector)
     .use(initReactI18next)
@@ -29,22 +28,20 @@ if (!i18n.isInitialized) {
         ff: { translation: ff },
         ar: { translation: ar },
       },
-
       fallbackLng: 'fr',
-      lng: 'fr',
-
       interpolation: {
         escapeValue: false,
       },
-
       detection: {
         order: ['localStorage', 'navigator', 'htmlTag'],
+        lookupLocalStorage: 'i18nextLng',
         caches: ['localStorage'],
       },
-
       react: {
         useSuspense: false,
       },
+      // 🔥 IMPORTANT : Ne pas charger de langue au démarrage si détectée
+      load: 'languageOnly',
     });
 }
 

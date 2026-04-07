@@ -5,8 +5,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { json, urlencoded } from 'express';
 import * as path from 'path';
 import * as express from 'express';
-import * as cookieParser from 'cookie-parser';
+import cookieParser = require('cookie-parser');
 import { AppModule } from './app.module';
+
+// Importations ajoutées pour les notifications Push (VAPID)
+import { configureVapid } from './config/vapid.config';
+import { PushService } from './modules/notifications/push.service';
 
 // Polyfill BigInt pour la sérialisation JSON (Prisma)
 declare global {
@@ -88,6 +92,13 @@ function isAllowedOrigin(origin: string | undefined, allowedOrigins: string[]): 
 async function bootstrap() {
   // Création de l'application sans CORS par défaut pour le configurer manuellement
   const app = await NestFactory.create(AppModule, { cors: false });
+
+  // Configure VAPID pour les notifications push
+  const vapidEnabled = configureVapid();
+  
+  // Injecte l'état VAPID dans le PushService
+  const pushService = app.get(PushService);
+  pushService.setVapidEnabled(vapidEnabled);
 
   // Préfixe global pour toutes les routes
   app.setGlobalPrefix('api');
