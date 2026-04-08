@@ -36,8 +36,9 @@ class EnvVars {
   @IsOptional() @IsString() MAIL_PASS?: string;
   @IsOptional() @IsString() MAIL_FROM?: string;
 
-  // Stockage
-  @IsOptional() @IsIn(['local', 's3']) STORAGE_DRIVER?: 'local' | 's3';
+  // Stockage (👈 CORRIGÉ : Ajout de Cloudinary et UPLOAD_DRIVER)
+  @IsOptional() @IsIn(['local', 's3', 'cloudinary']) STORAGE_DRIVER?: 'local' | 's3' | 'cloudinary';
+  @IsOptional() @IsIn(['local', 's3', 'cloudinary']) UPLOAD_DRIVER?: 'local' | 's3' | 'cloudinary';
   @IsOptional() @IsString() LOCAL_UPLOAD_DIR?: string;
   @IsOptional() @IsString() S3_BUCKET?: string;
 
