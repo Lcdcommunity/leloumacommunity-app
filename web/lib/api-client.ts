@@ -484,6 +484,7 @@ export const api = {
     firstName: string;
     lastName: string;
     email: string;
+    password?: string;
     phone?: string;
     city?: string;
     country?: string;
@@ -491,8 +492,34 @@ export const api = {
     originVillage?: string;
     professionalStatus?: string;
     function?: string;
+    birthDate?: string;
+    placeOfBirth?: string;
+    birthCountry?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    postalCode?: string;
   }) =>
-    http<{ message: string; user: UserSummary; temporaryPassword: string }>('/admin/members', { method: 'POST', body }),
+    http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),
+
+  // 👇 AJOUT CHIRURGICAL: ROUTE UPDATE MEMBER
+  updateAntennaMember: (id: string, body: Partial<{
+    firstName: string;
+    lastName: string;
+    phone: string;
+    professionalStatus: string;
+    function: string;
+    birthDate: string;
+    placeOfBirth: string;
+    birthCountry: string;
+    originSubPrefecture: string;
+    originVillage: string;
+    addressLine1: string;
+    addressLine2: string;
+    postalCode: string;
+    city: string;
+    country: string;
+  }>) =>
+    http<UserSummary, typeof body>(`/admin/members/${id}`, { method: 'PATCH', body }),
 
   suspendUser: (id: string) =>
     http(`/admin/members/${id}/suspend`, { method: 'PATCH' }),
@@ -665,7 +692,7 @@ export const api = {
     summary?: string;
     description?: string;
     locationText?: string;
-    promoterName?: string;
+    promomerName?: string;
     status?: string;
     budgetPlanned?: number;
     budgetSpent?: number;

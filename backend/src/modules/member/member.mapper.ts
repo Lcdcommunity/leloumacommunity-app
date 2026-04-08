@@ -94,6 +94,7 @@ export const memberMapper = {
       
       birthDate: toIso(u.birthDate),
       placeOfBirth: u.placeOfBirth ?? null,
+      birthCountry: u.birthCountry ?? null, // 🔥 Ajout de birthCountry
       countryOfBirth: u.countryOfBirth ?? null,
       professionalStatus: u.professionalStatus ?? null,
       function: u.function ?? null,

@@ -1,3 +1,4 @@
+//backend/src/modules/contributions/contributions.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -26,6 +27,7 @@ type CreateContributionInputCompat = CreateContributionDto & {
   reference?: string;
   receiptFileAssetId?: string | null;
   targetMemberId?: string;
+  currency?: string;
 };
 
 @Injectable()
@@ -75,7 +77,10 @@ export class ContributionsService {
       );
     }
 
+    // 🔥 CORRECTION : Priorité stricte à la devise envoyée par le frontend
+    const rawCurrency = dto.currency ?? incoming.currency;
     const resolvedCurrency =
+      rawCurrency ??
       membership.antenna.defaultCurrency ??
       membership.association.defaultCurrency ??
       'EUR';
@@ -93,6 +98,7 @@ export class ContributionsService {
     let finalAntennaId = dto.antennaId;
     let submitterId: string | null = null;
 
+    // 🔥 CORRECTION : Détection fiable de l'antenne du bénéficiaire
     if (
       incoming.targetMemberId &&
       incoming.targetMemberId !== actor.id
@@ -104,9 +110,8 @@ export class ContributionsService {
         },
         include: {
           memberships: {
-            orderBy: {
-              createdAt: 'desc',
-            },
+            where: { isPrimary: true, status: 'APPROVED' }, // On s'assure de prendre l'antenne valide du bénéficiaire
+            take: 1,
           },
         },
       });
@@ -116,8 +121,7 @@ export class ContributionsService {
         submitterId = actor.id;
 
         if (target.memberships.length > 0) {
-          finalAntennaId =
-            target.memberships[0].antennaId;
+          finalAntennaId = target.memberships[0].antennaId;
         }
       }
     }
@@ -406,12 +410,20 @@ export class ContributionsService {
     });
   }
 
+  // 🔥 CORRECTION : L'historique ramène les cotisations payées ET les cotisations effectuées pour autrui
   async listMine(actor: AuthUser) {
     return this.prisma.contribution.findMany({
       where: {
-        memberUserId: actor.id,
-        associationId:
-          actor.associationId,
+        associationId: actor.associationId,
+        OR: [
+          { memberUserId: actor.id },
+          { submitterUserId: actor.id }
+        ]
+      },
+      include: {
+        member: true, // Requis par ton front pour afficher "Pour: X"
+        submitter: true, // Requis par ton front pour afficher "Payé par: Y"
+        antenna: true,
       },
       orderBy: {
         submittedAt: 'desc',

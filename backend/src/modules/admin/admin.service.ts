@@ -201,7 +201,7 @@ export class AdminService {
     };
   }
 
-  // 🔥 CRÉATION DE MEMBRE SANS "originVillage" PUISQU'IL N'EST PAS DANS LE SCHEMA
+  // 🔥 CRÉATION DE MEMBRE (AVEC TOUS LES CHAMPS ET MDP MANUEL)
   async createMember(adminId: string, data: CreateMemberDto) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     
@@ -211,9 +211,8 @@ export class AdminService {
       throw new ConflictException("Cet email est déjà utilisé.");
     }
 
-    // Mot de passe temporaire
-    const defaultPassword = "lcd" + Math.floor(10000 + Math.random() * 90000).toString();
-    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+    // Le mot de passe provient de l'admin (data.password)
+    const passwordHash = await bcrypt.hash(data.password, 10);
 
     const newUser = await this.prisma.user.create({
       data: {
@@ -224,10 +223,15 @@ export class AdminService {
         phone: data.phone,
         city: data.city,
         country: data.country,
+        postalCode: data.postalCode,
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
         originSubPrefecture: data.originSubPrefecture,
-        // originVillage retiré car inexistant dans ton schema.prisma
         professionalStatus: data.professionalStatus,
         function: data.function,
+        birthDate: data.birthDate ? new Date(data.birthDate) : null,
+        placeOfBirth: data.placeOfBirth,
+        countryOfBirth: data.birthCountry, // 🔥 CORRECTION : mappage vers countryOfBirth au lieu de birthCountry
         role: UserRole.MEMBER,
         status: UserStatus.ACTIVE, // 🔥 ACTIF IMMÉDIATEMENT
         associationId,
@@ -251,8 +255,7 @@ export class AdminService {
 
     return { 
       message: "Membre créé avec succès.",
-      user: memberMapper.userSummary(newUser),
-      temporaryPassword: defaultPassword
+      user: memberMapper.userSummary(newUser)
     };
   }
 
@@ -314,7 +317,7 @@ export class AdminService {
     });
   }
 
-  // 🔥 MISE À JOUR SANS "originVillage" PUISQU'IL N'EST PAS DANS LE SCHEMA
+  // 🔥 MISE À JOUR SANS "originVillage" NI "birthCountry" PUISQU'ILS N'EXISTENT PAS DANS LE SCHEMA
   async updateAntennaMember(userId: string, adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
@@ -335,6 +338,11 @@ export class AdminService {
         ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
         ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
         ...(data.originSubPrefecture !== undefined ? { originSubPrefecture: data.originSubPrefecture } : {}),
+        ...(data.professionalStatus !== undefined ? { professionalStatus: data.professionalStatus } : {}),
+        ...(data.function !== undefined ? { function: data.function } : {}),
+        ...(data.birthDate !== undefined ? { birthDate: data.birthDate ? new Date(data.birthDate) : null } : {}),
+        ...(data.placeOfBirth !== undefined ? { placeOfBirth: data.placeOfBirth } : {}),
+        ...(data.birthCountry !== undefined ? { countryOfBirth: data.birthCountry } : {}), // 🔥 CORRECTION
       } 
     });
   }

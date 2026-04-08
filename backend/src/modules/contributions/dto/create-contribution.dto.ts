@@ -13,10 +13,10 @@ export class CreateContributionDto {
   @IsEnum(CurrencyCode)
   currency?: CurrencyCode;
 
+  @IsOptional()
   @IsEnum(PaymentMethod)
-  paymentMethod!: PaymentMethod;
+  paymentMethod?: PaymentMethod;
 
-  // 👇 AJOUT CHIRURGICAL ICI AUSSI 👇
   @IsOptional()
   @IsEnum(ContributionPurpose)
   purpose?: ContributionPurpose;
@@ -46,4 +46,29 @@ export class CreateContributionDto {
   @IsOptional()
   @IsString()
   proofFileId?: string;
+
+  // 👇 AJOUTS CHIRURGICAUX : Pour que NestJS ne supprime pas les données envoyées par ton Frontend
+  @IsOptional()
+  @IsString()
+  targetMemberId?: string;
+
+  @IsOptional()
+  @IsString()
+  method?: string;
+
+  @IsOptional()
+  @IsString()
+  depositedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+
+  @IsOptional()
+  @IsString()
+  reference?: string;
+
+  @IsOptional()
+  @IsString()
+  receiptFileAssetId?: string;
 }
