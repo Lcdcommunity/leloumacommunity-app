@@ -5,7 +5,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type EventItem } from '../../../../lib/api-client';
 
-// 👇 CORRECTION CHIRURGICALE : Création de l'interface pour éliminer le 'any'
 interface AttendanceItem {
   id: string;
   status: string;
@@ -50,6 +49,12 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // 👇 CORRECTION : Blocage du scroll de l'arrière-plan quand le modal est ouvert
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = 'unset'; };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
@@ -175,8 +180,8 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 
             <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid #E2E8F0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}>
-                <input type="checkbox" checked={isOnline} onChange={e => setIsOnline(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#2563EB' }} />
-                <span style={{ fontWeight: 700, color: '#374151' }}>Événement en ligne (Visio)</span>
+                <input type="checkbox" checked={isOnline} onChange={e => setIsOnline(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#2563EB' }} id="cb-online" />
+                <label htmlFor="cb-online" style={{ fontWeight: 700, color: '#374151', cursor: 'pointer', textTransform: 'none', fontSize: '0.9rem' }}>Événement en ligne (Visio)</label>
               </div>
               {isOnline ? (
                 <div className="aev-field"><label>Lien de la réunion</label><input type="url" className="aev-input" value={meetingLink} onChange={e => setMeetingLink(e.target.value)} placeholder="https://meet..." /></div>
@@ -200,18 +205,22 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 // MODAL : GESTION DES PRÉSENCES (FILTRE OUI / NON)
 // ----------------------------------------------------------------------
 function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => void }) {
-  const [filter, setFilter] = useState<'all' | 'attending' | 'absent'>('all');
-  
-  // 👇 ICI: Utilisation de notre interface au lieu de 'any'
+  const [filter, setFilter] = useState<'ALL' | 'ATTENDING' | 'ABSENT'>('ALL');
   const [attendances, setAttendances] = useState<AttendanceItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 👇 CORRECTION : Blocage du scroll de l'arrière-plan
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = 'unset'; };
+  }, []);
 
   useEffect(() => {
     async function loadAttendances() {
       setLoading(true);
       try {
         const res = await api.listEventAttendances(event.id, { 
-          status: filter === 'all' ? undefined : filter,
+          status: filter === 'ALL' ? undefined : filter,
           pageSize: 100 
         });
         setAttendances(res.items as unknown as AttendanceItem[]);
@@ -238,9 +247,9 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
 
         <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
           <div className="aev-tabs">
-            <button className={`aev-tab ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>Toutes les réponses</button>
-            <button className={`aev-tab ${filter === 'attending' ? 'active' : ''}`} onClick={() => setFilter('attending')} style={filter === 'attending' ? { color: '#059669', borderColor: '#059669', background: '#ECFDF5' } : {}}>✅ Présents</button>
-            <button className={`aev-tab ${filter === 'absent' ? 'active' : ''}`} onClick={() => setFilter('absent')} style={filter === 'absent' ? { color: '#DC2626', borderColor: '#DC2626', background: '#FEF2F2' } : {}}>❌ Absents</button>
+            <button className={`aev-tab ${filter === 'ALL' ? 'active' : ''}`} onClick={() => setFilter('ALL')}>Toutes les réponses</button>
+            <button className={`aev-tab ${filter === 'ATTENDING' ? 'active' : ''}`} onClick={() => setFilter('ATTENDING')} style={filter === 'ATTENDING' ? { color: '#059669', borderColor: '#059669', background: '#ECFDF5' } : {}}>✅ Présents</button>
+            <button className={`aev-tab ${filter === 'ABSENT' ? 'active' : ''}`} onClick={() => setFilter('ABSENT')} style={filter === 'ABSENT' ? { color: '#DC2626', borderColor: '#DC2626', background: '#FEF2F2' } : {}}>❌ Absents</button>
           </div>
         </div>
 
@@ -258,7 +267,7 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
                     <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 2 }}>{att.user.email} {att.user.phone ? `• ${att.user.phone}` : ''}</div>
                   </div>
                   <div>
-                    {att.status === 'attending' ? (
+                    {att.status === 'ATTENDING' ? (
                       <span style={{ display: 'inline-block', padding: '0.3rem 0.8rem', background: '#D1FAE5', color: '#065F46', borderRadius: 99, fontSize: '0.75rem', fontWeight: 800 }}>Participent</span>
                     ) : (
                       <span style={{ display: 'inline-block', padding: '0.3rem 0.8rem', background: '#FEE2E2', color: '#991B1B', borderRadius: 99, fontSize: '0.75rem', fontWeight: 800 }}>Absents</span>
@@ -289,11 +298,9 @@ export default function AdminEventsPage() {
     setLoading(true);
     try { 
       const res = await api.listEvents(); 
-      // 👇 AJOUT CHIRURGICAL : Le "|| []" protège l'appli si res.items est undefined
       setItems(res?.items || []); 
     } catch (err) { 
       console.error(err); 
-      // 👇 Sécurité supplémentaire en cas d'erreur API
       setItems([]); 
     } finally { 
       setLoading(false); 
@@ -304,118 +311,145 @@ export default function AdminEventsPage() {
 
   return (
     <AppShell title="Événements">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@500;600;700;800&display=swap');
-        .aev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1000px; margin: 0 auto; }
-        .aev-header { margin-bottom: 1.5rem; }
-        .aev-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: #111827; margin: 0; }
-        .aev-title span { color: #2563EB; }
-        .aev-panel { background: white; border-radius: 20px; border: 1px solid #BFDBFE; box-shadow: 0 4px 20px rgba(37,99,235,0.05); overflow: hidden; }
-        .aev-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid #DBEAFE; display: flex; justify-content: space-between; align-items: center; background: #EFF6FF; }
-        .aev-new-btn { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: transform 0.15s; }
-        .aev-new-btn:hover { transform: translateY(-1px); }
-        .aev-table { width: 100%; border-collapse: collapse; }
-        .aev-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; }
-        .aev-row { border-top: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
-        .aev-row:hover { background: #F8FAFC; }
-        .aev-table td { padding: 1rem 1.4rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; }
-        .aev-status { padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid rgba(0,0,0,0.05); }
-        
-        /* BOUTONS D'ACTION & TABS (AJOUTS POUR LES PRÉSENCES) */
-        .aev-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.3rem; }
-        .aev-action-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
-        .aev-action-btn.primary { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
-        .aev-action-btn.primary:hover { background: #DBEAFE; }
-        
-        .aev-tabs { display: flex; gap: 0.5rem; background: #E2E8F0; padding: 0.25rem; border-radius: 10px; }
-        .aev-tab { flex: 1; text-align: center; padding: 0.5rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; color: #6B7280; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.15s; }
-        .aev-tab:hover { color: #374151; }
-        .aev-tab.active { background: white; color: #111827; border-color: #D1D5DB; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+      <div style={{ width: '100%', overflowX: 'hidden' }}>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@500;600;700;800&display=swap');
+          
+          /* 👇 CORRECTION : Sécurisation du layout principal */
+          .aev-wrap { 
+            font-family: 'DM Sans', sans-serif; 
+            padding: clamp(1rem, 3vw, 2rem); 
+            width: 100%;
+            max-width: 1000px; 
+            margin: 0 auto; 
+            box-sizing: border-box;
+          }
+          
+          .aev-header { margin-bottom: 1.5rem; }
+          .aev-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: #111827; margin: 0; }
+          .aev-title span { color: #2563EB; }
+          
+          .aev-panel { 
+            background: white; 
+            border-radius: 20px; 
+            border: 1px solid #BFDBFE; 
+            box-shadow: 0 4px 20px rgba(37,99,235,0.05); 
+            width: 100%;
+            overflow: hidden; 
+            box-sizing: border-box;
+          }
+          
+          .aev-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid #DBEAFE; display: flex; justify-content: space-between; align-items: center; background: #EFF6FF; }
+          .aev-new-btn { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: transform 0.15s; }
+          
+          /* 👇 CORRECTION : Container du tableau scrolable sans casser la page */
+          .aev-table-container {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+          }
 
-        .aev-modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
-        .aev-modal { background: white; width: 100%; max-width: 500px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
-        .aev-modal-head { padding: 1.25rem 1.5rem; background: #EFF6FF; border-bottom: 1px solid #BFDBFE; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .aev-modal-close { background: white; border: 1px solid #BFDBFE; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1D4ED8; }
-        .aev-modal-body { padding: 1.5rem; overflow-y: auto; }
-        .aev-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-        .aev-field { display: flex; flex-direction: column; gap: 0.35rem; }
-        .aev-field label { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; color: #1D4ED8; }
-        .aev-field label span { color: #9CA3AF; }
-        .aev-input, .aev-select { height: 42px; border-radius: 10px; border: 1px solid #D1D5DB; padding: 0 1rem; font-family: 'DM Sans'; font-size: 0.88rem; font-weight: 600; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
-        .aev-input:focus, .aev-select:focus { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
-        .aev-select { appearance: none; padding-right: 2.2rem; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.8rem center; cursor: pointer; }
-        
-        .aev-info-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 0.8rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem; }
-        .aev-info-lbl { font-size: 0.65rem; font-weight: 800; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; }
-        .aev-info-val { font-size: 0.9rem; font-weight: 600; color: #111827; white-space: pre-wrap; line-height: 1.4; }
+          .aev-table { width: 100%; border-collapse: collapse; min-width: 400px; }
+          .aev-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; white-space: nowrap; }
+          .aev-row { border-top: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
+          .aev-row:hover { background: #F8FAFC; }
+          .aev-table td { padding: 1rem 1.4rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; }
+          .aev-status { padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid rgba(0,0,0,0.05); white-space: nowrap; }
+          
+          .aev-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+          .aev-action-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
+          .aev-action-btn.primary { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+          
+          .aev-tabs { display: flex; gap: 0.5rem; background: #E2E8F0; padding: 0.25rem; border-radius: 10px; }
+          .aev-tab { flex: 1; text-align: center; padding: 0.5rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; color: #6B7280; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.15s; }
+          .aev-tab.active { background: white; color: #111827; border-color: #D1D5DB; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-        .aev-btn-submit { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; transition: transform 0.15s; }
-        .aev-btn-cancel { background: white; border: 1px solid #D1D5DB; color: #4B5563; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 700; cursor: pointer; }
-        .aev-btn-del { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; }
+          /* 👇 CORRECTION : Styles des modaux sécurisés */
+          .aev-modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
+          .aev-modal { background: white; width: 100%; max-width: 500px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+          .aev-modal-head { padding: 1.25rem 1.5rem; background: #EFF6FF; border-bottom: 1px solid #BFDBFE; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+          .aev-modal-close { background: white; border: 1px solid #BFDBFE; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1D4ED8; flex-shrink: 0; }
+          
+          /* 👇 CORRECTION : Overflow uniquement dans le body du modal */
+          .aev-modal-body { padding: 1.5rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+          
+          .aev-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+          .aev-field { display: flex; flex-direction: column; gap: 0.35rem; }
+          .aev-field label { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; color: #1D4ED8; }
+          .aev-input, .aev-select { width: 100%; box-sizing: border-box; height: 42px; border-radius: 10px; border: 1px solid #D1D5DB; padding: 0 1rem; font-family: 'DM Sans'; font-size: 0.88rem; font-weight: 600; outline: none; }
+          .aev-input:focus, .aev-select:focus { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+          
+          .aev-btn-submit { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; }
+          .aev-btn-cancel { background: white; border: 1px solid #D1D5DB; color: #4B5563; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+          
+          @media (max-width: 600px) { 
+            .aev-grid-2 { grid-template-columns: 1fr; } 
+            .hide-mobile { display: none; } 
+            .aev-actions-td > div { flex-direction: column; align-items: flex-end; } 
+          }
+        `}</style>
         
-        @keyframes aescale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @media (max-width: 600px) { .aev-grid-2 { grid-template-columns: 1fr; } .hide-mobile { display: none; } .aev-actions-td { display: flex; flex-direction: column; gap: 0.4rem; } }
-      `}</style>
-      <div className="aev-wrap">
-        <div className="aev-header"><h1 className="aev-title">Calendrier des <span>Événements</span></h1></div>
-        <div className="aev-panel">
-          <div className="aev-panel-head">
-            <span style={{ fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', fontSize: '0.8rem' }}>Agenda</span>
-            <button className="aev-new-btn" onClick={() => setModalState({ isOpen: true })}>+ Organiser</button>
-          </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table className="aev-table">
-              <thead>
-                <tr>
-                  <th>Titre</th>
-                  <th className="hide-mobile">Date & Heure</th>
-                  <th>Statut</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>Chargement des événements...</td></tr>
-                ) : items.length === 0 ? (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>Aucun événement enregistré.</td></tr>
-                ) : (
-                  items.map(e => {
-                    const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
-                    return (
-                      <tr key={e.id} className="aev-row" onClick={() => setModalState({ isOpen: true, event: e })}>
-                        <td>{e.title} <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: 2 }}>{TYPE_MAP[e.type]}</div></td>
-                        <td className="hide-mobile" style={{ color: '#374151' }}>{formatDateTime(e.startsAt)}</td>
-                        <td>
-                          <span className="aev-status" style={{ background: s.bg, color: s.color }}>
-                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }}/> {s.label}
-                          </span>
-                        </td>
-                        <td className="aev-actions-td" style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              {e.type === 'ANTENNA_MEETING' && (
-                                <button className="aev-action-btn primary" onClick={(ev) => { ev.stopPropagation(); setAttendanceModal({ isOpen: true, event: e }); }}>
-                                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                                  Présences
+        <div className="aev-wrap">
+          <div className="aev-header"><h1 className="aev-title">Calendrier des <span>Événements</span></h1></div>
+          <div className="aev-panel">
+            <div className="aev-panel-head">
+              <span style={{ fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', fontSize: '0.8rem' }}>Agenda</span>
+              <button className="aev-new-btn" onClick={() => setModalState({ isOpen: true })}>+ Organiser</button>
+            </div>
+            
+            <div className="aev-table-container">
+              <table className="aev-table">
+                <thead>
+                  <tr>
+                    <th>Titre</th>
+                    <th className="hide-mobile">Date & Heure</th>
+                    <th>Statut</th>
+                    <th style={{ textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>Chargement des événements...</td></tr>
+                  ) : items.length === 0 ? (
+                    <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>Aucun événement enregistré.</td></tr>
+                  ) : (
+                    items.map(e => {
+                      const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
+                      return (
+                        <tr key={e.id} className="aev-row" onClick={() => setModalState({ isOpen: true, event: e })}>
+                          <td>{e.title} <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: 2 }}>{TYPE_MAP[e.type]}</div></td>
+                          <td className="hide-mobile" style={{ color: '#374151' }}>{formatDateTime(e.startsAt)}</td>
+                          <td>
+                            <span className="aev-status" style={{ background: s.bg, color: s.color }}>
+                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }}/> {s.label}
+                            </span>
+                          </td>
+                          <td className="aev-actions-td" style={{ textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                {e.type === 'ANTENNA_MEETING' && (
+                                  <button className="aev-action-btn primary" onClick={(ev) => { ev.stopPropagation(); setAttendanceModal({ isOpen: true, event: e }); }}>
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                    Présences
+                                  </button>
+                                )}
+                                <button className="aev-action-btn" onClick={(ev) => { ev.stopPropagation(); setModalState({ isOpen: true, event: e }); }}>
+                                  Détails
                                 </button>
-                              )}
-                              <button className="aev-action-btn" onClick={(ev) => { ev.stopPropagation(); setModalState({ isOpen: true, event: e }); }}>
-                                Détails
-                              </button>
-                            </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
+                              </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
+        
+        {modalState.isOpen && <EventModal event={modalState.event} onClose={() => setModalState({ isOpen: false })} onSuccess={() => { setModalState({ isOpen: false }); void load(); }} />}
+        {attendanceModal.isOpen && attendanceModal.event && <AttendanceModal event={attendanceModal.event} onClose={() => setAttendanceModal({ isOpen: false })} />}
       </div>
-      
-      {modalState.isOpen && <EventModal event={modalState.event} onClose={() => setModalState({ isOpen: false })} onSuccess={() => { setModalState({ isOpen: false }); void load(); }} />}
-      {attendanceModal.isOpen && attendanceModal.event && <AttendanceModal event={attendanceModal.event} onClose={() => setAttendanceModal({ isOpen: false })} />}
-      
     </AppShell>
   );
 }

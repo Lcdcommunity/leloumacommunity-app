@@ -30,22 +30,32 @@ export class EventsService {
     // Restrictions selon le rôle (Adapté pour la relation Many-to-Many 'antennas')
     if (role === UserRole.MEMBER) {
       where.status = EventStatus.PUBLISHED; 
+      
+      // Un membre ne voit l'événement que s'il est global (aucune antenne)
+      // OU s'il cible son antenne
+      // OU s'il a été explicitement invité (via EventAttendance)
+      const memberOrCondition: Prisma.EventWhereInput[] = [
+        { antennas: { none: {} } }, // Événement global
+        { attendees: { some: { userId: user.id } } } // Invité spécifiquement
+      ];
+      
       if (antennaId) {
-        where.AND = [
-          { associationId: associationId },
-          {
-            OR: [
-              { antennas: { none: {} } }, // Événements globaux (aucune antenne spécifiée)
-              { antennas: { some: { id: antennaId } } } // Événements ciblant son antenne
-            ]
-          }
-        ];
-      } else {
-        where.antennas = { none: {} }; // Un membre sans antenne ne voit que le global
+        memberOrCondition.push({ 
+          antennas: { 
+            some: { 
+              id: { equals: antennaId } 
+            } 
+          } 
+        });
       }
+
+      where.AND = [
+        { associationId: associationId },
+        { OR: memberOrCondition }
+      ];
     } else if (role === UserRole.ANTENNA_ADMIN) {
       if (antennaId) {
-        where.antennas = { some: { id: antennaId } };
+        where.antennas = { some: { id: { equals: antennaId } } }; 
       }
     }
 
@@ -91,7 +101,6 @@ export class EventsService {
         include: {
           user: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } }
         },
-        // 👇 CORRECTION 1 : updatedAt au lieu de createdAt
         orderBy: { updatedAt: 'desc' }
       })
     ]);
@@ -117,11 +126,22 @@ export class EventsService {
       connectAntennas = [{ id: user.memberships[0].antennaId }];
     }
 
+    // Gestion des invitations spécifiques (Membres sélectionnés manuellement)
+    // @ts-expect-error : Le DTO strict ne connaît pas encore "inviteAll"
+    const inviteAll = dto.inviteAll !== false; 
+    // @ts-expect-error
+    const specificMemberIds: string[] = dto.memberIds || [];
+    
+    let attendeesCreation = {};
+    if (!inviteAll && specificMemberIds.length > 0) {
+      attendeesCreation = {
+        create: specificMemberIds.map(mId => ({ userId: mId, status: AttendanceStatus.INVITED }))
+      };
+    }
+
     return this.prisma.event.create({
       data: {
-        // 👇 CORRECTION : Utilisation de "connect" pour la relation association !
         association: { connect: { id: associationId } },
-        
         title: dto.title,
         description: dto.description,
         type: (dto.type as EventType) || EventType.OTHER,
@@ -132,9 +152,8 @@ export class EventsService {
         isOnline: dto.isOnline || false,
         meetingLink: dto.meetingLink,
         ...(dto.coverImageId ? { coverImage: { connect: { id: dto.coverImageId } } } : {}),
-        
-        // 👇 On ne connecte les antennes que si la liste n'est pas vide
-        ...(connectAntennas.length > 0 ? { antennas: { connect: connectAntennas } } : {})
+        ...(connectAntennas.length > 0 ? { antennas: { connect: connectAntennas } } : {}),
+        ...(Object.keys(attendeesCreation).length > 0 ? { attendees: attendeesCreation } : {})
       }
     });
   }
@@ -170,12 +189,28 @@ export class EventsService {
       locationText: dto.locationText,
       isOnline: dto.isOnline,
       meetingLink: dto.meetingLink,
-      // 👇 CORRECTION 2 : Syntaxe relationnelle Prisma stricte
       ...(dto.coverImageId ? { coverImage: { connect: { id: dto.coverImageId } } } : {})
     };
 
     if (user?.role === UserRole.SUPER_ADMIN && dto.antennaIds) {
       updateData.antennas = { set: dto.antennaIds.map(id => ({ id })) };
+    }
+
+    // Gestion de la modification des invitations spécifiques
+    // @ts-expect-error
+    const inviteAll = dto.inviteAll;
+    // @ts-expect-error
+    const specificMemberIds: string[] = dto.memberIds;
+
+    if (inviteAll === false && specificMemberIds) {
+      updateData.attendees = {
+        deleteMany: {}, // Efface tout
+        create: specificMemberIds.map(mId => ({ userId: mId, status: AttendanceStatus.INVITED })) // Recrée
+      };
+    } else if (inviteAll === true) {
+      updateData.attendees = {
+        deleteMany: {}
+      };
     }
 
     return this.prisma.event.update({
