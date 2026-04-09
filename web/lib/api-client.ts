@@ -124,6 +124,11 @@ export interface EventItem {
   isOnline: boolean;
   meetingLink?: string | null;
   createdAt: string;
+  // Ajout chirurgical: Permet d'afficher les antennes ciblées (utile pour le Super-Admin)
+  antennas?: Array<{ id: string; name: string; code: string }>;
+  _count?: {
+    attendances?: number;
+  };
 }
 
 export interface Sponsor {
@@ -154,7 +159,7 @@ export const api = {
     const params = new URLSearchParams();
     if (domain) params.append('domain', domain);
     if (code) params.append('code', code);
-    
+
     return http<{
       id: string;
       name: string;
@@ -328,8 +333,7 @@ export const api = {
         members: number;
         pendingAccounts: number;
         pendingContributions: number;
-        activeProjects: number;
-        totalValidatedContributionsAmount: number;
+        activeProjects: number;        totalValidatedContributionsAmount: number;
       };
       recentPendingAccounts: UserSummary[];
       recentContributions: Contribution[];
@@ -635,7 +639,6 @@ export const api = {
     proofFileId: string | null;
   }>) =>
     http<Expense, typeof body>(`/admin/expenses/${id}`, { method: 'PATCH', body }),
-
   deleteAntennaExpense: (id: string) =>
     http(`/admin/expenses/${id}`, { method: 'DELETE' }),
 
@@ -647,7 +650,7 @@ export const api = {
     if (params?.startDate) p.append('startDate', params.startDate);
     if (params?.endDate) p.append('endDate', params.endDate);
     if (params?.antennaId) p.append('antennaId', params.antennaId);
-    
+
     return http<ApiListResponse<Expense>>(`/super-admin/expenses?${p.toString()}`);
   },
 
@@ -791,21 +794,35 @@ export const api = {
   // ==========================================
   // ÉVÉNEMENTS 
   // ==========================================
-  listEvents: (params?: { page?: number; pageSize?: number; status?: string; type?: string }) =>
+  listEvents: (params?: { page?: number; pageSize?: number; status?: string; type?: string; antennaId?: string }) =>
     http<ApiListResponse<EventItem>>(
       `/admin/events?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
-      }${params?.type ? `&type=${encodeURIComponent(params.type)}` : ''}`
+      }${params?.type ? `&type=${encodeURIComponent(params.type)}` : ''}${
+        params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''
+      }`
     ),
 
-  createEvent: (body: Partial<EventItem>) =>
+  // Ajout chirurgical : le payload de création et d'update supporte désormais une ou plusieurs antennes (Super-Admin)
+  createEvent: (body: Partial<EventItem> & { antennaIds?: string[] }) =>
     http<EventItem, typeof body>('/admin/events', { method: 'POST', body }),
 
-  updateEvent: (id: string, body: Partial<EventItem>) =>
+  updateEvent: (id: string, body: Partial<EventItem> & { antennaIds?: string[] }) =>
     http<EventItem, typeof body>(`/admin/events/${id}`, { method: 'PATCH', body }),
 
   deleteEvent: (id: string) =>
     http(`/admin/events/${id}`, { method: 'DELETE' }),
+
+  // Ajout chirurgical : Route pour récupérer et filtrer les présences d'un événement
+  listEventAttendances: (eventId: string, params?: { status?: string; page?: number; pageSize?: number }) =>
+    http<ApiListResponse<{
+      id: string;
+      status: string;
+      createdAt: string;
+      user: UserSummary;
+    }>>(`/admin/events/${eventId}/attendances?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
+      params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+    }`),
 
   registerEventAttendance: (id: string, body: { status: string }) =>
     http<{ message: string }, typeof body>(`/member/events/${id}/attendance`, { method: 'POST', body }),
@@ -895,7 +912,7 @@ export const api = {
 
   // ==========================================
   // SYSTEME
-  // ==========================================
+  // ==========================================  
   uploadFile: async (
   file: File,
   body?: {

@@ -11,6 +11,7 @@ import {
   UserRole,
   UserStatus,
   NotificationType,
+  ProjectStatus, // 🔥 AJOUT DE L'IMPORT ICI
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../../common/services/mail.service';
@@ -587,13 +588,19 @@ export class SuperAdminService {
   }
 
   async updateProject(id: string, data: any, associationId: string) {
+    // 🔥 CORRECTION CHIRURGICALE : Sécurisation blindée du statut entrant (Blind-Proof)
+    let safeStatus = data.status;
+    if (safeStatus === 'DRAFT') safeStatus = ProjectStatus.PROPOSED;
+    if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
+    if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
+
     return this.prisma.project.update({
       where: { id, associationId }, // 🔥 FILTRÉ
       data: {
         title: data.title,
         summary: data.summary,
         description: data.description,
-        status: data.status,
+        status: safeStatus, // 🔥 Utilisation de la version sécurisée
         budgetAmount: data.budgetAmount,
         amountSpent: data.amountSpent,
         startDate: data.startDate ? new Date(data.startDate) : undefined,

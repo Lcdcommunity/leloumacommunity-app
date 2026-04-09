@@ -29,7 +29,6 @@ export class EventsController {
   @Delete('admin/events/:id')
   @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
   deleteEvent(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    // 🔥 CORRECTION CHIRURGICALE : Casting du rôle pour correspondre à UserRole (Prisma)
     return this.eventsService.deleteEvent(user.associationId, id, user.role as UserRole, user.id);
   }
 
@@ -41,7 +40,6 @@ export class EventsController {
     @Query('status') status?: string,
     @Query('type') type?: string
   ) {
-    // 🔥 CORRECTION CHIRURGICALE : Casting du rôle
     return this.eventsService.listEvents(
       user.id, 
       user.role as UserRole, 
@@ -50,6 +48,25 @@ export class EventsController {
       Number(pageSize || 20), 
       status, 
       type
+    );
+  }
+
+  // 👇 AJOUT CHIRURGICAL : Route pour récupérer les présences filtrées
+  @Get('admin/events/:id/attendances')
+  @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
+  listAttendances(
+    @CurrentUser() user: AuthUser,
+    @Param('id') eventId: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+    @Query('status') status?: string
+  ) {
+    return this.eventsService.listEventAttendances(
+      user.associationId, 
+      eventId, 
+      Number(page || 1), 
+      Number(pageSize || 50), 
+      status
     );
   }
 

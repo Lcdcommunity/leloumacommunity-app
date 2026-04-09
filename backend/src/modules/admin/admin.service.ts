@@ -644,6 +644,12 @@ export class AdminService {
   async createProject(adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
 
+    // 🔥 CORRECTION CHIRURGICALE : Sécurisation blindée du statut entrant (pour contourner le cache du front)
+    let safeStatus = data.status;
+    if (safeStatus === 'DRAFT') safeStatus = ProjectStatus.PROPOSED;
+    if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
+    if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
+
     const project = await this.prisma.project.create({
       data: { 
         associationId,
@@ -663,7 +669,7 @@ export class AdminService {
         successIndicators: data.successIndicators,
         startDate: data.startsAt ? new Date(data.startsAt) : null,
         endDate: data.endsAt ? new Date(data.endsAt) : null,
-        status: data.status || ProjectStatus.APPROVED,
+        status: safeStatus || ProjectStatus.APPROVED, // Utilisation de safeStatus ici !
         createdByUserId: adminId,
         budgetAmount: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : null, 
         amountSpent: data.budgetSpent ? new Prisma.Decimal(data.budgetSpent) : 0,
@@ -687,6 +693,12 @@ export class AdminService {
     const project = await this.prisma.project.findFirst({ where: { id: projectId, antennaId, associationId } });
     if (!project) throw new NotFoundException("Projet introuvable.");
 
+    // 🔥 CORRECTION CHIRURGICALE : Même chose pour la mise à jour
+    let safeStatus = data.status;
+    if (safeStatus === 'DRAFT') safeStatus = ProjectStatus.PROPOSED;
+    if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
+    if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
+
     return this.prisma.project.update({ 
       where: { id: projectId }, 
       data: { 
@@ -703,7 +715,7 @@ export class AdminService {
         specificObjectives: data.specificObjectives,
         expectedResults: data.expectedResults,
         successIndicators: data.successIndicators,
-        status: data.status,
+        status: safeStatus, // Utilisation de safeStatus ici !
         startDate: data.startsAt ? new Date(data.startsAt) : undefined,
         endDate: data.endsAt ? new Date(data.endsAt) : undefined,
         budgetAmount: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : undefined,

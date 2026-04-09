@@ -1,4 +1,3 @@
-// web/app/(protected)/admin/members/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -32,6 +31,7 @@ interface EditMemberData {
   birthDate: string;
   placeOfBirth: string;
   birthCountry: string;
+  customBirthCountry: string;
   originSubPrefecture: string;
   originVillage: string;
   addressLine1: string;
@@ -39,9 +39,19 @@ interface EditMemberData {
   postalCode: string;
   city: string;
   country: string;
+  customCountry: string;
 }
 
-/* ══════════════════════════════════════════════════════ INITIALS */
+/* ══════════════════════════════════════════════════════ FONCTIONS UTILITAIRES GLOBALES */
+
+// 🔥 La fonction manquante placée ici au niveau global, impossible de la perdre !
+function renderInfoValue(value: string | null | undefined) {
+  if (!value || value.trim() === '') {
+    return <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontWeight: 500 }}>Non renseigné</span>;
+  }
+  return value;
+}
+
 function Initials({ name, color = '#2563EB' }: { name: string; color?: string }) {
   const parts = name.trim().split(' ');
   const txt = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
@@ -62,7 +72,6 @@ function BigInitials({ name, color = '#2563EB' }: { name: string; color?: string
   );
 }
 
-/* ══════════════════════════════════════════════════════ USER STATUS BADGE */
 const USER_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
   ACTIVE:           { label: 'Actif',              color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
   PENDING_APPROVAL: { label: 'En attente',         color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
@@ -107,7 +116,7 @@ const COUNTRIES = [
   'Cameroun', 'Niger', 'Afrique du Sud', 'Mozambique', 'Portugal', 'Autre (Non listé)'
 ].sort();
 
-/* ══════════════════════════════════════════════════════ PAGE */
+/* ══════════════════════════════════════════════════════ PAGE PRINCIPALE */
 export default function AdminMembersDirectoryPage() {
   const [members, setMembers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,9 +133,9 @@ export default function AdminMembersDirectoryPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<EditMemberData>({
     firstName: '', lastName: '', phone: '', professionalStatus: '', function: '',
-    birthDate: '', placeOfBirth: '', birthCountry: '', originSubPrefecture: '',
+    birthDate: '', placeOfBirth: '', birthCountry: '', customBirthCountry: '', originSubPrefecture: '',
     originVillage: '', addressLine1: '', addressLine2: '', postalCode: '',
-    city: '', country: ''
+    city: '', country: '', customCountry: ''
   });
 
   // États pour la création de membre (TOUS LES CHAMPS DU SIGNUP)
@@ -170,14 +179,28 @@ export default function AdminMembersDirectoryPage() {
 
   const startEditMode = () => {
     if (!selectedUser) return;
+    
+    const isStandardBirthCountry = !selectedUser.birthCountry || COUNTRIES.includes(selectedUser.birthCountry);
+    const isStandardCountry = !selectedUser.country || COUNTRIES.includes(selectedUser.country);
+
     setEditData({
-      firstName: selectedUser.firstName || '', lastName: selectedUser.lastName || '', phone: selectedUser.phone || '',
-      professionalStatus: selectedUser.professionalStatus || '', function: selectedUser.function || '',
+      firstName: selectedUser.firstName || '', 
+      lastName: selectedUser.lastName || '', 
+      phone: selectedUser.phone || '',
+      professionalStatus: selectedUser.professionalStatus || '', 
+      function: selectedUser.function || '',
       birthDate: selectedUser.birthDate ? new Date(selectedUser.birthDate).toLocaleDateString('fr-FR') : '',
-      placeOfBirth: selectedUser.placeOfBirth || '', birthCountry: selectedUser.birthCountry || '',
-      originSubPrefecture: selectedUser.originSubPrefecture || '', originVillage: selectedUser.originVillage || '',
-      addressLine1: selectedUser.addressLine1 || '', addressLine2: selectedUser.addressLine2 || '',
-      postalCode: selectedUser.postalCode || '', city: selectedUser.city || '', country: selectedUser.country || '',
+      placeOfBirth: selectedUser.placeOfBirth || '', 
+      birthCountry: isStandardBirthCountry ? (selectedUser.birthCountry || '') : 'Autre (Non listé)',
+      customBirthCountry: isStandardBirthCountry ? '' : (selectedUser.birthCountry || ''),
+      originSubPrefecture: selectedUser.originSubPrefecture || '', 
+      originVillage: selectedUser.originVillage || '',
+      addressLine1: selectedUser.addressLine1 || '', 
+      addressLine2: selectedUser.addressLine2 || '',
+      postalCode: selectedUser.postalCode || '', 
+      city: selectedUser.city || '', 
+      country: isStandardCountry ? (selectedUser.country || '') : 'Autre (Non listé)',
+      customCountry: isStandardCountry ? '' : (selectedUser.country || ''),
     });
     setIsEditing(true);
   };
@@ -228,15 +251,27 @@ export default function AdminMembersDirectoryPage() {
     setActionLoading('EDIT');
     setSaveOk(false);
     try {
+      const finalBirthCountry = editData.birthCountry === 'Autre (Non listé)' ? editData.customBirthCountry : editData.birthCountry;
+      const finalCountry = editData.country === 'Autre (Non listé)' ? editData.customCountry : editData.country;
+
       await api.updateAntennaMember(selectedUser.id, {
-        firstName: editData.firstName.trim() || undefined, lastName: editData.lastName.trim() || undefined,
-        phone: editData.phone.trim() || undefined, professionalStatus: editData.professionalStatus || undefined,
-        function: editData.function || undefined, birthDate: convertDateToISO(editData.birthDate) || undefined,
-        placeOfBirth: editData.placeOfBirth.trim() || undefined, birthCountry: editData.birthCountry || undefined,
-        originSubPrefecture: editData.originSubPrefecture || undefined, originVillage: editData.originVillage.trim() || undefined,
-        addressLine1: editData.addressLine1.trim() || undefined, addressLine2: editData.addressLine2.trim() || undefined,
-        postalCode: editData.postalCode.trim() || undefined, city: editData.city.trim() || undefined, country: editData.country || undefined,
+        firstName: editData.firstName.trim() || undefined, 
+        lastName: editData.lastName.trim() || undefined,
+        phone: editData.phone.trim() || undefined, 
+        professionalStatus: editData.professionalStatus || undefined,
+        function: editData.function || undefined, 
+        birthDate: convertDateToISO(editData.birthDate) || undefined,
+        placeOfBirth: editData.placeOfBirth.trim() || undefined, 
+        birthCountry: finalBirthCountry?.trim() || undefined,
+        originSubPrefecture: editData.originSubPrefecture || undefined, 
+        originVillage: editData.originVillage.trim() || undefined,
+        addressLine1: editData.addressLine1.trim() || undefined, 
+        addressLine2: editData.addressLine2.trim() || undefined,
+        postalCode: editData.postalCode.trim() || undefined, 
+        city: editData.city.trim() || undefined, 
+        country: finalCountry?.trim() || undefined,
       });
+
       setIsEditing(false);
       setSelectedUser(null);
       await loadMembers();
@@ -257,13 +292,26 @@ export default function AdminMembersDirectoryPage() {
       const finalCountry = formData.country === 'Autre (Non listé)' ? formData.customCountry : formData.country;
 
       await api.createAntennaMember({
-        ...formData,
-        birthDate: convertDateToISO(formData.birthDate),
-        birthCountry: finalBirthCountry,
-        country: finalCountry,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        phone: formData.phone || undefined,
+        city: formData.city || undefined,
+        country: finalCountry || undefined,
+        originSubPrefecture: formData.originSubPrefecture || undefined,
+        originVillage: formData.originVillage || undefined,
+        professionalStatus: formData.professionalStatus || undefined,
+        function: formData.function || undefined,
+        birthDate: convertDateToISO(formData.birthDate) || undefined,
+        placeOfBirth: formData.placeOfBirth || undefined,
+        birthCountry: finalBirthCountry || undefined,
+        addressLine1: formData.addressLine1 || undefined,
+        addressLine2: formData.addressLine2 || undefined,
+        postalCode: formData.postalCode || undefined,
       });
       
-      setCreatedPassword(formData.password); // Affiche le mot de passe créé
+      setCreatedPassword(formData.password);
       await loadMembers(); 
     } catch (err) {
       alert(err instanceof Error ? err.message : "Erreur lors de la création du compte.");
@@ -299,11 +347,6 @@ export default function AdminMembersDirectoryPage() {
     if (value.length > 2) formatted = `${value.slice(0, 2)}/${value.slice(2)}`;
     if (value.length > 4) formatted = `${value.slice(0, 2)}/${value.slice(2, 4)}/${value.slice(4)}`;
     setEditData({ ...editData, birthDate: formatted });
-  };
-
-  const renderInfoValue = (value: string | null | undefined) => {
-    if (!value || value.trim() === '') return <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontWeight: 500 }}>Non renseigné</span>;
-    return value;
   };
 
   /* ── Table styles ── */
@@ -423,7 +466,6 @@ export default function AdminMembersDirectoryPage() {
 
       <div className="aa-wrap">
 
-        {/* Header */}
         <div className="aa-header">
           <div>
             <div className="aa-eyebrow"><div className="aa-dot" />Admin antenne</div>
@@ -496,7 +538,8 @@ export default function AdminMembersDirectoryPage() {
                     <th className="hide-mobile" style={thStyle}>Email</th>
                     <th style={{ ...thStyle, width: '120px' }}>Statut</th>
                     <th className="hide-mobile" style={thStyle}>Créé le</th>
-                    <th style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
+                    {/* 🔥 LA COLONNE D'ACTIONS EST CACHÉE SUR MOBILE */}
+                    <th className="hide-mobile" style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -507,17 +550,18 @@ export default function AdminMembersDirectoryPage() {
                       className="aa-row-clickable"
                       onClick={() => openMemberModal(u)} 
                     >
-                      <td style={tdStyle}>
+                      {/* 🔥 COUPE LES TEXTES TROP LONGS AVEC DES POINTS DE SUSPENSION */}
+                      <td style={{ ...tdStyle, maxWidth: '200px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '.55rem' }}>
                           <Initials name={fullName(u)} />
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '.82rem', color: '#0F172A' }}>{fullName(u)}</div>
-                            <div className="hide-desktop" style={{ fontSize: '.68rem', color: '#6B7280' }}>{u.email}</div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: '.82rem', color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName(u)}</div>
+                            <div className="hide-desktop" style={{ fontSize: '.68rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
                           </div>
                         </div>
                       </td>
                       <td className="hide-mobile" style={tdStyle}>
-                        <div style={{ fontSize: '.8rem', color: '#6B7280' }}>{u.email}</div>
+                        <div style={{ fontSize: '.8rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
                       </td>
                       <td style={tdStyle}>
                         <UserStatusBadge status={u.status} />
@@ -525,7 +569,7 @@ export default function AdminMembersDirectoryPage() {
                       <td className="hide-mobile" style={{ ...tdStyle, fontSize: '.75rem', color: '#6B7280' }}>
                         {formatDate(u.createdAt)}
                       </td>
-                      <td style={{ ...tdStyle, textAlign: 'right' }}>
+                      <td className="hide-mobile" style={{ ...tdStyle, textAlign: 'right' }}>
                         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -731,6 +775,7 @@ export default function AdminMembersDirectoryPage() {
                       <span className="aa-info-label">Téléphone</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.phone)}</span>
                     </div>
+                    
                     <div className="aa-info-item">
                       <span className="aa-info-label">Date de naissance</span>
                       <span className="aa-info-value">{selectedUser.birthDate ? new Date(selectedUser.birthDate).toLocaleDateString('fr-FR') : renderInfoValue(null)}</span>
@@ -743,6 +788,7 @@ export default function AdminMembersDirectoryPage() {
                       <span className="aa-info-label">Pays de naissance</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.birthCountry)}</span>
                     </div>
+                    
                     <div className="aa-info-item">
                       <span className="aa-info-label">Profession</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.professionalStatus)}</span>
@@ -780,108 +826,91 @@ export default function AdminMembersDirectoryPage() {
                   </div>
                 ) : (
                   /* VUE ÉDITION INTÉGRÉE DANS LA MODALE */
-                  <form id="editMemberForm" onSubmit={handleSaveEdit}>
-                    <div className="md-edit-section">
-                      <div className="md-edit-section-title">Identité & Contact</div>
-                      <div className="aa-form-grid">
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Prénom</label>
-                          <input className="aa-form-input" value={editData.firstName} onChange={e => setEditData({ ...editData, firstName: e.target.value })} required />
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Nom</label>
-                          <input className="aa-form-input" value={editData.lastName} onChange={e => setEditData({ ...editData, lastName: e.target.value })} required />
-                        </div>
-                        <div className="aa-form-group full">
-                          <label className="aa-form-label">Email (Non modifiable)</label>
-                          <input className="aa-form-input" value={selectedUser.email} disabled />
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Téléphone</label>
-                          <input className="aa-form-input" value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} />
-                        </div>
-                      </div>
+                  <form id="editMemberForm" onSubmit={handleSaveEdit} className="aa-form-grid">
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Prénom</label>
+                      <input className="aa-form-input" value={editData.firstName} onChange={e => setEditData({ ...editData, firstName: e.target.value })} required />
                     </div>
-
-                    <div className="md-edit-section">
-                      <div className="md-edit-section-title">Naissance & Origine</div>
-                      <div className="aa-form-grid">
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Date naissance (JJ/MM/AAAA)</label>
-                          <input className="aa-form-input" value={editData.birthDate} onChange={handleEditBirthDateChange} placeholder="JJ/MM/AAAA" />
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Lieu naissance</label>
-                          <input className="aa-form-input" value={editData.placeOfBirth} onChange={e => setEditData({ ...editData, placeOfBirth: e.target.value })} />
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Pays naissance</label>
-                          <select className="md-edit-select" value={editData.birthCountry} onChange={e => setEditData({ ...editData, birthCountry: e.target.value })}>
-                            <option value="">Sélectionnez...</option>
-                            {COUNTRIES.map(c => <option key={`birth-${c}`} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Commune origine</label>
-                          <select className="md-edit-select" value={editData.originSubPrefecture} onChange={e => setEditData({ ...editData, originSubPrefecture: e.target.value })}>
-                            <option value="">Sélectionnez...</option>
-                            {COMMUNES_ORIGINE.map(c => <option key={`c-orig-${c}`} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                        <div className="aa-form-group full">
-                          <label className="aa-form-label">Village origine</label>
-                          <input className="aa-form-input" value={editData.originVillage} onChange={e => setEditData({ ...editData, originVillage: e.target.value })} />
-                        </div>
-                      </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Nom</label>
+                      <input className="aa-form-input" value={editData.lastName} onChange={e => setEditData({ ...editData, lastName: e.target.value })} required />
                     </div>
-
-                    <div className="md-edit-section">
-                      <div className="md-edit-section-title">Profession & Rôle Associatif</div>
-                      <div className="aa-form-grid">
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Profession</label>
-                          <select className="md-edit-select" value={editData.professionalStatus} onChange={e => setEditData({ ...editData, professionalStatus: e.target.value })}>
-                            <option value="">Sélectionnez...</option>
-                            {PROFESSION_LIST.map(p => <option key={`c-prof-${p}`} value={p}>{p}</option>)}
-                          </select>
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Poste associatif</label>
-                          <select className="md-edit-select" value={editData.function} onChange={e => setEditData({ ...editData, function: e.target.value })}>
-                            <option value="">Sélectionnez...</option>
-                            {ASSOCIATION_ROLES.map(r => <option key={`c-role-${r}`} value={r}>{r}</option>)}
-                          </select>
-                        </div>
-                      </div>
+                    <div className="aa-form-group full">
+                      <label className="aa-form-label">Email (Non modifiable)</label>
+                      <input className="aa-form-input" value={selectedUser.email} disabled />
                     </div>
-
-                    <div className="md-edit-section">
-                      <div className="md-edit-section-title">Localisation & Résidence</div>
-                      <div className="aa-form-grid">
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Adresse 1</label>
-                          <input className="aa-form-input" value={editData.addressLine1} onChange={e => setEditData({ ...editData, addressLine1: e.target.value })} />
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Adresse 2</label>
-                          <input className="aa-form-input" value={editData.addressLine2} onChange={e => setEditData({ ...editData, addressLine2: e.target.value })} />
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Code postal</label>
-                          <input className="aa-form-input" value={editData.postalCode} onChange={e => setEditData({ ...editData, postalCode: e.target.value })} />
-                        </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Ville résidence</label>
-                          <input className="aa-form-input" value={editData.city} onChange={e => setEditData({ ...editData, city: e.target.value })} />
-                        </div>
-                        <div className="aa-form-group full">
-                          <label className="aa-form-label">Pays résidence</label>
-                          <select className="md-edit-select" value={editData.country} onChange={e => setEditData({ ...editData, country: e.target.value })}>
-                            <option value="">Sélectionnez...</option>
-                            {COUNTRIES.map(c => <option key={`c-res-${c}`} value={c}>{c}</option>)}
-                          </select>
-                        </div>
-                      </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Téléphone</label>
+                      <input className="aa-form-input" value={editData.phone} onChange={e => setEditData({ ...editData, phone: e.target.value })} />
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Date naissance (JJ/MM/AAAA)</label>
+                      <input className="aa-form-input" value={editData.birthDate} onChange={handleEditBirthDateChange} placeholder="JJ/MM/AAAA" />
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Lieu naissance</label>
+                      <input className="aa-form-input" value={editData.placeOfBirth} onChange={e => setEditData({ ...editData, placeOfBirth: e.target.value })} />
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Pays naissance</label>
+                      <select className="md-edit-select" value={editData.birthCountry} onChange={e => { setEditData({ ...editData, birthCountry: e.target.value }); if(e.target.value !== 'Autre (Non listé)') setEditData(f => ({...f, customBirthCountry: ''})); }}>
+                        <option value="">Sélectionnez...</option>
+                        {COUNTRIES.map(c => <option key={`edit-birth-${c}`} value={c}>{c}</option>)}
+                      </select>
+                      {editData.birthCountry === 'Autre (Non listé)' && (
+                        <input className="aa-form-input" value={editData.customBirthCountry} onChange={e => setEditData({ ...editData, customBirthCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
+                      )}
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Profession</label>
+                      <select className="md-edit-select" value={editData.professionalStatus} onChange={e => setEditData({ ...editData, professionalStatus: e.target.value })}>
+                        <option value="">Sélectionnez...</option>
+                        {PROFESSION_LIST.map(p => <option key={`edit-prof-${p}`} value={p}>{p}</option>)}
+                      </select>
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Poste associatif</label>
+                      <select className="md-edit-select" value={editData.function} onChange={e => setEditData({ ...editData, function: e.target.value })}>
+                        <option value="">Sélectionnez...</option>
+                        {ASSOCIATION_ROLES.map(r => <option key={`edit-role-${r}`} value={r}>{r}</option>)}
+                      </select>
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Commune origine</label>
+                      <select className="md-edit-select" value={editData.originSubPrefecture} onChange={e => setEditData({ ...editData, originSubPrefecture: e.target.value })}>
+                        <option value="">Sélectionnez...</option>
+                        {COMMUNES_ORIGINE.map(c => <option key={`edit-orig-${c}`} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Village origine</label>
+                      <input className="aa-form-input" value={editData.originVillage} onChange={e => setEditData({ ...editData, originVillage: e.target.value })} />
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Adresse 1</label>
+                      <input className="aa-form-input" value={editData.addressLine1} onChange={e => setEditData({ ...editData, addressLine1: e.target.value })} />
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Adresse 2</label>
+                      <input className="aa-form-input" value={editData.addressLine2} onChange={e => setEditData({ ...editData, addressLine2: e.target.value })} />
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Code postal</label>
+                      <input className="aa-form-input" value={editData.postalCode} onChange={e => setEditData({ ...editData, postalCode: e.target.value })} />
+                    </div>
+                    <div className="aa-form-group">
+                      <label className="aa-form-label">Ville résidence</label>
+                      <input className="aa-form-input" value={editData.city} onChange={e => setEditData({ ...editData, city: e.target.value })} />
+                    </div>
+                    <div className="aa-form-group full">
+                      <label className="aa-form-label">Pays résidence</label>
+                      <select className="md-edit-select" value={editData.country} onChange={e => { setEditData({ ...editData, country: e.target.value }); if(e.target.value !== 'Autre (Non listé)') setEditData(f => ({...f, customCountry: ''})); }}>
+                        <option value="">Sélectionnez...</option>
+                        {COUNTRIES.map(c => <option key={`edit-res-${c}`} value={c}>{c}</option>)}
+                      </select>
+                      {editData.country === 'Autre (Non listé)' && (
+                        <input className="aa-form-input" value={editData.customCountry} onChange={e => setEditData({ ...editData, customCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
+                      )}
                     </div>
                   </form>
                 )}
@@ -907,11 +936,7 @@ export default function AdminMembersDirectoryPage() {
                       </button>
                     )}
 
-                    <button 
-                      className="aa-btn aa-btn-delete" 
-                      onClick={handleDelete} 
-                      disabled={actionLoading !== null || selectedUser.status === 'DELETED'}
-                    >
+                    <button className="aa-btn aa-btn-delete" onClick={handleDelete} disabled={actionLoading !== null || selectedUser.status === 'DELETED'}>
                       {actionLoading === 'DELETE' ? '...' : 'Supprimer'}
                     </button>
                   </>

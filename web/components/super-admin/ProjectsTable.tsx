@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/ProjectsTable.tsx
+// web/components/super-admin/ProjectsTable.tsx
 'use client';
 
 import { Table } from '../ui/Table';
@@ -7,23 +7,27 @@ import type { Project, ProjectStatus } from '../../types/project';
 import { formatCurrency, formatDate } from '../../lib/format';
 
 const STATUS_TONES: Record<ProjectStatus, "info" | "success" | "warning" | "danger" | "neutral"> = {
-  DRAFT: 'neutral',
-  PENDING_APPROVAL: 'warning',
+  PROPOSED: 'neutral',
+  UNDER_REVIEW: 'warning',
+  MEMBER_APPROVAL_PENDING: 'warning',
   APPROVED: 'info',
   IN_PROGRESS: 'info',
   COMPLETED: 'success',
-  SUSPENDED: 'warning',
-  CANCELLED: 'danger'
+  ON_HOLD: 'warning',
+  CANCELLED: 'danger',
+  ARCHIVED: 'neutral'
 };
 
 const STATUS_LABELS: Record<ProjectStatus, string> = {
-  DRAFT: 'Brouillon',
-  PENDING_APPROVAL: 'En attente',
+  PROPOSED: 'Brouillon',
+  UNDER_REVIEW: 'En attente',
+  MEMBER_APPROVAL_PENDING: 'Approbation membre requise',
   APPROVED: 'Approuvé',
   IN_PROGRESS: 'En cours',
   COMPLETED: 'Terminé',
-  SUSPENDED: 'Suspendu',
-  CANCELLED: 'Annulé'
+  ON_HOLD: 'Suspendu',
+  CANCELLED: 'Annulé',
+  ARCHIVED: 'Archivé'
 };
 
 export function ProjectsTable({ items }: { items: Project[] }) {
@@ -38,8 +42,8 @@ export function ProjectsTable({ items }: { items: Project[] }) {
             </div>
           </td>
           <td>
-            <Badge tone={STATUS_TONES[p.status as ProjectStatus] || 'neutral'}>
-              {STATUS_LABELS[p.status as ProjectStatus] || p.status}
+            <Badge tone={STATUS_TONES[p.status] || 'neutral'}>
+              {STATUS_LABELS[p.status] || p.status}
             </Badge>
           </td>
           <td style={{ fontWeight: 600 }}>{formatCurrency(p.budgetPlanned)}</td>

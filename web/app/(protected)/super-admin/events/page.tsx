@@ -1,11 +1,11 @@
-// web/app/(protected)/admin/events/page.tsx
+//web/app/(protected)/super-admin/events/page.tsx
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type EventItem } from '../../../../lib/api-client';
+import type { Antenna } from '../../../../types/antenna';
 
-// 👇 CORRECTION CHIRURGICALE : Création de l'interface pour éliminer le 'any'
 interface AttendanceItem {
   id: string;
   status: string;
@@ -19,7 +19,13 @@ interface AttendanceItem {
   };
 }
 
-const TYPE_MAP: Record<string, string> = { GENERAL_ASSEMBLY: 'A.G.', ANTENNA_MEETING: 'Réunion', FUNDRAISER: 'Levée de fonds', OTHER: 'Autre' };
+const TYPE_MAP: Record<string, string> = { 
+  GENERAL_ASSEMBLY: 'A.G.', 
+  ANTENNA_MEETING: 'Réunion', 
+  FUNDRAISER: 'Levée de fonds', 
+  OTHER: 'Autre' 
+};
+
 const STATUS_MAP: Record<string, { label: string, color: string, bg: string }> = {
   DRAFT: { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6' },
   PUBLISHED: { label: 'Publié', color: '#2563EB', bg: '#EFF6FF' },
@@ -33,28 +39,70 @@ function formatDateTime(dateString: string) {
 }
 
 // ----------------------------------------------------------------------
-// MODAL : GESTION DE L'ÉVÉNEMENT (CRÉATION / MODIFICATION ADMIN)
+// MODAL : GESTION DE L'ÉVÉNEMENT (CRÉATION / MODIFICATION)
 // ----------------------------------------------------------------------
 function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; onClose: () => void; onSuccess: () => void }) {
   const [isEditing, setIsEditing] = useState(!event); 
 
   const [title, setTitle] = useState(event?.title || '');
   const [description, setDescription] = useState(event?.description || '');
-  const [type, setType] = useState(event?.type || 'ANTENNA_MEETING');
+  const [type, setType] = useState(event?.type || 'GENERAL_ASSEMBLY');
   const [status, setStatus] = useState(event?.status || 'DRAFT');
   const [startsAt, setStartsAt] = useState(event ? new Date(event.startsAt).toISOString().slice(0, 16) : '');
   const [locationText, setLocationText] = useState(event?.locationText || '');
   const [isOnline, setIsOnline] = useState(event?.isOnline || false);
   const [meetingLink, setMeetingLink] = useState(event?.meetingLink || '');
+  
+  const [availableAntennas, setAvailableAntennas] = useState<Antenna[]>([]);
+  const [selectedAntennaIds, setSelectedAntennaIds] = useState<string[]>(event?.antennas?.map(a => a.id) || []);
+  const [loadingAntennas, setLoadingAntennas] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  useEffect(() => {
+    async function fetchAntennas() {
+      setLoadingAntennas(true);
+      try {
+        const res = await api.listAntennas({ pageSize: 100, isActive: true });
+        setAvailableAntennas(res.items);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingAntennas(false);
+      }
+    }
+    if (isEditing) void fetchAntennas();
+  }, [isEditing]);
+
+  const toggleAntenna = (id: string) => {
+    setSelectedAntennaIds(prev => prev.includes(id) ? prev.filter(aId => aId !== id) : [...prev, id]);
+  };
+
+  const selectAllAntennas = () => {
+    if (selectedAntennaIds.length === availableAntennas.length) {
+      setSelectedAntennaIds([]); 
+    } else {
+      setSelectedAntennaIds(availableAntennas.map(a => a.id)); 
+    }
+  };
+
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setSaving(true);
+    e.preventDefault(); 
+    setSaving(true);
     try {
-      const payload = { title, description, type, status, startsAt: new Date(startsAt).toISOString(), locationText, isOnline, meetingLink };
+      const payload = { 
+        title, 
+        description, 
+        type, 
+        status, 
+        startsAt: new Date(startsAt).toISOString(), 
+        locationText, 
+        isOnline, 
+        meetingLink,
+        antennaIds: selectedAntennaIds 
+      };
       if (event) await api.updateEvent(event.id, payload);
       else await api.createEvent(payload);
       onSuccess();
@@ -90,7 +138,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
                 <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
               </div>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', margin: '0 0 0.5rem' }}>Supprimer l&apos;événement ?</h3>
-              <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: '0 0 1.5rem', lineHeight: 1.5 }}>Cette action est définitive. L&apos;événement sera effacé de l&apos;agenda de tous les membres.</p>
+              <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: '0 0 1.5rem', lineHeight: 1.5 }}>Cette action est globale et définitive. L&apos;événement sera effacé de l&apos;agenda de tous les membres.</p>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
                 <button style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: '1px solid #D1D5DB', background: 'white', fontWeight: 700, color: '#4B5563', cursor: 'pointer', transition: 'background 0.15s' }} onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
                 <button style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: 'none', background: '#DC2626', fontWeight: 800, color: 'white', cursor: 'pointer', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }} onClick={executeDelete}>Supprimer</button>
@@ -101,7 +149,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 
         <div className="aev-modal-head">
           <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>
-            {event ? (isEditing ? "Modifier l'événement" : "Détails de l'événement") : "Nouvel événement"}
+            {event ? (isEditing ? "Modifier l'événement" : "Détails (Super-Admin)") : "Nouvel événement global"}
           </h2>
           <button className="aev-modal-close" onClick={onClose} disabled={saving || deleting}>
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -114,9 +162,14 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
               <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#111827', margin: '0 0 0.5rem 0', lineHeight: 1.2 }}>
                 {event.title}
               </h3>
-              <span className="aev-status" style={{ background: STATUS_MAP[event.status].bg, color: STATUS_MAP[event.status].color }}>
-                <span style={{ width: 5, height: 5, borderRadius: '50%', background: STATUS_MAP[event.status].color }}/> {STATUS_MAP[event.status].label}
-              </span>
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <span className="aev-status" style={{ background: STATUS_MAP[event.status].bg, color: STATUS_MAP[event.status].color }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: STATUS_MAP[event.status].color }}/> {STATUS_MAP[event.status].label}
+                </span>
+                <span className="aev-status" style={{ background: '#F3F4F6', color: '#4B5563', border: '1px solid #E5E7EB' }}>
+                  🌍 {event.antennas?.length || 0} antenne(s) ciblée(s)
+                </span>
+              </div>
             </div>
 
             <div className="aev-info-box">
@@ -146,6 +199,19 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
               </span>
             </div>
 
+            {event.antennas && event.antennas.length > 0 && (
+              <div className="aev-info-box">
+                <span className="aev-info-lbl">Antennes concernées</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
+                  {event.antennas.map(a => (
+                    <span key={a.id} style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.5rem', background: 'white', border: '1px solid #D1D5DB', borderRadius: 6, color: '#374151' }}>
+                      {a.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', gap: '0.75rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
               <button type="button" className="aev-btn-del" onClick={() => setShowDeleteConfirm(true)} disabled={deleting}>
                 {deleting ? 'Suppression...' : 'Supprimer'}
@@ -159,7 +225,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
           <form onSubmit={handleSubmit} className="aev-modal-body">
             <div className="aev-field" style={{ marginBottom: '1rem' }}>
               <label>Titre <span>*</span></label>
-              <input className="aev-input" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ex: Réunion mensuelle" />
+              <input className="aev-input" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ex: Assemblée Générale Annuelle" />
             </div>
 
             <div className="aev-field" style={{ marginBottom: '1rem' }}>
@@ -175,8 +241,8 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 
             <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid #E2E8F0' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}>
-                <input type="checkbox" checked={isOnline} onChange={e => setIsOnline(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#2563EB' }} />
-                <span style={{ fontWeight: 700, color: '#374151' }}>Événement en ligne (Visio)</span>
+                <input type="checkbox" checked={isOnline} onChange={e => setIsOnline(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#2563EB' }} id="cb-online" />
+                <label htmlFor="cb-online" style={{ fontWeight: 700, color: '#374151', cursor: 'pointer', textTransform: 'none', fontSize: '0.9rem' }}>Événement en ligne (Visio)</label>
               </div>
               {isOnline ? (
                 <div className="aev-field"><label>Lien de la réunion</label><input type="url" className="aev-input" value={meetingLink} onChange={e => setMeetingLink(e.target.value)} placeholder="https://meet..." /></div>
@@ -185,9 +251,40 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
               )}
             </div>
 
+            <div style={{ marginTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <label style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#1D4ED8' }}>
+                  Antennes ciblées <span>*</span>
+                </label>
+                {!loadingAntennas && availableAntennas.length > 0 && (
+                  <button type="button" onClick={selectAllAntennas} style={{ background: 'none', border: 'none', color: '#2563EB', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>
+                    {selectedAntennaIds.length === availableAntennas.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                  </button>
+                )}
+              </div>
+              
+              <div className="aev-antennas-grid">
+                {loadingAntennas ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#6B7280', fontSize: '0.85rem' }}>Chargement des antennes...</div>
+                ) : availableAntennas.length === 0 ? (
+                  <div style={{ padding: '1rem', textAlign: 'center', color: '#9CA3AF', fontSize: '0.85rem' }}>Aucune antenne disponible.</div>
+                ) : (
+                  availableAntennas.map(a => (
+                    <label key={a.id} className={`aev-antenna-cb ${selectedAntennaIds.includes(a.id) ? 'active' : ''}`}>
+                      <input type="checkbox" checked={selectedAntennaIds.includes(a.id)} onChange={() => toggleAntenna(a.id)} />
+                      <span>{a.name}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              {selectedAntennaIds.length === 0 && !loadingAntennas && (
+                <p style={{ color: '#DC2626', fontSize: '0.75rem', marginTop: '0.4rem', fontWeight: 600 }}>Veuillez sélectionner au moins une antenne.</p>
+              )}
+            </div>
+
             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
               <button type="button" className="aev-btn-cancel" onClick={() => event ? setIsEditing(false) : onClose()} disabled={saving}>Annuler</button>
-              <button type="submit" className="aev-btn-submit" disabled={saving}>{saving ? 'Sauvegarde...' : 'Enregistrer'}</button>
+              <button type="submit" className="aev-btn-submit" disabled={saving || selectedAntennaIds.length === 0}>{saving ? 'Sauvegarde...' : 'Enregistrer'}</button>
             </div>
           </form>
         )}
@@ -201,8 +298,6 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 // ----------------------------------------------------------------------
 function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => void }) {
   const [filter, setFilter] = useState<'all' | 'attending' | 'absent'>('all');
-  
-  // 👇 ICI: Utilisation de notre interface au lieu de 'any'
   const [attendances, setAttendances] = useState<AttendanceItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -275,14 +370,14 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
 }
 
 // ----------------------------------------------------------------------
-// PAGE PRINCIPALE : ADMIN D'ANTENNE
+// PAGE PRINCIPALE : SUPER ADMIN
 // ----------------------------------------------------------------------
-export default function AdminEventsPage() {
+export default function SuperAdminEventsPage() {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   
   // États des modaux
-  const [modalState, setModalState] = useState<{ isOpen: boolean; event?: EventItem | null }>({ isOpen: false });
+  const [eventModal, setEventModal] = useState<{ isOpen: boolean; event?: EventItem | null }>({ isOpen: false });
   const [attendanceModal, setAttendanceModal] = useState<{ isOpen: boolean; event?: EventItem | null }>({ isOpen: false });
 
   const load = useCallback(async () => {
@@ -303,40 +398,43 @@ export default function AdminEventsPage() {
   useEffect(() => { void load(); }, [load]);
 
   return (
-    <AppShell title="Événements">
+    <AppShell title="Événements Globaux">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@500;600;700;800&display=swap');
-        .aev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1000px; margin: 0 auto; }
+        
+        /* LAYOUT DE BASE */
+        .aev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1100px; margin: 0 auto; }
         .aev-header { margin-bottom: 1.5rem; }
         .aev-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: #111827; margin: 0; }
-        .aev-title span { color: #2563EB; }
+        .aev-title span { color: #1D4ED8; }
+        
+        /* TABLEAU ET PANNEAU */
         .aev-panel { background: white; border-radius: 20px; border: 1px solid #BFDBFE; box-shadow: 0 4px 20px rgba(37,99,235,0.05); overflow: hidden; }
         .aev-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid #DBEAFE; display: flex; justify-content: space-between; align-items: center; background: #EFF6FF; }
         .aev-new-btn { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: transform 0.15s; }
         .aev-new-btn:hover { transform: translateY(-1px); }
+        
         .aev-table { width: 100%; border-collapse: collapse; }
         .aev-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; }
-        .aev-row { border-top: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
+        .aev-row { border-top: 1px solid #F3F4F6; transition: background 0.15s; } 
         .aev-row:hover { background: #F8FAFC; }
         .aev-table td { padding: 1rem 1.4rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; }
         .aev-status { padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid rgba(0,0,0,0.05); }
         
-        /* BOUTONS D'ACTION & TABS (AJOUTS POUR LES PRÉSENCES) */
+        /* BOUTONS D'ACTION (TABLEAU) */
         .aev-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.3rem; }
         .aev-action-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
         .aev-action-btn.primary { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
         .aev-action-btn.primary:hover { background: #DBEAFE; }
-        
-        .aev-tabs { display: flex; gap: 0.5rem; background: #E2E8F0; padding: 0.25rem; border-radius: 10px; }
-        .aev-tab { flex: 1; text-align: center; padding: 0.5rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; color: #6B7280; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.15s; }
-        .aev-tab:hover { color: #374151; }
-        .aev-tab.active { background: white; color: #111827; border-color: #D1D5DB; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
+        /* MODAL GÉNÉRAL */
         .aev-modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
         .aev-modal { background: white; width: 100%; max-width: 500px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
         .aev-modal-head { padding: 1.25rem 1.5rem; background: #EFF6FF; border-bottom: 1px solid #BFDBFE; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
         .aev-modal-close { background: white; border: 1px solid #BFDBFE; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1D4ED8; }
         .aev-modal-body { padding: 1.5rem; overflow-y: auto; }
+        
+        /* FORMULAIRE & CHAMPS */
         .aev-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
         .aev-field { display: flex; flex-direction: column; gap: 0.35rem; }
         .aev-field label { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; color: #1D4ED8; }
@@ -345,63 +443,99 @@ export default function AdminEventsPage() {
         .aev-input:focus, .aev-select:focus { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
         .aev-select { appearance: none; padding-right: 2.2rem; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.8rem center; cursor: pointer; }
         
+        /* AFFICHAGE DES INFOS (LECTURE) */
         .aev-info-box { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 0.8rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; margin-bottom: 1rem; }
         .aev-info-lbl { font-size: 0.65rem; font-weight: 800; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; }
         .aev-info-val { font-size: 0.9rem; font-weight: 600; color: #111827; white-space: pre-wrap; line-height: 1.4; }
 
+        /* BOUTONS MODAL */
         .aev-btn-submit { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; transition: transform 0.15s; }
+        .aev-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
         .aev-btn-cancel { background: white; border: 1px solid #D1D5DB; color: #4B5563; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 700; cursor: pointer; }
         .aev-btn-del { background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; }
         
+        /* GRILLE DE SÉLECTION ANTENNES */
+        .aev-antennas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; max-height: 180px; overflow-y: auto; padding: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; }
+        .aev-antenna-cb { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.6rem; border: 1px solid transparent; border-radius: 8px; cursor: pointer; transition: all 0.15s; background: white; }
+        .aev-antenna-cb:hover { border-color: #D1D5DB; }
+        .aev-antenna-cb.active { border-color: #60A5FA; background: #EFF6FF; }
+        .aev-antenna-cb input { accent-color: #2563EB; cursor: pointer; }
+        .aev-antenna-cb span { font-size: 0.75rem; font-weight: 700; color: #374151; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* TABS (PRÉSENCES) */
+        .aev-tabs { display: flex; gap: 0.5rem; background: #E2E8F0; padding: 0.25rem; border-radius: 10px; }
+        .aev-tab { flex: 1; text-align: center; padding: 0.5rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; color: #6B7280; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.15s; }
+        .aev-tab:hover { color: #374151; }
+        .aev-tab.active { background: white; color: #111827; border-color: #D1D5DB; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
         @keyframes aescale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        @media (max-width: 600px) { .aev-grid-2 { grid-template-columns: 1fr; } .hide-mobile { display: none; } .aev-actions-td { display: flex; flex-direction: column; gap: 0.4rem; } }
+        @media (max-width: 768px) { .aev-grid-2 { grid-template-columns: 1fr; } .hide-mobile { display: none; } .aev-actions-td { display: flex; flex-direction: column; gap: 0.4rem; } }
       `}</style>
+
       <div className="aev-wrap">
-        <div className="aev-header"><h1 className="aev-title">Calendrier des <span>Événements</span></h1></div>
+        <div className="aev-header">
+          <h1 className="aev-title">Gestion Globale des <span>Événements</span></h1>
+          <p style={{ color: '#6B7280', fontSize: '0.85rem', marginTop: '0.2rem', fontWeight: 500 }}>
+            Créez des événements et affectez-les aux antennes de votre choix.
+          </p>
+        </div>
+
         <div className="aev-panel">
           <div className="aev-panel-head">
-            <span style={{ fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', fontSize: '0.8rem' }}>Agenda</span>
-            <button className="aev-new-btn" onClick={() => setModalState({ isOpen: true })}>+ Organiser</button>
+            <span style={{ fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', fontSize: '0.8rem' }}>Agenda du réseau</span>
+            <button className="aev-new-btn" onClick={() => setEventModal({ isOpen: true })}>+ Nouvel événement</button>
           </div>
+          
           <div style={{ overflowX: 'auto' }}>
             <table className="aev-table">
               <thead>
                 <tr>
-                  <th>Titre</th>
+                  <th>Événement</th>
                   <th className="hide-mobile">Date & Heure</th>
+                  <th className="hide-mobile">Cibles</th>
                   <th>Statut</th>
                   <th style={{ textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#6B7280' }}>Chargement des événements...</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>Chargement des événements...</td></tr>
                 ) : items.length === 0 ? (
-                  <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF' }}>Aucun événement enregistré.</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: '#9CA3AF' }}>Aucun événement n&apos;a été créé pour le moment.</td></tr>
                 ) : (
                   items.map(e => {
                     const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
+                    const antenneCount = e.antennas?.length || 0;
+                    
                     return (
-                      <tr key={e.id} className="aev-row" onClick={() => setModalState({ isOpen: true, event: e })}>
-                        <td>{e.title} <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: 2 }}>{TYPE_MAP[e.type]}</div></td>
-                        <td className="hide-mobile" style={{ color: '#374151' }}>{formatDateTime(e.startsAt)}</td>
+                      <tr key={e.id} className="aev-row">
+                        <td>
+                          <div style={{ fontWeight: 800, color: '#111827' }}>{e.title}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: 2, fontWeight: 700 }}>{TYPE_MAP[e.type]}</div>
+                        </td>
+                        <td className="hide-mobile" style={{ color: '#4B5563', fontSize: '0.8rem' }}>{formatDateTime(e.startsAt)}</td>
+                        <td className="hide-mobile">
+                          <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#F3F4F6', color: '#4B5563', padding: '0.2rem 0.5rem', borderRadius: 6 }}>
+                            {antenneCount} antenne(s)
+                          </span>
+                        </td>
                         <td>
                           <span className="aev-status" style={{ background: s.bg, color: s.color }}>
                             <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }}/> {s.label}
                           </span>
                         </td>
                         <td className="aev-actions-td" style={{ textAlign: 'right' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                              {e.type === 'ANTENNA_MEETING' && (
-                                <button className="aev-action-btn primary" onClick={(ev) => { ev.stopPropagation(); setAttendanceModal({ isOpen: true, event: e }); }}>
-                                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                                  Présences
-                                </button>
-                              )}
-                              <button className="aev-action-btn" onClick={(ev) => { ev.stopPropagation(); setModalState({ isOpen: true, event: e }); }}>
-                                Détails
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            {e.type === 'ANTENNA_MEETING' && (
+                              <button className="aev-action-btn primary" onClick={(ev) => { ev.stopPropagation(); setAttendanceModal({ isOpen: true, event: e }); }}>
+                                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
+                                Présences
                               </button>
-                            </div>
+                            )}
+                            <button className="aev-action-btn" onClick={() => setEventModal({ isOpen: true, event: e })}>
+                              Détails
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -412,10 +546,22 @@ export default function AdminEventsPage() {
           </div>
         </div>
       </div>
-      
-      {modalState.isOpen && <EventModal event={modalState.event} onClose={() => setModalState({ isOpen: false })} onSuccess={() => { setModalState({ isOpen: false }); void load(); }} />}
-      {attendanceModal.isOpen && attendanceModal.event && <AttendanceModal event={attendanceModal.event} onClose={() => setAttendanceModal({ isOpen: false })} />}
-      
+
+      {eventModal.isOpen && (
+        <EventModal 
+          event={eventModal.event} 
+          onClose={() => setEventModal({ isOpen: false })} 
+          onSuccess={() => { setEventModal({ isOpen: false }); void load(); }} 
+        />
+      )}
+
+      {attendanceModal.isOpen && attendanceModal.event && (
+        <AttendanceModal 
+          event={attendanceModal.event} 
+          onClose={() => setAttendanceModal({ isOpen: false })} 
+        />
+      )}
+
     </AppShell>
   );
 }

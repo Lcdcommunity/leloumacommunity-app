@@ -1,5 +1,16 @@
 // web/types/project.ts
-export type ProjectStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'IN_PROGRESS' | 'COMPLETED' | 'SUSPENDED' | 'CANCELLED';
+
+// Correction chirurgicale : Alignement strict avec l'Enum Prisma
+export type ProjectStatus = 
+  | 'PROPOSED' 
+  | 'UNDER_REVIEW' 
+  | 'MEMBER_APPROVAL_PENDING' 
+  | 'APPROVED' 
+  | 'IN_PROGRESS' 
+  | 'ON_HOLD' 
+  | 'COMPLETED' 
+  | 'CANCELLED' 
+  | 'ARCHIVED';
 
 // Type strict pour remplacer "any" sur les champs JSON
 export type JsonValue = string | number | boolean | null | { [key: string]: JsonValue } | JsonValue[];

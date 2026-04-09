@@ -61,6 +61,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/contributions',   label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
   { href: '/super-admin/expenses',        label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
   { href: '/super-admin/projects',        label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/super-admin/events',          label: 'Événements',             icon: <Ico d={ICO.calendar} /> }, // 👇 AJOUT ICI
   { href: '/super-admin/sponsors',        label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
   { href: '/super-admin/documents',       label: 'Documents',               icon: <Ico d={ICO.doc} /> },
   { href: '/super-admin/notifications',   label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
@@ -133,7 +134,7 @@ export function Sidebar() {
       try {
         const me = await api.me();
         if (!mounted) return;
-        
+
         setRole(me.role);
         if (me.association) {
           setAssociation({ name: me.association.name, logoUrl: me.association.logoUrl });
@@ -342,7 +343,6 @@ export function Sidebar() {
             ))}
           </div>
         )}
-
         <div className="sb-footer">
           <button className="sb-logout" onClick={handleLogout}>
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">

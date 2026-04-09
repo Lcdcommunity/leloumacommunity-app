@@ -61,6 +61,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/contributions',   label: 'Cotisations',            ico: ICO.coin,       section: 'Gestion' },
   { href: '/super-admin/expenses',        label: 'Dépenses',               ico: ICO.creditCard, section: 'Gestion' },
   { href: '/super-admin/projects',        label: 'Projets',                ico: ICO.clip,       section: 'Gestion' },
+  { href: '/super-admin/events',          label: 'Événements',             ico: ICO.calendar,   section: 'Gestion' }, // 👇 AJOUT ICI
   { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,      section: 'Gestion' },
   { href: '/super-admin/documents',       label: 'Documents',               ico: ICO.doc,        section: 'Gestion' },
   { href: '/super-admin/notifications',   label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
@@ -162,7 +163,7 @@ export function MobileNav() {
       try {
         const me = await api.me();
         if (!mounted) return;
-        
+
         setRole(me.role);
 
         // Récupération sécurisée du nom
@@ -281,8 +282,7 @@ export function MobileNav() {
 
         .mn-burger-lines {
           display: flex; flex-direction: column; gap: 3.5px;
-          width: 17px; align-items: flex-end;
-        }
+          width: 17px; align-items: flex-end;        }
         .mn-burger-line {
           height: 2px; background: currentColor; border-radius: 99px;
           transition: all 0.25s cubic-bezier(.22,1,.36,1);

@@ -9,36 +9,38 @@ import type { Project, ProjectStatus } from '../../../../types/project';
 import { formatCurrency, formatDate } from '../../../../lib/format';
 
 /* ══════════════════════════════════════════════════════ STATUS MAP */
+// Correction chirurgicale : Alignement strict avec l'Enum Prisma ProjectStatus
 const PROJ_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
-  DRAFT:            { label: 'Brouillon',     color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  PENDING_APPROVAL: { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  PROPOSED:         { label: 'Brouillon',     color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  UNDER_REVIEW:     { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
   APPROVED:         { label: 'Approuvé',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   IN_PROGRESS:      { label: 'En cours',      color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
   COMPLETED:        { label: 'Terminé',       color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  SUSPENDED:        { label: 'Suspendu',      color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  ON_HOLD:          { label: 'Suspendu',      color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
   CANCELLED:        { label: 'Annulé',        color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+  ARCHIVED:         { label: 'Archivé',       color: '#4B5563', bg: '#E5E7EB', border: '#D1D5DB' },
 };
 
 const STATUS_FORM_OPTIONS: { value: ProjectStatus; label: string }[] = [
-  { value: 'DRAFT',            label: 'Brouillon' },
-  { value: 'PENDING_APPROVAL', label: "En attente d'approbation" },
+  { value: 'PROPOSED',         label: 'Brouillon' },
+  { value: 'UNDER_REVIEW',     label: "En attente d'approbation" },
   { value: 'APPROVED',         label: 'Approuvé' },
   { value: 'IN_PROGRESS',      label: 'En cours' },
   { value: 'COMPLETED',        label: 'Terminé' },
-  { value: 'SUSPENDED',        label: 'Suspendu' },
+  { value: 'ON_HOLD',          label: 'Suspendu' },
   { value: 'CANCELLED',        label: 'Annulé' },
 ];
 
 const STATUS_LIST_OPTIONS = [
   { value: '',            label: 'Tous les statuts' },
-  { value: 'DRAFT',       label: 'Brouillon' },
+  { value: 'PROPOSED',    label: 'Brouillon' },
   { value: 'IN_PROGRESS', label: 'En cours' },
   { value: 'COMPLETED',   label: 'Terminé' },
 ];
 
 /* ══════════════════════════════════════════════════════ STATUS BADGE */
 function StatusBadge({ status }: { status: string }) {
-  const s = PROJ_STATUS_MAP[status] ?? PROJ_STATUS_MAP['DRAFT'];
+  const s = PROJ_STATUS_MAP[status] ?? PROJ_STATUS_MAP['PROPOSED'];
   return (
     <span
       style={{
@@ -341,7 +343,6 @@ function ProjectModal({
     : 0;
   const over = (project.budgetSpent ?? 0) > (project.budgetPlanned ?? 0);
   const budgetCol = over ? '#DC2626' : pct > 80 ? '#D97706' : '#2563EB';
-
   const downloadPDF = async () => {
     if (isExporting) return;
     setIsExporting(true);
@@ -614,7 +615,6 @@ function ProjectModal({
                   )
                 }
               />
-
               <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
 
               {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
@@ -837,10 +837,11 @@ const TA: React.CSSProperties = { width: '100%', borderRadius: 11, border: '1px 
 const SS: React.CSSProperties = { ...IS, appearance: 'none', cursor: 'pointer', backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right .75rem center', paddingRight: '2.2rem' };
 
 interface FormValues {
-  title: string; summary: string; description: string; locationText: string; promoterName: string; status: ProjectStatus; budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string; targetBeneficiaries: string; populationImpact: string; environmentalImpact: string; risksAndMitigation: string; implementationMethod: string; specificObjectives: string; expectedResults: string; successIndicators: string;
+  title: string; summary: string; description: string; locationText: string; promoterName: string; status: string; budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string; targetBeneficiaries: string; populationImpact: string; environmentalImpact: string; risksAndMitigation: string; implementationMethod: string; specificObjectives: string; expectedResults: string; successIndicators: string;
 }
 
-const EMPTY: FormValues = { title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'DRAFT', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '', targetBeneficiaries: '', populationImpact: '', environmentalImpact: '', risksAndMitigation: '', implementationMethod: '', specificObjectives: '', expectedResults: '', successIndicators: '' };
+// Correction chirurgicale : Statut par défaut aligné avec Prisma
+const EMPTY: FormValues = { title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'PROPOSED', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '', targetBeneficiaries: '', populationImpact: '', environmentalImpact: '', risksAndMitigation: '', implementationMethod: '', specificObjectives: '', expectedResults: '', successIndicators: '' };
 
 function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploadProgress }: { initial?: FormValues; onSave: (v: FormValues, p: File[]) => void; onCancel: () => void; submitting: boolean; submitLabel: string; uploadProgress: string | null; }) {
   const [v, setV] = useState<FormValues>(initial ?? EMPTY);
@@ -856,7 +857,7 @@ function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploa
             <div><label style={LS}>Titre du projet <span style={{ color: '#EF4444' }}>*</span></label><input style={IS} placeholder="Nom officiel du projet" required {...f('title')} /></div>
             <div><label style={LS}>Résumé court</label><input style={IS} placeholder="Une phrase d'accroche ou résumé rapide" {...f('summary')} /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
-              <div><label style={LS}>Statut</label><select style={SS} value={v.status} onChange={(e) => setV((p) => ({ ...p, status: e.target.value as ProjectStatus }))}>{STATUS_FORM_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}</select></div>
+              <div><label style={LS}>Statut</label><select style={SS} value={v.status} onChange={(e) => setV((p) => ({ ...p, status: e.target.value }))}>{STATUS_FORM_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}</select></div>
               <div><label style={LS}>Promoteur / Porteur</label><input style={IS} placeholder="Nom du responsable" {...f('promoterName')} /></div>
             </div>
             <div><label style={LS}>Localisation</label><input style={IS} placeholder="Région, Ville, ou Adresse" {...f('locationText')} /></div>
@@ -949,7 +950,7 @@ export default function AdminProjectsPage() {
   }, [q, statusFilter]);
 
   useEffect(() => { void load(); }, [load]);
-  
+
   function openCreate() { setEditing(null); setSaveError(null); setFormMode('create'); setDetailProject(null); }
   function openEdit(p: Project) { setEditing(p); setSaveError(null); setFormMode('edit'); setDetailProject(null); }
   function closeForm() { setFormMode('hidden'); setEditing(null); setSaveError(null); }
@@ -1010,7 +1011,8 @@ export default function AdminProjectsPage() {
     successIndicators: typeof editing.successIndicators === 'string' ? editing.successIndicators : JSON.stringify(editing.successIndicators ?? ''),
   } : undefined;
 
-  const draftCount = items.filter((i) => i.status === 'DRAFT').length;
+  // Correction chirurgicale : Filtres basés sur les statuts Prisma
+  const draftCount = items.filter((i) => i.status === 'PROPOSED').length;
   const inProgressCount = items.filter((i) => i.status === 'IN_PROGRESS').length;
   const completedCount = items.filter((i) => i.status === 'COMPLETED').length;
   const formOpen = formMode !== 'hidden';
@@ -1057,7 +1059,7 @@ export default function AdminProjectsPage() {
         .pp-form-section { background: rgba(255,255,255,.6); border: 1px solid rgba(37,99,235,.1); padding: 1.2rem; border-radius: 14px; margin-bottom: 1rem; }
         .pp-form-section-title { margin: 0 0 1rem; font-size: .8rem; font-weight: 800; color: #1D4ED8; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: .4rem; border-bottom: 1px dashed rgba(37,99,235,.15); padding-bottom: .6rem; }
 
-        .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
+                .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
         .pp-edit-dot{width:6px;height:6px;border-radius:50%;background:#2563EB;animation:pppulse 1.5s infinite;flex-shrink:0}
         .pp-save-err{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;color:#B91C1C;font-size:.78rem;font-weight:800;margin-bottom:.7rem}
         .pp-form-inner input:focus,.pp-form-inner textarea:focus,.pp-form-inner select:focus{border-color:rgba(37,99,235,.4)!important;box-shadow:0 0 0 3px rgba(37,99,235,.08)!important;background:white!important}
@@ -1256,8 +1258,7 @@ export default function AdminProjectsPage() {
           ) : items.length === 0 ? (
             <div className="pp-empty">
               <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />              </svg>
               <div className="pp-empty-title">Aucun projet trouvé</div>
               <div className="pp-empty-sub">
                 Cliquez sur <strong>Nouveau projet</strong> pour en créer un.

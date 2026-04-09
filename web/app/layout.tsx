@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: 'Lelouma Community',
   description: 'Plateforme de gestion d’association communautaire - Multi-tenant',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icon-192x192.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -42,10 +46,6 @@ export default async function RootLayout({
 
   return (
     <html lang={lang} suppressHydrationWarning>
-      <head>
-        <link rel="icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
-      </head>
       <body suppressHydrationWarning={true} className="antialiased">
         <ThemeProvider
           attribute="class"
