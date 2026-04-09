@@ -11,7 +11,7 @@ export const metadata: Metadata = {
   description: 'Plateforme de gestion d’association communautaire - Multi-tenant',
   manifest: '/manifest.json',
   icons: {
-    icon: '/favicon.ico',
+    // La ligne "icon" a été retirée car Next.js va détecter automatiquement le fichier icon.jpg dans le dossier app/
     apple: '/icon-192x192.png',
   },
   appleWebApp: {
