@@ -5,7 +5,49 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type EventItem } from '../../../../lib/api-client';
 
-// Fonction locale de formatage si formatDate n'est pas dispo dans lib/format
+// --- COMPOSANT TOAST (NOTIFICATION) ---
+function Toast({ message, type, onClose }: { message: string, type: 'success' | 'error', onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3500);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div style={{
+      position: 'fixed',
+      bottom: '80px', // Juste au-dessus de la barre de navigation mobile
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 9999,
+      background: type === 'success' ? '#059669' : '#DC2626',
+      color: 'white',
+      padding: '0.8rem 1.5rem',
+      borderRadius: '12px',
+      fontSize: '0.9rem',
+      fontWeight: 700,
+      boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      animation: 'slideUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+    }}>
+      <style>{`
+        @keyframes slideUp {
+          from { opacity: 0; transform: translate(-50%, 20px); }
+          to { opacity: 1; transform: translate(-50%, 0); }
+        }
+      `}</style>
+      {type === 'success' ? (
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+      ) : (
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+      )}
+      {message}
+    </div>
+  );
+}
+
+// Fonction de formatage
 function formatDateTime(dateString: string) {
   const d = new Date(dateString);
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -18,18 +60,27 @@ const TYPE_MAP: Record<string, string> = {
   OTHER: 'Autre' 
 };
 
-function MemberEventModal({ event, onClose, onSuccess }: { event: EventItem; onClose: () => void; onSuccess: () => void }) {
+// --- MODAL DE PARTICIPATION MEMBRE ---
+function MemberEventModal({ 
+  event, 
+  onClose, 
+  onSuccess 
+}: { 
+  event: EventItem; 
+  onClose: () => void; 
+  onSuccess: (status: 'attending' | 'absent') => void 
+}) {
   const [saving, setSaving] = useState(false);
 
   async function handleRSVP(status: 'attending' | 'absent') {
     setSaving(true);
     try {
-      await api.registerEventAttendance(event.id, { status });
-      onSuccess();
+      // Appel API avec le statut en majuscule car Prisma attend ATTENDING / ABSENT
+      await api.registerEventAttendance(event.id, { status: status.toUpperCase() });
+      onSuccess(status); // On passe le statut au parent pour afficher le bon Toast
     } catch (err) { 
       console.error(err);
       alert("Erreur lors de l'enregistrement de votre réponse. Veuillez réessayer."); 
-    } finally { 
       setSaving(false); 
     }
   }
@@ -38,7 +89,7 @@ function MemberEventModal({ event, onClose, onSuccess }: { event: EventItem; onC
     <div className="mev-modal-overlay" onClick={onClose}>
       <div className="mev-modal" onClick={e => e.stopPropagation()}>
         <div style={{ height: 6, background: 'linear-gradient(90deg, #059669, #34D399)' }} />
-        
+
         <div className="mev-modal-head">
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.8rem', fontWeight: 700, color: '#111827', margin: 0, lineHeight: 1.2 }}>
             {event.title}
@@ -89,18 +140,25 @@ function MemberEventModal({ event, onClose, onSuccess }: { event: EventItem; onC
   );
 }
 
+// ----------------------------------------------------------------------
+// PAGE PRINCIPALE : MEMBRE
+// ----------------------------------------------------------------------
 export default function MemberEventsPage() {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  
+  // État du toast
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try { 
       const res = await api.listEvents(); 
-      setItems(res.items); 
+      setItems(res?.items || []); 
     } catch (err) { 
       console.error(err); 
+      setItems([]);
     } finally { 
       setLoading(false); 
     }
@@ -108,12 +166,21 @@ export default function MemberEventsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const handleSuccess = (status: 'attending' | 'absent') => {
+    setSelectedEvent(null);
+    setToast({
+      message: status === 'attending' ? "Votre participation a été confirmée !" : "Votre absence a été signalée.",
+      type: 'success'
+    });
+    void load(); // Recharger les événements (optionnel)
+  };
+
   return (
     <AppShell title="Mes Événements">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@500;600;700;800&display=swap');
         
-        .mev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1000px; margin: 0 auto; }
+        .mev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1000px; margin: 0 auto; box-sizing: border-box; }
         .mev-title { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 700; color: #111827; margin-bottom: 1.5rem; line-height: 1.1; }
         .mev-title span { color: #059669; }
         
@@ -189,10 +256,15 @@ export default function MemberEventsPage() {
         <MemberEventModal 
           event={selectedEvent} 
           onClose={() => setSelectedEvent(null)} 
-          onSuccess={() => { 
-            setSelectedEvent(null); 
-            void load(); 
-          }} 
+          onSuccess={handleSuccess} 
+        />
+      )}
+
+      {toast && (
+        <Toast 
+          message={toast.message} 
+          type={toast.type} 
+          onClose={() => setToast(null)} 
         />
       )}
     </AppShell>
