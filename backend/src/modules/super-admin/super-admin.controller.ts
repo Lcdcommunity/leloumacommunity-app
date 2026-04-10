@@ -37,7 +37,8 @@ export class SuperAdminController {
 
   @Put('settings/pricing')
   updatePricing(
-    @Body() pricingData: Record<string, { monthlyQuota: number; membershipCard: number }>,
+    // 🔥 CORRECTION : On enlève le "?" pour matcher exactement avec la signature du Service
+    @Body() pricingData: Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold: number | null }>,
     @CurrentUser() actor: AuthUser
   ) {
     return this.service.updatePricingConfig(actor.associationId, pricingData, actor.id);
@@ -205,4 +206,4 @@ export class SuperAdminController {
       status
     );
   }
-} // 👈 LA VOICI ! C'est elle qui ferme la classe SuperAdminController
+}

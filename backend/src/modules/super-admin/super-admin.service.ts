@@ -11,7 +11,8 @@ import {
   UserRole,
   UserStatus,
   NotificationType,
-  ProjectStatus, // 🔥 AJOUT DE L'IMPORT ICI
+  ProjectStatus,
+  CurrencyCode, // 🔥 AJOUT DE L'IMPORT ICI POUR LE PRICING
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../../common/services/mail.service';
@@ -60,45 +61,59 @@ export class SuperAdminService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  /* ── GESTION DES PRIX ── */
+  /* ── GESTION DES PRIX (RÉÉCRITE POUR UTILISER LA VRAIE TABLE PRICING) ── */
 
   async getPricingConfig(associationId: string) {
-    const setting = await this.prisma.associationSetting.findUnique({
-      where: {
-        associationId_key: {
-          associationId,
-          key: 'PRICING_CONFIG',
-        },
-      },
+    // On va chercher dans la VRAIE table Pricing
+    const pricings = await this.prisma.pricing.findMany({
+      where: { associationId }
     });
 
-    return setting?.value ?? {};
+    const result: Record<string, any> = {};
+    for (const p of pricings) {
+      result[p.currency] = {
+        monthlyQuota: Number(p.monthlyQuota),
+        membershipCard: Number(p.membershipCard),
+        expenseValidationThreshold: p.expenseValidationThreshold ? Number(p.expenseValidationThreshold) : null,
+      };
+    }
+    return result;
   }
 
   async updatePricingConfig(
     associationId: string,
-    pricingData: Record<string, { monthlyQuota: number; membershipCard: number }>,
+    pricingData: Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold: number | null }>, // 🔥 ON ACCEPTE ENFIN LE SEUIL ICI
     actorId: string,
   ) {
-    return this.prisma.associationSetting.upsert({
-      where: {
-        associationId_key: {
-          associationId,
-          key: 'PRICING_CONFIG',
+    // On boucle sur chaque devise envoyée par le front et on fait un Upsert dans la vraie table Pricing
+    const updatePromises = Object.entries(pricingData).map(([currencyStr, data]) => {
+      const currency = currencyStr as CurrencyCode;
+      
+      return this.prisma.pricing.upsert({
+        where: {
+          associationId_currency: {
+            associationId,
+            currency,
+          }
         },
-      },
-      update: {
-        value: pricingData as Prisma.InputJsonValue,
-        updatedByUserId: actorId,
-      },
-      create: {
-        associationId,
-        key: 'PRICING_CONFIG',
-        value: pricingData as Prisma.InputJsonValue,
-        description: 'Tarifs globaux par devise',
-        updatedByUserId: actorId,
-      },
+        update: {
+          monthlyQuota: data.monthlyQuota,
+          membershipCard: data.membershipCard,
+          expenseValidationThreshold: data.expenseValidationThreshold !== undefined ? data.expenseValidationThreshold : null,
+        },
+        create: {
+          associationId,
+          currency,
+          monthlyQuota: data.monthlyQuota,
+          membershipCard: data.membershipCard,
+          expenseValidationThreshold: data.expenseValidationThreshold !== undefined ? data.expenseValidationThreshold : null,
+        }
+      });
     });
+
+    await Promise.all(updatePromises);
+    
+    return { success: true, message: 'Tarifs mis à jour avec succès.' };
   }
 
   /* ── ANTENNAS ── */
@@ -308,7 +323,6 @@ export class SuperAdminService {
       totalPages: Math.ceil(total / pageSize),
     };
   }
-
   async approveUser(userId: string, adminId: string, associationId: string) {
     const user = await this.prisma.user.update({
       where: { id: userId, associationId }, // 🔥 FILTRÉ
@@ -607,9 +621,7 @@ export class SuperAdminService {
         endDate: data.endDate ? new Date(data.endDate) : undefined,
       },
     });
-  }
-
-  async deleteProject(id: string, associationId: string) {
+  }  async deleteProject(id: string, associationId: string) {
     return this.prisma.project.delete({ where: { id, associationId } }); // 🔥 FILTRÉ
   }
 
