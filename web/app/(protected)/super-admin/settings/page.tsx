@@ -1,7 +1,7 @@
 // web/app/(protected)/super-admin/settings/page.tsx
 'use client';
 
-import { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
+import React, { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
 import { formatDate } from '../../../../lib/format';
@@ -311,18 +311,18 @@ export default function SuperAdminSettingsPage() {
         };
       });
 
-      // 🔥 FORÇAGE DE LA SAUVEGARDE DU SEUIL GLOBAL (Fallback si le backend Pricing ignore le champ)
-      const globalThresholdToSave = pricingMap[activeCurrency]?.expenseValidationThreshold 
-          ? Number(pricingMap[activeCurrency].expenseValidationThreshold) 
-          : (pricingMap['EUR']?.expenseValidationThreshold ? Number(pricingMap['EUR'].expenseValidationThreshold) : null);
+      // 🔥 Nettoyage strict du payload pour l'association (CORRECTION TYPESCRIPT ICI)
+      const assocPayload: Record<string, string | boolean | number | null> = { name, code, isActive };
+      
+      const rawThreshold = pricingMap[activeCurrency]?.expenseValidationThreshold || pricingMap['EUR']?.expenseValidationThreshold;
+      if (rawThreshold && rawThreshold.toString().trim() !== '') {
+         assocPayload.expenseValidationThreshold = Number(rawThreshold);
+      } else {
+         assocPayload.expenseValidationThreshold = null;
+      }
 
       await Promise.all([
-        api.updateAssociation({ 
-          name, 
-          code, 
-          isActive,
-          expenseValidationThreshold: globalThresholdToSave // Envoi direct sur la table Association !
-        }),
+        api.updateAssociation(assocPayload),
         api.updatePricingSuperAdmin(payload),
       ]);
 
@@ -331,7 +331,8 @@ export default function SuperAdminSettingsPage() {
       setInitialPricingMap(JSON.parse(JSON.stringify(pricingMap)));
       setMsg({ type: 'success', text: t('settings.saveSuccess', 'Paramètres mis à jour avec succès !') });
       setIsEditing(false);
-    } catch {
+    } catch (error: unknown) { // 🔥 CORRECTION TYPESCRIPT ICI
+      console.error("🔥 Erreur détaillée du backend :", error);
       setMsg({ type: 'error', text: t('settings.saveError', 'Erreur de sauvegarde') });
     } finally {
       setLoading(false);
