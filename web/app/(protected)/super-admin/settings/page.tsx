@@ -181,7 +181,7 @@ export default function SuperAdminSettingsPage() {
     setMounted(true);
     let isSubscribed = true;
 
-    // Forcer le thème CLAIR par défaut pour le SuperAdmin si aucun thème n'est explicitement défini
+    // 🔥 Forcer le thème CLAIR par défaut (évite le mode sombre non désiré)
     if (!theme || theme === 'system') {
       setTheme('light');
     }
@@ -217,6 +217,11 @@ export default function SuperAdminSettingsPage() {
             expenseValidationThreshold: apiPrices.expenseValidationThreshold ? apiPrices.expenseValidationThreshold.toString() : '',
           };
         });
+
+        // Tenter de récupérer le seuil global de l'association si le Pricing n'en avait pas pour l'EUR
+        if (!formattedMap['EUR'].expenseValidationThreshold && a.expenseValidationThreshold) {
+          formattedMap['EUR'].expenseValidationThreshold = a.expenseValidationThreshold.toString();
+        }
 
         setPricingMap(formattedMap);
         setInitialPricingMap(JSON.parse(JSON.stringify(formattedMap)));
@@ -306,8 +311,18 @@ export default function SuperAdminSettingsPage() {
         };
       });
 
+      // 🔥 FORÇAGE DE LA SAUVEGARDE DU SEUIL GLOBAL (Fallback si le backend Pricing ignore le champ)
+      const globalThresholdToSave = pricingMap[activeCurrency]?.expenseValidationThreshold 
+          ? Number(pricingMap[activeCurrency].expenseValidationThreshold) 
+          : (pricingMap['EUR']?.expenseValidationThreshold ? Number(pricingMap['EUR'].expenseValidationThreshold) : null);
+
       await Promise.all([
-        api.updateAssociation({ name, code, isActive }),
+        api.updateAssociation({ 
+          name, 
+          code, 
+          isActive,
+          expenseValidationThreshold: globalThresholdToSave // Envoi direct sur la table Association !
+        }),
         api.updatePricingSuperAdmin(payload),
       ]);
 

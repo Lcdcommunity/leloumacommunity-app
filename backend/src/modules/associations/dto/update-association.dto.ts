@@ -1,5 +1,5 @@
 //backend/src/modules/associations/dto/update-association.dto.ts
-import { IsBoolean, IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsOptional, IsString, MaxLength, IsNumber } from 'class-validator';
 
 export class UpdateAssociationDto {
   @IsOptional()
@@ -83,4 +83,9 @@ export class UpdateAssociationDto {
   @IsOptional()
   @IsDateString({}, { message: 'La date de fondation doit être valide (YYYY-MM-DD)' })
   foundedAt?: string;
+
+  // 🔥 LA CORRECTION CHIRURGICALE EST ICI
+  @IsOptional()
+  @IsNumber()
+  expenseValidationThreshold?: number;
 }

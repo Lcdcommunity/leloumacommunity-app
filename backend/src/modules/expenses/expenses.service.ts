@@ -25,7 +25,7 @@ export class ExpensesService {
     const { antenna, association } = assignment;
     const currencyToUse = (dto.currency || antenna.defaultCurrency || 'EUR') as CurrencyCode;
 
-    // Récupération du seuil de validation configuré par le SuperAdmin dans la table Pricing (par devise)
+    // 1. Tenter de récupérer le seuil configuré par devise (Table Pricing)
     const pricing = await this.prisma.pricing.findFirst({
       where: {
         associationId: association.id,
@@ -33,10 +33,26 @@ export class ExpensesService {
       }
     });
 
-    const threshold = pricing?.expenseValidationThreshold ? Number(pricing.expenseValidationThreshold) : null;
-    
-    // Le statut est En Attente si le montant dépasse strictement le seuil configuré
-    const isAboveThreshold = threshold !== null && dto.amount > threshold;
+    let threshold: number | null = null;
+
+    if (pricing && pricing.expenseValidationThreshold !== null && pricing.expenseValidationThreshold !== undefined) {
+      threshold = Number(pricing.expenseValidationThreshold);
+    } 
+    // 2. FALLBACK CRUCIAL : Si non trouvé dans Pricing, on cherche sur la table Association
+    else if (association.expenseValidationThreshold !== null && association.expenseValidationThreshold !== undefined) {
+      threshold = Number(association.expenseValidationThreshold);
+    }
+
+    // 🔥 LOGS DE DEBUGGING POUR LE TERMINAL DU BACKEND 🔥
+    console.log('\n--- DEBUG VALIDATION DÉPENSE ---');
+    console.log('1. Montant demandé :', dto.amount);
+    console.log('2. Seuil Pricing trouvé en BDD :', pricing?.expenseValidationThreshold);
+    console.log('3. Seuil Association trouvé en BDD :', association.expenseValidationThreshold);
+    console.log('4. Seuil final appliqué pour le test :', threshold);
+    console.log('--------------------------------\n');
+
+    // Dès que le montant est supérieur OU ÉGAL au seuil, on bloque en attente de validation
+    const isAboveThreshold = threshold !== null && Number(dto.amount) >= threshold;
     const initialStatus = isAboveThreshold ? ExpenseStatus.PENDING_VALIDATION : ExpenseStatus.VALIDATED;
 
     const expense = await this.prisma.expense.create({
@@ -57,7 +73,7 @@ export class ExpensesService {
       }
     });
 
-    // Si la dépense est directement validée (sous le seuil), on l'impute au solde immédiatement
+    // Si la dépense est validée (sous le seuil), on l'impute au solde immédiatement
     if (initialStatus === ExpenseStatus.VALIDATED) {
       await this.prisma.ledgerEntry.create({
         data: {

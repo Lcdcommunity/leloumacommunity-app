@@ -43,6 +43,9 @@ export class AssociationsService {
         ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
         ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency as CurrencyCode } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+        
+        // 🔥 L'AJOUT FINAL EST ICI ! On dit au service de sauvegarder le seuil dans Prisma
+        ...(data.expenseValidationThreshold !== undefined ? { expenseValidationThreshold: data.expenseValidationThreshold } : {}),
       },
     });
 
