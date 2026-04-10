@@ -5,8 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
 import type { Contribution, ContributionStatus } from '../../../../types/contribution';
-import { ContributionsTable } from '../../../../components/super-admin/ContributionsTable';
-import { formatCurrency } from '../../../../lib/format';
+import { formatCurrency, formatDate } from '../../../../lib/format';
 
 type CurrencyBucket = Record<string, number>;
 
@@ -16,7 +15,23 @@ const STATUS_MAP: Record<string, { label: string; color: string; bg: string; bor
   VALIDATED: { label: 'Validée', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
   REJECTED: { label: 'Rejetée', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
   CANCELLED: { label: 'Annulée', color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+  DRAFT: { label: 'Brouillon', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  SUBMITTED: { label: 'Soumise', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
 };
+
+const METHOD_LABELS: Record<string, string> = {
+  CASH: 'Espèces',
+  BANK_TRANSFER: 'Virement',
+  MOBILE_MONEY: 'Mobile Money',
+  CARD: 'Carte',
+  OTHER: 'Autre',
+};
+
+function getInitials(name: string) {
+  const parts = name.trim().split(' ');
+  const initials = parts.map((part) => part[0]).join('');
+  return initials.slice(0, 2).toUpperCase();
+}
 
 function StatCard({
   label,
@@ -50,30 +65,13 @@ function sumAmountsByCurrency(entries: Contribution[]): CurrencyBucket {
   }, {});
 }
 
-function renderCurrencyBucket(bucket: CurrencyBucket, color?: string) {
-  const entries = Object.entries(bucket);
-  if (entries.length === 0) return null;
-
-  return (
-    <div className="sc-currency-wrap">
-      {entries.map(([currency, amount]) => (
-        <span
-          key={currency}
-          className="sc-currency-badge"
-          style={{ color: color ?? '#111827' }}
-        >
-          {formatCurrency(amount, currency)}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 export default function SuperAdminContributionsPage() {
   const [items, setItems] = useState<Contribution[]>([]);
   const [status, setStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [selectedItem, setSelectedItem] = useState<Contribution | null>(null);
 
   const load = useCallback(
     async (statusVal?: string) => {
@@ -100,7 +98,15 @@ export default function SuperAdminContributionsPage() {
     void load('');
   }, [load]);
 
-  // Filtrage local instantané
+  useEffect(() => {
+    if (selectedItem) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [selectedItem]);
+
   const displayedItems = useMemo(() => {
     if (!status) return items;
     return items.filter((c) => {
@@ -120,10 +126,11 @@ export default function SuperAdminContributionsPage() {
     [items],
   );
 
-  const pendingByCurrency = useMemo(
+  const _pendingByCurrency = useMemo(
     () => sumAmountsByCurrency(pendingItems),
     [pendingItems],
   );
+  void _pendingByCurrency;
 
   const hasPending = pending > 0;
 
@@ -131,34 +138,18 @@ export default function SuperAdminContributionsPage() {
     <AppShell title="Cotisations globales">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
-        .sc-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1200px;margin:0 auto}
-        .sc-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:scin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
-        .sc-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
-        .sc-dot{width:6px;height:6px;background:#EF4444;border-radius:50%;animation:scpulse 2s ease-in-out infinite}
-        @keyframes scpulse{0%,100%{opacity:1}50%{opacity:.3}}
-        .sc-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
-        .sc-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        
+        .sc-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1200px; margin: 0 auto; box-sizing: border-box; overflow-x: hidden; }
+        
+        .sc-header { margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: scin .5s .04s cubic-bezier(.22,1,.36,1) forwards; }
+        .sc-eyebrow { font-size: .67rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #DC2626; margin-bottom: .35rem; display: flex; align-items: center; gap: .4rem; }
+        .sc-dot { width: 6px; height: 6px; background: #EF4444; border-radius: 50%; animation: scpulse 2s ease-in-out infinite; }
+        @keyframes scpulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+        .sc-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; color: #111827; letter-spacing: -.02em; line-height: 1.15; margin: 0; }
+        .sc-title span { background: linear-gradient(135deg, #991B1B, #EF4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-        .sc-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.7rem;
-            margin-bottom: 1.4rem;
-            opacity: 0;
-            transform: translateY(10px);
-            animation: scin 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards;
-        }
-        .stat-card {
-            background: rgba(253,253,255,.93);
-            border-radius: 14px;
-            border: 1px solid rgba(220,38,38,.09);
-            box-shadow: 0 2px 8px rgba(220,38,38,.04);
-            padding: 0.8rem 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.5rem;
-        }
+        .sc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; margin-bottom: 1.4rem; opacity: 0; transform: translateY(10px); animation: scin 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards; }
+        .stat-card { background: rgba(253,253,255,.93); border-radius: 14px; border: 1px solid rgba(220,38,38,.09); box-shadow: 0 2px 8px rgba(220,38,38,.04); padding: 0.8rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
         .stat-val { font-family: 'Cormorant Garamond',serif; font-size: 1.55rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
         .stat-lbl { font-size: 0.64rem; font-weight: 900; color: #6B7280; text-transform: uppercase; letter-spacing: 0.07em; line-height: 1.2; }
         .stat-ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -172,97 +163,30 @@ export default function SuperAdminContributionsPage() {
             .stat-ico svg { width: 14px; height: 14px; }
         }
 
-        .sc-urgent{display:flex;align-items:flex-start;gap:.75rem;padding:.85rem 1.1rem;background:linear-gradient(135deg,rgba(217,119,6,.07),rgba(245,158,11,.04));border:1px solid rgba(217,119,6,.2);border-radius:13px;margin-bottom:1.25rem;opacity:0;transform:translateY(8px);animation:scin .5s .12s cubic-bezier(.22,1,.36,1) forwards}
-        .sc-urgent-ico{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#92400E,#D97706);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 3px 8px rgba(217,119,6,.3)}
-        .sc-urgent-text strong{font-size:.85rem;font-weight:800;color:#111827;display:block;margin-bottom:.35rem}
-        .sc-urgent-text span{font-size:.75rem;font-weight:600;color:#6B7280}
+        .sc-urgent { display: flex; align-items: center; gap: .75rem; padding: .85rem 1.1rem; background: linear-gradient(135deg,rgba(217,119,6,.07),rgba(245,158,11,.04)); border: 1px solid rgba(217,119,6,.2); border-radius: 13px; margin-bottom: 1.25rem; opacity: 0; transform: translateY(8px); animation: scin .5s .12s cubic-bezier(.22,1,.36,1) forwards; }
+        .sc-urgent-ico { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg,#92400E,#D97706); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 3px 8px rgba(217,119,6,.3); }
+        .sc-urgent-text { display: flex; flex-direction: column; gap: .2rem; }
+        .sc-urgent-text strong { font-size: .85rem; font-weight: 800; color: #111827; }
+        .sc-urgent-text span { font-size: .75rem; font-weight: 600; color: #6B7280; }
 
-        .sc-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:scin .5s .16s cubic-bezier(.22,1,.36,1) forwards}
-        .sc-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:nowrap; overflow: hidden;}
-        .sc-panel-titlerow{display:flex;align-items:center;gap:.55rem; min-width: 0;}
-        .sc-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
+        .sc-panel { background: rgba(253,253,255,.94); backdrop-filter: blur(14px); border-radius: 22px; border: 1px solid rgba(220,38,38,.09); box-shadow: 0 2px 18px rgba(220,38,38,.06), 0 0 0 1px rgba(255,255,255,.9) inset; overflow: hidden; opacity: 0; transform: translateY(10px); animation: scin .5s .16s cubic-bezier(.22,1,.36,1) forwards; }
+        .sc-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid rgba(220,38,38,.07); display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: nowrap; overflow: hidden; }
+        .sc-panel-titlerow { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+        .sc-panel-ico { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg,#991B1B,#DC2626); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(220,38,38,.3); }
         
-        .sc-panel-title {
-            font-size: clamp(0.7rem, 2.5vw, 0.75rem);
-            font-weight: 900;
-            letter-spacing: .05em;
-            text-transform: uppercase;
-            color: #1F2937;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .sc-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA; flex-shrink:0;}
+        .sc-panel-title { font-size: clamp(0.7rem, 2.5vw, 0.75rem); font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sc-count-chip { font-size: .68rem; font-weight: 900; padding: .2rem .6rem; border-radius: 99px; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; flex-shrink: 0; }
 
-        .sc-toolbar {
-            display: flex;
-            flex-direction: row;
-            gap: 0.6rem;
-            align-items: center;
-            flex-wrap: nowrap;
-            padding: 0.9rem 1.4rem;
-            border-bottom: 1px solid rgba(220,38,38,.07);
-        }
-        .sc-field {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            gap: 0.5rem;
-            flex: 1;
-            min-width: 0;
-        }
-        .sc-label {
-            font-size: 0.7rem;
-            font-weight: 900;
-            color: #374151;
-            letter-spacing: .05em;
-            text-transform: uppercase;
-            white-space: nowrap;
-        }
-        .sc-select {
-            flex: 1;
-            height: 40px;
-            border-radius: 11px;
-            border: 1px solid rgba(220,38,38,.18);
-            background: rgba(255,255,255,.9);
-            padding: 0 1.8rem 0 .85rem;
-            font-family: 'DM Sans',sans-serif;
-            font-size: .84rem;
-            font-weight: 700;
-            color: #111827;
-            outline: none;
-            appearance: none;
-            cursor: pointer;
-            background-image: url("data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right .65rem center;
-            transition: border-color .2s,box-shadow .2s;
-            min-width: 0;
-            text-overflow: ellipsis;
-        }
+        .sc-toolbar { display: flex; flex-direction: row; gap: 0.6rem; align-items: center; flex-wrap: nowrap; padding: 0.9rem 1.4rem; border-bottom: 1px solid rgba(220,38,38,.07); }
+        .sc-field { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+        .sc-label { font-size: 0.7rem; font-weight: 900; color: #374151; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+        .sc-select { flex: 1; height: 40px; border-radius: 11px; border: 1px solid rgba(220,38,38,.18); background: rgba(255,255,255,.9); padding: 0 1.8rem 0 .85rem; font-family: 'DM Sans',sans-serif; font-size: .84rem; font-weight: 700; color: #111827; outline: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .65rem center; transition: border-color .2s,box-shadow .2s; min-width: 0; text-overflow: ellipsis; }
         .sc-select:focus { border-color: rgba(220,38,38,.42); box-shadow: 0 0 0 3px rgba(220,38,38,.09); }
-        .sc-filter-btn {
-            height: 40px;
-            padding: 0 1.2rem;
-            border-radius: 11px;
-            background: linear-gradient(135deg,#991B1B,#DC2626);
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-family: 'DM Sans',sans-serif;
-            font-size: .84rem;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: .45rem;
-            box-shadow: 0 3px 10px rgba(220,38,38,.3);
-            transition: all .18s;
-            white-space: nowrap;
-            flex-shrink: 0;
-        }
+        
+        .sc-filter-btn { height: 40px; padding: 0 1.2rem; border-radius: 11px; background: linear-gradient(135deg,#991B1B,#DC2626); border: none; color: white; cursor: pointer; font-family: 'DM Sans',sans-serif; font-size: .84rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: .45rem; box-shadow: 0 3px 10px rgba(220,38,38,.3); transition: all .18s; white-space: nowrap; flex-shrink: 0; }
         .sc-filter-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(220,38,38,.42); }
         .sc-filter-btn:disabled { opacity: .6; cursor: not-allowed; }
+        
         @media(max-width: 500px) {
             .sc-toolbar { padding: 0.7rem 0.8rem; gap: 0.4rem; }
             .sc-field { gap: 0.35rem; }
@@ -271,74 +195,112 @@ export default function SuperAdminContributionsPage() {
             .sc-filter-btn { padding: 0 0.8rem; font-size: 0.75rem; }
         }
 
-        /* LIGNE 1 : Statuts forcés sur une ligne sans scroll */
-        .sc-status-chips {
-            display: flex;
-            flex-wrap: nowrap;
-            align-items: center;
-            justify-content: center;
-            gap: clamp(0.2rem, 1.5vw, 0.6rem);
-            padding: 0.75rem clamp(0.3rem, 2vw, 1.4rem);
-            border-bottom: 1px solid rgba(220,38,38,.06);
-            background: rgba(254,242,242,.18);
-            width: 100%;
-            overflow: hidden;
-        }
-        .sc-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.15rem;
-            font-size: clamp(0.5rem, 2.5vw, 0.68rem);
-            font-weight: 800;
-            border-radius: 99px;
-            padding: 0.15rem clamp(0.25rem, 1.5vw, 0.6rem);
-            border: 1px solid;
-            cursor: pointer;
-            transition: all 0.15s;
-            white-space: nowrap;
-            flex-shrink: 1;
-            min-width: 0;
-        }
-        .sc-chip span:last-child {
-            font-family: 'DM Mono', monospace;
-            font-size: clamp(0.5rem, 2.5vw, 0.68rem);
-            margin-left: 0.1rem;
+        .sc-status-chips { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: clamp(0.2rem, 1.5vw, 0.6rem); padding: 0.75rem clamp(0.3rem, 2vw, 1.4rem); border-bottom: 1px solid rgba(220,38,38,.06); background: rgba(254,242,242,.18); width: 100%; overflow: hidden; }
+        .sc-chip { display: inline-flex; align-items: center; gap: 0.15rem; font-size: clamp(0.5rem, 2.5vw, 0.68rem); font-weight: 800; border-radius: 99px; padding: 0.15rem clamp(0.25rem, 1.5vw, 0.6rem); border: 1px solid; cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 1; min-width: 0; }
+        .sc-chip span:last-child { font-family: 'DM Mono', monospace; font-size: clamp(0.5rem, 2.5vw, 0.68rem); margin-left: 0.1rem; }
+
+        .sc-currency-wrap { display: flex; flex-direction: column; gap: 0.35rem; align-items: center; justify-content: center; width: 100%; }
+        .sc-currency-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; padding: 0.25rem 0.5rem; font-size: clamp(0.55rem, 2.2vw, 0.72rem); font-weight: 800; background: rgba(255,255,255,.9); border: 1px solid rgba(0,0,0,.08); white-space: nowrap; width: max-content; max-width: 100%; }
+
+        .sc-error { display: flex; align-items: center; gap: .65rem; padding: .9rem 1.2rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; color: #B91C1C; font-size: .82rem; font-weight: 800; margin: 1rem; }
+        .sc-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: .75rem; color: #6B7280; font-size: .84rem; font-weight: 700; }
+        .sc-ring { width: 24px; height: 24px; border: 2.5px solid rgba(220,38,38,.12); border-top-color: #DC2626; border-radius: 50%; animation: scspin .8s linear infinite; }
+        .sc-empty { display: flex; flex-direction: column; align-items: center; padding: 3.5rem 1rem; gap: .75rem; color: #9CA3AF; }
+        .sc-empty-title { font-size: .9rem; font-weight: 800; color: #374151; }
+        .sc-empty-sub { font-size: .78rem; font-weight: 600; }
+
+        @keyframes scin { to { opacity: 1; transform: translateY(0); } }
+        @keyframes scspin { to { transform: rotate(360deg); } }
+
+        /* ─── STYLES DU TABLEAU INTÉGRÉ ─── */
+        .sct-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .sct-table thead tr { border-bottom: 1px solid rgba(220,38,38,.08); }
+        .sct-table thead th { padding: .85rem 1.1rem; text-align: left; font-size: .66rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: #6B7280; background: rgba(254,242,242,.22); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .sct-row { border-bottom: 1px solid rgba(220,38,38,.06); transition: background .15s ease; cursor: pointer; }
+        .sct-row:hover { background: rgba(220,38,38,.03); }
+        .sct-row:last-child { border-bottom: none; }
+        .sct-table td { padding: .9rem 1.1rem; font-size: .82rem; color: #374151; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+
+        .sct-member-cell { display: flex; align-items: center; gap: 0.75rem; }
+        .sct-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #DC2626, #991B1B); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900; color: white; flex-shrink: 0; }
+        .sct-member { display: flex; flex-direction: column; gap: .18rem; min-width: 0; }
+        .sct-member-name { font-size: .87rem; font-weight: 800; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sct-member-email { font-size: .72rem; color: #9CA3AF; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .sct-amount { font-family: 'DM Mono', monospace; font-size: .84rem; font-weight: 800; color: #111827; white-space: nowrap; }
+        .sct-date { white-space: nowrap; font-size: .78rem; font-weight: 600; color: #374151; }
+        .sct-status { display: inline-flex; align-items: center; gap: .32rem; padding: .25rem .62rem; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+        .sct-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+        /* ── CARTES MOBILE (Remplace le tableau) ── */
+        .sct-cards { display: none; }
+
+        @media (max-width: 768px) {
+          .sct-table { display: none; } 
+          
+          .sct-cards { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.8rem 1rem; }
+          .sct-card { background: white; border-radius: 16px; border: 1px solid rgba(220,38,38,.08); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.1s, background 0.15s; }
+          .sct-card:active { transform: scale(0.98); background: #FDF2F2; }
+
+          .sct-card-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+          .sct-card-member { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+          .sct-card-member .sct-avatar { width: 28px; height: 28px; font-size: 0.6rem; }
+          .sct-card-member .sct-member-name { font-size: 0.8rem; }
+          
+          .sct-card-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 0.6rem; border-top: 1px solid rgba(0,0,0,0.04); }
+          .sct-card-date { font-size: 0.7rem; color: #9CA3AF; font-weight: 600; }
         }
 
-        /* Gestion de l'affichage des devises multiples - EMPILEMENT VERTICAL */
-        .sc-currency-wrap {
-            display: flex;
-            flex-direction: column;
-            gap: 0.35rem;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
+        /* ── NOUVEAU MODAL (Basé sur Members) ── */
+        .modal-overlay { 
+          position: fixed; inset: 0; 
+          background: rgba(15,23,42,0.6); backdrop-filter: blur(4px); 
+          z-index: 1000; 
+          display: flex; align-items: center; justify-content: center; 
+          padding: 1rem; 
         }
-        .sc-currency-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 999px;
-            padding: 0.25rem 0.5rem;
-            font-size: clamp(0.55rem, 2.2vw, 0.72rem);
-            font-weight: 800;
-            background: rgba(255,255,255,.9);
-            border: 1px solid rgba(0,0,0,.08);
-            white-space: nowrap;
-            width: max-content;
-            max-width: 100%;
+        .modal-content { 
+          background: white; 
+          width: 100%; max-width: 500px; 
+          border-radius: 24px; 
+          max-height: 90vh; overflow-y: auto; 
+          box-shadow: 0 20px 40px rgba(0,0,0,0.2);
         }
+        .modal-header { 
+          padding: 1.25rem; 
+          border-bottom: 1px solid #f1f5f9; 
+          display: flex; justify-content: space-between; align-items: center; 
+          position: sticky; top: 0; background: white; z-index: 10; 
+        }
+        .modal-title { font-family: 'Cormorant Garamond',serif; font-size: 1.4rem; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #e2e8f0; display: flex; align-items: center; justify-content: center; cursor: pointer; background: white; color: #64748b; }
+        .modal-close:hover { background: #f8fafc; }
+        
+        .modal-body { padding: 1.25rem; }
 
-        .sc-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
-        .sc-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
-        .sc-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:scspin .8s linear infinite}
+        /* Mise en avant du montant - EN VERT ET DOUX COMME DEMANDÉ */
+        .sc-modal-hero { 
+          display: flex; flex-direction: column; align-items: center; justify-content: center; 
+          padding: 1rem 1.5rem; 
+          background: linear-gradient(to bottom, #ECFDF5, #F0FDF4); 
+          border-radius: 16px; border: 1px dashed #A7F3D0;
+          margin-bottom: 1.5rem;
+        }
+        .sc-modal-hero-label { font-size: 0.65rem; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.2rem; }
+        .sc-modal-hero-amount { font-family: 'DM Mono', monospace; font-size: clamp(1.8rem, 6vw, 2.4rem); font-weight: 800; color: #047857; line-height: 1; text-align: center; word-break: break-word; }
 
-        .sc-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1rem;gap:.75rem;color:#9CA3AF}
-        .sc-empty-title{font-size:.9rem;font-weight:800;color:#374151}
-        .sc-empty-sub{font-size:.78rem;font-weight:600}
+        /* Grille des infos */
+        .sm-section-divider { font-size: 0.7rem; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #A7F3D0; padding-bottom: 0.4rem; margin: 0 0 0.75rem 0; }
+        .sm-dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .sm-dp-field { display: flex; flex-direction: column; gap: 4px; }
+        .sm-dp-field.full { grid-column: span 2; }
+        .sm-dp-field label { font-size: .65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+        .sm-dp-value { font-size: .9rem; font-weight: 600; color: #1e293b; padding: 4px 0; word-break: break-word; }
 
-        @keyframes scin{to{opacity:1;transform:translateY(0)}}
-        @keyframes scspin{to{transform:rotate(360deg)}}
+        /* Avatar / Utilisateur dans la grille - VERT ÉGALEMENT */
+        .sc-modal-user { display: flex; align-items: center; gap: 0.6rem; }
+        .sc-modal-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#059669,#047857); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; color: white; flex-shrink: 0; }
       `}</style>
 
       <div className="sc-wrap">
@@ -388,9 +350,8 @@ export default function SuperAdminContributionsPage() {
               </svg>
             </div>
             <div className="sc-urgent-text">
-              <strong>{pending} cotisation{pending > 1 ? 's' : ''} en attente</strong>
-              {renderCurrencyBucket(pendingByCurrency, '#92400E')}
-              <span style={{ display: 'block', marginTop: '0.4rem' }}>Ces cotisations n&apos;ont pas encore été validées par les administrateurs d&apos;antenne.</span>
+              <strong>{pending} cotisation{pending > 1 ? 's' : ''} en attente de validation</strong>
+              <span>Ces cotisations n&apos;ont pas encore été validées par les administrateurs d&apos;antenne.</span>
             </div>
           </div>
         )}
@@ -454,7 +415,6 @@ export default function SuperAdminContributionsPage() {
             </button>
           </div>
 
-          {/* GROUPE 1 : Statuts (Ligne forcée sans scroll) */}
           {!loading && items.length > 0 && (
             <div className="sc-status-chips">
               {(Object.entries(STATUS_MAP) as [ContributionStatus, typeof STATUS_MAP[ContributionStatus]][]).map(([key, s]) => {
@@ -517,10 +477,187 @@ export default function SuperAdminContributionsPage() {
               <div className="sc-empty-sub">Essayez de modifier le filtre ou de réinitialiser.</div>
             </div>
           ) : !error ? (
-            <ContributionsTable items={displayedItems} />
+            <>
+              {/* TABLEAU DESKTOP */}
+              <table className="sct-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '35%' }}>Membre</th>
+                    <th style={{ width: '20%' }}>Antenne</th>
+                    <th style={{ width: '15%' }}>Montant</th>
+                    <th style={{ width: '15%' }}>Date</th>
+                    <th style={{ width: '15%' }}>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedItems.map((contribution) => {
+                    const statusStyles = STATUS_MAP[contribution.status] || STATUS_MAP.PENDING;
+                    const memberName = `${contribution.member?.firstName ?? ''} ${contribution.member?.lastName ?? ''}`.trim() || '—';
+
+                    return (
+                      <tr 
+                        key={contribution.id} 
+                        className="sct-row" 
+                        onClick={() => setSelectedItem(contribution)}
+                        title="Cliquer pour voir les détails"
+                      >
+                        <td>
+                          <div className="sct-member-cell">
+                            <div className="sct-avatar">{getInitials(memberName)}</div>
+                            <div className="sct-member">
+                              <span className="sct-member-name">{memberName}</span>
+                              <span className="sct-member-email">{contribution.member?.email ?? '—'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{contribution.antenna?.name || '-'}</td>
+                        <td className="sct-amount">{formatCurrency(contribution.amount, contribution.currency || 'EUR')}</td>
+                        <td className="sct-date">{formatDate(contribution.contributionDate || contribution.createdAt)}</td>
+                        <td>
+                          <span
+                            className="sct-status"
+                            style={{ color: statusStyles.color, background: statusStyles.bg, border: `1px solid ${statusStyles.border}` }}
+                          >
+                            <span className="sct-status-dot" style={{ background: statusStyles.color }} />
+                            {statusStyles.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* CARTES MOBILE */}
+              <div className="sct-cards">
+                {displayedItems.map((contribution) => {
+                  const statusStyles = STATUS_MAP[contribution.status] || STATUS_MAP.PENDING;
+                  const memberName = `${contribution.member?.firstName ?? ''} ${contribution.member?.lastName ?? ''}`.trim() || '—';
+
+                  return (
+                    <div 
+                      key={contribution.id} 
+                      className="sct-card" 
+                      onClick={() => setSelectedItem(contribution)}
+                    >
+                      <div className="sct-card-head">
+                        <div className="sct-card-member">
+                          <div className="sct-avatar">{getInitials(memberName)}</div>
+                          <span className="sct-member-name">{memberName}</span>
+                        </div>
+                        <span
+                          className="sct-status"
+                          style={{ color: statusStyles.color, background: statusStyles.bg, border: `1px solid ${statusStyles.border}` }}
+                        >
+                          <span className="sct-status-dot" style={{ background: statusStyles.color }} />
+                          {statusStyles.label}
+                        </span>
+                      </div>
+                      
+                      <div className="sct-card-foot">
+                        <span className="sct-card-date">Le {formatDate(contribution.contributionDate || contribution.createdAt)}</span>
+                        <span style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 600 }}>Détails ➔</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           ) : null}
         </div>
       </div>
+
+      {/* ── MODAL (Aligné sur le style "Members" avec Hero en Vert) ── */}
+      {selectedItem && (
+        <div className="modal-overlay" onClick={() => setSelectedItem(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            
+            <div className="modal-header">
+              <h2 className="modal-title">
+                Détails de la cotisation
+              </h2>
+              <button className="modal-close" onClick={() => setSelectedItem(null)}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Le montant est le héros du modal - EN VERT */}
+              <div className="sc-modal-hero">
+                <span className="sc-modal-hero-label">Montant de la cotisation</span>
+                <span className="sc-modal-hero-amount">
+                  {formatCurrency(selectedItem.amount, selectedItem.currency || 'EUR')}
+                </span>
+              </div>
+
+              <div className="sm-section-divider">Informations Membre</div>
+              <div className="sm-dp-grid" style={{ marginBottom: '1rem', gridTemplateColumns: '1fr' }}>
+                <div className="sm-dp-field full">
+                  <div className="sc-modal-user">
+                    <div className="sc-modal-avatar">
+                      {getInitials(`${selectedItem.member?.firstName ?? ''} ${selectedItem.member?.lastName ?? ''}`.trim() || '—')}
+                    </div>
+                    <div>
+                      <div className="sm-dp-value" style={{ padding: 0 }}>
+                        {`${selectedItem.member?.firstName ?? ''} ${selectedItem.member?.lastName ?? ''}`.trim() || '—'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>
+                        {selectedItem.member?.email ?? 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="sm-section-divider">Détails de la transaction</div>
+              <div className="sm-dp-grid">
+                <div className="sm-dp-field">
+                  <label>Statut</label>
+                  <div className="sm-dp-value">
+                    <span 
+                      className="sct-status" 
+                      style={{ 
+                        color: (STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).color, 
+                        background: (STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).bg, 
+                        border: `1px solid ${(STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).border}`
+                      }}
+                    >
+                      <span className="sct-status-dot" style={{ background: (STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).color }} />
+                      {(STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).label}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="sm-dp-field">
+                  <label>Date de dépôt</label>
+                  <div className="sm-dp-value">{formatDate(selectedItem.contributionDate || selectedItem.createdAt)}</div>
+                </div>
+
+                <div className="sm-dp-field">
+                  <label>Antenne affiliée</label>
+                  <div className="sm-dp-value">{selectedItem.antenna?.name || '—'}</div>
+                </div>
+
+                <div className="sm-dp-field">
+                  <label>Méthode de paiement</label>
+                  <div className="sm-dp-value">{METHOD_LABELS[selectedItem.paymentMethod || ''] || selectedItem.paymentMethod || '—'}</div>
+                </div>
+
+                <div className="sm-dp-field full">
+                  <label>Référence</label>
+                  <div className="sm-dp-value" style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#6B7280' }}>
+                    {selectedItem.id}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </AppShell>
   );
 }

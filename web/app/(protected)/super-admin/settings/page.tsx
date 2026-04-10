@@ -146,12 +146,12 @@ export default function SuperAdminSettingsPage() {
   const isRTL = i18n.language === 'ar';
 
   const [association, setAssociation] = useState<Association | null>(null);
-  
+
   // Settings Association
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [isActive, setIsActive] = useState(true);
-  
+
   // Settings Pricing Multi-Devises
   const [activeCurrency, setActiveCurrency] = useState('EUR');
   const [pricingMap, setPricingMap] = useState<PricingMap>({});
@@ -181,6 +181,11 @@ export default function SuperAdminSettingsPage() {
     setMounted(true);
     let isSubscribed = true;
 
+    // Forcer le thème CLAIR par défaut pour le SuperAdmin si aucun thème n'est explicitement défini
+    if (!theme || theme === 'system') {
+      setTheme('light');
+    }
+
     // Vérification des notifications Push au montage
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(registration => {
@@ -196,13 +201,13 @@ export default function SuperAdminSettingsPage() {
           api.getAssociation(),
           api.getPricingSuperAdmin().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold?: number }>)),
         ]);
-        
+
         if (!isSubscribed) return;
         setAssociation(a);
         setName(a.name);
         setCode(a.code);
         setIsActive(a.isActive);
-        
+
         const formattedMap: PricingMap = {};
         SUPPORTED_CURRENCIES.forEach(cur => {
           const apiPrices = pricingData[cur] || { monthlyQuota: 0, membershipCard: 0, expenseValidationThreshold: null };
@@ -222,7 +227,7 @@ export default function SuperAdminSettingsPage() {
       }
     })();
     return () => { isSubscribed = false; };
-  }, [t]);
+  }, [t, theme, setTheme]);
 
   /* ── Gestion des Notifications Push ── */
   const togglePushNotifications = async (enable: boolean) => {
@@ -286,7 +291,7 @@ export default function SuperAdminSettingsPage() {
       setIsActive(association.isActive);
     }
     setPricingMap(JSON.parse(JSON.stringify(initialPricingMap)));
-  };
+  };  
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -305,7 +310,7 @@ export default function SuperAdminSettingsPage() {
         api.updateAssociation({ name, code, isActive }),
         api.updatePricingSuperAdmin(payload),
       ]);
-      
+
       const updated = await api.getAssociation();
       setAssociation(updated);
       setInitialPricingMap(JSON.parse(JSON.stringify(pricingMap)));
@@ -472,7 +477,7 @@ export default function SuperAdminSettingsPage() {
 
             {/* ── LEFT COLUMN ── */}
             <div className="ss-left-col">
-              
+
               {/* Panel 1 : Configuration Globale */}
               <div className="ss-panel ss-panel-left">
                 <div className="ss-panel-head">
@@ -493,7 +498,7 @@ export default function SuperAdminSettingsPage() {
                     </button>
                   )}
                 </div>
-                
+
                 {!initLoad && (
                   <form onSubmit={(e: FormEvent<HTMLFormElement>) => void onSubmit(e)}>
                     <div className="ss-panel-body" style={{ paddingBottom: isEditing ? '1rem' : '1.5rem' }}>
@@ -512,8 +517,7 @@ export default function SuperAdminSettingsPage() {
                           placeholder={t('settings.orgNamePlaceholder', 'Ex : Ma Super Association')}
                           required
                           disabled={!isEditing}
-                          hint={t('settings.orgNameHint', "Ce nom apparaît sur tous les documents et communications officiels.")}
-                          isRTL={isRTL}
+                          hint={t('settings.orgNameHint', "Ce nom apparaît sur tous les documents et communications officiels.")}                          isRTL={isRTL}
                         />
 
                         <Field
@@ -596,7 +600,7 @@ export default function SuperAdminSettingsPage() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {isEditing && (
                       <div className="ss-form-footer" style={{ paddingTop: '1rem' }}>
                         <div>
@@ -715,8 +719,7 @@ export default function SuperAdminSettingsPage() {
 
                     <div className="ss-field-group">
                       <label className="ss-field-label">{t('settings.theme', 'Thème')}</label>
-                      <div className="ss-theme-row">
-                        {([
+                      <div className="ss-theme-row">                        {([
                           { value: 'light', label: t('settings.themeLight', 'Clair'), icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path strokeLinecap="round" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> },
                           { value: 'dark',  label: t('settings.themeDark', 'Sombre'), icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg> },
                           { value: 'system',label: t('settings.themeSystem', 'Système'), icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> },

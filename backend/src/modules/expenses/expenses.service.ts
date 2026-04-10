@@ -11,7 +11,7 @@ export class ExpensesService {
   // ==========================================
   // LOGIQUE ADMIN D'ANTENNE
   // ==========================================
-  
+
   async createAntennaExpense(adminUserId: string, dto: CreateExpenseDto) {
     const assignment = await this.prisma.antennaAdminAssignment.findFirst({
       where: { adminUserId, isActive: true },
@@ -23,9 +23,20 @@ export class ExpensesService {
     }
 
     const { antenna, association } = assignment;
-    const threshold = association.expenseValidationThreshold ? Number(association.expenseValidationThreshold) : null;
-    const isAboveThreshold = threshold !== null && dto.amount >= threshold;
+    const currencyToUse = (dto.currency || antenna.defaultCurrency || 'EUR') as CurrencyCode;
 
+    // Récupération du seuil de validation configuré par le SuperAdmin dans la table Pricing (par devise)
+    const pricing = await this.prisma.pricing.findFirst({
+      where: {
+        associationId: association.id,
+        currency: currencyToUse
+      }
+    });
+
+    const threshold = pricing?.expenseValidationThreshold ? Number(pricing.expenseValidationThreshold) : null;
+    
+    // Le statut est En Attente si le montant dépasse strictement le seuil configuré
+    const isAboveThreshold = threshold !== null && dto.amount > threshold;
     const initialStatus = isAboveThreshold ? ExpenseStatus.PENDING_VALIDATION : ExpenseStatus.VALIDATED;
 
     const expense = await this.prisma.expense.create({
@@ -34,7 +45,7 @@ export class ExpensesService {
         antennaId: antenna.id,
         engagedByUserId: adminUserId,
         amount: dto.amount,
-        currency: (dto.currency || antenna.defaultCurrency || 'EUR') as CurrencyCode,
+        currency: currencyToUse,
         category: dto.category as ExpenseCategory,
         title: dto.title,
         description: dto.description,
@@ -46,6 +57,7 @@ export class ExpensesService {
       }
     });
 
+    // Si la dépense est directement validée (sous le seuil), on l'impute au solde immédiatement
     if (initialStatus === ExpenseStatus.VALIDATED) {
       await this.prisma.ledgerEntry.create({
         data: {
@@ -96,15 +108,15 @@ export class ExpensesService {
     const expense = await this.prisma.expense.findFirst({ 
       where: { id: expenseId, associationId, engagedByUserId: adminUserId } 
     });
-    
+
     if (!expense) {
       throw new NotFoundException("Dépense introuvable ou vous n'avez pas les droits.");
     }
-    
+
     if (expense.status === ExpenseStatus.VALIDATED) {
       throw new BadRequestException("Impossible de supprimer une dépense déjà validée.");
     }
-    
+
     return this.prisma.expense.delete({ where: { id: expenseId } });
   }
 
@@ -157,7 +169,7 @@ export class ExpensesService {
     });
 
     if (!expense) throw new NotFoundException("Dépense introuvable dans votre association.");
-    
+
     if (expense.status !== ExpenseStatus.PENDING_VALIDATION) {
       throw new BadRequestException("Cette dépense n'est pas en attente de validation.");
     }
@@ -196,7 +208,7 @@ export class ExpensesService {
     });
 
     if (!expense) throw new NotFoundException("Dépense introuvable.");
-    
+
     if (expense.status !== ExpenseStatus.PENDING_VALIDATION) {
       throw new BadRequestException("Cette dépense n'est pas en attente de validation.");
     }

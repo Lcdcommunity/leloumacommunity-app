@@ -304,9 +304,7 @@ export default function AntennaAdminExpensesPage() {
         .ae-eyebrow { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.4rem; }
         .ae-eyebrow-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; }
         .ae-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 700; color: #0F172A; letter-spacing: -0.02em; line-height: 1.15; margin: 0; }
-        .ae-title span { color: #2563EB; }
-        
-        .ae-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.05s cubic-bezier(.22,1,.36,1) forwards; }
+        .ae-title span { color: #2563EB; }        .ae-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; opacity: 0; transform: translateY(10px); animation: aein 0.5s 0.05s cubic-bezier(.22,1,.36,1) forwards; }
         .ae-stat { background: white; border-radius: 16px; border: 1px solid #E2E8F0; padding: 1.25rem 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: center; }
         .ae-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; line-height: 1; margin-bottom: 0.4rem; color: #0F172A; }
         .ae-stat-lbl { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -430,7 +428,6 @@ export default function AntennaAdminExpensesPage() {
         
         .ae-btn-cancel { height: 44px; padding: 0 1.25rem; border-radius: 10px; background: white; border: 1px solid #CBD5E1; color: #475569; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600; transition: background 0.2s; }
         .ae-btn-cancel:hover:not(:disabled) { background: #F8FAFC; color: #0F172A; }
-
         .ae-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: aespin 0.8s linear infinite; }
         .ae-error { display: flex; align-items: center; gap: 0.5rem; padding: 0.85rem 1rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; color: #B91C1C; font-size: 0.85rem; font-weight: 600; margin-bottom: 1rem; }
         .ae-loader { display: flex; align-items: center; justify-content: center; padding: 4rem; gap: 0.75rem; color: #64748B; font-size: 0.9rem; font-weight: 600; }
@@ -477,7 +474,6 @@ export default function AntennaAdminExpensesPage() {
               </div>
               <span className="ae-panel-title">Historique</span>
             </div>
-            {/* Le bouton n'est plus ici, il est dans ae-header */}
           </div>
 
           <div className="ae-toolbar">

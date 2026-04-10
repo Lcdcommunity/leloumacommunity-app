@@ -47,7 +47,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
   const [locationText, setLocationText] = useState(event?.locationText || '');
   const [isOnline, setIsOnline] = useState(event?.isOnline || false);
   const [meetingLink, setMeetingLink] = useState(event?.meetingLink || '');
-  
+
   const [availableAntennas, setAvailableAntennas] = useState<Antenna[]>([]);
   const [selectedAntennaIds, setSelectedAntennaIds] = useState<string[]>(event?.antennas?.map(a => a.id) || []);
 
@@ -106,14 +106,13 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
         inviteAll,
         memberIds: inviteAll ? [] : selectedMemberIds
       };
-      
-      // Les types sont parfaits, plus besoin de forcer avec ts-expect-error !
+
       if (event) {
         await api.updateEvent(event.id, payload);
       } else {
         await api.createEvent(payload);
       }
-      
+
       onSuccess();
     } catch (err) { 
       console.error(err); alert('Erreur lors de la sauvegarde'); setSaving(false); 
@@ -167,7 +166,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
                 </span>
               </div>
             </div>
-            
+
             <div className="aev-info-box">
               <span className="aev-info-lbl">Description</span>
               <span className="aev-info-val">{event.description || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucune description</span>}</span>
@@ -243,7 +242,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
                     <input type="checkbox" id="cb-inviteall" checked={inviteAll} onChange={e => setInviteAll(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#1D4ED8' }} />
                     <label htmlFor="cb-inviteall" style={{ fontWeight: 700, color: '#1E3A8A', cursor: 'pointer', fontSize: '0.85rem' }}>Inviter TOUS les membres de ces antennes</label>
                   </div>
-                  
+
                   {!inviteAll && (
                     <div style={{ marginTop: '0.8rem', borderTop: '1px dashed #BFDBFE', paddingTop: '0.8rem' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: '#1D4ED8', display: 'block', marginBottom: '0.5rem' }}>Sélectionnez les participants</label>
@@ -363,7 +362,7 @@ export default function SuperAdminEventsPage() {
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@500;600;700;800&display=swap');
           
-          .aev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); width: 100%; max-width: 1000px; margin: 0 auto; box-sizing: border-box; }
+          .aev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); width: 100%; max-width: 1000px; margin: 0 auto; box-sizing: border-box; overflow-x: hidden; }
           .aev-header { margin-bottom: 1.5rem; }
           .aev-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: #111827; margin: 0; }
           .aev-title span { color: #1D4ED8; }
@@ -372,16 +371,16 @@ export default function SuperAdminEventsPage() {
           .aev-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid #DBEAFE; display: flex; justify-content: space-between; align-items: center; background: #EFF6FF; }
           .aev-new-btn { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: transform 0.15s; }
           
-          .aev-table-container { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-          .aev-table { width: 100%; border-collapse: collapse; min-width: 400px; }
+          .aev-table-container { width: 100%; overflow: hidden; }
+          .aev-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
           
-          .aev-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; white-space: nowrap; }
+          .aev-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
           .aev-row { border-top: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
           .aev-row:hover { background: #F8FAFC; }
-          .aev-table td { padding: 1rem 1.4rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; }
+          .aev-table td { padding: 1rem 1.4rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
           .aev-status { padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid rgba(0,0,0,0.05); white-space: nowrap; }
           
-          .aev-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+          .aev-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; white-space: nowrap; }
           .aev-action-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
           .aev-action-btn.primary { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
           
@@ -409,10 +408,30 @@ export default function SuperAdminEventsPage() {
           .aev-antenna-cb { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.6rem; border: 1px solid transparent; border-radius: 8px; cursor: pointer; background: white; }
           .aev-antenna-cb.active { border-color: #60A5FA; background: #EFF6FF; }
           
-          @media (max-width: 600px) { 
+          /* LAYOUT CARTES MOBILE */
+          .aev-cards { display: none; }
+
+          @media (max-width: 768px) { 
             .aev-grid-2 { grid-template-columns: 1fr; } 
-            .hide-mobile { display: none; } 
-            .aev-actions-td > div { flex-direction: column; align-items: flex-end; } 
+            
+            /* Cacher le tableau classique */
+            .aev-table-container { display: none !important; } 
+            
+            /* Afficher les cartes */
+            .aev-cards { display: flex; flex-direction: column; width: 100%; }
+            .aev-card { 
+              display: flex; justify-content: space-between; align-items: center; 
+              padding: 1rem; border-bottom: 1px solid #F3F4F6; gap: 0.5rem;
+            }
+            .aev-card:last-child { border-bottom: none; }
+            
+            /* Colonne 1 : Événement */
+            .aev-card-content { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 0; }
+            .aev-card-title { font-weight: 800; font-size: 0.9rem; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+            .aev-card-meta { font-size: 0.72rem; color: #6B7280; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            
+            /* Colonne 2 : Actions/Présences */
+            .aev-card-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end; flex-shrink: 0; }
           }
         `}</style>
 
@@ -423,16 +442,17 @@ export default function SuperAdminEventsPage() {
               <span style={{ fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', fontSize: '0.8rem' }}>Agenda du réseau</span>
               <button className="aev-new-btn" onClick={() => setEventModal({ isOpen: true })}>+ Nouvel événement</button>
             </div>
-            
+
+            {/* VUE DESKTOP (Tableau classique) */}
             <div className="aev-table-container">
               <table className="aev-table">
                 <thead>
                   <tr>
-                    <th>Événement</th>
-                    <th className="hide-mobile">Date & Heure</th>
-                    <th className="hide-mobile">Cibles</th>
-                    <th>Statut</th>
-                    <th style={{ textAlign: 'right' }}>Actions</th>
+                    <th style={{ width: '30%' }}>Événement</th>
+                    <th style={{ width: '25%' }}>Date & Heure</th>
+                    <th style={{ width: '15%' }}>Cibles</th>
+                    <th style={{ width: '15%' }}>Statut</th>
+                    <th style={{ width: '15%', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -444,16 +464,16 @@ export default function SuperAdminEventsPage() {
                     items.map(e => {
                       const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
                       const antenneCount = e.antennas?.length || 0;
-                      
+
                       return (
                         <tr key={e.id} className="aev-row">
                           <td>
-                            <div style={{ fontWeight: 800, color: '#111827' }}>{e.title}</div>
+                            <div style={{ fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</div>
                             <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: 2, fontWeight: 700 }}>{TYPE_MAP[e.type]}</div>
                           </td>
-                          <td className="hide-mobile" style={{ color: '#4B5563', fontSize: '0.8rem' }}>{formatDateTime(e.startsAt)}</td>
-                          <td className="hide-mobile">
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#F3F4F6', color: '#4B5563', padding: '0.2rem 0.5rem', borderRadius: 6 }}>
+                          <td style={{ color: '#4B5563', fontSize: '0.8rem' }}>{formatDateTime(e.startsAt)}</td>
+                          <td>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#F3F4F6', color: '#4B5563', padding: '0.2rem 0.5rem', borderRadius: 6, whiteSpace: 'nowrap' }}>
                               {antenneCount} antenne(s)
                             </span>
                           </td>
@@ -481,6 +501,56 @@ export default function SuperAdminEventsPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* VUE MOBILE (Cartes 2 colonnes) */}
+            <div className="aev-cards">
+              {loading ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280', fontSize: '0.85rem' }}>Chargement...</div>
+              ) : items.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.85rem' }}>Aucun événement.</div>
+              ) : (
+                items.map(e => {
+                  const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
+                  return (
+                    <div key={e.id} className="aev-card">
+                      
+                      {/* Colonne 1 : Événement */}
+                      <div className="aev-card-content">
+                        <div className="aev-card-title">{e.title}</div>
+                        <div className="aev-card-meta">{TYPE_MAP[e.type]} • {formatDateTime(e.startsAt)}</div>
+                        <div>
+                          <span className="aev-status" style={{ background: s.bg, color: s.color, padding: '0.15rem 0.4rem', fontSize: '0.65rem' }}>
+                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: s.color }}/> {s.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Colonne 2 : Présences & Détails */}
+                      <div className="aev-card-actions">
+                        {e.type === 'ANTENNA_MEETING' && (
+                          <button 
+                            className="aev-action-btn primary" 
+                            style={{ fontSize: '0.7rem', padding: '0.35rem 0.7rem', width: '100%' }} 
+                            onClick={() => setAttendanceModal({ isOpen: true, event: e })}
+                          >
+                            Présences
+                          </button>
+                        )}
+                        <button 
+                          className="aev-action-btn" 
+                          style={{ fontSize: '0.7rem', padding: '0.35rem 0.7rem', width: '100%' }} 
+                          onClick={() => setEventModal({ isOpen: true, event: e })}
+                        >
+                          Détails
+                        </button>
+                      </div>
+
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
           </div>
         </div>
 

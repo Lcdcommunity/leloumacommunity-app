@@ -30,7 +30,7 @@ export class EventsService {
     // Restrictions selon le rôle (Adapté pour la relation Many-to-Many 'antennas')
     if (role === UserRole.MEMBER) {
       where.status = EventStatus.PUBLISHED; 
-      
+
       // Un membre ne voit l'événement que s'il est global (aucune antenne)
       // OU s'il cible son antenne
       // OU s'il a été explicitement invité (via EventAttendance)
@@ -38,7 +38,7 @@ export class EventsService {
         { antennas: { none: {} } }, // Événement global
         { attendees: { some: { userId: user.id } } } // Invité spécifiquement
       ];
-      
+
       if (antennaId) {
         memberOrCondition.push({ 
           antennas: { 
@@ -69,7 +69,12 @@ export class EventsService {
         include: {
           antennas: { select: { id: true, name: true, code: true } },
           coverImage: { select: { url: true } },
-          _count: { select: { attendees: true } } 
+          _count: { select: { attendees: true } },
+          // 👇 AJOUT CHIRURGICAL : On inclut le statut du membre courant
+          attendees: { 
+            where: { userId: userId }, 
+            select: { status: true } 
+          }
         }
       })
     ]);
@@ -131,11 +136,11 @@ export class EventsService {
     const inviteAll = dto.inviteAll !== false; 
     // @ts-expect-error
     const specificMemberIds: string[] = dto.memberIds || [];
-    
+
     let attendeesCreation = {};
     if (!inviteAll && specificMemberIds.length > 0) {
       attendeesCreation = {
-        create: specificMemberIds.map(mId => ({ userId: mId, status: AttendanceStatus.INVITED }))
+        create: specificMemberIds.map((mId: string) => ({ userId: mId, status: AttendanceStatus.INVITED }))
       };
     }
 
@@ -205,7 +210,7 @@ export class EventsService {
     if (inviteAll === false && specificMemberIds) {
       updateData.attendees = {
         deleteMany: {}, // Efface tout
-        create: specificMemberIds.map(mId => ({ userId: mId, status: AttendanceStatus.INVITED })) // Recrée
+        create: specificMemberIds.map((mId: string) => ({ userId: mId, status: AttendanceStatus.INVITED })) // Recrée
       };
     } else if (inviteAll === true) {
       updateData.attendees = {

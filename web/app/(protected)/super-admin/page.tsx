@@ -72,7 +72,6 @@ function StatusBadge({ status }: { status: string }) {
     VALIDATED:        { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
     PENDING:          { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
     PENDING_APPROVAL: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-    // 👇 CORRECTION 2 : Traduction du statut des dépenses
     PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' }, 
     REJECTED:         { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
     ACTIVE:           { label: 'Actif',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
@@ -82,15 +81,16 @@ function StatusBadge({ status }: { status: string }) {
     COMPLETED:        { label: 'Terminé',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
     APPROVED:         { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
     CANCELLED:        { label: 'Annulé',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    PROPOSED:         { label: 'Proposé',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   };
   const s = map[status] ?? { label: status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '0.25rem',
-      fontSize: '0.68rem', fontWeight: 700,
+      fontSize: '0.65rem', fontWeight: 700,
       color: s.color, background: s.bg,
       border: `1px solid ${s.border}`,
-      borderRadius: 99, padding: '0.18rem 0.58rem', whiteSpace: 'nowrap',
+      borderRadius: 99, padding: '0.15rem 0.4rem', whiteSpace: 'nowrap',
     }}>
       <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
       {s.label}
@@ -114,7 +114,8 @@ function BalancesModal({ currency, balances, onClose }: { currency: string; bala
       <div style={{ width: '100%', maxWidth: 480, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: '1.5rem', border: '1px solid rgba(37,99,235,.15)', boxShadow: '0 24px 60px rgba(37,99,235,.12)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', margin: 0 }}>
-            {FIXED_CURRENCIES.find(c => c.cur === currency)?.label ?? `Soldes — ${currency}`}
+            {/* Note: Assure-toi que FIXED_CURRENCIES est importé ou défini plus haut dans ton fichier complet ! */}
+            {`Soldes — ${currency}`}
           </h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
             <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -178,39 +179,149 @@ function AccountDetailModal({ user, onClose }: { user: UserSummary; onClose: () 
 }
 
 function AdminContributionDetailModal({ item, onClose }: { item: Contribution; onClose: () => void }) {
+  const [animOpen, setAnimOpen] = useState(false);
+  
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    const timer = setTimeout(() => setAnimOpen(true), 10);
+    return () => {
+      document.body.style.overflow = '';
+      clearTimeout(timer);
+    };
+  }, []);
+
+  const handleClose = () => {
+    setAnimOpen(false);
+    setTimeout(onClose, 300); // Attendre la fin de l'animation
+  };
+
+  const memberName = item.member ? `${item.member.firstName} ${item.member.lastName}` : item.memberUserId;
+  
+  // 👇 SUPPRESSION DE "methodLabels" ICI
+
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', animation: 'sain 0.2s ease' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 22, padding: '1.5rem', boxShadow: '0 24px 60px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 600, color: '#111827', margin: 0 }}>Détail de la cotisation</h2>
-          <button onClick={onClose} style={{ background: '#F3F4F6', border: 'none', cursor: 'pointer', color: '#6B7280', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+    <div className={`modal-overlay ${animOpen ? 'open' : ''}`} onClick={handleClose}>
+      <style>{`
+        .modal-overlay { 
+          position: fixed; inset: 0; z-index: 9999; 
+          background: rgba(15,23,42,0); backdrop-filter: blur(0px); 
+          display: flex; align-items: center; justify-content: center; 
+          padding: 1rem; opacity: 0; pointer-events: none;
+          transition: background 0.3s ease, opacity 0.3s ease;
+        }
+        .modal-overlay.open { 
+          background: rgba(15,23,42,0.6); opacity: 1; pointer-events: auto; backdrop-filter: blur(4px); 
+        }
+
+        .modal-content { 
+          background: white; 
+          width: 100%; max-width: 500px; 
+          border-radius: 24px; 
+          max-height: 90vh; overflow-y: auto; 
+          box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+          transform: translateY(20px) scale(0.98);
+          transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .modal-overlay.open .modal-content {
+          transform: translateY(0) scale(1);
+        }
+
+        .modal-header { 
+          padding: 1.25rem; 
+          border-bottom: 1px solid #f1f5f9; 
+          display: flex; justify-content: space-between; align-items: center; 
+          position: sticky; top: 0; background: white; z-index: 10; 
+        }
+        .modal-title { font-family: 'Cormorant Garamond',serif; font-size: 1.4rem; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 0.5rem; margin: 0; }
+        .modal-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #e2e8f0; display: flex; align-items: center; justify-content: center; cursor: pointer; background: white; color: #64748b; transition: background 0.2s; }
+        .modal-close:hover { background: #f8fafc; color: #111827;}
+        
+        .modal-body { padding: 1.25rem; }
+
+        /* Mise en avant du montant (MODIFIÉ POUR ÊTRE VERT) */
+        .sc-modal-hero { 
+          display: flex; flex-direction: column; align-items: center; justify-content: center; 
+          padding: 1rem 1.5rem; 
+          background: linear-gradient(to bottom, #ECFDF5, #F0FDF4); 
+          border-radius: 16px; border: 1px dashed #A7F3D0;
+          margin-bottom: 1.5rem;
+        }
+        .sc-modal-hero-label { font-size: 0.65rem; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.2rem; }
+        .sc-modal-hero-amount { font-family: 'DM Mono', monospace; font-size: clamp(1.8rem, 6vw, 2.4rem); font-weight: 800; color: #047857; line-height: 1; text-align: center; word-break: break-word; }
+
+        /* Grille des infos */
+        .sm-section-divider { font-size: 0.7rem; font-weight: 800; color: #DC2626; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #FECACA; padding-bottom: 0.4rem; margin: 0 0 0.75rem 0; }
+        .sm-dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+        .sm-dp-field { display: flex; flex-direction: column; gap: 4px; }
+        .sm-dp-field.full { grid-column: span 2; }
+        .sm-dp-field label { font-size: .65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
+        .sm-dp-value { font-size: .9rem; font-weight: 600; color: #1e293b; padding: 4px 0; word-break: break-word; }
+
+        /* Avatar / Utilisateur dans la grille */
+        .sc-modal-user { display: flex; align-items: center; gap: 0.6rem; }
+        .sc-modal-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#DC2626,#991B1B); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; color: white; flex-shrink: 0; }
+      `}</style>
+
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Détails de la cotisation</h2>
+          <button className="modal-close" onClick={handleClose}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.65rem', marginBottom: '1.5rem' }}>
-          <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2.2rem', fontWeight: 700, color: '#111827' }}>
-            {formatCurrency(item.amount, item.currency || 'EUR')}
-          </span>
-          <StatusBadge status={item.status} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #F3F4F6', alignItems: 'center' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Membre</span>
-            {item.member ? (
-              <div className="sa-user-cell">
-                <div className="sa-avatar" style={{ width: 24, height: 24, fontSize: '0.5rem', background: 'linear-gradient(135deg, #059669, #34D399)' }}>
-                  {getInitials(`${item.member.firstName} ${item.member.lastName}`)}
-                </div>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#111827' }}>{`${item.member.firstName} ${item.member.lastName}`}</span>
-              </div>
-            ) : (
-              // Correction ici : memberId -> memberUserId
-              <span style={{ fontSize: '0.85rem', color: '#6B7280' }}>ID: {item.memberUserId}</span>
-            )}
+
+        <div className="modal-body">
+          {/* Le montant est le héros du modal (Vert) */}
+          <div className="sc-modal-hero">
+            <span className="sc-modal-hero-label">Montant de la cotisation</span>
+            <span className="sc-modal-hero-amount">
+              {formatCurrency(item.amount, item.currency || 'EUR')}
+            </span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '0.75rem', borderBottom: '1px solid #F3F4F6' }}>
-            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Date de création</span>
-            <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151' }}>{formatDate(item.createdAt)}</span>
+
+          <div className="sm-section-divider">Informations Membre</div>
+          <div className="sm-dp-grid" style={{ marginBottom: '1rem', gridTemplateColumns: '1fr' }}>
+            <div className="sm-dp-field full">
+              <div className="sc-modal-user">
+                <div className="sc-modal-avatar">
+                  {item.member ? getInitials(memberName) : 'ID'}
+                </div>
+                <div>
+                  <div className="sm-dp-value" style={{ padding: 0 }}>
+                    {memberName}
+                  </div>
+                  {item.member && (
+                    <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>
+                      {item.member.email}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="sm-section-divider">Détails de la transaction</div>
+          <div className="sm-dp-grid">
+            <div className="sm-dp-field">
+              <label>Statut</label>
+              <div className="sm-dp-value">
+                <StatusBadge status={item.status} />
+              </div>
+            </div>
+
+            <div className="sm-dp-field">
+              <label>Date de dépôt</label>
+              <div className="sm-dp-value">{formatDate(item.createdAt)}</div>
+            </div>
+
+            <div className="sm-dp-field full">
+              <label>Référence</label>
+              <div className="sm-dp-value" style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#6B7280' }}>
+                {item.id}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -286,7 +397,7 @@ export default function SuperAdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
-  
+
   const [selectedAccount, setSelectedAccount] = useState<UserSummary | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null);
   const [selectedProject, setSelectedProject] = useState<BackendProject | null>(null);
@@ -384,8 +495,11 @@ export default function SuperAdminDashboardPage() {
 
         .sa-wrap {
           font-family: 'DM Sans', sans-serif;
-          padding: clamp(1.25rem, 3vw, 2rem);
+          padding: clamp(1rem, 3vw, 2rem);
           max-width: 1340px; margin: 0 auto;
+          box-sizing: border-box;
+          width: 100%;
+          overflow-x: hidden;
         }
 
         /* ── Header ── */
@@ -434,9 +548,8 @@ export default function SuperAdminDashboardPage() {
         }
         @media (max-width: 520px) { .sa-stats-currency { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; } }
 
-        /* 👇 CORRECTION 1 : Centrage des éléments de la carte */
         .sa-stat {
-          display: flex; flex-direction: column; align-items: center; text-align: center; /* CENTRÉ */
+          display: flex; flex-direction: column; align-items: center; text-align: center;
           background: rgba(253,253,255,0.9);
           backdrop-filter: blur(12px);
           border-radius: 18px;
@@ -470,7 +583,6 @@ export default function SuperAdminDashboardPage() {
           .sa-stat-top { flex-direction: column-reverse; gap: 0.2rem; margin-bottom: 0.4rem; }
         }
 
-        /* 👇 CORRECTION 1 : L'icône passe au-dessus du texte */
         .sa-stat-top { display: flex; flex-direction: column-reverse; align-items: center; justify-content: center; gap: 0.4rem; margin-bottom: 0.65rem; width: 100%; }
         .sa-stat-label { font-size: 0.61rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7280; text-align: center; line-height: 1.4; }
         .sa-stat-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -520,12 +632,88 @@ export default function SuperAdminDashboardPage() {
         .sa-budget-bar { height: 3px; background: #E5E7EB; border-radius: 99px; overflow: hidden; max-width: 80px; }
         .sa-budget-fill { height: 100%; border-radius: 99px; }
 
+        /* Style des cartes Projets */
+        .sa-project-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 1rem;
+          padding: 1.25rem;
+          background: #F9FAFB;
+        }
+        .sa-project-card {
+          background: #ffffff;
+          border: 1px solid #E5E7EB;
+          border-radius: 16px;
+          padding: 1.25rem;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          transition: all 0.2s ease;
+          cursor: pointer;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        }
+        .sa-project-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+          border-color: #BFDBFE;
+        }
+        .sa-project-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 1rem;
+        }
+        .sa-project-title {
+          font-weight: 800;
+          font-size: 0.95rem;
+          color: #111827;
+          line-height: 1.3;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+        .sa-project-budget-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+        }
+        .sa-project-budget-lbl {
+          font-size: 0.65rem;
+          font-weight: 800;
+          color: #9CA3AF;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .sa-project-budget-val {
+          font-family: 'Cormorant Garamond', serif;
+          font-size: 1.2rem;
+          font-weight: 700;
+          color: #111827;
+        }
+        .sa-project-footer {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 0.75rem;
+          border-top: 1px solid #F3F4F6;
+          font-size: 0.75rem;
+          color: #6B7280;
+          font-weight: 600;
+        }
+
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
-          .sa-table th { padding: 0.5rem 0.6rem; font-size: 0.6rem; }
-          .sa-table td { padding: 0.6rem 0.6rem; font-size: 0.75rem; }
-          .sa-table td.mono { font-size: 0.85rem; }
-          .sa-panel-head { padding: 1rem; }
+          .sa-table { table-layout: fixed; width: 100%; } 
+          .sa-table th { padding: 0.4rem 0.2rem; font-size: 0.55rem; white-space: normal; overflow-wrap: break-word; }
+          .sa-table td { padding: 0.5rem 0.2rem; font-size: 0.65rem; overflow-wrap: break-word; word-break: break-word; hyphens: auto; }
+          .sa-table td.mono { font-size: 0.75rem; }
+          .sa-panel-head { padding: 0.8rem 1rem; }
+          .sa-user-cell { gap: 0.3rem; }
+          .sa-user-cell span { font-size: 0.65rem !important; white-space: normal; line-height: 1.2; }
+          .sa-avatar { width: 24px; height: 24px; font-size: 0.55rem; }
+          
+          .sa-project-grid { grid-template-columns: 1fr; padding: 1rem; gap: 0.75rem; }
         }
 
         /* ── Loader / Error ── */
@@ -590,9 +778,7 @@ export default function SuperAdminDashboardPage() {
                 <div className="sa-stat-sub">{s.sub}</div>
               </div>
             ))}
-          </div>
-
-          {/* ── Cartes de soldes par devise ── */}
+          </div>          {/* ── Cartes de soldes par devise ── */}
           <>
             <p className="sa-section-label">Soldes par devise</p>
             <div className="sa-stats-currency">
@@ -702,7 +888,6 @@ export default function SuperAdminDashboardPage() {
                             {c.member ? getInitials(`${c.member.firstName} ${c.member.lastName}`) : '??'}
                           </div>
                           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>
-                            {/* Correction ici : memberId -> memberUserId */}
                             {c.member ? `${c.member.firstName} ${c.member.lastName}` : c.memberUserId}
                           </span>
                         </div>
@@ -735,52 +920,67 @@ export default function SuperAdminDashboardPage() {
                   </span>
                 )}
               </div>
-              <table className="sa-table">
-                <thead>
-                  <tr>
-                    <th>Titre</th>
-                    <th>Statut</th>
-                    <th>Budget prévu</th>
-                    <th className="hide-mobile">Budget dépensé</th>
-                    <th className="hide-mobile">Avancement</th>
-                    <th className="hide-mobile">Créé le</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentProjects.length === 0 && <EmptyRow cols={6} label="Aucun projet enregistré" />}
+              
+              {/* Remplacement du tableau par des cartes modernes */}
+              {data.recentProjects.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#9CA3AF', fontSize: '0.85rem' }}>
+                  Aucun projet enregistré
+                </div>
+              ) : (
+                <div className="sa-project-grid">
                   {data.recentProjects.map(p => {
                     const { planned, spent } = getProjectBudget(p);
                     const pct = planned > 0 ? Math.min((spent / planned) * 100, 100) : 0;
                     const overBudget = planned > 0 && spent > planned;
+                    
                     return (
-                      <tr key={p.id} className="sa-row-clickable" onClick={() => setSelectedProject(p)}>
-                        <td className="bold">{p.title}</td>
-                        <td><StatusBadge status={p.status} /></td>
-                        <td className="mono">{planned > 0 ? formatCurrency(planned) : '—'}</td>
-                        <td className="mono hide-mobile" style={{ color: overBudget ? '#DC2626' : '#111827' }}>
-                          {spent > 0 ? formatCurrency(spent) : '—'}
-                        </td>
-                        <td className="hide-mobile">
+                      <div key={p.id} className="sa-project-card" onClick={() => setSelectedProject(p)}>
+                        <div className="sa-project-header">
+                          <div className="sa-project-title">{p.title}</div>
+                          <StatusBadge status={p.status} />
+                        </div>
+                        
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <div className="sa-project-budget-row">
+                            <div>
+                              <div className="sa-project-budget-lbl">Budget Prévu</div>
+                              <div className="sa-project-budget-val">{planned > 0 ? formatCurrency(planned) : '—'}</div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                              <div className="sa-project-budget-lbl">Dépensé</div>
+                              <div className="sa-project-budget-val" style={{ color: overBudget ? '#DC2626' : '#111827' }}>
+                                {spent > 0 ? formatCurrency(spent) : '—'}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Progress Bar */}
                           {planned > 0 ? (
-                            <div className="sa-budget-wrap">
-                              <div className="sa-budget-bar">
+                            <div style={{ marginTop: '0.2rem' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 800, marginBottom: '0.2rem', color: overBudget ? '#DC2626' : '#6B7280' }}>
+                                <span>Avancement</span>
+                                <span>{Math.round(pct)}%</span>
+                              </div>
+                              <div style={{ maxWidth: '100%', height: '6px', background: '#E5E7EB', borderRadius: '99px', overflow: 'hidden' }}>
                                 <div
-                                  className="sa-budget-fill"
-                                  style={{ width: `${pct}%`, background: overBudget ? '#DC2626' : pct > 75 ? '#D97706' : '#2563EB' }}
+                                  style={{ height: '100%', borderRadius: '99px', width: `${pct}%`, background: overBudget ? '#DC2626' : pct > 75 ? '#D97706' : '#2563EB' }}
                                 />
                               </div>
-                              <span style={{ fontSize: '0.67rem', color: overBudget ? '#DC2626' : '#6B7280', fontWeight: 700 }}>
-                                {Math.round(pct)}%
-                              </span>
                             </div>
-                          ) : <span style={{ color: '#D1D5DB', fontSize: '0.75rem' }}>—</span>}
-                        </td>
-                        <td className="muted hide-mobile">{formatDate(p.createdAt)}</td>
-                      </tr>
+                          ) : (
+                             <div style={{ fontSize: '0.75rem', color: '#D1D5DB', fontWeight: 500, marginTop: '0.2rem' }}>Budget non défini</div>
+                          )}
+                        </div>
+
+                        <div className="sa-project-footer">
+                          <span>Créé le {formatDate(p.createdAt)}</span>
+                          <span style={{ color: '#2563EB' }}>Détails ➔</span>
+                        </div>
+                      </div>
                     );
                   })}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
           </div>
 

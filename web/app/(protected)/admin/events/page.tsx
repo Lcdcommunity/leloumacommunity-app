@@ -202,18 +202,13 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 }
 
 // ----------------------------------------------------------------------
-// MODAL : GESTION DES PRÉSENCES (FILTRE OUI / NON)
+// MODAL : GESTION DES PRÉSENCES (FILTRE OUI / NON) - ADMIN ANTENNE
 // ----------------------------------------------------------------------
 function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => void }) {
+  // 👇 ICI: MAJUSCULES
   const [filter, setFilter] = useState<'ALL' | 'ATTENDING' | 'ABSENT'>('ALL');
   const [attendances, setAttendances] = useState<AttendanceItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // 👇 CORRECTION : Blocage du scroll de l'arrière-plan
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'unset'; };
-  }, []);
 
   useEffect(() => {
     async function loadAttendances() {
@@ -247,6 +242,7 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
 
         <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
           <div className="aev-tabs">
+            {/* 👇 ICI: MAJUSCULES */}
             <button className={`aev-tab ${filter === 'ALL' ? 'active' : ''}`} onClick={() => setFilter('ALL')}>Toutes les réponses</button>
             <button className={`aev-tab ${filter === 'ATTENDING' ? 'active' : ''}`} onClick={() => setFilter('ATTENDING')} style={filter === 'ATTENDING' ? { color: '#059669', borderColor: '#059669', background: '#ECFDF5' } : {}}>✅ Présents</button>
             <button className={`aev-tab ${filter === 'ABSENT' ? 'active' : ''}`} onClick={() => setFilter('ABSENT')} style={filter === 'ABSENT' ? { color: '#DC2626', borderColor: '#DC2626', background: '#FEF2F2' } : {}}>❌ Absents</button>
@@ -267,6 +263,7 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
                     <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 2 }}>{att.user.email} {att.user.phone ? `• ${att.user.phone}` : ''}</div>
                   </div>
                   <div>
+                    {/* 👇 ICI: MAJUSCULES (FIN DU BUG ABSENT) */}
                     {att.status === 'ATTENDING' ? (
                       <span style={{ display: 'inline-block', padding: '0.3rem 0.8rem', background: '#D1FAE5', color: '#065F46', borderRadius: 99, fontSize: '0.75rem', fontWeight: 800 }}>Participent</span>
                     ) : (
@@ -282,7 +279,6 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
     </div>
   );
 }
-
 // ----------------------------------------------------------------------
 // PAGE PRINCIPALE : ADMIN D'ANTENNE
 // ----------------------------------------------------------------------

@@ -1,335 +1,353 @@
 // web/components/super-admin/ContributionsTable.tsx
 'use client';
 
-import { useState } from 'react';
-import type { Contribution, ContributionStatus } from '../../types/contribution';
-import { formatCurrency, formatDate } from '../../lib/format';
+import { useMemo } from 'react';
+import type { Contribution } from '../../types/contribution';
+import { formatDate } from '../../lib/format';
 
-const statusLabels: Record<ContributionStatus, string> = {
-  DRAFT: 'Brouillon',
-  SUBMITTED: 'Soumise',
-  PENDING: 'En attente',
-  PENDING_VALIDATION: 'En validation',
-  VALIDATED: 'Validée',
-  REJECTED: 'Rejetée',
-  CANCELLED: 'Annulée',
-};
-
-const methodLabels: Record<string, string> = {
-  CASH: 'Espèces',
-  BANK_TRANSFER: 'Virement',
-  MOBILE_MONEY: 'Mobile Money',
-  CARD: 'Carte',
-  OTHER: 'Autre',
-};
-
-export function ContributionsTable({ items }: { items: Contribution[] }) {
-  const [selectedItem, setSelectedItem] = useState<Contribution | null>(null);
-
-  if (!items || items.length === 0) {
-    return (
-      <div style={{ padding: '2rem 1.25rem', color: '#6B7280', fontWeight: 600 }}>
-        Aucune cotisation trouvée.
-      </div>
-    );
+const STATUS_MAP: Record<
+  string,
+  {
+    label: string;
+    color: string;
+    bg: string;
+    border: string;
   }
+> = {
+  PENDING: {
+    label: 'En attente',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+  },
+  PENDING_VALIDATION: {
+    label: 'En attente',
+    color: '#D97706',
+    bg: '#FFFBEB',
+    border: '#FDE68A',
+  },
+  VALIDATED: {
+    label: 'Validée',
+    color: '#059669',
+    bg: '#ECFDF5',
+    border: '#A7F3D0',
+  },
+  REJECTED: {
+    label: 'Rejetée',
+    color: '#DC2626',
+    bg: '#FEF2F2',
+    border: '#FECACA',
+  },
+  CANCELLED: {
+    label: 'Annulée',
+    color: '#9CA3AF',
+    bg: '#F9FAFB',
+    border: '#E5E7EB',
+  },
+};
 
-  const getDisplayMethod = (item: Contribution) => {
-    const rawMethod = item.paymentMethod || '';
-    return methodLabels[rawMethod] || rawMethod || '—';
+function getInitials(name: string): string {
+  const cleanName = name.trim();
+
+  if (!cleanName) return '--';
+
+  return cleanName
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const s = STATUS_MAP[status] ?? {
+    label: status,
+    color: '#6B7280',
+    bg: '#F3F4F6',
+    border: '#E5E7EB',
   };
 
   return (
-    <>
+    <span
+      className="sa-ct-status"
+      style={{
+        color: s.color,
+        background: s.bg,
+        borderColor: s.border,
+      }}
+    >
+      <span
+        style={{
+          width: 4,
+          height: 4,
+          borderRadius: '50%',
+          background: s.color,
+          flexShrink: 0,
+        }}
+      />
+      {s.label}
+    </span>
+  );
+}
+
+type Props = {
+  items: Contribution[];
+  onItemClick?: (contribution: Contribution) => void;
+};
+
+export function ContributionsTable({
+  items,
+  onItemClick,
+}: Props) {
+  const sortedItems = useMemo(
+    () =>
+      [...items].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime(),
+      ),
+    [items],
+  );
+
+  return (
+    <div className="sa-ct-wrap">
       <style>{`
-        .sct-wrap {
+        .sa-ct-wrap {
           width: 100%;
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
+          max-width: 100%;
+          overflow-x: hidden;
+          overflow-y: visible;
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
         }
 
-        .sct-table {
+        .sa-ct-table {
           width: 100%;
           border-collapse: collapse;
-          font-family: 'DM Sans', sans-serif;
+          table-layout: fixed;
+          margin: 0;
         }
 
-        .sct-table thead tr {
-          border-bottom: 1px solid rgba(220,38,38,.08);
+        .sa-ct-table thead tr {
+          border-bottom: 1px solid rgba(220, 38, 38, 0.07);
         }
 
-        .sct-table thead th {
-          padding: .85rem 1.1rem;
-          text-align: left;
-          font-size: .66rem;
+        .sa-ct-table th {
+          padding: 0.8rem 1rem;
+          font-size: 0.65rem;
           font-weight: 900;
-          letter-spacing: .09em;
           text-transform: uppercase;
-          color: #6B7280;
-          background: rgba(254,242,242,.22);
+          color: #9CA3AF;
+          text-align: left;
           white-space: nowrap;
         }
 
-        .sct-row {
-          border-bottom: 1px solid rgba(220,38,38,.06);
-          transition: background .15s ease;
-          cursor: pointer;
-        }
-
-        .sct-row:hover {
-          background: rgba(220,38,38,.03);
-        }
-
-        .sct-row:last-child {
-          border-bottom: none;
-        }
-
-        .sct-table td {
-          padding: .9rem 1.1rem;
-          font-size: .82rem;
+        .sa-ct-table td {
+          padding: 0.8rem 1rem;
+          font-size: 0.82rem;
+          font-weight: 600;
           color: #374151;
           vertical-align: middle;
         }
 
-        .sct-member { display: flex; flex-direction: column; gap: .18rem; }
-        .sct-member-name { font-size: .87rem; font-weight: 800; color: #111827; white-space: nowrap; }
-        .sct-member-email { font-size: .72rem; color: #9CA3AF; font-weight: 500; }
-        .sct-amount { font-family: 'DM Mono', monospace; font-size: .84rem; font-weight: 800; color: #111827; white-space: nowrap; }
-        
-        .sct-method {
-          display: inline-flex; align-items: center; gap: .28rem; font-size: .7rem;
-          font-weight: 700; color: #374151; background: #F9FAFB; border: 1px solid #E5E7EB;
-          border-radius: 999px; padding: .24rem .58rem; white-space: nowrap;
+        .sa-ct-row {
+          border-bottom: 1px solid rgba(220, 38, 38, 0.05);
+          transition: background 0.15s ease;
+          cursor: pointer;
         }
 
-        .sct-date { white-space: nowrap; font-size: .78rem; font-weight: 600; color: #374151; }
-
-        .sct-status {
-          display: inline-flex; align-items: center; gap: .32rem; padding: .25rem .62rem;
-          border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap;
-        }
-        .sct-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-
-        @media (max-width: 768px) {
-          .hide-mobile { display: none !important; }
-          .sct-table td, .sct-table th { padding: 0.75rem 0.6rem; }
+        .sa-ct-row:hover {
+          background: rgba(220, 38, 38, 0.03);
         }
 
-        .sct-modal-overlay {
-          position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(4px);
-          z-index: 9999;
-          overflow-y: auto;
-          -webkit-overflow-scrolling: touch;
+        .sa-ct-user {
           display: flex;
-          flex-direction: column;
+          align-items: center;
+          gap: 0.6rem;
+          min-width: 0;
         }
 
-        .sct-modal-overlay::before,
-        .sct-modal-overlay::after {
-          content: '';
-          flex: 1 0 auto;
-        }
-
-        .sct-modal {
-          background: white; 
-          width: calc(100% - 2rem);
-          max-width: 500px; 
-          border-radius: 20px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.15);
-          animation: sctSlideUp 0.3s cubic-bezier(.22,1,.36,1);
-          margin: 2.5rem auto; 
+        .sa-ct-avatar {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #DC2626, #991B1B);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 0.68rem;
+          font-weight: 900;
+          color: white;
           flex-shrink: 0;
+        }
+
+        .sa-ct-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.25rem;
+          font-size: 0.68rem;
+          font-weight: 800;
+          border-radius: 999px;
+          padding: 0.15rem 0.6rem;
+          border: 1px solid;
+          white-space: nowrap;
+        }
+
+        .sa-ct-cards {
+          display: none;
+          width: 100%;
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        .sa-ct-name {
+          white-space: nowrap;
           overflow: hidden;
-          display: flex;
-          flex-direction: column;
+          text-overflow: ellipsis;
+          min-width: 0;
+          display: block;
         }
 
-        .sct-modal-header {
-          display: flex; justify-content: space-between; align-items: center;
-          padding: 1.25rem 1.5rem; background: rgba(254,242,242,0.95); border-bottom: 1px solid rgba(220,38,38,0.1);
+        @media (max-width: 600px) {
+          .sa-ct-table {
+            display: none;
+          }
+
+          .sa-ct-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            width: 100%;
+            padding: 0;
+            margin: 0;
+          }
+
+          .sa-ct-card {
+            width: 100%;
+            background: white;
+            border-radius: 14px;
+            border: 1px solid rgba(220, 38, 38, 0.07);
+            padding: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            cursor: pointer;
+            box-sizing: border-box;
+          }
+
+          .sa-ct-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            min-width: 0;
+          }
+
+          .sa-ct-card-body {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(0, 0, 0, 0.04);
+            padding-top: 0.5rem;
+          }
+
+          .sa-ct-card-subtext {
+            font-size: 0.7rem;
+            color: #9CA3AF;
+            font-weight: 500;
+          }
         }
-
-        .sct-modal-title {
-          font-weight: 900; font-size: 0.85rem; color: #DC2626; text-transform: uppercase; letter-spacing: 0.08em;
-          display: flex; align-items: center; gap: 0.5rem;
-        }
-
-        .sct-modal-close {
-          background: white; border: 1px solid #E5E7EB; width: 32px; height: 32px; border-radius: 50%;
-          display: flex; justify-content: center; align-items: center; cursor: pointer; color: #6B7280;
-          transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-
-        .sct-modal-close:hover { background: #FEF2F2; color: #DC2626; border-color: #FECACA; }
-        
-        .sct-modal-body { padding: 1.5rem; }
-
-        .sct-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
-        
-        @media (max-width: 480px) { .sct-grid { grid-template-columns: 1fr; gap: 1rem; } }
-
-        .sct-field { display: flex; flex-direction: column; gap: 0.25rem; }
-        .sct-field label { font-size: 0.65rem; font-weight: 800; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; }
-        .sct-field span { font-size: 0.9rem; font-weight: 700; color: #111827; word-break: break-word; }
-        .sct-field .mono { font-family: 'DM Mono', monospace; color: #DC2626; }
-
-        @keyframes sctFadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes sctSlideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      <div className="sct-wrap">
-        <table className="sct-table">
-          <thead>
-            <tr>
-              <th>Membre</th>
-              <th className="hide-mobile">Antenne</th>
-              <th>Montant</th>
-              <th className="hide-mobile">Méthode</th>
-              <th className="hide-mobile">Date</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
+      {/* Desktop */}
+      <table className="sa-ct-table">
+        <thead>
+          <tr>
+            <th>Membre</th>
+            <th>Statut</th>
+            <th>Créée le</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedItems.map((c) => {
+            const fullName = `${c.member?.firstName ?? ''} ${c.member?.lastName ?? ''}`;
 
-          <tbody>
-            {items.map((contribution) => {
-              const statusStyles = getStatusStyles(contribution.status);
-              const memberName = `${contribution.member?.firstName ?? ''} ${contribution.member?.lastName ?? ''}`.trim() || '—';
-
-              return (
-                <tr 
-                  key={contribution.id} 
-                  className="sct-row" 
-                  onClick={() => setSelectedItem(contribution)}
-                  title="Cliquer pour voir les détails"
-                >
-                  <td>
-                    <div className="sct-member">
-                      <span className="sct-member-name">{memberName}</span>
-                      <span className="sct-member-email hide-mobile">{contribution.member?.email ?? '—'}</span>
+            return (
+              <tr
+                key={c.id}
+                className="sa-ct-row"
+                onClick={() => onItemClick?.(c)}
+              >
+                <td>
+                  <div className="sa-ct-user">
+                    <div className="sa-ct-avatar">
+                      {getInitials(fullName)}
                     </div>
-                  </td>
-
-                  <td className="hide-mobile">{contribution.antenna?.name || '-'}</td>
-
-                  <td className="sct-amount">
-                    {formatCurrency(contribution.amount, contribution.currency || 'EUR')}
-                  </td>
-
-                  <td className="hide-mobile">
-                    <span className="sct-method">
-                      {getDisplayMethod(contribution)}
-                    </span>
-                  </td>
-
-                  <td className="sct-date hide-mobile">
-                    {formatDate(contribution.contributionDate || contribution.createdAt)}
-                  </td>
-
-                  <td>
-                    <span
-                      className="sct-status"
-                      style={{ color: statusStyles.color, background: statusStyles.bg, border: `1px solid ${statusStyles.border}` }}
-                    >
-                      <span className="sct-status-dot" style={{ background: statusStyles.color }} />
-                      {statusLabels[contribution.status] ?? contribution.status}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {/* ── MODAL DE DÉTAILS ── */}
-      {selectedItem && (
-        <div className="sct-modal-overlay" onClick={() => setSelectedItem(null)}>
-          <div className="sct-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sct-modal-header">
-              <div className="sct-modal-title">
-                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Détails de la cotisation
-              </div>
-              <button className="sct-modal-close" onClick={() => setSelectedItem(null)}>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="sct-modal-body">
-              <div className="sct-grid">
-                <div className="sct-field" style={{ gridColumn: '1 / -1' }}>
-                  <label>Membre</label>
-                  <span>
-                    {`${selectedItem.member?.firstName ?? ''} ${selectedItem.member?.lastName ?? ''}`.trim() || '—'}
-                    <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 500, marginTop: '2px' }}>
-                      {selectedItem.member?.email ?? '—'}
-                    </div>
-                  </span>
-                </div>
-
-                <div className="sct-field">
-                  <label>Montant</label>
-                  <span className="mono" style={{ fontSize: '1.1rem' }}>
-                    {formatCurrency(selectedItem.amount, selectedItem.currency || 'EUR')}
-                  </span>
-                </div>
-
-                <div className="sct-field">
-                  <label>Statut</label>
-                  <div>
-                    <span 
-                      className="sct-status" 
-                      style={{ 
-                        color: getStatusStyles(selectedItem.status).color, 
-                        background: getStatusStyles(selectedItem.status).bg, 
-                        border: `1px solid ${getStatusStyles(selectedItem.status).border}`
-                      }}
-                    >
-                      <span className="sct-status-dot" style={{ background: getStatusStyles(selectedItem.status).color }} />
-                      {statusLabels[selectedItem.status] ?? selectedItem.status}
-                    </span>
+                    <span className="sa-ct-name">{fullName}</span>
                   </div>
+                </td>
+
+                <td>
+                  <StatusBadge status={c.status} />
+                </td>
+
+                <td
+                  style={{
+                    color: '#6B7280',
+                    fontSize: '.76rem',
+                  }}
+                >
+                  {formatDate(c.createdAt)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Mobile */}
+      <div className="sa-ct-cards">
+        {sortedItems.map((c) => {
+          const fullName = `${c.member?.firstName ?? ''} ${c.member?.lastName ?? ''}`;
+
+          return (
+            <div
+              key={c.id}
+              className="sa-ct-card"
+              onClick={() => onItemClick?.(c)}
+            >
+              <div className="sa-ct-card-header">
+                <div className="sa-ct-user">
+                  <div className="sa-ct-avatar">
+                    {getInitials(fullName)}
+                  </div>
+                  <span className="sa-ct-name">{fullName}</span>
                 </div>
 
-                <div className="sct-field">
-                  <label>Antenne affiliée</label>
-                  <span>{selectedItem.antenna?.name || '—'}</span>
-                </div>
+                <StatusBadge status={c.status} />
+              </div>
 
-                <div className="sct-field">
-                  <label>Méthode de paiement</label>
-                  <span>{getDisplayMethod(selectedItem)}</span>
-                </div>
-
-                <div className="sct-field">
-                  <label>Date de dépôt</label>
-                  <span>{formatDate(selectedItem.contributionDate || selectedItem.createdAt)}</span>
-                </div>
-
-                <div className="sct-field" style={{ gridColumn: '1 / -1' }}>
-                  <label>Référence de transaction</label>
-                  <span className="mono" style={{ fontSize: '0.8rem', color: '#6B7280', wordBreak: 'break-all' }}>
-                    {selectedItem.id}
-                  </span>
-                </div>
+              <div className="sa-ct-card-body">
+                <span className="sa-ct-card-subtext">
+                  Créée le
+                </span>
+                <span
+                  style={{
+                    fontSize: '.7rem',
+                    color: '#6B7280',
+                    fontWeight: 600,
+                  }}
+                >
+                  {formatDate(c.createdAt)}
+                </span>
               </div>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+          );
+        })}
+      </div>
+    </div>
   );
-}
-
-function getStatusStyles(status: ContributionStatus) {
-  if (status === 'VALIDATED') return { color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
-  if (status === 'REJECTED') return { color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
-  if (status === 'CANCELLED') return { color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
-  // Style pour DRAFT et SUBMITTED (couleurs bleutées pour ce qui est "en cours")
-  if (status === 'DRAFT' || status === 'SUBMITTED') return { color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
-  return { color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
 }

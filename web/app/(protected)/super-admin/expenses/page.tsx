@@ -97,7 +97,7 @@ function SuperAdminExpenseModal({
               {CATEGORY_MAP[expense.category] ?? expense.category}
             </h2>
           </div>
-          
+
           <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center', flexShrink: 0 }}>
             <button className="sae-action-btn sae-action-edit" onClick={onEdit} title="Modifier" disabled={saving}>
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
@@ -170,7 +170,7 @@ function EditExpenseModal({ expense, onClose, onSuccess }: { expense: Expense; o
   const [expenseDate, setExpenseDate] = useState(expense.expenseDate ? new Date(expense.expenseDate).toISOString().split('T')[0] : '');
   const [paymentMethod, setPaymentMethod] = useState(expense.paymentMethod || 'OTHER');
   const [description, setDescription] = useState(expense.description || '');
-  
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -278,15 +278,13 @@ function EditExpenseModal({ expense, onClose, onSuccess }: { expense: Expense; o
 export default function SuperAdminExpensesPage() {
   const [items, setItems] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Filtres
   const [status, setStatus] = useState(''); 
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [endDate, setEndDate] = useState('');  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
-  
+
   // 🔥 ÉTAT POUR LA MODALE DE SUPPRESSION
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -302,7 +300,7 @@ export default function SuperAdminExpensesPage() {
       setLoading(false); 
     }
   }, [status, startDate, endDate]);
-  
+
   useEffect(() => { void load(); }, [load]);
 
   const handleDeleteRequest = (expense: Expense) => {
@@ -460,7 +458,7 @@ export default function SuperAdminExpensesPage() {
             <div className="sae-stat-lbl">En attente</div>
           </div>
         </div>
-        
+
         <div className="sae-panel">
           <div className="sae-panel-head">
             <div style={{ width: 44, height: 44, borderRadius: 14, background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -487,7 +485,7 @@ export default function SuperAdminExpensesPage() {
                 </select>
               </div>
             </div>
-            
+
             <div className="sae-dates-row">
               <div className="sae-date-wrapper">
                 <label className="sae-date-lbl">Du</label>
@@ -497,9 +495,7 @@ export default function SuperAdminExpensesPage() {
                 <label className="sae-date-lbl">Au</label>
                 <input type="date" className="sae-date-input" value={endDate} onChange={e => { const v = e.target.value; setEndDate(v); void load(status, startDate, v); }} />
               </div>
-            </div>
-
-            {(startDate || endDate || status) && (
+            </div>            {(startDate || endDate || status) && (
               <div className="sae-filter-field" style={{ flex: '0 0 auto', justifyContent: 'flex-end', width: 'auto' }}>
                 <button className="sae-btn-cancel" style={{ height: 42, width: '100%', background: '#F8FAFC' }} onClick={() => { setStatus(''); setStartDate(''); setEndDate(''); void load('', '', ''); }}>
                   Réinitialiser
@@ -507,7 +503,7 @@ export default function SuperAdminExpensesPage() {
               </div>
             )}
           </div>
-          
+
           {loading ? (
             <div className="spinner" />
           ) : items.length === 0 ? (
@@ -586,7 +582,7 @@ export default function SuperAdminExpensesPage() {
           )}
         </div>
       </div>
-      
+
       {selectedExpense && (
         <SuperAdminExpenseModal 
           expense={selectedExpense} 
@@ -605,7 +601,7 @@ export default function SuperAdminExpensesPage() {
         />
       )}
 
-      {/* 🔥 MODALE DE CONFIRMATION DE SUPPRESSION (Correction des guillemets) */}
+      {/* 🔥 MODALE DE CONFIRMATION DE SUPPRESSION */}
       {expenseToDelete && (
         <div className="sae-modal-overlay" onClick={() => !isDeleting && setExpenseToDelete(null)} style={{ zIndex: 10000 }}>
           <div className="sae-modal" style={{ maxWidth: 400, margin: 'auto', textAlign: 'center', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>

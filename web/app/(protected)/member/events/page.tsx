@@ -5,6 +5,11 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type EventItem } from '../../../../lib/api-client';
 
+// On étend localement l'interface pour inclure la réponse retournée par le backend
+interface MemberEventItem extends EventItem {
+  attendees?: Array<{ status: string }>;
+}
+
 function formatDateTime(dateString: string) {
   const d = new Date(dateString);
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -17,18 +22,24 @@ const TYPE_MAP: Record<string, string> = {
   OTHER: 'Autre' 
 };
 
-function MemberEventModal({ event, onClose, onSuccess }: { event: EventItem; onClose: () => void; onSuccess: () => void }) {
+function MemberEventModal({ event, onClose, onSuccess }: { event: MemberEventItem; onClose: () => void; onSuccess: () => void }) {
   const [saving, setSaving] = useState(false);
   
-  // 👇 NOUVEAU : Vérification de l'expiration
+  // Vérification de l'expiration
   const isExpired = new Date(event.startsAt).getTime() < new Date().getTime();
+  
+  // Gestion du statut existant
+  const initialStatus = event.attendees?.[0]?.status || null;
+  const [currentStatus, setCurrentStatus] = useState<string | null>(initialStatus);
+  const [isModifying, setIsModifying] = useState(false);
 
-  // 👇 CORRECTION : Envoi strict en MAJUSCULES
   async function handleRSVP(status: 'ATTENDING' | 'ABSENT') {
     setSaving(true);
     try {
       await api.registerEventAttendance(event.id, { status });
-      onSuccess();
+      setCurrentStatus(status);
+      setIsModifying(false);
+      onSuccess(); // Rafraîchit en arrière-plan
     } catch (err) { 
       console.error(err);
       alert("Erreur lors de l'enregistrement de votre réponse. Veuillez réessayer."); 
@@ -68,10 +79,28 @@ function MemberEventModal({ event, onClose, onSuccess }: { event: EventItem; onC
             </div>
           </div>
 
-          {/* 👇 NOUVEAU : Disparition des boutons si expiré */}
+          {/* 👇 LOGIQUE D'AFFICHAGE CONDITIONNELLE DES BOUTONS */}
           {isExpired ? (
-            <div style={{ textAlign: 'center', padding: '1.25rem', background: '#F3F4F6', borderRadius: 14, color: '#4B5563', fontWeight: 700 }}>
-              Cet événement est déjà passé.
+            <div style={{ textAlign: 'center', padding: '1.25rem', background: '#F3F4F6', borderRadius: 14 }}>
+              <div style={{ color: '#4B5563', fontWeight: 700, fontSize: '0.95rem' }}>Cet événement est déjà passé.</div>
+              {currentStatus === 'ATTENDING' && <div style={{ fontSize: '0.8rem', color: '#059669', marginTop: '0.5rem', fontWeight: 600 }}>✅ Vous étiez inscrit comme participant.</div>}
+              {currentStatus === 'ABSENT' && <div style={{ fontSize: '0.8rem', color: '#DC2626', marginTop: '0.5rem', fontWeight: 600 }}>❌ Vous étiez noté absent.</div>}
+            </div>
+          ) : currentStatus && !isModifying ? (
+            <div style={{ textAlign: 'center', padding: '1.5rem', background: currentStatus === 'ATTENDING' ? '#ECFDF5' : '#FEF2F2', borderRadius: 16, border: `1px solid ${currentStatus === 'ATTENDING' ? '#A7F3D0' : '#FECACA'}` }}>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: currentStatus === 'ATTENDING' ? '#059669' : '#DC2626', marginBottom: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                {currentStatus === 'ATTENDING' ? (
+                  <><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> Vous participez !</>
+                ) : (
+                  <><svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg> Vous serez absent.</>
+                )}
+              </div>
+              <button 
+                onClick={() => setIsModifying(true)}
+                style={{ background: 'white', border: `1px solid ${currentStatus === 'ATTENDING' ? '#059669' : '#DC2626'}`, color: currentStatus === 'ATTENDING' ? '#059669' : '#DC2626', padding: '0.7rem 1.4rem', borderRadius: 99, fontSize: '0.85rem', fontWeight: 700, cursor: 'pointer', transition: 'all 0.15s' }}
+              >
+                Modifier ma réponse
+              </button>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
@@ -85,6 +114,15 @@ function MemberEventModal({ event, onClose, onSuccess }: { event: EventItem; onC
                   <><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg> Je serai absent</>
                 )}
               </button>
+              
+              {isModifying && (
+                <button 
+                  onClick={() => setIsModifying(false)}
+                  style={{ gridColumn: '1 / -1', background: 'transparent', border: 'none', color: '#6B7280', fontSize: '0.85rem', fontWeight: 600, marginTop: '0.5rem', cursor: 'pointer', textDecoration: 'underline' }}
+                >
+                  Annuler la modification
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -94,17 +132,18 @@ function MemberEventModal({ event, onClose, onSuccess }: { event: EventItem; onC
 }
 
 export default function MemberEventsPage() {
-  const [items, setItems] = useState<EventItem[]>([]);
+  const [items, setItems] = useState<MemberEventItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<MemberEventItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try { 
       const res = await api.listEvents(); 
-      setItems(res?.items || []); 
+      setItems(res?.items as MemberEventItem[] || []); 
     } catch (err) { 
       console.error(err); 
+      setItems([]); 
     } finally { 
       setLoading(false); 
     }
@@ -168,6 +207,9 @@ export default function MemberEventsPage() {
           ) : (
             items.map(e => {
               const isExpired = new Date(e.startsAt).getTime() < new Date().getTime();
+              // Petit badge statut sur la carte si le membre a répondu
+              const status = e.attendees?.[0]?.status;
+
               return (
                 <div key={e.id} className={`mev-card ${isExpired ? 'expired' : ''}`} onClick={() => setSelectedEvent(e)}>
                   <div className="mev-type-badge" style={isExpired ? { background: '#F3F4F6', color: '#6B7280', borderColor: '#E5E7EB' } : {}}>
@@ -175,12 +217,19 @@ export default function MemberEventsPage() {
                   </div>
                   <div className="mev-date">{formatDateTime(e.startsAt)}</div>
                   <div className="mev-name">{e.title}</div>
-                  <div className="mev-loc">
-                    {e.isOnline ? (
-                      <><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> En ligne</>
-                    ) : (
-                      <><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {e.locationText || 'Lieu à définir'}</>
-                    )}
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.8rem' }}>
+                    <div className="mev-loc">
+                      {e.isOnline ? (
+                        <><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> En ligne</>
+                      ) : (
+                        <><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg> {e.locationText || 'Lieu à définir'}</>
+                      )}
+                    </div>
+                    
+                    {/* Indicateur visuel rapide sur la carte */}
+                    {status === 'ATTENDING' && <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#059669', background: '#D1FAE5', padding: '0.2rem 0.5rem', borderRadius: 99 }}>✅ Inscrit</span>}
+                    {status === 'ABSENT' && <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#DC2626', background: '#FEE2E2', padding: '0.2rem 0.5rem', borderRadius: 99 }}>❌ Absent</span>}
                   </div>
                 </div>
               );
