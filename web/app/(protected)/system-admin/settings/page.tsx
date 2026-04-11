@@ -1,4 +1,4 @@
-// web/app/(protected)/system-admin/settings/page.tsx
+/////// web/app/(protected)/system-admin/settings/page.tsx
 'use client';
 
 import { type FormEvent, useState } from 'react';
@@ -67,14 +67,25 @@ export default function SystemSettingsPage() {
   async function onSave(e: FormEvent) {
     e.preventDefault();
     setMsg(null);
+
+    // 🔒 AJOUT CHIRURGICAL : Vérification de la correspondance des mots de passe
+    if (password && password !== confirmPassword) {
+      setMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
+      return;
+    }
+
     setLoading(true);
     try {
+      // TODO: Remplacer ceci par le véritable appel API vers ton backend
+      // await api.updateSystemSettings({ platformName, contactEmail, maintenanceMode, theme, password });
       await new Promise(r => setTimeout(r, 1000)); 
+      
       setMsg({ type: 'success', text: 'Paramètres enregistrés avec succès !' });
       setIsEditing(false);
-      setPassword(''); setConfirmPassword('');
+      setPassword(''); 
+      setConfirmPassword('');
     } catch {
-      setMsg({ type: 'error', text: 'Une erreur est survenue.' });
+      setMsg({ type: 'error', text: 'Une erreur est survenue lors de l\'enregistrement.' });
     } finally {
       setLoading(false);
     }

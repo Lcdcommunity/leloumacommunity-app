@@ -41,9 +41,9 @@ type DashboardData = {
       country?: string | null;
       city?: string | null;
       profilePhotoUrl?: string | null;
-      function?: string | null;             // <- AJOUT IMPORTANT
-      professionalStatus?: string | null;   // <- AJOUT IMPORTANT
-      originVillage?: string | null;        // <- AJOUT IMPORTANT POUR LA CARTE
+      function?: string | null;              
+      professionalStatus?: string | null;   
+      originVillage?: string | null;        
     };
   } | null;
   recentContributions: Contribution[];
@@ -84,6 +84,7 @@ function getStatusConfig(status: string) {
     DRAFT:              { label: 'Brouillon',  color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
     APPROVED:           { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
     COMPLETED:          { label: 'Terminé',    color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' },
+    PROPOSED:           { label: 'Proposé',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   };
   return map[status] ?? { label: status, color: '#4B5563', bg: '#F3F4F6', border: '#E5E7EB' };
 }
@@ -92,7 +93,7 @@ function getPurposeConfig(purpose?: string | null) {
   const map: Record<string, { label: string; icon: string; color: string; bg: string }> = {
     REGULAR_QUOTA:   { label: 'Cotisation',  icon: '📅', color: '#059669', bg: '#ECFDF5' },
     MEMBERSHIP_CARD: { label: 'Carte membre', icon: '💳', color: '#2563EB', bg: '#EFF6FF' },
-    DONATION:        { label: 'Don libre',             icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
+    DONATION:        { label: 'Don libre',               icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
   };
   return purpose ? (map[purpose] ?? null) : null;
 }
@@ -266,8 +267,7 @@ function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; on
           <div style={{ textAlign: 'center', padding: '1.5rem', color: '#9CA3AF', fontSize: '0.85rem' }}>Données non disponibles</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 16, padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669' }}>Total validé</span>
+            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 16, padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669' }}>Total validé</span>
               <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 700, color: '#111827' }}>{formatCurrency(summary.totalValidatedContributionsAmount, summary.currency)}</span>
               <span style={{ fontSize: '0.74rem', color: '#6B7280' }}>{summary.associationName}</span>
             </div>
@@ -286,7 +286,7 @@ const FIXED_CURRENCIES_MEMBER = [
   { cur: 'GNF', label: 'Solde antennes (GNF)',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
   { cur: 'EUR', label: 'Solde antennes (Euro)',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   { cur: 'USD', label: 'Solde antennes (Dollar)',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  { cur: 'XOF', label: 'Solde antennes (XOF)',     color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  { cur: 'XOF', label: 'Solde antennes (XOF)',      color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
 ];
 
 // ─── Project Detail Modal (membre) ──────────────────────────────────────────
@@ -295,10 +295,11 @@ function ProjectDetailModal({ project, onClose }: { project: Project; onClose: (
   const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string; bar: string }> = {
     IN_PROGRESS: { label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', bar: '#3B82F6' },
     APPROVED:    { label: 'Approuvé',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', bar: '#10B981' },
-    COMPLETED:   { label: 'Terminé',   color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', bar: '#8B5CF6' },
+    COMPLETED:   { label: 'Terminé',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', bar: '#8B5CF6' },
     SUSPENDED:   { label: 'Suspendu',  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', bar: '#F59E0B' },
-    CANCELLED:   { label: 'Annulé',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', bar: '#EF4444' },
+    CANCELLED:   { label: 'Annulé',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', bar: '#EF4444' },
     DRAFT:       { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
+    PROPOSED:    { label: 'Proposé',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
   };
   const cfg = STATUS_CFG[project.status] ?? STATUS_CFG['DRAFT'];
   const planned = (project as unknown as { budgetPlanned?: number | null }).budgetPlanned ?? (project as unknown as { budgetAmount?: number | null }).budgetAmount ?? 0;
@@ -438,11 +439,8 @@ export default function MemberHomePage() {
         ]);
 
         if (dashRes.status === 'fulfilled') {
-          // 🔥 AJOUT DU TYPAGE "as DashboardData" ICI POUR EVITER L'ERREUR TYPESCRIPT
           const res = dashRes.value as DashboardData;
-          
-          // 🔥 ON S'ASSURE QUE LE POSTE EST BIEN DANS LA CARTE MÊME SI L'API L'OUBLIE 
-          // (On le récupère de `res.me` si nécessaire)
+
           if (res.virtualCard && res.virtualCard.user && res.me) {
             if (!res.virtualCard.user.function && res.me.function) {
                 res.virtualCard.user.function = res.me.function;
@@ -488,14 +486,17 @@ export default function MemberHomePage() {
   }, []);
 
   const me = data?.me;
-  const cur = data?.stats?.currency || balanceSummary?.currency || 'EUR';
-  const lateMonths = data?.stats?.lateMonths ?? 0;
-
   const recentContribs: ExtendedContribution[] = myContributions.length > 0 ? myContributions : (data?.recentContributions ?? []) as ExtendedContribution[];
+  
+  const cur = data?.stats?.currency || balanceSummary?.currency || 'EUR';
+  
+  const lateMonths = data?.stats?.lateMonths ?? 0;
   const totalCotise = data?.stats?.myContributionsTotal ?? data?.stats?.myTotalContributions ?? recentContribs.reduce((s, c) => s + (c.amount ?? 0), 0);
   const totalValide = data?.stats?.myContributionsValidatedTotal ?? recentContribs.filter(c => c.status === 'VALIDATED').reduce((s, c) => s + (c.amount ?? 0), 0);
   const pendingCount = data?.stats?.myPendingContributionsCount ?? recentContribs.filter(c => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION').length;
   const lastContribDate = data?.stats?.myLastContributionAt ?? (recentContribs.length > 0 ? recentContribs[0].depositedAt || recentContribs[0].createdAt : null);
+
+  const firstName = data?.me?.firstName || data?.virtualCard?.user?.firstName || 'Membre';
 
   type StatCard = { label: string; value: string | number; icon: React.ReactNode; color: string; bg: string; sub: string; spanClass: string; urgent?: boolean; clickable?: boolean; onClick?: () => void; };
 
@@ -519,8 +520,7 @@ export default function MemberHomePage() {
       return { 
         label, 
         value: formatCurrency(grp.total, fc), 
-        icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>, 
-        color, 
+        icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>,         color, 
         bg, 
         sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails', 
         clickable: true, 
@@ -584,7 +584,9 @@ export default function MemberHomePage() {
           font-size: 0.8rem; font-weight: 600; color: #374151;
           background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.15);
           border-radius: 8px; padding: 0.5rem 1rem; white-space: nowrap;
-        }        .mb-stats {
+        }        
+        
+        .mb-stats {
           display: grid; grid-template-columns: repeat(6, 1fr);
           gap: 0.75rem; margin-bottom: 1.5rem;
         }
@@ -602,7 +604,6 @@ export default function MemberHomePage() {
           .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
         }
 
-        /* 👇 C'est ici que l'on centre le texte et les icônes de la carte ! */
         .mb-stat {
           display: flex; flex-direction: column; align-items: center; text-align: center;
           background: rgba(253,253,255,0.9); backdrop-filter: blur(12px);
@@ -703,6 +704,24 @@ export default function MemberHomePage() {
         .mb-contrib-row:hover { background: rgba(37,99,235,0.04) !important; }
         .mb-contrib-row:active { background: rgba(37,99,235,0.08) !important; }
 
+        .mb-list { display: grid; grid-template-columns: 1fr; gap: 0.75rem; padding: 1.25rem 1.4rem; }
+        .mb-list-item {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 1rem 1.25rem; border: 1px solid rgba(37,99,235,0.1); border-radius: 16px;
+          background: #fff; cursor: pointer; transition: all 0.2s ease; gap: 1rem;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+        .mb-list-item:hover {
+          border-color: rgba(37,99,235,0.3);
+          box-shadow: 0 6px 16px rgba(37,99,235,0.08);
+          transform: translateY(-2px);
+        }
+        .mb-list-content { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 0; }
+        .mb-list-title { font-weight: 800; color: #111827; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+        .mb-list-meta { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: #6B7280; font-weight: 600; }
+        .mb-list-icon { width: 36px; height: 36px; border-radius: 10px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #6B7280; }
+        .mb-empty { text-align: center; padding: 2.5rem 1rem; color: #9CA3AF; font-size: 0.85rem; font-weight: 500; }
+
         .mb-member-pill { display: flex; align-items: center; gap: 0.6rem; }
         .mb-avatar-sm {
           width: 30px; height: 30px; border-radius: 50%;
@@ -712,7 +731,9 @@ export default function MemberHomePage() {
         }
         .mb-late-bar { display: flex; align-items: center; gap: 0.6rem; }
         .mb-late-track { flex: 1; height: 5px; background: #FEE2E2; border-radius: 99px; overflow: hidden; max-width: 65px; }
-        .mb-late-fill  { height: 100%; background: #DC2626; border-radius: 99px; }.mb-fab {
+        .mb-late-fill  { height: 100%; background: #DC2626; border-radius: 99px; }
+        
+        .mb-fab {
           position: fixed; bottom: calc(64px + 1rem); right: 1rem; z-index: 100;
           background: linear-gradient(135deg, #10B981 0%, #065F46 100%);
           color: white; border: none; border-radius: 50px;
@@ -766,9 +787,8 @@ export default function MemberHomePage() {
           border-radius: 50%; animation: mbspin 0.8s linear infinite;
         }
 
-        /* ── Classes pour les badges ── */
         .mb-status-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.7rem; font-weight: 800; border-radius: 99px; padding: 0.18rem 0.6rem; white-space: nowrap; }
-        .mb-status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        .mb-status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }        
         
         .mb-motif-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.68rem; font-weight: 600; border-radius: 99px; padding: 0.18rem 0.55rem; white-space: nowrap; max-width: 100%; }
         .mb-motif-icon { flex-shrink: 0; }
@@ -776,22 +796,20 @@ export default function MemberHomePage() {
 
         .truncate-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* ── Compression Mobile (3 colonnes, sans scroll) ── */
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
           .mb-table th { padding: 0.6rem 0.4rem; font-size: 0.6rem; letter-spacing: 0; }
           .mb-table td { padding: 0.7rem 0.4rem; font-size: 0.75rem; } 
           .mb-table td.mono { font-size: 0.85rem; }
           .mb-panel-head { padding: 1rem; }
-          
-          /* Tronquer doucement pour garder 3 colonnes propres */
           .truncate-cell { max-width: 120px; }
-          
-          /* Ajustement léger des badges (moins extrême qu'avec 4 colonnes) */
           .mb-status-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
           .mb-motif-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
+          .mb-list { padding: 1rem; }
         }
-      `}</style>      {!data && !error && (
+      `}</style>      
+
+      {!data && !error && (
         <div className="mb-loader">
           <div className="mb-ring" />
           <span>Chargement de votre espace…</span>
@@ -813,7 +831,7 @@ export default function MemberHomePage() {
           <div className="mb-header">
             <div>
               <div className="mb-eyebrow"><div className="mb-eyebrow-dot"/>Espace membre</div>
-              <h1 className="mb-title">Bonjour, <span>{me?.firstName ?? 'Membre'}</span></h1>
+              <h1 className="mb-title">Bonjour, <span>{firstName}</span></h1>
             </div>
             <div className="mb-greeting-chip">
               {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -846,7 +864,6 @@ export default function MemberHomePage() {
             ))}
           </div>
 
-          {/* Cotisations récentes + Projets */}
           <div className="mb-grid2">
             <div className="mb-panel" style={{ animationDelay: '0.48s' }}>
               <div className="mb-panel-head">
@@ -921,34 +938,30 @@ export default function MemberHomePage() {
                   </span>
                 )}
               </div>
-              <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th>Projet</th>
-                    <th>Statut</th>
-                    <th className="hide-mobile">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.projectsInProgress || []).length === 0 && <EmptyRow cols={3} label="Aucun projet actif"/>}
-                  {(data.projectsInProgress || []).map(p => (
-                    <tr
-                      key={p.id}
-                      className="mb-contrib-row"
-                      onClick={() => setSelectedProject(p)}
-                      title="Voir les détails"
-                    >
-                      <td className="truncate-cell" style={{ fontWeight: 700, color: '#111827' }}>{p.title}</td>
-                      <td><StatusBadge status={p.status}/></td>
-                      <td className="muted hide-mobile">{formatDate(p.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              
+              <div className="mb-list">
+                {(data.projectsInProgress || []).length === 0 && <div className="mb-empty">Aucun projet actif</div>}
+                {(data.projectsInProgress || []).map(p => (
+                  <div key={p.id} className="mb-list-item" onClick={() => setSelectedProject(p)}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      <div className="mb-list-icon">
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                      </div>
+                      <div className="mb-list-content">
+                        <div className="mb-list-title">{p.title}</div>
+                        <div className="mb-list-meta">Mis à jour le {formatDate(p.updatedAt || p.createdAt)}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+                      <StatusBadge status={p.status}/>
+                      <span style={{ fontSize: '0.68rem', color: '#2563EB', fontWeight: 700 }}>Voir ➔</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* Contenus + Retardataires */}
           <div className="mb-grid2">
             <div className="mb-panel" style={{ animationDelay: '0.58s' }}>
               <div className="mb-panel-head">
@@ -961,32 +974,27 @@ export default function MemberHomePage() {
                   Informations récentes
                 </div>
               </div>
-              <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th>Titre</th>
-                    <th>Statut</th>
-                    <th className="hide-mobile">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.latestContents || []).length === 0 && <EmptyRow cols={3} label="Aucune actualité publiée"/>}
-                  {(data.latestContents || []).map(c => (
-                    <tr
-                      key={c.id}
-                      className="mb-contrib-row"
-                      onClick={() => setSelectedContent(c)}
-                      title="Lire l'article"
-                    >
-                      <td className="truncate-cell" style={{ fontWeight: 700, color: '#111827' }}>
-                        {c.title}
-                      </td>
-                      <td><StatusBadge status={c.status}/></td>
-                      <td className="muted hide-mobile">{formatDate(c.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              
+              <div className="mb-list">
+                {(data.latestContents || []).length === 0 && <div className="mb-empty">Aucune actualité publiée</div>}
+                {(data.latestContents || []).map(c => (
+                  <div key={c.id} className="mb-list-item" onClick={() => setSelectedContent(c)}>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      <div className="mb-list-icon" style={{ color: '#059669', background: '#ECFDF5' }}>
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+                      </div>
+                      <div className="mb-list-content">
+                        <div className="mb-list-title">{c.title}</div>
+                        <div className="mb-list-meta">Publié le {formatDate(c.createdAt)}</div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
+                      <StatusBadge status={c.status}/>
+                      <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700 }}>Lire ➔</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="mb-panel" style={{ animationDelay: '0.63s' }}>

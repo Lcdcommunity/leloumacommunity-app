@@ -1,4 +1,4 @@
-// backend/src/modules/auth/auth.controller.ts
+/////// backend/src/modules/auth/auth.controller.ts
 import { Body, Controller, Post, Get, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -23,9 +23,13 @@ export class AuthController {
 
   @Post('login')
   async login(@Body() dto: LoginDto, @Req() req: Request) {
+    // 🌍 Récupération du domaine du tenant (injecté par notre Middleware Next.js)
+    const tenantDomain = (req.headers['x-tenant-domain'] as string) || req.headers.host;
+
     return this.authService.login(dto, {
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
+      tenantDomain, // 👈 On passe le domaine au service pour le verrouillage
     });
   }
 

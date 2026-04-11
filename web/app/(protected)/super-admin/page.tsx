@@ -1,4 +1,4 @@
-// web/app/(protected)/super-admin/page.tsx
+/////// web/app/(protected)/super-admin/page.tsx
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -63,25 +63,26 @@ function getProjectBudget(p: BackendProject) {
 }
 
 function getInitials(name: string) {
+  if (!name) return '??';
   const parts = name.trim().split(' ');
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
 }
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    VALIDATED:        { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    PENDING:          { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-    PENDING_APPROVAL: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    VALIDATED:          { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    PENDING:            { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    PENDING_APPROVAL:   { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
     PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' }, 
-    REJECTED:         { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-    ACTIVE:           { label: 'Actif',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-    IN_PROGRESS:      { label: 'En cours',   color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-    PUBLISHED:        { label: 'Publié',     color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    DRAFT:            { label: 'Brouillon',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-    COMPLETED:        { label: 'Terminé',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-    APPROVED:         { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    CANCELLED:        { label: 'Annulé',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-    PROPOSED:         { label: 'Proposé',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    REJECTED:           { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    ACTIVE:             { label: 'Actif',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+    IN_PROGRESS:        { label: 'En cours',   color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+    PUBLISHED:          { label: 'Publié',     color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    DRAFT:              { label: 'Brouillon',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    COMPLETED:          { label: 'Terminé',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+    APPROVED:           { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    CANCELLED:          { label: 'Annulé',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    PROPOSED:           { label: 'Proposé',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   };
   const s = map[status] ?? { label: status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
   return (
@@ -98,23 +99,12 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function EmptyRow({ cols, label }: { cols: number; label: string }) {
-  return (
-    <tr>
-      <td colSpan={cols} style={{ textAlign: 'center', padding: '2rem 1rem', color: '#9CA3AF', fontSize: '0.78rem' }}>
-        {label}
-      </td>
-    </tr>
-  );
-}
-
 function BalancesModal({ currency, balances, onClose }: { currency: string; balances?: AntennaBalance[]; onClose: () => void; }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', animation: 'sain 0.2s ease' }} onClick={onClose}>
       <div style={{ width: '100%', maxWidth: 480, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: '1.5rem', border: '1px solid rgba(37,99,235,.15)', boxShadow: '0 24px 60px rgba(37,99,235,.12)', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
           <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', margin: 0 }}>
-            {/* Note: Assure-toi que FIXED_CURRENCIES est importé ou défini plus haut dans ton fichier complet ! */}
             {`Soldes — ${currency}`}
           </h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
@@ -192,12 +182,10 @@ function AdminContributionDetailModal({ item, onClose }: { item: Contribution; o
 
   const handleClose = () => {
     setAnimOpen(false);
-    setTimeout(onClose, 300); // Attendre la fin de l'animation
+    setTimeout(onClose, 300);
   };
 
   const memberName = item.member ? `${item.member.firstName} ${item.member.lastName}` : item.memberUserId;
-  
-  // 👇 SUPPRESSION DE "methodLabels" ICI
 
   return (
     <div className={`modal-overlay ${animOpen ? 'open' : ''}`} onClick={handleClose}>
@@ -212,7 +200,6 @@ function AdminContributionDetailModal({ item, onClose }: { item: Contribution; o
         .modal-overlay.open { 
           background: rgba(15,23,42,0.6); opacity: 1; pointer-events: auto; backdrop-filter: blur(4px); 
         }
-
         .modal-content { 
           background: white; 
           width: 100%; max-width: 500px; 
@@ -222,42 +209,20 @@ function AdminContributionDetailModal({ item, onClose }: { item: Contribution; o
           transform: translateY(20px) scale(0.98);
           transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
         }
-        .modal-overlay.open .modal-content {
-          transform: translateY(0) scale(1);
-        }
-
-        .modal-header { 
-          padding: 1.25rem; 
-          border-bottom: 1px solid #f1f5f9; 
-          display: flex; justify-content: space-between; align-items: center; 
-          position: sticky; top: 0; background: white; z-index: 10; 
-        }
+        .modal-overlay.open .modal-content { transform: translateY(0) scale(1); }
+        .modal-header { padding: 1.25rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: white; z-index: 10; }
         .modal-title { font-family: 'Cormorant Garamond',serif; font-size: 1.4rem; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 0.5rem; margin: 0; }
         .modal-close { width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #e2e8f0; display: flex; align-items: center; justify-content: center; cursor: pointer; background: white; color: #64748b; transition: background 0.2s; }
-        .modal-close:hover { background: #f8fafc; color: #111827;}
-        
         .modal-body { padding: 1.25rem; }
-
-        /* Mise en avant du montant (MODIFIÉ POUR ÊTRE VERT) */
-        .sc-modal-hero { 
-          display: flex; flex-direction: column; align-items: center; justify-content: center; 
-          padding: 1rem 1.5rem; 
-          background: linear-gradient(to bottom, #ECFDF5, #F0FDF4); 
-          border-radius: 16px; border: 1px dashed #A7F3D0;
-          margin-bottom: 1.5rem;
-        }
+        .sc-modal-hero { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem 1.5rem; background: linear-gradient(to bottom, #ECFDF5, #F0FDF4); border-radius: 16px; border: 1px dashed #A7F3D0; margin-bottom: 1.5rem; }
         .sc-modal-hero-label { font-size: 0.65rem; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.2rem; }
         .sc-modal-hero-amount { font-family: 'DM Mono', monospace; font-size: clamp(1.8rem, 6vw, 2.4rem); font-weight: 800; color: #047857; line-height: 1; text-align: center; word-break: break-word; }
-
-        /* Grille des infos */
         .sm-section-divider { font-size: 0.7rem; font-weight: 800; color: #DC2626; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #FECACA; padding-bottom: 0.4rem; margin: 0 0 0.75rem 0; }
         .sm-dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
         .sm-dp-field { display: flex; flex-direction: column; gap: 4px; }
         .sm-dp-field.full { grid-column: span 2; }
         .sm-dp-field label { font-size: .65rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; }
         .sm-dp-value { font-size: .9rem; font-weight: 600; color: #1e293b; padding: 4px 0; word-break: break-word; }
-
-        /* Avatar / Utilisateur dans la grille */
         .sc-modal-user { display: flex; align-items: center; gap: 0.6rem; }
         .sc-modal-avatar { width: 36px; height: 36px; border-radius: 50%; background: linear-gradient(135deg,#DC2626,#991B1B); display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; color: white; flex-shrink: 0; }
       `}</style>
@@ -266,61 +231,36 @@ function AdminContributionDetailModal({ item, onClose }: { item: Contribution; o
         <div className="modal-header">
           <h2 className="modal-title">Détails de la cotisation</h2>
           <button className="modal-close" onClick={handleClose}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-
         <div className="modal-body">
-          {/* Le montant est le héros du modal (Vert) */}
           <div className="sc-modal-hero">
             <span className="sc-modal-hero-label">Montant de la cotisation</span>
-            <span className="sc-modal-hero-amount">
-              {formatCurrency(item.amount, item.currency || 'EUR')}
-            </span>
+            <span className="sc-modal-hero-amount">{formatCurrency(item.amount, item.currency || 'EUR')}</span>
           </div>
-
           <div className="sm-section-divider">Informations Membre</div>
           <div className="sm-dp-grid" style={{ marginBottom: '1rem', gridTemplateColumns: '1fr' }}>
             <div className="sm-dp-field full">
               <div className="sc-modal-user">
-                <div className="sc-modal-avatar">
-                  {item.member ? getInitials(memberName) : 'ID'}
-                </div>
+                <div className="sc-modal-avatar">{item.member ? getInitials(memberName) : 'ID'}</div>
                 <div>
-                  <div className="sm-dp-value" style={{ padding: 0 }}>
-                    {memberName}
-                  </div>
-                  {item.member && (
-                    <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>
-                      {item.member.email}
-                    </div>
-                  )}
+                  <div className="sm-dp-value" style={{ padding: 0 }}>{memberName}</div>
+                  {item.member && <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>{item.member.email}</div>}
                 </div>
               </div>
             </div>
           </div>
-
           <div className="sm-section-divider">Détails de la transaction</div>
           <div className="sm-dp-grid">
             <div className="sm-dp-field">
-              <label>Statut</label>
-              <div className="sm-dp-value">
-                <StatusBadge status={item.status} />
-              </div>
+              <label>Statut</label><div className="sm-dp-value"><StatusBadge status={item.status} /></div>
             </div>
-
             <div className="sm-dp-field">
-              <label>Date de dépôt</label>
-              <div className="sm-dp-value">{formatDate(item.createdAt)}</div>
+              <label>Date de dépôt</label><div className="sm-dp-value">{formatDate(item.createdAt)}</div>
             </div>
-
             <div className="sm-dp-field full">
-              <label>Référence</label>
-              <div className="sm-dp-value" style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#6B7280' }}>
-                {item.id}
-              </div>
+              <label>Référence</label><div className="sm-dp-value" style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#6B7280' }}>{item.id}</div>
             </div>
           </div>
         </div>
@@ -346,13 +286,7 @@ function AdminProjectDetailModal({ project, onClose }: { project: BackendProject
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-
-        {project.description && (
-          <p style={{ fontSize: '0.85rem', color: '#4B5563', lineHeight: 1.6, marginBottom: '1.5rem', padding: '1rem', background: '#F9FAFB', borderRadius: 12 }}>
-            {project.description}
-          </p>
-        )}
-
+        {project.description && <p style={{ fontSize: '0.85rem', color: '#4B5563', lineHeight: 1.6, marginBottom: '1.5rem', padding: '1rem', background: '#F9FAFB', borderRadius: 12 }}>{project.description}</p>}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
           <div style={{ background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid #E2E8F0' }}>
             <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', marginBottom: '0.4rem' }}>Budget Prévu</div>
@@ -363,7 +297,6 @@ function AdminProjectDetailModal({ project, onClose }: { project: BackendProject
             <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.25rem', fontWeight: 700, color: overBudget ? '#DC2626' : '#111827' }}>{spent > 0 ? formatCurrency(spent) : '—'}</div>
           </div>
         </div>
-
         {planned > 0 && (
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
@@ -375,7 +308,6 @@ function AdminProjectDetailModal({ project, onClose }: { project: BackendProject
             </div>
           </div>
         )}
-
         <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '1rem', borderTop: '1px solid #F3F4F6' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#9CA3AF', textTransform: 'uppercase' }}>Créé le</span>
           <span style={{ fontSize: '0.85rem', fontWeight: 500, color: '#374151' }}>{formatDate(project.createdAt)}</span>
@@ -385,10 +317,9 @@ function AdminProjectDetailModal({ project, onClose }: { project: BackendProject
   );
 }
 
-// 4 devises fixes — toujours affichées même si solde = 0
 const FIXED_CURRENCIES = [
   { cur: 'GNF', label: 'Solde antennes (GNF)',     color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  { cur: 'EUR', label: 'Solde antennes (Euro)',     color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  { cur: 'EUR', label: 'Solde antennes (Euro)',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   { cur: 'USD', label: 'Solde antennes (Dollar)',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
   { cur: 'XOF', label: 'Solde antennes (XOF)',      color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
 ];
@@ -397,7 +328,6 @@ export default function SuperAdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
-
   const [selectedAccount, setSelectedAccount] = useState<UserSummary | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null);
   const [selectedProject, setSelectedProject] = useState<BackendProject | null>(null);
@@ -428,299 +358,88 @@ export default function SuperAdminDashboardPage() {
   }, [data]);
 
   const baseStats: StatCard[] = data ? [
-    {
-      label: 'Associations',
-      value: data.stats.associations,
-      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>,
-      color: '#2563EB', bg: '#EFF6FF', sub: 'Organisations',
-    },
-    {
-      label: 'Antennes',
-      value: data.stats.antennas,
-      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>,
-      color: '#7C3AED', bg: '#F5F3FF', sub: 'Sections locales',
-    },
-    {
-      label: 'Membres',
-      value: data.stats.members,
-      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
-      color: '#059669', bg: '#ECFDF5', sub: 'Membres validés',
-    },
-    {
-      label: 'Comptes en attente',
-      value: data.stats.pendingAccounts,
-      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>,
-      color: '#D97706', bg: '#FFFBEB', sub: 'À valider',
-      urgent: data.stats.pendingAccounts > 0,
-    },
-    {
-      label: 'Cotisations en attente',
-      value: data.stats.pendingContributions,
-      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>,
-      color: '#0891B2', bg: '#ECFEFF', sub: 'En attente de validation',
-      urgent: data.stats.pendingContributions > 0,
-    },
-    {
-      label: 'Projets actifs',
-      value: data.stats.activeProjects,
-      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>,
-      color: '#7C3AED', bg: '#F5F3FF', sub: 'En cours',
-    },
+    { label: 'Associations', value: data.stats.associations, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>, color: '#2563EB', bg: '#EFF6FF', sub: 'Organisations' },
+    { label: 'Antennes', value: data.stats.antennas, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>, color: '#7C3AED', bg: '#F5F3FF', sub: 'Sections locales' },
+    { label: 'Membres', value: data.stats.members, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>, color: '#059669', bg: '#ECFDF5', sub: 'Membres validés' },
+    { label: 'Comptes en attente', value: data.stats.pendingAccounts, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>, color: '#D97706', bg: '#FFFBEB', sub: 'À valider', urgent: data.stats.pendingAccounts > 0 },
+    { label: 'Cotisations en attente', value: data.stats.pendingContributions, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>, color: '#0891B2', bg: '#ECFEFF', sub: 'En attente de validation', urgent: data.stats.pendingContributions > 0 },
+    { label: 'Projets actifs', value: data.stats.activeProjects, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>, color: '#7C3AED', bg: '#F5F3FF', sub: 'En cours' },
   ] : [];
 
   const currencyStats: StatCard[] = FIXED_CURRENCIES.map(({ cur, label, color, bg }) => {
     const group = currencyGroups[cur] ?? { total: 0, antennas: [] };
-    const antennaCount = group.antennas.length;
-    return {
-      label,
-      value: formatCurrency(group.total, cur),
-      icon: (
-        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-        </svg>
-      ),
-      color, bg,
-      sub: antennaCount > 0
-        ? `${antennaCount} antenne${antennaCount > 1 ? 's' : ''} · Clic pour détails`
-        : 'Aucune antenne · Clic pour détails',
-      clickable: true,
-      onClick: () => setSelectedCurrency(cur),
-    };
+    return { label, value: formatCurrency(group.total, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>, color, bg, sub: group.antennas.length > 0 ? `${group.antennas.length} antenne${group.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails', clickable: true, onClick: () => setSelectedCurrency(cur) };
   });
 
   return (
     <AppShell title="Super Admin · Vue globale">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700;800&display=swap');
-
-        .sa-wrap {
-          font-family: 'DM Sans', sans-serif;
-          padding: clamp(1rem, 3vw, 2rem);
-          max-width: 1340px; margin: 0 auto;
-          box-sizing: border-box;
-          width: 100%;
-          overflow-x: hidden;
-        }
-
-        /* ── Header ── */
-        .sa-header {
-          display: flex; align-items: flex-end;
-          justify-content: space-between; flex-wrap: wrap;
-          gap: 1rem; margin-bottom: 1.75rem;
-          padding-bottom: 1.5rem;
-          border-bottom: 1px solid rgba(220,38,38,0.10);
-          opacity: 0; transform: translateY(10px);
-          animation: sain 0.5s 0.04s cubic-bezier(.22,1,.36,1) forwards;
-        }
+        .sa-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 1340px; margin: 0 auto; box-sizing: border-box; width: 100%; overflow-x: hidden; }
+        .sa-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; padding-bottom: 1.5rem; border-bottom: 1px solid rgba(220,38,38,0.10); opacity: 0; transform: translateY(10px); animation: sain 0.5s 0.04s cubic-bezier(.22,1,.36,1) forwards; }
         .sa-eyebrow { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #DC2626; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
         .sa-eyebrow-dot { width: 6px; height: 6px; background: #EF4444; border-radius: 50%; animation: sapulse 2s ease-in-out infinite; }
         @keyframes sapulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.8)} }
         .sa-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 3vw, 1.95rem); font-weight: 700; color: #111827; letter-spacing: -0.02em; line-height: 1.15; }
         .sa-title span { background: linear-gradient(135deg, #B91C1C, #EF4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
         .sa-chip { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: #6B7280; font-weight: 600; background: rgba(220,38,38,0.05); border: 1px solid rgba(220,38,38,0.12); border-radius: 8px; padding: 0.45rem 0.9rem; white-space: nowrap; }
-        .sa-chip-dot { width: 6px; height: 6px; background: #EF4444; border-radius: 50%; }
-
-        /* ── Stats sections ── */
-        .sa-section-label {
-          font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em;
-          text-transform: uppercase; color: #9CA3AF;
-          margin: 0 0 0.65rem;
-          display: flex; align-items: center; gap: 0.5rem;
-        }
+        .sa-section-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #9CA3AF; margin: 0 0 0.65rem; display: flex; align-items: center; gap: 0.5rem; }
         .sa-section-label::after { content: ''; flex: 1; height: 1px; background: rgba(0,0,0,0.06); }
-
-        /* Base stats grid : 3 colonnes sur desktop, 2 sur tablet, 3 sur mobile (compact) */
-        .sa-stats-base {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 0.75rem;
-          margin-bottom: 0.5rem;
-        }
-        @media (max-width: 900px) { .sa-stats-base { grid-template-columns: repeat(3, 1fr); } }
+        .sa-stats-base { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 0.5rem; }
         @media (max-width: 520px)  { .sa-stats-base { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; } }
-
-        /* Currency cards : 1 à 4 colonnes selon le nombre de devises */
-        .sa-stats-currency {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-          gap: 0.75rem;
-          margin-bottom: 1.5rem;
-        }
+        .sa-stats-currency { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
         @media (max-width: 520px) { .sa-stats-currency { grid-template-columns: repeat(2, 1fr); gap: 0.4rem; } }
-
-        .sa-stat {
-          display: flex; flex-direction: column; align-items: center; text-align: center;
-          background: rgba(253,253,255,0.9);
-          backdrop-filter: blur(12px);
-          border-radius: 18px;
-          padding: 1.1rem 1.15rem;
-          border: 1px solid rgba(37,99,235,0.08);
-          box-shadow: 0 2px 10px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.8) inset;
-          position: relative; overflow: hidden;
-          opacity: 0; transform: translateY(14px);
-          animation: sain 0.5s cubic-bezier(.22,1,.36,1) forwards;
-          transition: transform 0.2s, box-shadow 0.2s;
-        }
+        .sa-stat { display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(253,253,255,0.9); backdrop-filter: blur(12px); border-radius: 18px; padding: 1.1rem 1.15rem; border: 1px solid rgba(37,99,235,0.08); box-shadow: 0 2px 10px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.8) inset; position: relative; overflow: hidden; opacity: 0; transform: translateY(14px); animation: sain 0.5s cubic-bezier(.22,1,.36,1) forwards; transition: transform 0.2s, box-shadow 0.2s; }
         .sa-stat-clickable { cursor: pointer; }
-        .sa-stat-clickable:hover {
-          transform: translateY(-3px) scale(1.01);
-          box-shadow: 0 12px 24px rgba(5,150,105,0.14), 0 0 0 1px rgba(255,255,255,0.9) inset;
-        }
-        /* Carte devise : style légèrement différencié */
-        .sa-stat-currency {
-          border-color: rgba(5,150,105,0.15);
-          background: linear-gradient(135deg, rgba(240,253,244,0.9), rgba(253,253,255,0.9));
-        }
-        .sa-stat-currency .sa-stat-accent { background: linear-gradient(90deg, #059669, #10B981) !important; }
-
-        @media (max-width: 520px) {
-          .sa-stat { padding: 0.6rem 0.5rem; border-radius: 12px; }
-          .sa-stat-value { font-size: 1.05rem !important; word-break: break-word; }
-          .sa-stat-label { font-size: 0.5rem !important; }
-          .sa-stat-sub   { font-size: 0.48rem !important; }
-          .sa-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
-          .sa-stat-icon svg { width: 12px; height: 12px; }
-          .sa-stat-top { flex-direction: column-reverse; gap: 0.2rem; margin-bottom: 0.4rem; }
-        }
-
+        .sa-stat-clickable:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 12px 24px rgba(5,150,105,0.14), 0 0 0 1px rgba(255,255,255,0.9) inset; }
+        .sa-stat-currency { border-color: rgba(5,150,105,0.15); background: linear-gradient(135deg, rgba(240,253,244,0.9), rgba(253,253,255,0.9)); }
+        @media (max-width: 520px) { .sa-stat { padding: 0.6rem 0.5rem; border-radius: 12px; } .sa-stat-value { font-size: 1.05rem !important; word-break: break-word; } .sa-stat-label { font-size: 0.5rem !important; } .sa-stat-icon { width: 24px !important; height: 24px !important; border-radius: 6px !important; } .sa-stat-icon svg { width: 12px; height: 12px; } .sa-stat-top { flex-direction: column-reverse; gap: 0.2rem; margin-bottom: 0.4rem; } }
         .sa-stat-top { display: flex; flex-direction: column-reverse; align-items: center; justify-content: center; gap: 0.4rem; margin-bottom: 0.65rem; width: 100%; }
         .sa-stat-label { font-size: 0.61rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #6B7280; text-align: center; line-height: 1.4; }
         .sa-stat-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .sa-stat-value { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 700; color: #111827; letter-spacing: -0.03em; line-height: 1; margin-bottom: 0.28rem; word-break: break-word; }
         .sa-stat-sub { font-size: 0.62rem; color: #9CA3AF; font-weight: 600; text-align: center; }
         .sa-stat-accent { position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 18px 18px 0 0; }
-
-        /* ── Grid panels ── */
         .sa-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
         @media (max-width: 780px) { .sa-grid2 { grid-template-columns: 1fr; } }
-
-        .sa-panel {
-          background: rgba(253,253,255,0.9); backdrop-filter: blur(12px);
-          border-radius: 18px; border: 1px solid rgba(37,99,235,0.08);
-          box-shadow: 0 2px 10px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.8) inset;
-          overflow: hidden; opacity: 0;
-          animation: sain 0.5s cubic-bezier(.22,1,.36,1) forwards;
-        }
+        .sa-panel { background: rgba(253,253,255,0.9); backdrop-filter: blur(12px); border-radius: 18px; border: 1px solid rgba(37,99,235,0.08); box-shadow: 0 2px 10px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.8) inset; overflow: hidden; opacity: 0; animation: sain 0.5s cubic-bezier(.22,1,.36,1) forwards; }
         .sa-panel-full { grid-column: span 2; }
         @media (max-width: 780px) { .sa-panel-full { grid-column: span 1; } }
-
         .sa-panel-head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.3rem; border-bottom: 1px solid rgba(37,99,235,0.07); }
         .sa-panel-title { font-size: 0.73rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #374151; display: flex; align-items: center; gap: 0.45rem; }
         .sa-panel-ico { width: 26px; height: 26px; background: #EFF6FF; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: #2563EB; }
         .sa-count-chip { font-size: 0.66rem; font-weight: 800; padding: 0.18rem 0.55rem; border-radius: 99px; background: #FFFBEB; color: #92400E; border: 1px solid #FDE68A; }
-
-        /* ── Tables ── */
-        .sa-table { width: 100%; border-collapse: collapse; }
-        .sa-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.08); }
-        .sa-table thead th { padding: 0.6rem 1.2rem; font-size: 0.63rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: #9CA3AF; text-align: left; white-space: nowrap; }
-        .sa-table tbody tr { border-bottom: 1px solid rgba(37,99,235,0.05); transition: background 0.15s; }
-        .sa-table tbody tr:last-child { border-bottom: none; }
         
-        .sa-row-clickable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .sa-row-clickable:hover { background: rgba(37,99,235,0.04) !important; }
-        .sa-row-clickable:active { background: rgba(37,99,235,0.08) !important; }
-
-        .sa-table td { padding: 0.65rem 1.2rem; font-size: 0.79rem; color: #374151; font-weight: 500; vertical-align: middle; }
-        .sa-table td.mono { font-family: 'Cormorant Garamond', serif; font-size: 0.93rem; font-weight: 700; color: #111827; }
-        .sa-table td.muted { color: #9CA3AF; font-size: 0.72rem; }
-        .sa-table td.bold { font-weight: 700; color: #111827; }
-
-        .sa-user-cell { display: flex; align-items: center; gap: 0.55rem; }
-        .sa-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #2563EB, #60A5FA); display: flex; align-items: center; justify-content: center; font-size: 0.59rem; font-weight: 800; color: white; flex-shrink: 0; }
-        .sa-role { font-size: 0.64rem; font-weight: 800; padding: 0.14rem 0.5rem; border-radius: 6px; background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
-        .sa-budget-wrap { display: flex; flex-direction: column; gap: 0.22rem; }
-        .sa-budget-bar { height: 3px; background: #E5E7EB; border-radius: 99px; overflow: hidden; max-width: 80px; }
-        .sa-budget-fill { height: 100%; border-radius: 99px; }
-
-        /* Style des cartes Projets */
-        .sa-project-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-          gap: 1rem;
-          padding: 1.25rem;
-          background: #F9FAFB;
-        }
-        .sa-project-card {
-          background: #ffffff;
-          border: 1px solid #E5E7EB;
-          border-radius: 16px;
-          padding: 1.25rem;
-          display: flex;
-          flex-direction: column;
-          gap: 1rem;
-          transition: all 0.2s ease;
+        /* Liste des cartes d'items */
+        .sa-list-items { display: flex; flex-direction: column; gap: 0.5rem; padding: 1rem; }
+        .sa-item-card { 
+          display: flex; align-items: center; justify-content: space-between; 
+          background: white; border: 1px solid #F1F5F9; border-radius: 14px; 
+          padding: 0.75rem 1rem; transition: transform 0.2s, box-shadow 0.2s; 
           cursor: pointer;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         }
-        .sa-project-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-          border-color: #BFDBFE;
+        .sa-item-card:hover { transform: translateX(3px); box-shadow: 0 4px 12px rgba(0,0,0,0.04); border-color: #E2E8F0; }
+        
+        .sa-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #2563EB, #60A5FA); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; color: white; flex-shrink: 0; }
+        .sa-role { font-size: 0.64rem; font-weight: 800; padding: 0.14rem 0.5rem; border-radius: 6px; background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
+        
+        /* Projets récents */
+        .sa-project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; padding: 1.25rem; background: #F9FAFB; }
+        .sa-project-card { 
+          background: rgba(37, 99, 235, 0.04); /* BLEU TRANSPARENT DYNAMIQUE */
+          border: 1px solid rgba(37, 99, 235, 0.1); 
+          border-radius: 16px; padding: 1.25rem; 
+          display: flex; flex-direction: column; gap: 1rem; 
+          transition: all 0.2s ease; cursor: pointer; 
         }
-        .sa-project-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 1rem;
-        }
-        .sa-project-title {
-          font-weight: 800;
-          font-size: 0.95rem;
-          color: #111827;
-          line-height: 1.3;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-        .sa-project-budget-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-        }
-        .sa-project-budget-lbl {
-          font-size: 0.65rem;
-          font-weight: 800;
-          color: #9CA3AF;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-        }
-        .sa-project-budget-val {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 1.2rem;
-          font-weight: 700;
-          color: #111827;
-        }
-        .sa-project-footer {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding-top: 0.75rem;
-          border-top: 1px solid #F3F4F6;
-          font-size: 0.75rem;
-          color: #6B7280;
-          font-weight: 600;
-        }
+        .sa-project-card:hover { background: rgba(37, 99, 235, 0.08); border-color: rgba(37, 99, 235, 0.2); }
 
-        @media (max-width: 768px) {
-          .hide-mobile { display: none !important; }
-          .sa-table { table-layout: fixed; width: 100%; } 
-          .sa-table th { padding: 0.4rem 0.2rem; font-size: 0.55rem; white-space: normal; overflow-wrap: break-word; }
-          .sa-table td { padding: 0.5rem 0.2rem; font-size: 0.65rem; overflow-wrap: break-word; word-break: break-word; hyphens: auto; }
-          .sa-table td.mono { font-size: 0.75rem; }
-          .sa-panel-head { padding: 0.8rem 1rem; }
-          .sa-user-cell { gap: 0.3rem; }
-          .sa-user-cell span { font-size: 0.65rem !important; white-space: normal; line-height: 1.2; }
-          .sa-avatar { width: 24px; height: 24px; font-size: 0.55rem; }
-          
-          .sa-project-grid { grid-template-columns: 1fr; padding: 1rem; gap: 0.75rem; }
+        @media (max-width: 768px) { 
+          .hide-mobile { display: none !important; } 
+          .sa-project-grid { grid-template-columns: 1fr; } 
         }
-
-        /* ── Loader / Error ── */
-        .sa-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 55vh; gap: 1rem; color: #6B7280; font-size: 0.82rem; font-weight: 600; }
+        .sa-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 55vh; gap: 1rem; color: #6B7280; }
         .sa-ring { width: 40px; height: 40px; border: 3px solid rgba(220,38,38,0.1); border-top-color: #DC2626; border-radius: 50%; animation: saspin 0.8s linear infinite; }
-        .sa-error { display: flex; align-items: center; gap: 0.6rem; padding: 1rem 1.25rem; background: rgba(185,28,28,0.06); border: 1px solid rgba(185,28,28,0.18); border-radius: 14px; color: #B91C1C; font-size: 0.82rem; font-weight: 700; margin-bottom: 1.5rem; }
-
         @keyframes saspin { to { transform: rotate(360deg); } }
         @keyframes sain   { to { opacity: 1; transform: translateY(0); } }
       `}</style>
@@ -743,8 +462,6 @@ export default function SuperAdminDashboardPage() {
 
       {data && (
         <div className="sa-wrap">
-
-          {/* Header */}
           <div className="sa-header">
             <div>
               <div className="sa-eyebrow"><div className="sa-eyebrow-dot" />Super Administration</div>
@@ -756,7 +473,6 @@ export default function SuperAdminDashboardPage() {
             </div>
           </div>
 
-          {/* ── Stats de base (6 cartes) ── */}
           <p className="sa-section-label">Indicateurs généraux</p>
           <div className="sa-stats-base" style={{ marginBottom: '1.5rem' }}>
             {baseStats.map((s, i) => (
@@ -767,9 +483,6 @@ export default function SuperAdminDashboardPage() {
                 onClick={s.onClick}
               >
                 <div className="sa-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}, ${s.color}55)` }} />
-                {s.urgent && (
-                  <div style={{ position: 'absolute', inset: 0, borderRadius: 18, border: `1.5px solid ${s.color}50`, pointerEvents: 'none' }} />
-                )}
                 <div className="sa-stat-top">
                   <span className="sa-stat-label">{s.label}</span>
                   <div className="sa-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
@@ -778,245 +491,117 @@ export default function SuperAdminDashboardPage() {
                 <div className="sa-stat-sub">{s.sub}</div>
               </div>
             ))}
-          </div>          {/* ── Cartes de soldes par devise ── */}
-          <>
-            <p className="sa-section-label">Soldes par devise</p>
-            <div className="sa-stats-currency">
-              {currencyStats.map((s, i) => (
-                  <div
-                    key={s.label}
-                    className="sa-stat sa-stat-currency sa-stat-clickable"
-                    style={{ animationDelay: `${0.42 + i * 0.07}s` }}
-                    onClick={s.onClick}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={e => e.key === 'Enter' && s.onClick?.()}
-                    title="Voir le détail par antenne"
-                  >
-                    <div className="sa-stat-accent" />
-                    <div className="sa-stat-top">
-                      <span className="sa-stat-label">{s.label}</span>
-                      <div className="sa-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
-                    </div>
-                    <div className="sa-stat-value" style={{ color: s.color }}>{String(s.value)}</div>
-                    <div className="sa-stat-sub">{s.sub}</div>
-                  </div>
-              ))}
-            </div>
-          </>
+          </div>
 
-          {/* ── Panels : comptes en attente + cotisations ── */}
+          <p className="sa-section-label">Soldes par devise</p>
+          <div className="sa-stats-currency">
+            {currencyStats.map((s, i) => (
+              <div
+                key={s.label}
+                className="sa-stat sa-stat-currency sa-stat-clickable"
+                style={{ animationDelay: `${0.42 + i * 0.07}s` }}
+                onClick={s.onClick}
+              >
+                <div className="sa-stat-accent" />
+                <div className="sa-stat-top">
+                  <span className="sa-stat-label">{s.label}</span>
+                  <div className="sa-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                </div>
+                <div className="sa-stat-value" style={{ color: s.color }}>{String(s.value)}</div>
+                <div className="sa-stat-sub">{s.sub}</div>
+              </div>
+            ))}
+          </div>
+
           <div className="sa-grid2">
-
             <div className="sa-panel" style={{ animationDelay: '0.52s' }}>
               <div className="sa-panel-head">
                 <div className="sa-panel-title">
-                  <div className="sa-panel-ico">
-                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
-                    </svg>
-                  </div>
+                  <div className="sa-panel-ico"><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg></div>
                   Comptes en attente
                 </div>
-                {data.recentPendingAccounts.length > 0 && (
-                  <span className="sa-count-chip">{data.recentPendingAccounts.length}</span>
+                {data.recentPendingAccounts.length > 0 && <span className="sa-count-chip">{data.recentPendingAccounts.length}</span>}
+              </div>
+              <div className="sa-list-items">
+                {data.recentPendingAccounts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.78rem' }}>Aucun compte en attente</div>
+                ) : (
+                  data.recentPendingAccounts.map(u => (
+                    <div key={u.id} className="sa-item-card" onClick={() => setSelectedAccount(u)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="sa-avatar">{getInitials(fullName(u))}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: 800, color: '#111827', fontSize: '0.82rem' }}>{fullName(u)}</span>
+                          <span className="sa-role" style={{ width: 'fit-content', marginTop: '2px' }}>{u.role}</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={u.status} />
+                    </div>
+                  ))
                 )}
               </div>
-              <table className="sa-table">
-                <thead>
-                  <tr>
-                    <th>Membre</th>
-                    <th>Rôle</th>
-                    <th>Statut</th>
-                    <th className="hide-mobile">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentPendingAccounts.length === 0 && <EmptyRow cols={4} label="Aucun compte en attente" />}
-                  {data.recentPendingAccounts.map(u => (
-                    <tr key={u.id} className="sa-row-clickable" onClick={() => setSelectedAccount(u)}>
-                      <td>
-                        <div className="sa-user-cell">
-                          <div className="sa-avatar">{getInitials(fullName(u))}</div>
-                          <div>
-                            <div style={{ fontWeight: 700, color: '#111827', fontSize: '0.8rem', lineHeight: 1.3 }}>{fullName(u)}</div>
-                            <div style={{ fontSize: '0.69rem', color: '#9CA3AF' }} className="hide-mobile">{u.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td><span className="sa-role">{u.role}</span></td>
-                      <td><StatusBadge status={u.status} /></td>
-                      <td className="muted hide-mobile">{formatDate(u.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
 
             <div className="sa-panel" style={{ animationDelay: '0.57s' }}>
               <div className="sa-panel-head">
                 <div className="sa-panel-title">
-                  <div className="sa-panel-ico" style={{ background: '#ECFDF5', color: '#059669' }}>
-                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                  </div>
+                  <div className="sa-panel-ico" style={{ background: '#ECFDF5', color: '#059669' }}><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
                   Cotisations récentes
                 </div>
-                {data.recentContributions.length > 0 && (
-                  <span className="sa-count-chip" style={{ background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>
-                    {data.recentContributions.length}
-                  </span>
+                {data.recentContributions.length > 0 && <span className="sa-count-chip" style={{ background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>{data.recentContributions.length}</span>}
+              </div>
+              <div className="sa-list-items">
+                {data.recentContributions.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.78rem' }}>Aucune cotisation récente</div>
+                ) : (
+                  data.recentContributions.map(c => (
+                    <div key={c.id} className="sa-item-card" onClick={() => setSelectedContribution(c)}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <div className="sa-avatar" style={{ background: 'linear-gradient(135deg, #059669, #34D399)' }}>{c.member ? getInitials(`${c.member.firstName} ${c.member.lastName}`) : '??'}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontWeight: 800, color: '#111827', fontSize: '0.82rem' }}>{c.member ? `${c.member.firstName} ${c.member.lastName}` : c.memberUserId}</span>
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', fontWeight: 800, color: '#059669' }}>{formatCurrency(c.amount, c.currency)}</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={c.status} />
+                    </div>
+                  ))
                 )}
               </div>
-              <table className="sa-table">
-                <thead>
-                  <tr>
-                    <th>Membre</th>
-                    <th>Montant</th>
-                    <th>Statut</th>
-                    <th className="hide-mobile">Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentContributions.length === 0 && <EmptyRow cols={4} label="Aucune cotisation récente" />}
-                  {data.recentContributions.map(c => (
-                    <tr key={c.id} className="sa-row-clickable" onClick={() => setSelectedContribution(c)}>
-                      <td>
-                        <div className="sa-user-cell">
-                          <div className="sa-avatar" style={{ background: 'linear-gradient(135deg, #059669, #34D399)' }}>
-                            {c.member ? getInitials(`${c.member.firstName} ${c.member.lastName}`) : '??'}
-                          </div>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#111827' }}>
-                            {c.member ? `${c.member.firstName} ${c.member.lastName}` : c.memberUserId}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="mono">{formatCurrency(c.amount, c.currency)}</td>
-                      <td><StatusBadge status={c.status} /></td>
-                      <td className="muted hide-mobile">{formatDate(c.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           </div>
 
-          {/* ── Projets récents (pleine largeur) ── */}
           <div className="sa-grid2">
             <div className="sa-panel sa-panel-full" style={{ animationDelay: '0.62s' }}>
               <div className="sa-panel-head">
-                <div className="sa-panel-title">
-                  <div className="sa-panel-ico" style={{ background: '#F5F3FF', color: '#7C3AED' }}>
-                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
-                    </svg>
-                  </div>
-                  Projets récents
-                </div>
-                {data.recentProjects.length > 0 && (
-                  <span className="sa-count-chip" style={{ background: '#F5F3FF', color: '#5B21B6', border: '1px solid #DDD6FE' }}>
-                    {data.recentProjects.length}
-                  </span>
-                )}
+                <div className="sa-panel-title"><div className="sa-panel-ico" style={{ background: '#F5F3FF', color: '#7C3AED' }}><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg></div>Projets récents</div>
               </div>
-              
-              {/* Remplacement du tableau par des cartes modernes */}
-              {data.recentProjects.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#9CA3AF', fontSize: '0.85rem' }}>
-                  Aucun projet enregistré
-                </div>
-              ) : (
-                <div className="sa-project-grid">
-                  {data.recentProjects.map(p => {
-                    const { planned, spent } = getProjectBudget(p);
-                    const pct = planned > 0 ? Math.min((spent / planned) * 100, 100) : 0;
-                    const overBudget = planned > 0 && spent > planned;
-                    
-                    return (
-                      <div key={p.id} className="sa-project-card" onClick={() => setSelectedProject(p)}>
-                        <div className="sa-project-header">
-                          <div className="sa-project-title">{p.title}</div>
-                          <StatusBadge status={p.status} />
-                        </div>
-                        
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          <div className="sa-project-budget-row">
-                            <div>
-                              <div className="sa-project-budget-lbl">Budget Prévu</div>
-                              <div className="sa-project-budget-val">{planned > 0 ? formatCurrency(planned) : '—'}</div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div className="sa-project-budget-lbl">Dépensé</div>
-                              <div className="sa-project-budget-val" style={{ color: overBudget ? '#DC2626' : '#111827' }}>
-                                {spent > 0 ? formatCurrency(spent) : '—'}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          {/* Progress Bar */}
-                          {planned > 0 ? (
-                            <div style={{ marginTop: '0.2rem' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', fontWeight: 800, marginBottom: '0.2rem', color: overBudget ? '#DC2626' : '#6B7280' }}>
-                                <span>Avancement</span>
-                                <span>{Math.round(pct)}%</span>
-                              </div>
-                              <div style={{ maxWidth: '100%', height: '6px', background: '#E5E7EB', borderRadius: '99px', overflow: 'hidden' }}>
-                                <div
-                                  style={{ height: '100%', borderRadius: '99px', width: `${pct}%`, background: overBudget ? '#DC2626' : pct > 75 ? '#D97706' : '#2563EB' }}
-                                />
-                              </div>
-                            </div>
-                          ) : (
-                             <div style={{ fontSize: '0.75rem', color: '#D1D5DB', fontWeight: 500, marginTop: '0.2rem' }}>Budget non défini</div>
-                          )}
-                        </div>
-
-                        <div className="sa-project-footer">
-                          <span>Créé le {formatDate(p.createdAt)}</span>
-                          <span style={{ color: '#2563EB' }}>Détails ➔</span>
+              <div className="sa-project-grid">
+                {data.recentProjects.map(p => {
+                  const { planned, spent } = getProjectBudget(p);
+                  return (
+                    <div key={p.id} className="sa-project-card" onClick={() => setSelectedProject(p)}>
+                      <div className="sa-project-header"><div className="sa-project-title">{p.title}</div><StatusBadge status={p.status} /></div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <div><div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9CA3AF' }}>Budget Prévu</div><div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700 }}>{planned > 0 ? formatCurrency(planned) : '—'}</div></div>
+                          <div style={{ textAlign: 'right' }}><div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9CA3AF' }}>Dépensé</div><div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700 }}>{spent > 0 ? formatCurrency(spent) : '—'}</div></div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                      <div style={{ fontSize: '0.75rem', color: '#6B7280', paddingTop: '0.75rem', borderTop: '1px solid rgba(37, 99, 235, 0.1)' }}>Créé le {formatDate(p.createdAt)}</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
-
         </div>
       )}
 
-      {/* Modales */}
-      {selectedCurrency && (
-        <BalancesModal
-          currency={selectedCurrency}
-          balances={currencyGroups[selectedCurrency]?.antennas}
-          onClose={() => setSelectedCurrency(null)}
-        />
-      )}
-
-      {selectedAccount && (
-        <AccountDetailModal
-          user={selectedAccount}
-          onClose={() => setSelectedAccount(null)}
-        />
-      )}
-
-      {selectedContribution && (
-        <AdminContributionDetailModal
-          item={selectedContribution}
-          onClose={() => setSelectedContribution(null)}
-        />
-      )}
-
-      {selectedProject && (
-        <AdminProjectDetailModal
-          project={selectedProject}
-          onClose={() => setSelectedProject(null)}
-        />
-      )}
-
+      {selectedCurrency && <BalancesModal currency={selectedCurrency} balances={currencyGroups[selectedCurrency]?.antennas} onClose={() => setSelectedCurrency(null)} />}
+      {selectedAccount && <AccountDetailModal user={selectedAccount} onClose={() => setSelectedAccount(null)} />}
+      {selectedContribution && <AdminContributionDetailModal item={selectedContribution} onClose={() => setSelectedContribution(null)} />}
+      {selectedProject && <AdminProjectDetailModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
     </AppShell>
   );
 }

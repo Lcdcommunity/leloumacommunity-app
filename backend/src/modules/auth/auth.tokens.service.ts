@@ -1,17 +1,18 @@
-//src/modules/auth/auth.tokens.service.ts
+/////// src/modules/auth/auth.tokens.service.ts
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../prisma/prisma.service';
-// CORRECTION DU CHEMIN D'IMPORT ICI :
-import { PermissionsService } from '../permissions/permissions.service'; // Attention: vérifier s'il s'appelle servive ou service
-import { UserRole } from '@prisma/client';
+import { PermissionsService } from '../permissions/permissions.service'; 
+import { UserRole, UserStatus } from '@prisma/client'; // 👈 Import ajouté
 
+// 👈 Ajout de 'status' pour aligner avec JwtStrategy
 type TokenUser = {
   id: string;
   associationId: string;
   role: UserRole;
+  status: UserStatus; 
   email: string;
 };
 
@@ -49,6 +50,7 @@ export class AuthTokensService {
         sub: user.id,
         associationId: user.associationId,
         role: user.role,
+        status: user.status, // 👈 Ajout du statut dans le token (corrige le bug potentiel)
         email: user.email,
         permissions,
         typ: 'access',
@@ -138,6 +140,7 @@ export class AuthTokensService {
         id: user.id,
         associationId: user.associationId,
         role: user.role,
+        status: user.status, // 👈 Ajout ici
         email: user.email,
       },
       newRefreshToken: newRaw,

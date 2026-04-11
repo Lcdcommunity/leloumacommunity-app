@@ -1,4 +1,4 @@
-// web/app/(protected)/system-admin/page.tsx
+/////// web/app/(protected)/system-admin/page.tsx
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -33,11 +33,16 @@ export default function SystemAdminDashboard() {
   
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
+  const fetchDashboardData = () => {
+    setLoading(true);
     api.getSystemDashboard()
       .then((res) => setData(res as unknown as SystemDashboardData))
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
   }, []);
 
   const filteredAssociations = useMemo(() => {
@@ -57,12 +62,14 @@ export default function SystemAdminDashboard() {
     return { totalAntennas, avgUsers, activeRate: '100%' };
   }, [data]);
 
-  // Logique de Suspension / Activation
+  // Logique de Suspension / Activation (MAINTENANT CONNECTÉE)
   const handleToggleStatus = async () => {
     if (!selectedAsso) return;
     try {
       setIsProcessing(true);
       const newStatus = selectedAsso.isActive === false ? true : false;
+      
+      // 🔒 APPEL API RÉEL
       await api.updateAssociationStatusSystemAdmin(selectedAsso.id, newStatus);
       
       setData((prev) => {
@@ -75,7 +82,7 @@ export default function SystemAdminDashboard() {
         };
       });
       setSelectedAsso({ ...selectedAsso, isActive: newStatus });
-    } catch (err: unknown) { // 🔥 CORRECTION ESLINT ICI
+    } catch (err: unknown) { 
       const msg = err instanceof Error ? err.message : 'Erreur inconnue';
       alert("Erreur lors de la modification du statut : " + msg);
     } finally {
@@ -83,7 +90,7 @@ export default function SystemAdminDashboard() {
     }
   };
 
-  // Logique de Suppression
+  // Logique de Suppression (MAINTENANT CONNECTÉE)
   const handleDelete = async () => {
     if (!selectedAsso) return;
     
@@ -93,11 +100,16 @@ export default function SystemAdminDashboard() {
     try {
       setIsProcessing(true);
       
-      // await api.deleteAssociationSystemAdmin(selectedAsso.id);
+      // 🔒 APPEL API RÉEL 
+      await api.deleteAssociationSystemAdmin(selectedAsso.id);
       
-      alert("🚧 Le bouton est prêt ! Il ne reste plus qu'à connecter la fonction api.deleteAssociationSystemAdmin dans votre Backend.");
+      alert(`L'association ${selectedAsso.name} a été supprimée.`);
       
-    } catch (err: unknown) { // 🔥 CORRECTION ESLINT ICI
+      setSelectedAsso(null);
+      // On rafraîchit les données pour avoir les bons chiffres en haut de page
+      fetchDashboardData();
+      
+    } catch (err: unknown) { 
       const msg = err instanceof Error ? err.message : 'Erreur inconnue';
       alert("Erreur lors de la suppression : " + msg);
     } finally {

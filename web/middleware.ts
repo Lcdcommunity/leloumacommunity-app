@@ -1,13 +1,16 @@
-// web/middleware.ts
+/////// web/middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get('accessToken')?.value;
-  
+
   // 🌍 Récupération de la langue depuis le cookie (configuré par i18next)
   const locale = request.cookies.get('i18next')?.value || 'fr';
+
+  // 🌍 Récupération du domaine (Tenant) pour le Multi-Tenancy visuel
+  const hostname = request.headers.get('host') || '';
 
   // 1. Identification des zones
   const isSystemAdminRoute = pathname.startsWith('/system-admin');
@@ -64,11 +67,21 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 🌍 On injecte la langue dans les headers pour que les Server Components puissent la lire
-  const response = NextResponse.next();
+  // 5. Injection des headers pour les Server Components (Domaine ciblé)
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-tenant-domain', hostname);
+
+  const response = NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
+
+  // 🌍 On injecte la langue dans les cookies si elle n'y est pas
   if (!request.cookies.has('i18next')) {
     response.cookies.set('i18next', locale);
   }
+  
   return response;
 }
 

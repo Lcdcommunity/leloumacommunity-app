@@ -7,7 +7,6 @@ import { AppShell } from '../../../../../components/layout/AppShell';
 import { api } from '../../../../../lib/api-client';
 import { formatDate } from '../../../../../lib/format';
 
-// Interface locale pour les détails (évite le "any")
 interface AssociationDetail {
   id: string;
   name: string;
@@ -31,11 +30,22 @@ export default function AssociationDetails() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // loadData est maintenant "mémorisé" pour plaire au useEffect
+  // État pour l'édition des paramètres système
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editCode, setEditCode] = useState('');
+  const [editDomain, setEditDomain] = useState('');
+
   const loadData = useCallback(() => {
     setLoading(true);
     api.getAssociationByIdSystemAdmin(id as string)
-      .then((data) => setAsso(data as AssociationDetail))
+      .then((data) => {
+        const d = data as AssociationDetail;
+        setAsso(d);
+        setEditName(d.name);
+        setEditCode(d.code);
+        setEditDomain(d.domainName || '');
+      })
       .catch(() => router.push('/system-admin/associations'))
       .finally(() => setLoading(false));
   }, [id, router]);
@@ -48,13 +58,31 @@ export default function AssociationDetails() {
     if (!asso) return;
     const action = asso.isActive ? 'suspendre' : 'réactiver';
     if (!confirm(`Voulez-vous vraiment ${action} cette instance ?`)) return;
-    
+
     setActionLoading(true);
     try {
       await api.updateAssociationStatusSystemAdmin(id as string, !asso.isActive);
       loadData();
     } catch {
       alert("Erreur lors du changement de statut");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateIdentity = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      await api.updateAssociationDetailsSystemAdmin(id as string, {
+        name: editName,
+        code: editCode,
+        domainName: editDomain
+      });
+      setIsEditing(false);
+      loadData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Erreur lors de la mise à jour");
     } finally {
       setActionLoading(false);
     }
@@ -82,11 +110,20 @@ export default function AssociationDetails() {
         }
         .det-grid { display: grid; grid-template-columns: 1fr 350px; gap: 1.5rem; }
         @media (max-width: 900px) { .det-grid { grid-template-columns: 1fr; } }
+        
         .det-card { background: white; border-radius: 24px; border: 1px solid #EDE9FE; padding: 1.5rem; box-shadow: 0 4px 20px rgba(124,58,237,0.05); margin-bottom: 1.5rem; }
-        .det-card-title { font-size: 0.9rem; font-weight: 800; color: #4C1D95; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.6rem; }
-        .info-row { display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #F9FAFB; }
+        .det-card-title { font-size: 0.9rem; font-weight: 800; color: #4C1D95; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+        
+        .info-row { display: flex; justify-content: space-between; padding: 0.8rem 0; border-bottom: 1px solid #F9FAFB; align-items: center;}
         .info-label { color: #6B7280; font-weight: 500; font-size: 0.9rem; }
         .info-value { color: #111827; font-weight: 700; font-size: 0.9rem; text-align: right; }
+        
+        .sys-input { padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px solid #DDD6FE; font-family: inherit; font-size: 0.85rem; font-weight: 600; outline: none; color: #111827; width: 60%; text-align: right; background: #F5F3FF; transition: border-color 0.2s;}
+        .sys-input:focus { border-color: #7C3AED; }
+        
+        .btn-edit { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+        .btn-edit:hover { background: #EDE9FE; }
+        
         .btn-action { 
           width: 100%; padding: 1rem; border-radius: 14px; font-weight: 800; cursor: pointer; transition: all 0.2s; border: none;
           display: flex; align-items: center; justify-content: center; gap: 0.5rem;
@@ -115,12 +152,41 @@ export default function AssociationDetails() {
         <div className="det-grid">
           <div className="det-main">
             <div className="det-card">
-              <h3 className="det-card-title">📋 Informations Générales</h3>
-              <div className="info-row"><span className="info-label">Code Identifiant</span><span className="info-value" style={{ fontFamily: 'monospace' }}>{asso.code}</span></div>
-              <div className="info-row"><span className="info-label">Domaine Dédié</span><span className="info-value">{asso.domainName || 'Non configuré'}</span></div>
-              <div className="info-row"><span className="info-label">Devise par défaut</span><span className="info-value">{asso.defaultCurrency}</span></div>
-              <div className="info-row"><span className="info-label">Pays</span><span className="info-value">{asso.country || 'Non spécifié'}</span></div>
-              <div className="info-row"><span className="info-label">Date de création</span><span className="info-value">{formatDate(asso.createdAt)}</span></div>
+              <div className="det-card-title">
+                <span>📋 Identité de l&apos;Instance</span>
+                {!isEditing && <button className="btn-edit" onClick={() => setIsEditing(true)}>Modifier</button>}
+              </div>
+
+              {isEditing ? (
+                <form onSubmit={handleUpdateIdentity}>
+                  <div className="info-row">
+                    <span className="info-label">Nom Officiel</span>
+                    <input className="sys-input" value={editName} onChange={e => setEditName(e.target.value)} required />
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Code Identifiant</span>
+                    <input className="sys-input" style={{ fontFamily: 'monospace' }} value={editCode} onChange={e => setEditCode(e.target.value.toUpperCase().replace(/\s/g,''))} required />
+                  </div>
+                  <div className="info-row">
+                    <span className="info-label">Domaine Dédié</span>
+                    <input className="sys-input" value={editDomain} onChange={e => setEditDomain(e.target.value)} placeholder="asso.lcd.com" />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
+                    <button type="button" className="btn-edit" onClick={() => setIsEditing(false)} disabled={actionLoading}>Annuler</button>
+                    <button type="submit" className="btn-edit" style={{ background: '#7C3AED', color: 'white' }} disabled={actionLoading}>Enregistrer</button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <div className="info-row"><span className="info-label">Nom Officiel</span><span className="info-value">{asso.name}</span></div>
+                  <div className="info-row"><span className="info-label">Code Identifiant</span><span className="info-value" style={{ fontFamily: 'monospace', color: '#7C3AED' }}>{asso.code}</span></div>
+                  <div className="info-row"><span className="info-label">Domaine Dédié</span><span className="info-value">{asso.domainName || 'Non configuré'}</span></div>
+                </>
+              )}
+              
+              <div className="info-row" style={{ marginTop: '1rem', border: 'none' }}><span className="info-label">Devise par défaut</span><span className="info-value">{asso.defaultCurrency}</span></div>
+              <div className="info-row" style={{ border: 'none' }}><span className="info-label">Pays</span><span className="info-value">{asso.country || 'Non spécifié'}</span></div>
+              <div className="info-row" style={{ border: 'none' }}><span className="info-label">Date de création</span><span className="info-value">{formatDate(asso.createdAt)}</span></div>
             </div>
 
             <div className="det-card" style={{ background: 'linear-gradient(135deg, #FAF9FF 0%, #FFFFFF 100%)' }}>

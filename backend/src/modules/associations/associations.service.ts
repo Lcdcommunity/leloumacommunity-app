@@ -1,4 +1,4 @@
-// backend/src/modules/associations/associations.service.ts
+/////// backend/src/modules/associations/associations.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -23,9 +23,6 @@ export class AssociationsService {
   async updateCurrent(data: UpdateAssociationDto) {
     const assoc = await this.getCurrent();
 
-    // ✅ Nous avons retiré la tentative de sauvegarde de "foundedAt" 
-    // car ce champ n'existe pas dans le modèle Prisma Association.
-
     const updated = await this.prisma.association.update({
       where: { id: assoc.id },
       data: {
@@ -43,8 +40,6 @@ export class AssociationsService {
         ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
         ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency as CurrencyCode } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
-        
-        // 🔥 L'AJOUT FINAL EST ICI ! On dit au service de sauvegarder le seuil dans Prisma
         ...(data.expenseValidationThreshold !== undefined ? { expenseValidationThreshold: data.expenseValidationThreshold } : {}),
       },
     });

@@ -1,4 +1,4 @@
-// prisma/schema.prisma
+/////// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -413,7 +413,7 @@ model Association {
   ReminderRunLog                   ReminderRunLog[]
   videoPosts                       VideoPost[]
   carouselImages                   CarouselImage[]
-  pricings                         Pricing[] // 🔥 Relation ajoutée
+  pricings                         Pricing[] 
 
   @@index([isActive])
   @@map("associations")
@@ -442,8 +442,8 @@ model Antenna {
   createdAt                    DateTime     @default(now())
   updatedAt                    DateTime     @updatedAt
   suspendedAt                  DateTime?
-  suspendedReason              String?
-
+  suspendedReason              String?  
+  
   association                  Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
   createdByUser                User?        @relation("AntennaCreatedByUser", fields: [createdByUserId], references: [id], onDelete: SetNull)
 
@@ -1194,8 +1194,8 @@ model VoteSession {
   closedAt        DateTime?
 
   createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
-
+  updatedAt       DateTime          @updatedAt  
+  
   association     Association       @relation(fields: [associationId], references: [id], onDelete: Cascade)
   antenna         Antenna?          @relation(fields: [antennaId], references: [id], onDelete: SetNull)
   project         Project?          @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -1457,8 +1457,7 @@ model FileAsset {
   checksumSha256           String?
 
   category                 FileCategory                @default(OTHER)
-  visibility               FileVisibility              @default(PRIVATE)
-
+  visibility               FileVisibility              @default(PRIVATE)  
   width                    Int?
   height                   Int?
   durationSeconds          Int? 
@@ -1765,7 +1764,7 @@ model Pricing {
 
   association                Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
 
-  @@unique([associationId, currency]) // Une seule ligne de prix par association et par devise
+  @@unique([associationId, currency])
   @@index([associationId])
   @@map("pricings")
 }

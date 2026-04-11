@@ -1,4 +1,4 @@
-// backend/src/modules/auth/auth.service.ts
+/////// backend/src/modules/auth/auth.service.ts
 import {
   BadRequestException,
   Injectable,
@@ -100,7 +100,7 @@ export class AuthService {
 
   async login(
     dto: LoginDto,
-    meta?: { userAgent?: string; ipAddress?: string },
+    meta?: { userAgent?: string; ipAddress?: string; tenantDomain?: string }, // 👈 Ajout du paramètre
   ) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase().trim() },
@@ -125,11 +125,29 @@ export class AuthService {
       );
     }
 
+    // 🔒 PILIER 3 : BARRIÈRE ANTI TENANT-SPOOFING
+    if (user.role !== 'SYSTEM_ADMIN' && meta?.tenantDomain && user.associationId) {
+      const requestDomain = meta.tenantDomain.split(':')[0]; // On retire le port s'il y en a un (ex: localhost:3000)
+      
+      const userAssociation = await this.prisma.association.findUnique({
+        where: { id: user.associationId },
+        select: { domainName: true }
+      });
+
+      // Si l'utilisateur appartient à une association qui possède un domaine, 
+      // il DOIT se connecter via ce domaine exact.
+      if (userAssociation?.domainName && userAssociation.domainName !== requestDomain) {
+        // On renvoie un message générique pour ne pas donner d'infos aux attaquants
+        throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
+      }
+    }
+
     const tokens = await this.tokens.issueLoginTokens(
       {
         id: user.id,
         associationId: user.associationId,
         role: user.role,
+        status: user.status, // 👈 Ajouté pour corriger la stratégie JWT
         email: user.email,
       },
       meta,
@@ -203,13 +221,11 @@ export class AuthService {
     );
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
-    // Invalider les anciens tokens de l'utilisateur
     await this.prisma.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null },
       data: { usedAt: new Date() },
     });
 
-    // Créer le nouveau token (cloisonné à l'association)
     await this.prisma.passwordResetToken.create({
       data: {
         associationId: user.associationId,
@@ -222,7 +238,6 @@ export class AuthService {
     const front = this.getFrontendBaseUrl();
     const resetUrl = `${front}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
-    // Envoi de l'email en mode "Marque Blanche"
     await this.authMailer.sendPasswordResetEmail({
       to: user.email,
       resetUrl,
@@ -259,14 +274,12 @@ export class AuthService {
         data: { usedAt: new Date() },
       });
 
-      // Révoquer toutes les sessions en cours pour sécurité
       await tx.refreshTokenSession.updateMany({
         where: { userId: record.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
     });
 
-    // Notification de sécurité
     await this.notifications.createForUser({
       associationId: record.associationId,
       userId: record.userId,

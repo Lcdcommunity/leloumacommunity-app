@@ -1,4 +1,4 @@
-//backend/src/modules/associations/dto/update-association.dto.ts
+/////// backend/src/modules/associations/dto/update-association.dto.ts
 import { IsBoolean, IsDateString, IsOptional, IsString, MaxLength, IsNumber, ValidateIf } from 'class-validator';
 
 export class UpdateAssociationDto {
@@ -84,7 +84,6 @@ export class UpdateAssociationDto {
   @IsDateString({}, { message: 'La date de fondation doit être valide (YYYY-MM-DD)' })
   foundedAt?: string;
 
-  // 🔥 LA CORRECTION EST ICI : on autorise explicitement le "null" pour éviter le blocage
   @IsOptional()
   @ValidateIf((object, value) => value !== null)
   @IsNumber()

@@ -1,4 +1,4 @@
-// backend/src/modules/system-admin/system-admin.service.ts
+/////// backend/src/modules/system-admin/system-admin.service.ts
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/services/mail.service';
@@ -26,9 +26,6 @@ export class SystemAdminService {
     private mailService: MailService
   ) {}
 
-  /**
-   * Création d'une nouvelle instance (Association) et de son premier Super Admin.
-   */
   async createAssociationWithSuperAdmin(data: CreateAssociationPayload) {
     const existingAsso = await this.prisma.association.findUnique({ where: { code: data.code } });
     if (existingAsso) throw new ConflictException("Ce code d'association est déjà pris.");
@@ -83,9 +80,6 @@ export class SystemAdminService {
     };
   }
 
-  /**
-   * Statistiques globales pour le Dashboard du Grand Chef.
-   */
   async getSystemDashboard() {
     const [totalAssociations, totalUsers, associations] = await Promise.all([
       this.prisma.association.count(),
@@ -112,9 +106,6 @@ export class SystemAdminService {
     };
   }
 
-  /**
-   * Récupération des détails d'une association spécifique.
-   */
   async getAssociationById(id: string) {
     return this.prisma.association.findUnique({
       where: { id },
@@ -126,9 +117,25 @@ export class SystemAdminService {
     });
   }
 
-  /**
-   * Activation ou Suspension d'une instance.
-   */
+  async updateAssociationDetails(id: string, data: { name?: string; code?: string; domainName?: string }) {
+    const assoc = await this.prisma.association.findUnique({ where: { id } });
+    if (!assoc) throw new NotFoundException("Association introuvable.");
+
+    if (data.code && data.code !== assoc.code) {
+      const existing = await this.prisma.association.findUnique({ where: { code: data.code } });
+      if (existing) throw new ConflictException("Ce code d'association est déjà utilisé par une autre instance.");
+    }
+
+    return this.prisma.association.update({
+      where: { id },
+      data: {
+        ...(data.name ? { name: data.name } : {}),
+        ...(data.code ? { code: data.code.toUpperCase().replace(/\s/g, '') } : {}),
+        ...(data.domainName !== undefined ? { domainName: data.domainName } : {}),
+      }
+    });
+  }
+
   async updateAssociationStatus(id: string, isActive: boolean) {
     await this.prisma.association.update({
       where: { id },
@@ -137,9 +144,6 @@ export class SystemAdminService {
     return { message: `Instance ${isActive ? 'activée' : 'suspendue'} avec succès.` };
   }
 
-  /**
-   * Journal d'audit global (Plateforme + Instances).
-   */
   async getAuditLogs() {
     const logs = await this.prisma.auditLog.findMany({
       take: 100,
@@ -168,15 +172,10 @@ export class SystemAdminService {
     }));
   }
 
-  /**
-   * 🔥 DESTRUCTION MASSIVE : Suppression définitive d'une instance.
-   */
   async deleteAssociation(id: string) {
     const association = await this.prisma.association.findUnique({ where: { id } });
     if (!association) throw new NotFoundException("Association introuvable.");
 
-    // La suppression en cascade détruira tous les enregistrements liés 
-    // (si schema.prisma est correctement configuré avec onDelete: Cascade)
     await this.prisma.association.delete({
       where: { id }
     });

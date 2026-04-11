@@ -1,4 +1,4 @@
-// backend/src/app.module.ts
+/////// backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -27,7 +27,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { FileAssetsModule } from './modules/file-assets/file-assets.module';
-import { LedgerModule } from './modules/ledger/ledger.module';           
+import { LedgerModule } from './modules/ledger/ledger.module';          
 import { ContributionsModule } from './modules/contributions/contributions.module'; 
 import { ProjectsModule } from './modules/projects/projects.module';      
 import { ExpensesModule } from './modules/expenses/expenses.module';
@@ -67,7 +67,7 @@ import { UsersModule } from './modules/users/users.module';
     // --- MODULES MÉTIER ---
     PermissionsModule,
     PreferencesModule,
-    AuthModule, // 👈 C'est LUI qui gère AuthMemberController et AuthMemberService
+    AuthModule, 
     UploadsModule,
     SchedulerModule,
     NotificationsModule,
@@ -88,14 +88,12 @@ import { UsersModule } from './modules/users/users.module';
     AdminModule,
     UsersModule,
   ],
-  controllers: [], // 🔥 RETIRÉ : AuthMemberController est déjà dans AuthModule
+  controllers: [], 
   providers: [
     {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,
     },
-    // 🔥 RETIRÉ : AuthMemberService est déjà dans AuthModule
-    // 🔥 RETIRÉ : PrismaService est déjà fourni par PrismaModule
   ],
 })
 export class AppModule {}

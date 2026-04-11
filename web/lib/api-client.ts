@@ -1048,7 +1048,7 @@ export const api = {
       }`
     ),
 
-  // ==========================================
+// ==========================================
   // SYSTEM ADMIN (GRAND CHEF)
   // ==========================================
   createAssociationSystemAdmin: (body: {
@@ -1114,6 +1114,10 @@ export const api = {
     http<{ message: string }>(`/system-admin/associations/${id}`, {
       method: 'DELETE',
     }),
+
+  // 🔥 L'ERREUR ÉTAIT ICI : on remplace "any" par un type propre
+  updateAssociationDetailsSystemAdmin: (id: string, body: { name?: string; code?: string; domainName?: string }) =>
+    http<{ id: string; name: string; code: string; domainName: string | null }, typeof body>(`/system-admin/associations/${id}`, { method: 'PATCH', body }),
 
   updateAssociationStatusSystemAdmin: (id: string, isActive: boolean) =>
     http<{ message: string }>(`/system-admin/associations/${id}/status`, {

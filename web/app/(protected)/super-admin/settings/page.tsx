@@ -1,4 +1,4 @@
-// web/app/(protected)/super-admin/settings/page.tsx
+/////// web/app/(protected)/super-admin/settings/page.tsx
 'use client';
 
 import React, { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
@@ -126,7 +126,7 @@ function Field({
             }}
           >
             {showPassword ? (
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943-9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
             ) : (
               <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268-2.943 9.543 7-1.275 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
             )}
@@ -181,7 +181,7 @@ export default function SuperAdminSettingsPage() {
     setMounted(true);
     let isSubscribed = true;
 
-    // 🔥 Forcer le thème CLAIR par défaut (évite le mode sombre non désiré)
+    // 🔥 Forcer le thème CLAIR par défaut
     if (!theme || theme === 'system') {
       setTheme('light');
     }
@@ -234,7 +234,6 @@ export default function SuperAdminSettingsPage() {
     return () => { isSubscribed = false; };
   }, [t, theme, setTheme]);
 
-  /* ── Gestion des Notifications Push ── */
   const togglePushNotifications = async (enable: boolean) => {
     setPushNotifications(enable); 
     if (enable) {
@@ -311,8 +310,9 @@ export default function SuperAdminSettingsPage() {
         };
       });
 
-      // 🔥 Nettoyage strict du payload pour l'association (CORRECTION TYPESCRIPT ICI)
-      const assocPayload: Record<string, string | boolean | number | null> = { name, code, isActive };
+      // 🔥 CORRECTION DE L'ERREUR 400 BAD REQUEST: 
+      // On retire "code" du payload car le backend interdit la modification du code unique
+      const assocPayload: Record<string, string | boolean | number | null> = { name, isActive };
       
       const rawThreshold = pricingMap[activeCurrency]?.expenseValidationThreshold || pricingMap['EUR']?.expenseValidationThreshold;
       if (rawThreshold && rawThreshold.toString().trim() !== '') {
@@ -331,7 +331,7 @@ export default function SuperAdminSettingsPage() {
       setInitialPricingMap(JSON.parse(JSON.stringify(pricingMap)));
       setMsg({ type: 'success', text: t('settings.saveSuccess', 'Paramètres mis à jour avec succès !') });
       setIsEditing(false);
-    } catch (error: unknown) { // 🔥 CORRECTION TYPESCRIPT ICI
+    } catch (error: unknown) {
       console.error("🔥 Erreur détaillée du backend :", error);
       setMsg({ type: 'error', text: t('settings.saveError', 'Erreur de sauvegarde') });
     } finally {
@@ -532,8 +532,9 @@ export default function SuperAdminSettingsPage() {
                           onChange={setName}
                           placeholder={t('settings.orgNamePlaceholder', 'Ex : Ma Super Association')}
                           required
-                          disabled={!isEditing}
-                          hint={t('settings.orgNameHint', "Ce nom apparaît sur tous les documents et communications officiels.")}                          isRTL={isRTL}
+                          disabled={true} // 🔥 VERROUILLÉ DÉFINITIVEMENT
+                          hint="Le nom officiel est géré par l'administration système."
+                          isRTL={isRTL}
                         />
 
                         <Field
@@ -543,8 +544,8 @@ export default function SuperAdminSettingsPage() {
                           placeholder="Ex : ASSOC-01"
                           required
                           mono
-                          disabled={!isEditing}
-                          hint={t('settings.uniqueIdHint', "Uniquement des lettres majuscules, chiffres et tirets. Utilisé comme référence interne.")}
+                          disabled={true} // 🔥 VERROUILLÉ DÉFINITIVEMENT
+                          hint={t('settings.uniqueIdHint', "Ce code est unique et ne peut pas être modifié après création.")}
                           isRTL={isRTL}
                         />
 
@@ -735,7 +736,8 @@ export default function SuperAdminSettingsPage() {
 
                     <div className="ss-field-group">
                       <label className="ss-field-label">{t('settings.theme', 'Thème')}</label>
-                      <div className="ss-theme-row">                        {([
+                      <div className="ss-theme-row">
+                        {([
                           { value: 'light', label: t('settings.themeLight', 'Clair'), icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><path strokeLinecap="round" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg> },
                           { value: 'dark',  label: t('settings.themeDark', 'Sombre'), icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg> },
                           { value: 'system',label: t('settings.themeSystem', 'Système'), icon: <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> },
