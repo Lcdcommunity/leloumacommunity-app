@@ -1,5 +1,4 @@
 // backend/src/modules/member/member.service.ts
-// backend/src/modules/member/member.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -143,7 +142,7 @@ export class MemberService {
             _sum: { amount: true }
           })
         ]);
-        
+
         return {
           id: ant.id,
           name: ant.name,
@@ -316,10 +315,10 @@ export class MemberService {
       });
 
       if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
-      
+
       finalMemberId = target.id;
       submitterId = me.id;
-      
+
       const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
       if (primaryMembership && primaryMembership.antennaId) {
         finalAntennaId = primaryMembership.antennaId;
@@ -608,6 +607,7 @@ export class MemberService {
         estimatedBudget: dto.expectedBudget
           ? new Prisma.Decimal(dto.expectedBudget)
           : null,
+        currency: dto.currency || CurrencyCode.EUR,
         status: ProposalStatus.SUBMITTED,
         ...(dto.attachmentFileAssetId
           ? {
@@ -662,6 +662,7 @@ export class MemberService {
       items: items.map((p) => ({
         ...memberMapper.projectProposal(p),
         estimatedBudget: p.estimatedBudget ? Number(p.estimatedBudget) : null,
+        currency: p.currency,
       })),
       total,
       page,

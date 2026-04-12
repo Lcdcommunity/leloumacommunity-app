@@ -190,7 +190,7 @@ export class SuperAdminController {
     return this.service.deleteDocument(id, actor.associationId);
   }
 
-/* ── CONTRIBUTIONS ── */
+  /* ── CONTRIBUTIONS ── */
   @Get('contributions')
   listContributions(
     @CurrentUser() actor: AuthUser,
@@ -205,5 +205,32 @@ export class SuperAdminController {
       Number(pageSize) || 100,
       status
     );
+  }
+
+  /* ── GESTION DES CONTENUS (ANNONCES) (AJOUT CHIRURGICAL) ── */
+  @Get('contents')
+  listContents(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.service.listContents(
+      actor.associationId,
+      query.page,
+      query.pageSize,
+      query.q,
+      query.status,
+    );
+  }
+
+  @Post('contents')
+  createContent(@CurrentUser() actor: AuthUser, @Body() body: any) {
+    return this.service.createContent(actor.id, actor.associationId, body);
+  }
+
+  @Patch('contents/:id')
+  updateContent(@Param('id') id: string, @CurrentUser() actor: AuthUser, @Body() body: any) {
+    return this.service.updateContent(id, actor.associationId, body);
+  }
+
+  @Delete('contents/:id')
+  deleteContent(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.deleteContent(id, actor.associationId);
   }
 }

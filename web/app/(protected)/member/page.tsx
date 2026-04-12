@@ -5,6 +5,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { AppShell } from '../../../components/layout/AppShell';
 import { MemberStatusBanner } from '../../../components/member/MemberStatusBanner';
 import { VirtualCardWidget } from '../../../components/member/VirtualCardWidget';
+import { DashboardCarousel, CarouselProject, CarouselEvent } from '../../../components/member/DashboardCarousel';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, formatDate } from '../../../lib/format';
 import type { UserSummary } from '../../../types/user';
@@ -13,6 +14,29 @@ import type { Project } from '../../../types/project';
 import type { ContentPost } from '../../../types/content';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
+
+interface ApiFileAttachment {
+  file?: { url?: string | null } | null;
+}
+
+type RawApiProject = Omit<Project, 'updatedAt'> & {
+  updatedAt?: string | null;
+  budgetPlanned?: number | null;
+  budgetAmount?: number | null;
+  budgetSpent?: number | null;
+  amountSpent?: number | null;
+  endsAt?: string | null;
+  attachments?: ApiFileAttachment[] | null;
+};
+
+type ExtendedCarouselProject = CarouselProject & {
+  updatedAt?: string | Date | null;
+  endsAt?: string | Date | null;
+  budgetPlanned?: number | null;
+  budgetAmount?: number | null;
+  budgetSpent?: number | null;
+  amountSpent?: number | null;
+};
 
 type DashboardData = {
   stats: {
@@ -41,14 +65,15 @@ type DashboardData = {
       country?: string | null;
       city?: string | null;
       profilePhotoUrl?: string | null;
-      function?: string | null;              
-      professionalStatus?: string | null;   
-      originVillage?: string | null;        
+      function?: string | null;
+      professionalStatus?: string | null;
+      originVillage?: string | null;
     };
   } | null;
   recentContributions: Contribution[];
-  projectsInProgress: Project[];
+  projectsInProgress: ExtendedCarouselProject[];
   latestContents: ContentPost[];
+  upcomingEvents?: CarouselEvent[];
   lateMembersPreview: Array<{ id: string; firstName: string; lastName: string; lateMonths?: number }>;
   antennaBalances?: Array<{ id: string; name: string; balance: number; currency: string }>;
 };
@@ -91,9 +116,9 @@ function getStatusConfig(status: string) {
 
 function getPurposeConfig(purpose?: string | null) {
   const map: Record<string, { label: string; icon: string; color: string; bg: string }> = {
-    REGULAR_QUOTA:   { label: 'Cotisation',  icon: '📅', color: '#059669', bg: '#ECFDF5' },
+    REGULAR_QUOTA:   { label: 'Cotisation',   icon: '📅', color: '#059669', bg: '#ECFDF5' },
     MEMBERSHIP_CARD: { label: 'Carte membre', icon: '💳', color: '#2563EB', bg: '#EFF6FF' },
-    DONATION:        { label: 'Don libre',               icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
+    DONATION:        { label: 'Don libre',    icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
   };
   return purpose ? (map[purpose] ?? null) : null;
 }
@@ -216,7 +241,7 @@ function ContributionDetailModal({
   );
 }
 
-// ─── Currency Balances Modal ─────────────────────────────────────────────────
+// ─── Modals Soldes & Association ─────────────────────────────────────────────
 
 function CurrencyBalancesModal({
   currency, balances, onClose,
@@ -267,7 +292,8 @@ function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; on
           <div style={{ textAlign: 'center', padding: '1.5rem', color: '#9CA3AF', fontSize: '0.85rem' }}>Données non disponibles</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 16, padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669' }}>Total validé</span>
+            <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 16, padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#059669' }}>Total validé</span>
               <span style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '2rem', fontWeight: 700, color: '#111827' }}>{formatCurrency(summary.totalValidatedContributionsAmount, summary.currency)}</span>
               <span style={{ fontSize: '0.74rem', color: '#6B7280' }}>{summary.associationName}</span>
             </div>
@@ -281,31 +307,33 @@ function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; on
   );
 }
 
-// 4 devises fixes
 const FIXED_CURRENCIES_MEMBER = [
-  { cur: 'GNF', label: 'Solde antennes (GNF)',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  { cur: 'EUR', label: 'Solde antennes (Euro)',    color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-  { cur: 'USD', label: 'Solde antennes (Dollar)',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  { cur: 'XOF', label: 'Solde antennes (XOF)',      color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  { cur: 'GNF', label: 'Solde antennes (GNF)',   color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  { cur: 'EUR', label: 'Solde antennes (Euro)',   color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  { cur: 'USD', label: 'Solde antennes (Dollar)', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  { cur: 'XOF', label: 'Solde antennes (XOF)',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
 ];
 
-// ─── Project Detail Modal (membre) ──────────────────────────────────────────
+// ─── Modal Détail Projet ─────────────────────────────────────────────────────
 
-function ProjectDetailModal({ project, onClose }: { project: Project; onClose: () => void }) {
+function ProjectDetailModal({ project, onClose }: { project: ExtendedCarouselProject; onClose: () => void }) {
   const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string; bar: string }> = {
     IN_PROGRESS: { label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', bar: '#3B82F6' },
     APPROVED:    { label: 'Approuvé',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', bar: '#10B981' },
-    COMPLETED:   { label: 'Terminé',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', bar: '#8B5CF6' },
+    COMPLETED:   { label: 'Terminé',   color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', bar: '#8B5CF6' },
     SUSPENDED:   { label: 'Suspendu',  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', bar: '#F59E0B' },
-    CANCELLED:   { label: 'Annulé',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', bar: '#EF4444' },
+    CANCELLED:   { label: 'Annulé',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', bar: '#EF4444' },
     DRAFT:       { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
-    PROPOSED:    { label: 'Proposé',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
+    PROPOSED:    { label: 'Proposé',   color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
   };
-  const cfg = STATUS_CFG[project.status] ?? STATUS_CFG['DRAFT'];
-  const planned = (project as unknown as { budgetPlanned?: number | null }).budgetPlanned ?? (project as unknown as { budgetAmount?: number | null }).budgetAmount ?? 0;
-  const spent   = (project as unknown as { budgetSpent?: number | null }).budgetSpent   ?? (project as unknown as { amountSpent?: number | null }).amountSpent   ?? 0;
-  const pct     = planned > 0 ? Math.min(((spent) / planned) * 100, 100) : 0;
-  const over    = spent > planned && planned > 0;  return (
+
+  const cfg = STATUS_CFG[project.status || 'DRAFT'] ?? STATUS_CFG['DRAFT'];
+  const planned = project.budgetPlanned ?? project.budgetAmount ?? 0;
+  const spent   = project.budgetSpent   ?? project.amountSpent  ?? 0;
+  const pct     = planned > 0 ? Math.min((spent / planned) * 100, 100) : 0;
+  const over    = spent > planned && planned > 0;
+
+  return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
       <div style={{ width: '100%', maxWidth: 500, background: '#fff', borderRadius: 24, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 72px rgba(0,0,0,0.18)', animation: 'mbscale2 0.28s cubic-bezier(.22,1,.36,1)' }} onClick={e => e.stopPropagation()}>
         <div style={{ height: 4, background: cfg.bar, borderRadius: '24px 24px 0 0' }} />
@@ -331,9 +359,9 @@ function ProjectDetailModal({ project, onClose }: { project: Project; onClose: (
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.75rem' }}>
             {[
-              { label: 'Début', value: (project as unknown as { startsAt?: string | null }).startsAt ? formatDate((project as unknown as { startsAt: string }).startsAt) : '—' },
-              { label: 'Fin prévue', value: (project as unknown as { endsAt?: string | null }).endsAt ? formatDate((project as unknown as { endsAt: string }).endsAt) : '—' },
-              { label: 'Budget prévu', value: planned > 0 ? formatCurrency(planned) : '—' },
+              { label: 'Début',         value: project.startsAt ? formatDate(project.startsAt as string | Date) : '—' },
+              { label: 'Fin prévue',    value: project.endsAt   ? formatDate(project.endsAt   as string | Date) : '—' },
+              { label: 'Budget prévu',  value: planned > 0 ? formatCurrency(planned) : '—' },
               { label: 'Budget dépensé', value: spent > 0 ? formatCurrency(spent) : '—', urgent: over },
             ].map(row => (
               <div key={row.label} style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
@@ -358,11 +386,11 @@ function ProjectDetailModal({ project, onClose }: { project: Project; onClose: (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.65rem' }}>
             <div style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
               <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Créé le</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate(project.createdAt)}</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate(project.createdAt as string | Date)}</div>
             </div>
             <div style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
               <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Mis à jour</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate(project.updatedAt)}</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate((project.updatedAt || project.createdAt) as string | Date)}</div>
             </div>
           </div>
         </div>
@@ -371,7 +399,7 @@ function ProjectDetailModal({ project, onClose }: { project: Project; onClose: (
   );
 }
 
-// ─── Content Detail Modal (membre) ───────────────────────────────────────────
+// ─── Modal Détail Info/Actualité ─────────────────────────────────────────────
 
 function ContentDetailModal({ content, onClose }: { content: ContentPost; onClose: () => void }) {
   const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -413,7 +441,6 @@ function ContentDetailModal({ content, onClose }: { content: ContentPost; onClos
 }
 
 // ─── Main page ───────────────────────────────────────────────────────────────
-
 export default function MemberHomePage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [myContributions, setMyContributions] = useState<ExtendedContribution[]>([]);
@@ -422,7 +449,7 @@ export default function MemberHomePage() {
   const [isCardVisible, setIsCardVisible] = useState(false);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ExtendedCarouselProject | null>(null);
   const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<ExtendedContribution | null>(null);
 
@@ -432,9 +459,9 @@ export default function MemberHomePage() {
         const [dashRes, balanceRes, contribRes, projectsRes, contentsRes, lateRes] = await Promise.allSettled([
           api.dashboardMember(),
           api.getAssociationBalanceSummary(),
-          api.listMyContributions({ page: 1, pageSize: 10 }),
+          api.listMyContributions({ page: 1, pageSize: 5 }),
           api.listProjectsForMembers({ page: 1, pageSize: 5 }),
-          api.listContentsForMembers({ page: 1, pageSize: 5 }), 
+          api.listContentsForMembers({ page: 1, pageSize: 5 }),
           api.listLateMembersVisible({ page: 1, pageSize: 5 })
         ]);
 
@@ -443,10 +470,10 @@ export default function MemberHomePage() {
 
           if (res.virtualCard && res.virtualCard.user && res.me) {
             if (!res.virtualCard.user.function && res.me.function) {
-                res.virtualCard.user.function = res.me.function;
+              res.virtualCard.user.function = res.me.function;
             }
             if (!res.virtualCard.user.professionalStatus && res.me.professionalStatus) {
-                res.virtualCard.user.professionalStatus = res.me.professionalStatus;
+              res.virtualCard.user.professionalStatus = res.me.professionalStatus;
             }
             if (!res.virtualCard.user.originVillage && res.me.originSubPrefecture) {
               res.virtualCard.user.originVillage = res.me.originSubPrefecture;
@@ -459,9 +486,31 @@ export default function MemberHomePage() {
           }
 
           if (projectsRes.status === 'fulfilled') {
-            res.projectsInProgress = (projectsRes.value.items as Project[])
+            const rawItems = projectsRes.value.items as unknown as RawApiProject[];
+
+            res.projectsInProgress = rawItems
               .filter(p => !['DRAFT', 'CANCELLED', 'ARCHIVED'].includes(p.status as string))
-              .slice(0, 5);
+              .map(p => ({
+                id: p.id,
+                title: p.title,
+                summary: p.summary,
+                description: p.description,
+                startsAt: p.startsAt,
+                endsAt: p.endsAt,
+                createdAt: p.createdAt,
+                updatedAt: p.updatedAt,
+                status: p.status,
+                coverImageFileId: p.coverImageFileId,
+                locationText: p.locationText,
+                budgetPlanned: p.budgetPlanned,
+                budgetAmount: p.budgetAmount,
+                budgetSpent: p.budgetSpent,
+                amountSpent: p.amountSpent,
+                attachments: Array.isArray(p.attachments)
+                  ? p.attachments.map(a => ({ file: { url: (a as unknown as { url?: string | null }).url || null } }))
+                  : null
+              })) as ExtendedCarouselProject[];
+
             if (res.stats) res.stats.activeProjects = res.projectsInProgress.length;
           }
           if (contentsRes.status === 'fulfilled') {
@@ -487,18 +536,21 @@ export default function MemberHomePage() {
 
   const me = data?.me;
   const recentContribs: ExtendedContribution[] = myContributions.length > 0 ? myContributions : (data?.recentContributions ?? []) as ExtendedContribution[];
-  
-  const cur = data?.stats?.currency || balanceSummary?.currency || 'EUR';
-  
-  const lateMonths = data?.stats?.lateMonths ?? 0;
-  const totalCotise = data?.stats?.myContributionsTotal ?? data?.stats?.myTotalContributions ?? recentContribs.reduce((s, c) => s + (c.amount ?? 0), 0);
-  const totalValide = data?.stats?.myContributionsValidatedTotal ?? recentContribs.filter(c => c.status === 'VALIDATED').reduce((s, c) => s + (c.amount ?? 0), 0);
-  const pendingCount = data?.stats?.myPendingContributionsCount ?? recentContribs.filter(c => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION').length;
-  const lastContribDate = data?.stats?.myLastContributionAt ?? (recentContribs.length > 0 ? recentContribs[0].depositedAt || recentContribs[0].createdAt : null);
+
+  const myAntennaId = data?.me?.antennaId;
+  const myAntenna = data?.antennaBalances?.find(a => a.id === myAntennaId);
+  const cur = data?.stats?.currency || myAntenna?.currency || balanceSummary?.currency || 'EUR';
+
+  const lateMonths      = data?.stats?.lateMonths              ?? 0;
+  const lastContribDate = data?.stats?.myLastContributionAt    ?? null;
 
   const firstName = data?.me?.firstName || data?.virtualCard?.user?.firstName || 'Membre';
 
-  type StatCard = { label: string; value: string | number; icon: React.ReactNode; color: string; bg: string; sub: string; spanClass: string; urgent?: boolean; clickable?: boolean; onClick?: () => void; };
+  type StatCard = {
+    label: string; value: string | number; icon: React.ReactNode;
+    color: string; bg: string; sub: string; spanClass: string;
+    urgent?: boolean; clickable?: boolean; onClick?: () => void;
+  };
 
   const mbCurrencyGroups = useMemo(() => {
     if (!data?.antennaBalances) return {} as Record<string, { total: number; antennas: { id: string; name: string; balance: number; currency: string }[] }>;
@@ -512,24 +564,30 @@ export default function MemberHomePage() {
   }, [data]);
 
   const stats: StatCard[] = data ? [
-    { label: 'Total cotisé', value: formatCurrency(totalCotise, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, color: '#2563EB', bg: '#EFF6FF', sub: 'Montant total versé', spanClass: 'mb-span-1' },
-    { label: 'Cotisations validées', value: formatCurrency(totalValide, cur), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z"/></svg>, color: '#059669', bg: '#ECFDF5', sub: "Confirmées par l'admin", spanClass: 'mb-span-1' },
-    { label: 'En attente', value: pendingCount, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>, color: '#D97706', bg: '#FFFBEB', sub: 'Dépôts à valider', urgent: pendingCount > 0, spanClass: 'mb-span-1' },
     ...FIXED_CURRENCIES_MEMBER.map(({ cur: fc, label, color, bg }) => {
       const grp = mbCurrencyGroups[fc] ?? { total: 0, antennas: [] };
-      return { 
-        label, 
-        value: formatCurrency(grp.total, fc), 
-        icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>,         color, 
-        bg, 
-        sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails', 
-        clickable: true, 
-        onClick: () => setSelectedCurrency(fc), 
-        spanClass: 'mb-span-1' 
+      return {
+        label,
+        value: formatCurrency(grp.total, fc),
+        icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>,
+        color, bg,
+        sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails',
+        clickable: true,
+        onClick: () => setSelectedCurrency(fc),
+        spanClass: 'mb-span-1',
       };
     }),
-    { label: 'Retard', value: `${lateMonths} mois`, icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>, color: lateMonths > 0 ? '#DC2626' : '#059669', bg: lateMonths > 0 ? '#FEF2F2' : '#ECFDF5', sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !', urgent: lateMonths > 2, spanClass: 'mb-span-1' },
-    { label: 'Dernière cotisation', value: formatDate(lastContribDate), icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>, color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement', spanClass: 'mb-span-1' },
+    {
+      label: 'Retard', value: `${lateMonths} mois`,
+      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>,
+      color: lateMonths > 0 ? '#DC2626' : '#059669', bg: lateMonths > 0 ? '#FEF2F2' : '#ECFDF5',
+      sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !', urgent: lateMonths > 2, spanClass: 'mb-span-1',
+    },
+    {
+      label: 'Dernière cotisation', value: formatDate(lastContribDate),
+      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+      color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement', spanClass: 'mb-span-1',
+    },
   ] : [];
 
   return (
@@ -584,8 +642,8 @@ export default function MemberHomePage() {
           font-size: 0.8rem; font-weight: 600; color: #374151;
           background: rgba(37,99,235,0.06); border: 1px solid rgba(37,99,235,0.15);
           border-radius: 8px; padding: 0.5rem 1rem; white-space: nowrap;
-        }        
-        
+        }
+
         .mb-stats {
           display: grid; grid-template-columns: repeat(6, 1fr);
           gap: 0.75rem; margin-bottom: 1.5rem;
@@ -654,8 +712,8 @@ export default function MemberHomePage() {
           background: rgba(253,253,255,0.9); backdrop-filter: blur(12px);
           border-radius: 20px; border: 1px solid rgba(37,99,235,0.12);
           box-shadow: 0 4px 15px rgba(37,99,235,0.03), 0 0 0 1px rgba(255,255,255,0.8) inset;
-          overflow: hidden; opacity: 0;
-          animation: mbin 0.5s cubic-bezier(.22,1,.36,1) forwards;
+          overflow: hidden; max-width: 100%;
+          opacity: 0; animation: mbin 0.5s cubic-bezier(.22,1,.36,1) forwards;
         }
         .mb-panel-head {
           display: flex; align-items: center; justify-content: space-between;
@@ -675,8 +733,9 @@ export default function MemberHomePage() {
           font-size: 0.7rem; font-weight: 800; padding: 0.2rem 0.6rem;
           border-radius: 99px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
         }
+        .mb-panel-body { overflow-x: auto; }
 
-        .mb-table { width: 100%; border-collapse: collapse; }
+        .mb-table { width: 100%; border-collapse: collapse; min-width: 320px; }
         .mb-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.1); }
         .mb-table thead th {
           padding: 0.75rem 1.4rem;
@@ -704,22 +763,41 @@ export default function MemberHomePage() {
         .mb-contrib-row:hover { background: rgba(37,99,235,0.04) !important; }
         .mb-contrib-row:active { background: rgba(37,99,235,0.08) !important; }
 
-        .mb-list { display: grid; grid-template-columns: 1fr; gap: 0.75rem; padding: 1.25rem 1.4rem; }
-        .mb-list-item {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 1rem 1.25rem; border: 1px solid rgba(37,99,235,0.1); border-radius: 16px;
-          background: #fff; cursor: pointer; transition: all 0.2s ease; gap: 1rem;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        .mb-cards-viewport {
+          overflow: hidden; width: 100%; padding: 1.25rem 0;
+          position: relative;
         }
-        .mb-list-item:hover {
-          border-color: rgba(37,99,235,0.3);
-          box-shadow: 0 6px 16px rgba(37,99,235,0.08);
-          transform: translateY(-2px);
+        .mb-cards-track {
+          display: flex; gap: 1rem; width: max-content;
+          padding: 0 1.4rem;
+          animation: panCards 18s ease-in-out infinite alternate;
         }
-        .mb-list-content { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 0; }
-        .mb-list-title { font-weight: 800; color: #111827; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-        .mb-list-meta { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; color: #6B7280; font-weight: 600; }
-        .mb-list-icon { width: 36px; height: 36px; border-radius: 10px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: #6B7280; }
+        .mb-cards-track:hover, .mb-cards-track:active {
+          animation-play-state: paused;
+        }
+        @keyframes panCards {
+          0%, 5% { transform: translateX(0); }
+          95%, 100% { transform: translateX(calc(-100% + 100vw - 3rem)); }
+        }
+        @media (min-width: 1024px) {
+          .mb-cards-track { animation: none; flex-wrap: wrap; width: 100%; }
+        }
+
+        .mb-true-card {
+          min-width: 250px; max-width: 280px; flex: 0 0 auto;
+          border-radius: 18px; padding: 1.1rem 1.25rem;
+          display: flex; flex-direction: column; gap: 0.65rem;
+          border: 1px solid rgba(255,255,255,0.6);
+          box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative;
+          cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .mb-true-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+        .mb-tc-proj { background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); border-color: #BFDBFE; }
+        .mb-tc-news { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border-color: #A7F3D0; }
+        .mb-tc-title { font-size: 0.95rem; font-weight: 800; color: #111827; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .mb-tc-meta { font-size: 0.72rem; color: #4B5563; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; margin-top: auto; }
+        .mb-tc-btn { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.4rem; }
+
         .mb-empty { text-align: center; padding: 2.5rem 1rem; color: #9CA3AF; font-size: 0.85rem; font-weight: 500; }
 
         .mb-member-pill { display: flex; align-items: center; gap: 0.6rem; }
@@ -732,7 +810,7 @@ export default function MemberHomePage() {
         .mb-late-bar { display: flex; align-items: center; gap: 0.6rem; }
         .mb-late-track { flex: 1; height: 5px; background: #FEE2E2; border-radius: 99px; overflow: hidden; max-width: 65px; }
         .mb-late-fill  { height: 100%; background: #DC2626; border-radius: 99px; }
-        
+
         .mb-fab {
           position: fixed; bottom: calc(64px + 1rem); right: 1rem; z-index: 100;
           background: linear-gradient(135deg, #10B981 0%, #065F46 100%);
@@ -788,8 +866,8 @@ export default function MemberHomePage() {
         }
 
         .mb-status-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.7rem; font-weight: 800; border-radius: 99px; padding: 0.18rem 0.6rem; white-space: nowrap; }
-        .mb-status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }        
-        
+        .mb-status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+
         .mb-motif-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.68rem; font-weight: 600; border-radius: 99px; padding: 0.18rem 0.55rem; white-space: nowrap; max-width: 100%; }
         .mb-motif-icon { flex-shrink: 0; }
         .mb-motif-text { overflow: hidden; text-overflow: ellipsis; }
@@ -799,15 +877,15 @@ export default function MemberHomePage() {
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
           .mb-table th { padding: 0.6rem 0.4rem; font-size: 0.6rem; letter-spacing: 0; }
-          .mb-table td { padding: 0.7rem 0.4rem; font-size: 0.75rem; } 
+          .mb-table td { padding: 0.7rem 0.4rem; font-size: 0.75rem; }
           .mb-table td.mono { font-size: 0.85rem; }
           .mb-panel-head { padding: 1rem; }
           .truncate-cell { max-width: 120px; }
           .mb-status-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
           .mb-motif-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
-          .mb-list { padding: 1rem; }
+          .mb-cards-track { animation-duration: 10s; }
         }
-      `}</style>      
+      `}</style>
 
       {!data && !error && (
         <div className="mb-loader">
@@ -864,6 +942,12 @@ export default function MemberHomePage() {
             ))}
           </div>
 
+          <DashboardCarousel
+            projects={data.projectsInProgress}
+            news={data.latestContents}
+            events={data.upcomingEvents}
+          />
+
           <div className="mb-grid2">
             <div className="mb-panel" style={{ animationDelay: '0.48s' }}>
               <div className="mb-panel-head">
@@ -879,47 +963,29 @@ export default function MemberHomePage() {
                   <span className="mb-count-chip">{recentContribs.length}</span>
                 )}
               </div>
-              <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th style={{ textAlign: 'center' }}>Montant</th>
-                    <th style={{ textAlign: 'center' }}>Motif</th>
-                    <th style={{ textAlign: 'center' }}>Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentContribs.length === 0 && (
-                    <EmptyRow cols={3} label="Aucune cotisation enregistrée"/>
-                  )}
-                  {recentContribs.map(c => {
-                    const pc = getPurposeConfig(c.purpose);
-                    return (
-                      <tr
-                        key={c.id}
-                        className="mb-contrib-row"
-                        onClick={() => setSelectedContribution(c)}
-                        title="Voir le détail"
-                      >
-                        <td className="mono" style={{ textAlign: 'center' }}>{formatCurrency(c.amount, c.currency || cur)}</td>
-                        <td style={{ textAlign: 'center' }}>
-                          {pc ? (
-                            <span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}>
-                              <span className="mb-motif-icon">{pc.icon}</span> 
-                              <span className="mb-motif-text">{pc.label}</span>
-                            </span>
-                          ) : (
-                            <span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}>
-                              <span className="mb-motif-icon">📅</span> 
-                              <span className="mb-motif-text">Cotisation</span>
-                            </span>
-                          )}
-                        </td>
-                        <td style={{ textAlign: 'center' }}><StatusBadge status={c.status}/></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <div className="mb-panel-body">
+                <table className="mb-table">
+                  <thead>
+                    <tr>
+                      <th style={{ textAlign: 'center' }}>Montant</th>
+                      <th style={{ textAlign: 'center' }}>Motif</th>
+                      <th style={{ textAlign: 'center' }}>Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentContribs.length === 0 && (
+                      <EmptyRow cols={3} label="Aucune cotisation enregistrée"/>
+                    )}
+                    {recentContribs.map(c => {
+                      const pc = getPurposeConfig(c.purpose);
+                      return (
+                        // ─── FIX HYDRATION : pas de whitespace entre <tr> et les <td> ───
+                        <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)} title="Voir le détail"><td className="mono" style={{ textAlign: 'center' }}>{formatCurrency(c.amount, c.currency || cur)}</td><td style={{ textAlign: 'center' }}>{pc ? (<span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}><span className="mb-motif-icon">{pc.icon}</span><span className="mb-motif-text">{pc.label}</span></span>) : (<span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}><span className="mb-motif-icon">📅</span><span className="mb-motif-text">Cotisation</span></span>)}</td><td style={{ textAlign: 'center' }}><StatusBadge status={c.status}/></td></tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="mb-panel" style={{ animationDelay: '0.53s' }}>
@@ -938,26 +1004,25 @@ export default function MemberHomePage() {
                   </span>
                 )}
               </div>
-              
-              <div className="mb-list">
-                {(data.projectsInProgress || []).length === 0 && <div className="mb-empty">Aucun projet actif</div>}
-                {(data.projectsInProgress || []).map(p => (
-                  <div key={p.id} className="mb-list-item" onClick={() => setSelectedProject(p)}>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                      <div className="mb-list-icon">
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+
+              <div className="mb-cards-viewport">
+                {(data.projectsInProgress || []).length === 0 ? (
+                  <div className="mb-empty">Aucun projet actif</div>
+                ) : (
+                  <div className="mb-cards-track">
+                    {(data.projectsInProgress || []).map(p => (
+                      <div key={p.id} className="mb-true-card mb-tc-proj" onClick={() => setSelectedProject(p)}>
+                        <StatusBadge status={p.status || 'DRAFT'}/>
+                        <div className="mb-tc-title">{p.title}</div>
+                        <div className="mb-tc-meta">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          Mis à jour le {formatDate(p.updatedAt || p.createdAt || null)}
+                        </div>
+                        <div className="mb-tc-btn" style={{ color: '#2563EB' }}>Voir le projet ➔</div>
                       </div>
-                      <div className="mb-list-content">
-                        <div className="mb-list-title">{p.title}</div>
-                        <div className="mb-list-meta">Mis à jour le {formatDate(p.updatedAt || p.createdAt)}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
-                      <StatusBadge status={p.status}/>
-                      <span style={{ fontSize: '0.68rem', color: '#2563EB', fontWeight: 700 }}>Voir ➔</span>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -974,26 +1039,25 @@ export default function MemberHomePage() {
                   Informations récentes
                 </div>
               </div>
-              
-              <div className="mb-list">
-                {(data.latestContents || []).length === 0 && <div className="mb-empty">Aucune actualité publiée</div>}
-                {(data.latestContents || []).map(c => (
-                  <div key={c.id} className="mb-list-item" onClick={() => setSelectedContent(c)}>
-                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                      <div className="mb-list-icon" style={{ color: '#059669', background: '#ECFDF5' }}>
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" /></svg>
+
+              <div className="mb-cards-viewport">
+                {(data.latestContents || []).length === 0 ? (
+                  <div className="mb-empty">Aucune actualité publiée</div>
+                ) : (
+                  <div className="mb-cards-track">
+                    {(data.latestContents || []).map(c => (
+                      <div key={c.id} className="mb-true-card mb-tc-news" onClick={() => setSelectedContent(c)}>
+                        <StatusBadge status={c.status}/>
+                        <div className="mb-tc-title">{c.title}</div>
+                        <div className="mb-tc-meta">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Publié le {formatDate(c.createdAt)}
+                        </div>
+                        <div className="mb-tc-btn" style={{ color: '#059669' }}>Lire l&apos;article ➔</div>
                       </div>
-                      <div className="mb-list-content">
-                        <div className="mb-list-title">{c.title}</div>
-                        <div className="mb-list-meta">Publié le {formatDate(c.createdAt)}</div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
-                      <StatusBadge status={c.status}/>
-                      <span style={{ fontSize: '0.68rem', color: '#059669', fontWeight: 700 }}>Lire ➔</span>
-                    </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
@@ -1013,40 +1077,42 @@ export default function MemberHomePage() {
                   </span>
                 )}
               </div>
-              <table className="mb-table">
-                <thead>
-                  <tr>
-                    <th>Membre</th>
-                    <th>Retard</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.lateMembersPreview || []).length === 0 && <EmptyRow cols={2} label="Aucun retardataire — bravo !"/>}
-                  {(data.lateMembersPreview || []).map(m => {
-                    const months = m.lateMonths ?? 0;
-                    return (
-                      <tr key={m.id}>
-                        <td>
-                          <div className="mb-member-pill">
-                            <div className="mb-avatar-sm">{(m.firstName[0] ?? '') + (m.lastName[0] ?? '')}</div>
-                            <span className="truncate-cell" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>{m.firstName} {m.lastName}</span>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="mb-late-bar">
-                            <div className="mb-late-track">
-                              <div className="mb-late-fill" style={{ width: `${Math.min((months / 12) * 100, 100)}%` }}/>
+              <div className="mb-panel-body">
+                <table className="mb-table">
+                  <thead>
+                    <tr>
+                      <th>Membre</th>
+                      <th>Retard</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.lateMembersPreview || []).length === 0 && <EmptyRow cols={2} label="Aucun retardataire — bravo !"/>}
+                    {(data.lateMembersPreview || []).map(m => {
+                      const months = m.lateMonths ?? 0;
+                      return (
+                        <tr key={m.id}>
+                          <td>
+                            <div className="mb-member-pill">
+                              <div className="mb-avatar-sm">{(m.firstName[0] ?? '') + (m.lastName[0] ?? '')}</div>
+                              <span className="truncate-cell" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>{m.firstName} {m.lastName}</span>
                             </div>
-                            <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#DC2626', whiteSpace: 'nowrap' }}>
-                              {months > 0 ? `${months} mois` : '—'}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td>
+                            <div className="mb-late-bar">
+                              <div className="mb-late-track">
+                                <div className="mb-late-fill" style={{ width: `${Math.min((months / 12) * 100, 100)}%` }}/>
+                              </div>
+                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#DC2626', whiteSpace: 'nowrap' }}>
+                                {months > 0 ? `${months} mois` : '—'}
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>

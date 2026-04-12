@@ -680,7 +680,7 @@ export const api = {
       }`
     ),
 
-  // ==========================================
+ // ==========================================
   // PROJETS & PROPOSITIONS
   // ==========================================
   listProjects: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
@@ -695,7 +695,7 @@ export const api = {
     summary?: string;
     description?: string;
     locationText?: string;
-    promomerName?: string;
+    promoterName?: string;       // 🔥 CORRECTION : "promomerName" corrigé en "promoterName"
     status?: string;
     budgetPlanned?: number;
     budgetSpent?: number;
@@ -761,6 +761,7 @@ export const api = {
     title: string;
     description: string;
     expectedBudget?: number;
+    currency?: string;           // 🔥 CORRECTION : Ajout de la devise manquante
     attachmentFileAssetId?: string | null;
   }) =>
     http<ProjectProposal, typeof body>('/member/project-proposals', { method: 'POST', body }),

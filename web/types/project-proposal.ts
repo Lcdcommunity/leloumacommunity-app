@@ -1,4 +1,5 @@
-//web/types/project-proposal.ts
+// web/types/project-proposal.ts
+
 export type ProjectProposalStatus =
   | 'DRAFT'
   | 'SUBMITTED'
@@ -15,6 +16,7 @@ export interface ProjectProposal {
   title: string;
   description: string;
   expectedBudget?: number | null;
+  currency?: string | null;  // 🔥 AJOUT ICI : Propriété currency
   status: ProjectProposalStatus;
   attachmentFileAssetId?: string | null;
   createdAt: string;

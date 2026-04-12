@@ -61,9 +61,11 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/contributions',   label: 'Cotisations',            ico: ICO.coin,       section: 'Gestion' },
   { href: '/super-admin/expenses',        label: 'Dépenses',               ico: ICO.creditCard, section: 'Gestion' },
   { href: '/super-admin/projects',        label: 'Projets',                ico: ICO.clip,       section: 'Gestion' },
-  { href: '/super-admin/events',          label: 'Événements',             ico: ICO.calendar,   section: 'Gestion' }, // 👇 AJOUT ICI
-  { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,      section: 'Gestion' },
-  { href: '/super-admin/documents',       label: 'Documents',               ico: ICO.doc,        section: 'Gestion' },
+  { href: '/super-admin/events',          label: 'Événements',             ico: ICO.calendar,   section: 'Gestion' },
+  { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,       section: 'Gestion' },
+  { href: '/super-admin/documents',       label: 'Documents',              ico: ICO.doc,        section: 'Gestion' },
+  // 👇 AJOUT ICI : Section Informations / Contenus
+  { href: '/super-admin/contents',        label: 'Informations',           ico: ICO.news,       section: 'Gestion' },
   { href: '/super-admin/notifications',   label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
   { href: '/super-admin/audit',           label: 'Audit',                  ico: ICO.audit,      section: 'Outils' },
   { href: '/super-admin/profile',         label: 'Mon profil',             ico: ICO.user,       section: 'Outils' },
@@ -92,7 +94,7 @@ const adminItems: NavItem[] = [
 const memberItems: NavItem[] = [
   { href: '/member',                       label: 'Dashboard',              ico: ICO.home,       section: 'Principal' },
   { href: '/member/contributions/new',     label: 'Faire un dépôt',         ico: ICO.plus,       section: 'Principal' },
-  { href: '/member/contributions/history', label: 'Mes cotisations',         ico: ICO.coin,       section: 'Principal' },
+  { href: '/member/contributions/history', label: 'Mes cotisations',        ico: ICO.coin,       section: 'Principal' },
   { href: '/member/expenses',              label: 'Dépenses',               ico: ICO.creditCard, section: 'Principal' },
   { href: '/member/projects',              label: 'Projets',                ico: ICO.clip,       section: 'Communauté' },
   { href: '/member/projects/propose',      label: 'Proposer un projet',     ico: ICO.edit,       section: 'Communauté' },

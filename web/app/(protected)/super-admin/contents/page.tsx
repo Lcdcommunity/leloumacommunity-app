@@ -1,4 +1,4 @@
-// web/app/(protected)/admin/contents/page.tsx
+// web/app/(protected)/super-admin/contents/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -9,7 +9,6 @@ import type { ContentPost, ContentStatus } from '../../../../types/content';
 import { formatDate } from '../../../../lib/format';
 
 /* ══════════════════════════════════════════════════════ TYPES ETENDS */
-// Permet de corriger l'erreur ESLint (Unexpected any) et l'erreur TS (null)
 interface ExtendedContentPost extends ContentPost {
   coverImageFile?: { url: string } | null;
   coverUrl?: string | null;
@@ -81,10 +80,8 @@ function DetailModal({
   onDelete: () => void;
   busy: boolean;
 }) {
-  // 🔥 Résolution sécurisée sans "any" + gestion multi-images
   const mainImageUrl = content.coverImageFile?.url || content.coverUrl;
   
-  // On regroupe toutes les images (principale + galerie)
   const allImages: string[] = [];
   if (mainImageUrl) allImages.push(mainImageUrl);
   if (content.attachments && content.attachments.length > 0) {
@@ -98,7 +95,6 @@ function DetailModal({
       <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.5)', backdropFilter:'blur(5px)', zIndex:300 }} onClick={onClose} />
       <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', zIndex:301, background:'rgba(253,253,255,0.98)', borderRadius:22, width:'100%', maxWidth:680, maxHeight:'90vh', display:'flex', flexDirection:'column', boxShadow:'0 25px 50px rgba(15,23,42,0.2)', animation:'modalPop .3s cubic-bezier(.22,1,.36,1)' }}>
 
-        {/* Header Modale */}
         <div style={{ padding:'1.5rem', borderBottom:'1px solid rgba(37,99,235,0.09)', display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:'1rem', background:'#F8FAFC', borderRadius:'22px 22px 0 0' }}>
           <div>
             <div style={{ display:'flex', alignItems:'center', gap:'.5rem', marginBottom:'.6rem' }}>
@@ -116,14 +112,17 @@ function DetailModal({
           </button>
         </div>
 
-        {/* Corps Scrollable */}
         <div style={{ overflowY:'auto', padding:'1.5rem', flex:1 }}>
           {allImages.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
               {allImages.map((imgUrl, index) => (
                 <div key={index} style={{ width:'100%', borderRadius:14, overflow:'hidden', background:'linear-gradient(135deg, #F1F5F9, #E2E8F0)', border:'1px solid rgba(0,0,0,0.05)' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imgUrl} alt={`Illustration ${index + 1}`} style={{ width:'100%', maxHeight:350, objectFit:'contain', display:'block' }} />
+                  <img 
+                    src={imgUrl} 
+                    alt={`Illustration ${index + 1}`} 
+                    style={{ width:'100%', maxHeight:350, objectFit:'contain', display:'block' }} 
+                  />
                 </div>
               ))}
             </div>
@@ -134,13 +133,12 @@ function DetailModal({
           </div>
         </div>
 
-        {/* Footer Actions Modale (Optimisé pour petits écrans) */}
+        {/* Footer Actions Modale - Optimisé pour écrans étroits */}
         <div style={{ padding:'1rem', borderTop:'1px solid rgba(37,99,235,0.09)', background:'white', borderRadius:'0 0 22px 22px', display:'flex', justifyContent:'center', flexWrap:'wrap', gap:'0.45rem' }}>
-          
           <button 
             disabled={busy} 
             onClick={onDelete} 
-            style={{ flex: '1 1 auto', minWidth: '110px', height:38, padding:'0 0.75rem', borderRadius:8, border:'1.5px solid rgba(220,38,38,.2)', background:'rgba(254,242,242,.6)', color:'#DC2626', fontFamily:"'DM Sans',sans-serif", fontSize:'.78rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent: 'center', gap:'.35rem', transition:'all .18s' }}
+            style={{ flex: '1 1 auto', minWidth: '100px', height:38, padding:'0 0.75rem', borderRadius:8, border:'1.5px solid rgba(220,38,38,.2)', background:'rgba(254,242,242,.6)', color:'#DC2626', fontFamily:"'DM Sans',sans-serif", fontSize:'.78rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent: 'center', gap:'.35rem', transition:'all .18s' }}
           >
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
             Supprimer
@@ -152,7 +150,7 @@ function DetailModal({
               target="_blank"
               rel="noreferrer"
               download
-              style={{ flex: '1 1 auto', minWidth: '120px', height:38, padding:'0 0.75rem', borderRadius:8, border:'1px solid rgba(37,99,235,0.18)', background:'rgba(239,246,255,0.7)', color:'#1D4ED8', fontFamily:"'DM Sans',sans-serif", fontSize:'.78rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent: 'center', gap:'.35rem', textDecoration:'none', transition:'all .18s' }}
+              style={{ flex: '1 1 auto', minWidth: '110px', height:38, padding:'0 0.75rem', borderRadius:8, border:'1px solid rgba(37,99,235,0.18)', background:'rgba(239,246,255,0.7)', color:'#1D4ED8', fontFamily:"'DM Sans',sans-serif", fontSize:'.78rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent: 'center', gap:'.35rem', textDecoration:'none', transition:'all .18s' }}
             >
               <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"/></svg>
               Télécharger
@@ -162,7 +160,7 @@ function DetailModal({
           <button 
             disabled={busy} 
             onClick={onCycleStatus} 
-            style={{ flex: '1 1 auto', minWidth: '130px', height:38, padding:'0 0.75rem', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1D4ED8,#2563EB)', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:'.78rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent: 'center', gap:'.35rem', boxShadow:'0 4px 10px rgba(37,99,235,.2)', transition:'all .18s' }}
+            style={{ flex: '1 1 auto', minWidth: '120px', height:38, padding:'0 0.75rem', borderRadius:8, border:'none', background:'linear-gradient(135deg,#1D4ED8,#2563EB)', color:'white', fontFamily:"'DM Sans',sans-serif", fontSize:'.78rem', fontWeight:700, cursor:'pointer', display:'flex', alignItems:'center', justifyContent: 'center', gap:'.35rem', boxShadow:'0 4px 10px rgba(37,99,235,.2)', transition:'all .18s' }}
           >
             {busy ? (
               <div style={{ width:14, height:14, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'white', borderRadius:'50%', animation:'acspin .7s linear infinite' }} />
@@ -197,7 +195,6 @@ export default function AdminContentsPage() {
         q:      (qVal  ?? q)      || undefined,
         status: (sVal  ?? status) || undefined,
       });
-      // 👉 Ajout du cast ici pour rassurer TypeScript
       setItems(res.items as ExtendedContentPost[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de chargement');
@@ -241,7 +238,6 @@ export default function AdminContentsPage() {
         .ac-header{margin-bottom:1.75rem;opacity:0;transform:translateY(10px);animation:acin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
         .ac-eyebrow{font-size:.67rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#2563EB;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
         .ac-dot{width:6px;height:6px;background:#3B82F6;border-radius:50%;animation:acpulse 2s ease-in-out infinite}
-        @keyframes acpulse{0%,100%{opacity:1}50%{opacity:.3}}
         .ac-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.85rem);font-weight:600;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .ac-title span{background:linear-gradient(135deg,#1D4ED8,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         
@@ -264,17 +260,12 @@ export default function AdminContentsPage() {
         .ac-form-wrapper.open { max-height: 1500px; opacity: 1; overflow: visible; }
         .ac-form-body{padding:1.25rem 1.3rem}
         
-        /* ── TOOLBAR AJUSTÉE POUR MOBILE ── */
         .ac-toolbar{display:flex;gap:.6rem;align-items:center;flex-wrap:nowrap;padding:1rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);width:100%;box-sizing:border-box}
         .ac-sw{position:relative;flex:1 1 auto;min-width:0}
         .ac-si{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
         .ac-search{width:100%;height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 .85rem 0 2.3rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;outline:none;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
-        .ac-search:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08);background:white}
-        .ac-search::placeholder{color:rgba(107,114,128,.45)}
         .ac-select{flex:0 1 auto;min-width:0;height:38px;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);padding:0 2rem 0 .85rem;font-family:'DM Sans',sans-serif;font-size:.82rem;color:#111827;font-weight:600;outline:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239CA3AF' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .65rem center;transition:border-color .2s,box-shadow .2s}
-        .ac-select:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
         .ac-reload-btn{flex:0 0 auto;height:38px;padding:0 .85rem;border-radius:10px;border:1px solid rgba(37,99,235,.15);background:rgba(255,255,255,.85);display:flex;align-items:center;gap:.35rem;cursor:pointer;color:#374151;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:600;transition:all .18s;white-space:nowrap}
-        .ac-reload-btn:hover{background:#EFF6FF;border-color:rgba(37,99,235,.3);color:#1D4ED8}
         
         @media(max-width:500px){
           .ac-toolbar { padding: 0.8rem 0.5rem; gap: 0.4rem; }
@@ -284,8 +275,8 @@ export default function AdminContentsPage() {
           .ac-reload-btn { padding: 0 0.6rem; height: 36px; font-size: 0.75rem; }
           .btn-text { display: none; }
         }
-        
-        /* 🔥 VRAIES CARTES MODERNES (Remplace les listes tristes et coupées) 🔥 */
+
+        /* GRILLE DE CARTES */
         .ac-cards-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -315,76 +306,19 @@ export default function AdminContentsPage() {
           border-color: rgba(37, 99, 235, 0.15);
         }
 
-        .ac-card-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-start;
-          gap: 0.5rem;
-        }
-
-        .ac-card-title {
-          font-size: 1rem;
-          font-weight: 800;
-          color: #0F172A;
-          line-height: 1.3;
-          display: -webkit-box;
-          -webkit-line-clamp: 2;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-        }
-
-        .ac-card-date {
-          font-size: 0.72rem;
-          font-weight: 600;
-          color: #64748B;
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-        }
-
-        .ac-card-excerpt {
-          font-size: 0.8rem;
-          color: #4B5563;
-          line-height: 1.5;
-          display: -webkit-box;
-          -webkit-line-clamp: 3;
-          -webkit-box-orient: vertical;
-          overflow: hidden;
-          margin-top: 0.2rem;
-        }
-
-        .ac-card-footer {
-          margin-top: auto;
-          padding-top: 0.85rem;
-          border-top: 1px solid rgba(37, 99, 235, 0.08);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-
-        .ac-card-btn {
-          font-size: 0.75rem;
-          font-weight: 700;
-          color: #2563EB;
-          display: flex;
-          align-items: center;
-          gap: 0.3rem;
-          transition: transform 0.2s;
-        }
+        .ac-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+        .ac-card-title { font-size: 1rem; font-weight: 800; color: #0F172A; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .ac-card-date { font-size: 0.72rem; font-weight: 600; color: #64748B; display: flex; align-items: center; gap: 0.3rem; }
+        .ac-card-excerpt { font-size: 0.8rem; color: #4B5563; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-top: 0.2rem; }
+        .ac-card-footer { margin-top: auto; padding-top: 0.85rem; border-top: 1px solid rgba(37, 99, 235, 0.08); display: flex; justify-content: space-between; align-items: center; }
+        .ac-card-btn { font-size: 0.75rem; font-weight: 700; color: #2563EB; display: flex; align-items: center; gap: 0.3rem; }
         .ac-card:hover .ac-card-btn { transform: translateX(3px); }
 
-        @media (max-width: 640px) {
-          .ac-cards-grid {
-            grid-template-columns: 1fr; /* 1 colonne sur mobile */
-            padding: 1rem;
-            gap: 1rem;
-          }
-        }
+        @media (max-width: 640px) { .ac-cards-grid { grid-template-columns: 1fr; padding: 1rem; gap: 1rem; } }
         
         .ac-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.82rem;font-weight:600}
         .ac-ring{width:24px;height:24px;border:2.5px solid rgba(37,99,235,.1);border-top-color:#2563EB;border-radius:50%;animation:acspin .8s linear infinite}
         .ac-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem 1rem;gap:.65rem;color:#9CA3AF}
-        .ac-empty p{font-size:.82rem;font-weight:700}
         .ac-error{display:flex;align-items:center;gap:.6rem;padding:.9rem 1.1rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.8rem;font-weight:700;margin:.75rem 1.2rem}
         
         @keyframes acin{from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)}}
@@ -399,40 +333,24 @@ export default function AdminContentsPage() {
         </div>
 
         <div className={`ac-layout ${formOpen ? 'form-open' : 'form-closed'}`}>
-
-          {/* LEFT — Form Toggleable */}
           <div className="ac-panel ac-panel-left">
-            <div 
-              className="ac-panel-head" 
-              onClick={() => setFormOpen(!formOpen)} 
-              style={{ cursor: 'pointer', background: formOpen ? 'rgba(239,246,255,0.4)' : 'transparent' }}
-            >
+            <div className="ac-panel-head" onClick={() => setFormOpen(!formOpen)} style={{ cursor: 'pointer', background: formOpen ? 'rgba(239,246,255,0.4)' : 'transparent' }}>
               <div className="ac-panel-title">
                 <div className="ac-panel-ico">
                   <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                    {formOpen ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
-                    ) : (
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    )}
+                    {formOpen ? <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" /> : <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />}
                   </svg>
                 </div>
                 {formOpen ? 'Fermer le formulaire' : 'Publier un contenu'}
               </div>
-              {!formOpen && (
-                <button style={{ background:'none', border:'none', color:'#2563EB', fontWeight:800, fontSize:'.7rem', cursor:'pointer' }}>
-                  Ouvrir
-                </button>
-              )}
             </div>
             <div className={`ac-form-wrapper ${formOpen ? 'open' : ''}`}>
               <div className="ac-form-body">
-                <ContentForm onCreated={() => { void load(); setFormOpen(false); }} />
+                <ContentForm onCreated={() => { void load(); setFormOpen(false); }} isSuperAdmin={true} />
               </div>
             </div>
           </div>
 
-          {/* RIGHT — List (Transformée en grille de cartes) */}
           <div className="ac-panel ac-panel-right">
             <div className="ac-panel-head">
               <div className="ac-panel-title">
@@ -447,10 +365,7 @@ export default function AdminContentsPage() {
             <div className="ac-toolbar">
               <div className="ac-sw">
                 <span className="ac-si"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/></svg></span>
-                <input className="ac-search" type="text" placeholder="Rechercher un titre&#8230;" value={q}
-                  onChange={e => setQ(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && void load(q, status)}
-                />
+                <input className="ac-search" type="text" placeholder="Rechercher un titre&#8230;" value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void load(q, status)} />
               </div>
               <select className="ac-select" value={status} onChange={e => { setStatus(e.target.value); void load(q, e.target.value); }}>
                 <option value="">Tous statuts</option>
@@ -464,12 +379,7 @@ export default function AdminContentsPage() {
               </button>
             </div>
 
-            {error && (
-              <div className="ac-error">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink:0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                {error}
-              </div>
-            )}
+            {error && <div className="ac-error">{error}</div>}
 
             {loading ? (
               <div className="ac-loader"><div className="ac-ring" />Chargement&#8230;</div>
@@ -479,27 +389,18 @@ export default function AdminContentsPage() {
                 <p>Aucun contenu pour le moment</p>
               </div>
             ) : (
-              /* 🔥 NOUVELLE VUE EN GRILLE DE CARTES MODERNES 🔥 */
               <div className="ac-cards-grid">
                 {filtered.map((c, i) => (
                   <div key={c.id} className="ac-card" style={{ animationDelay: `${i * 0.04}s` }} onClick={() => setDetailContent(c)}>
-                    <div className="ac-card-header">
-                      <div className="ac-card-title">{c.title}</div>
-                    </div>
-                    
+                    <div className="ac-card-header"><div className="ac-card-title">{c.title}</div></div>
                     <div className="ac-card-date">
                       <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                       {formatDate(c.createdAt)}
                     </div>
-
                     {c.body && <div className="ac-card-excerpt">{c.body}</div>}
-
                     <div className="ac-card-footer">
                       <StatusBadge status={c.status} />
-                      <div className="ac-card-btn">
-                        Détails
-                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-                      </div>
+                      <div className="ac-card-btn">Détails <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg></div>
                     </div>
                   </div>
                 ))}
@@ -510,21 +411,11 @@ export default function AdminContentsPage() {
       </div>
 
       {detailContent && (
-        <DetailModal 
-          content={detailContent} 
-          onClose={() => setDetailContent(null)} 
-          onCycleStatus={() => void handleStatusCycle(detailContent)}
-          onDelete={() => setDeleteTarget(detailContent)}
-          busy={busyId === detailContent.id}
-        />
+        <DetailModal content={detailContent} onClose={() => setDetailContent(null)} onCycleStatus={() => void handleStatusCycle(detailContent)} onDelete={() => setDeleteTarget(detailContent)} busy={busyId === detailContent.id} />
       )}
 
       {deleteTarget && (
-        <DeleteModal
-          title={deleteTarget.title}
-          onConfirm={() => void handleDelete(deleteTarget)}
-          onCancel={() => setDeleteTarget(null)}
-        />
+        <DeleteModal title={deleteTarget.title} onConfirm={() => void handleDelete(deleteTarget)} onCancel={() => setDeleteTarget(null)} />
       )}
     </AppShell>
   );

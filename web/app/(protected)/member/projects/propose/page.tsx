@@ -1,7 +1,4 @@
 // web/app/(protected)/member/projects/propose/page.tsx
-// ✅ FIX ESLint : 'attachmentFile' supprimé (assigné mais jamais utilisé dans le JSX)
-// La taille du fichier est désormais lue directement depuis `attachmentPreview.size`
-// qui est calculé au moment du changement de fichier.
 'use client';
 
 import { useEffect, useState, useCallback, useRef, ChangeEvent } from 'react';
@@ -46,14 +43,12 @@ export default function MemberProjectProposalsPage() {
   const [title,       setTitle]       = useState('');
   const [description, setDescription] = useState('');
   const [budget,      setBudget]      = useState('');
+  const [currency,    setCurrency]    = useState('EUR'); // Ajout de la devise
   const [submitting,  setSubmitting]  = useState(false);
   const [formError,   setFormError]   = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState(false);
 
   // ── Pièce jointe (document) ──
-  // ✅ ESLint fix : on ne stocke PAS le File dans un état séparé car il n'est
-  // jamais lu directement dans le JSX — seuls `attachmentPreview` et
-  // `attachmentAssetId` sont utilisés pour le rendu.
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [attachmentAssetId,   setAttachmentAssetId]   = useState<string | null>(null);
   const [attachmentPreview,   setAttachmentPreview]   = useState<{ name: string; size: string; type: string } | null>(null);
@@ -110,8 +105,6 @@ export default function MemberProjectProposalsPage() {
       return;
     }
 
-    // On calcule les métadonnées ici et on les stocke dans le state de preview.
-    // Le File lui-même n'a pas besoin d'être stocké dans un état React séparé.
     const sizeStr = file.size < 1024 * 1024
       ? `${(file.size / 1024).toFixed(0)} Ko`
       : `${(file.size / (1024 * 1024)).toFixed(1)} Mo`;
@@ -124,7 +117,8 @@ export default function MemberProjectProposalsPage() {
     setUploadingAttachment(true);
 
     try {
-      const result = await api.uploadFile(file, { category: 'proposal', folder: 'proposals' });
+      // CORRECTION : Utilisation de la catégorie 'PROJECT_DOCUMENT' prévue par le schéma Prisma
+      const result = await api.uploadFile(file, { category: 'PROJECT_DOCUMENT', folder: 'proposals' });
       setAttachmentAssetId(result.id);
     } catch {
       setAttachmentError("Échec de l'upload. Réessayez.");
@@ -169,7 +163,8 @@ export default function MemberProjectProposalsPage() {
     setUploadingPhoto(true);
 
     try {
-      const result = await api.uploadFile(file, { category: 'proposal-photo', folder: 'proposals' });
+      // CORRECTION : Utilisation de la catégorie 'PROJECT_IMAGE' prévue par le schéma Prisma
+      const result = await api.uploadFile(file, { category: 'PROJECT_IMAGE', folder: 'proposals' });
       setPhotoAssetId(result.id);
     } catch {
       setPhotoError("Échec de l'upload. Réessayez.");
@@ -208,11 +203,13 @@ export default function MemberProjectProposalsPage() {
         title:       title.trim(),
         description: description.trim(),
         expectedBudget:          budget ? Number(budget) : undefined,
+        currency:                budget ? currency : undefined, // Envoi de la devise sélectionnée
         attachmentFileAssetId:   attachmentAssetId ?? photoAssetId ?? null,
       });
       setTitle('');
       setDescription('');
       setBudget('');
+      setCurrency('EUR');
       removeAttachment();
       removePhoto();
       setFormSuccess(true);
@@ -285,9 +282,55 @@ export default function MemberProjectProposalsPage() {
         .pp-input::placeholder, .pp-textarea::placeholder { color: rgba(107,114,128,0.5); }
         .pp-input:focus, .pp-textarea:focus { border-color: var(--b-mid); background: white; box-shadow: 0 0 0 3px rgba(37,99,235,0.10); }
         .pp-textarea { resize: vertical; min-height: 120px; line-height: 1.6; }
-        .pp-budget-wrap { position: relative; }
-        .pp-budget-prefix { position: absolute; left: 0.95rem; top: 50%; transform: translateY(-50%); font-size: 0.82rem; font-weight: 600; color: var(--s-muted); pointer-events: none; }
-        .pp-budget-input { padding-left: 1.9rem !important; }
+        
+        /* Composant Budget + Devise revisité */
+        .pp-budget-wrap { 
+          display: flex; 
+          align-items: center; 
+          border-radius: 12px; 
+          border: 1.5px solid rgba(37,99,235,0.14); 
+          background: rgba(255,255,255,0.9); 
+          transition: border-color 0.18s, box-shadow 0.18s; 
+          overflow: hidden; 
+        }
+        .pp-budget-wrap:focus-within { 
+          border-color: var(--b-mid); 
+          background: white; 
+          box-shadow: 0 0 0 3px rgba(37,99,235,0.10); 
+        }
+        .pp-budget-select-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+          background: var(--b-faint);
+          border-right: 1.5px solid rgba(37,99,235,0.14);
+        }
+        .pp-budget-currency {
+          appearance: none;
+          background: transparent;
+          border: none;
+          padding: 0.72rem 1.8rem 0.72rem 0.95rem;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 0.88rem;
+          font-weight: 700;
+          color: var(--b-mid);
+          outline: none;
+          cursor: pointer;
+        }
+        .pp-budget-select-icon {
+          position: absolute;
+          right: 0.6rem;
+          pointer-events: none;
+          color: var(--b-mid);
+        }
+        .pp-budget-input { 
+          border: none !important; 
+          background: transparent !important; 
+          box-shadow: none !important; 
+          padding-left: 0.95rem !important; 
+          border-radius: 0 !important; 
+          flex: 1; 
+        }
 
         /* Upload section */
         .pp-upload-section { display: flex; flex-direction: column; gap: 0.75rem; padding: 1.15rem; background: linear-gradient(135deg, rgba(239,246,255,0.6) 0%, rgba(248,250,255,0.4) 100%); border-radius: 14px; border: 1px solid rgba(37,99,235,0.09); margin-bottom: 1rem; }
@@ -422,7 +465,20 @@ export default function MemberProjectProposalsPage() {
                 <div className="pp-field">
                   <label className="pp-label">Budget estimatif <span className="pp-opt">(optionnel)</span></label>
                   <div className="pp-budget-wrap">
-                    <span className="pp-budget-prefix">€</span>
+                    <div className="pp-budget-select-wrap">
+                      <select className="pp-budget-currency" value={currency} onChange={e => setCurrency(e.target.value)} disabled={submitting}>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="XOF">XOF (CFA)</option>
+                        <option value="GNF">GNF (FG)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="CAD">CAD ($)</option>
+                        <option value="CHF">CHF</option>
+                      </select>
+                      <svg className="pp-budget-select-icon" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </div>
                     <input className="pp-input pp-budget-input" type="number" min="0" step="any" value={budget} onChange={e => setBudget(e.target.value)} placeholder="0" disabled={submitting} />
                   </div>
                 </div>
@@ -652,7 +708,7 @@ export default function MemberProjectProposalsPage() {
                       return (
                         <tr key={item.id}>
                           <td><div className="pp-table-title" title={item.title}>{item.title}</div></td>
-                          <td><span className="pp-table-budget">{item.expectedBudget != null ? `${Number(item.expectedBudget).toLocaleString('fr-FR')} €` : '—'}</span></td>
+                          <td><span className="pp-table-budget">{item.expectedBudget != null ? `${Number(item.expectedBudget).toLocaleString('fr-FR')} ${item.currency ?? '€'}` : '—'}</span></td>
                           <td>
                             <span className="pp-status-badge" style={{ background: meta.bg, borderColor: meta.border, color: meta.color }}>
                               <span className="pp-status-dot" style={{ background: meta.dot }} />

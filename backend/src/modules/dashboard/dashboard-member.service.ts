@@ -1,3 +1,4 @@
+//backend/src/modules/dashboard/dashboard-member.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { 
@@ -28,6 +29,7 @@ export class DashboardMemberService {
         function: true,              // 🔥 AJOUT : Poste occupé
         professionalStatus: true,    // 🔥 AJOUT : Statut pro
         originSubPrefecture: true,   // 🔥 AJOUT : Pour la carte
+        createdAt: true,             // 🔥 REQUIS pour calcul retard initial
         memberships: {
           where: { isPrimary: true },
           select: { 
@@ -36,7 +38,6 @@ export class DashboardMemberService {
             antenna: { select: { defaultCurrency: true } }
           },
         },
-        createdAt: true,
         updatedAt: true,
       },
     });
@@ -82,10 +83,15 @@ export class DashboardMemberService {
       };
     }
 
-    const [aggAll, aggValidated, pendingCount, lastContribution] =
+    // 🔥 CORRECTION CRITIQUE 1 & 2 : Les agrégations
+    const [aggAll, aggValidated, pendingCount, lastValidContrib] =
       await Promise.all([
         this.prisma.contribution.aggregate({
-          where: { memberUserId: userId },
+          // Exclure les annulations et rejets du total global
+          where: { 
+            memberUserId: userId,
+            status: { notIn: ['REJECTED', 'CANCELLED'] } 
+          },
           _sum: { amount: true },
         }),
         this.prisma.contribution.aggregate({
@@ -93,12 +99,16 @@ export class DashboardMemberService {
           _sum: { amount: true },
         }),
         this.prisma.contribution.count({
-          where: { memberUserId: userId, status: ContributionStatus.PENDING_VALIDATION },
+          where: { 
+            memberUserId: userId, 
+            status: { in: ['PENDING_VALIDATION', 'SUBMITTED'] } // Compter tout ce qui est en attente
+          },
         }),
+        // Ne récupérer QUE la dernière cotisation validée pour le calcul du retard
         this.prisma.contribution.findFirst({
-          where: { memberUserId: userId },
-          orderBy: [{ createdAt: 'desc' }],
-          select: { createdAt: true },
+          where: { memberUserId: userId, status: ContributionStatus.VALIDATED },
+          orderBy: [{ validatedAt: 'desc' }],
+          select: { validatedAt: true },
         }),
       ]);
 
@@ -167,6 +177,9 @@ export class DashboardMemberService {
         endDate: true,
         budgetAmount: true,
         amountSpent: true,
+        locationText: true,           // Utile pour le carrousel
+        summary: true,                // Utile pour le carrousel
+        coverImageFile: { select: { url: true } } // Image pour le carrousel
       },
     });
 
@@ -184,9 +197,30 @@ export class DashboardMemberService {
         createdAt: true,
         updatedAt: true,
         content: true,
+        coverImageFile: { select: { url: true } } // Image pour le carrousel
       },
     });
 
+    // 🔥 NOUVEAUTÉ : Récupération des événements à venir pour le carrousel
+    const upcomingEvents = await this.prisma.event.findMany({
+      where: {
+        associationId: me.associationId,
+        status: 'PUBLISHED',
+        startsAt: { gte: new Date() } // Uniquement les événements futurs
+      },
+      orderBy: [{ startsAt: 'asc' }],
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        startsAt: true,
+        locationText: true,
+        coverImage: { select: { url: true } } // Image pour le carrousel
+      }
+    });
+
+    // 🔥 CORRECTION CRITIQUE 3 : Calcul correct des retards de l'antenne (basé sur validé)
     const lateMembersPreviewRaw = await this.prisma.user.findMany({
       where: {
         associationId: me.associationId,
@@ -198,19 +232,26 @@ export class DashboardMemberService {
         id: true,
         firstName: true,
         lastName: true,
+        createdAt: true,
         contributions: {
-          orderBy: [{ createdAt: 'desc' }],
+          where: { status: ContributionStatus.VALIDATED },
+          orderBy: [{ validatedAt: 'desc' }],
           take: 1,
-          select: { createdAt: true },
+          select: { validatedAt: true },
         },
       },
     });
 
     const now = new Date();
+    
+    // Calcul du retard du membre connecté
+    const myLastDate = lastValidContrib?.validatedAt ?? me.createdAt;
+    const myLateMonths = monthDiff(myLastDate, now);
+
     const lateMembersPreview = lateMembersPreviewRaw
       .map((u) => {
-        const last = u.contributions[0]?.createdAt ?? null;
-        const lateMonths = last ? monthDiff(last, now) : 999;
+        const lastDate = u.contributions[0]?.validatedAt ?? u.createdAt;
+        const lateMonths = monthDiff(lastDate, now);
         return {
           id: u.id,
           firstName: u.firstName,
@@ -227,14 +268,11 @@ export class DashboardMemberService {
         myContributionsTotal: Number(aggAll._sum.amount ?? 0),
         myContributionsValidatedTotal: Number(aggValidated._sum.amount ?? 0),
         myPendingContributionsCount: pendingCount,
-        myLastContributionAt: lastContribution?.createdAt?.toISOString() ?? null,
+        myLastContributionAt: lastValidContrib?.validatedAt?.toISOString() ?? null,
         associationTotalBalance: totalAssociationBalance, 
         // 🔥 CORRECTION : On renvoie la devise de l'antenne au lieu de 'EUR'
         currency: primaryAntennaCurrency,
-        lateMonths: (() => {
-          const mine = recentContributions[0]?.createdAt ?? null;
-          return mine ? monthDiff(mine, now) : 999;
-        })(),
+        lateMonths: myLateMonths, // Valeur corrigée
       },
       me: {
         id: me.id,
@@ -263,6 +301,7 @@ export class DashboardMemberService {
         amountSpent: x.amountSpent != null ? Number(x.amountSpent) : null,
       })),
       latestContents,
+      upcomingEvents, // 🔥 Export des événements ajoutés pour le front
       lateMembersPreview,
     };
   }

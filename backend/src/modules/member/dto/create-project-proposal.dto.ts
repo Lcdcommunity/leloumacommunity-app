@@ -1,4 +1,4 @@
-//backend/src/modules/member/dto/create-project-proposal.dto.ts
+// backend/src/modules/member/dto/create-project-proposal.dto.ts
 import {
   IsNumber,
   IsOptional,
@@ -6,8 +6,10 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  IsEnum,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { CurrencyCode } from '@prisma/client';
 
 export class CreateProjectProposalDto {
   @IsString()
@@ -23,6 +25,10 @@ export class CreateProjectProposalDto {
   @IsNumber()
   @Min(0)
   expectedBudget?: number;
+
+  @IsOptional()
+  @IsEnum(CurrencyCode)
+  currency?: CurrencyCode;
 
   @IsOptional()
   @IsUUID()

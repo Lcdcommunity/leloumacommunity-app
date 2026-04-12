@@ -1,4 +1,4 @@
-//backend/src/modules/admin/dto/create-member.dto.ts
+// backend/src/modules/admin/admin.controller.ts
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Header, Res } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -7,11 +7,12 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { Response } from 'express';
-import { CreateMemberDto } from './dto/create-member.dto'; // 🔥 NOUVEL IMPORT
+import { CreateMemberDto } from './dto/create-member.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.ANTENNA_ADMIN)
+// 🔥 CORRECTION : On autorise l'Admin d'Antenne ET le Super Admin à utiliser ces routes
+@Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
 export class AdminController {
   constructor(private readonly service: AdminService) {}
 
@@ -56,7 +57,6 @@ export class AdminController {
     return this.service.listLateMembers(user.id, +page, +pageSize);
   }
 
-  // 🔥 NOUVELLE ROUTE POUR CRÉER UN MEMBRE DIRECTEMENT
   @Post('members')
   createMember(@CurrentUser() user: AuthUser, @Body() body: CreateMemberDto) {
     return this.service.createMember(user.id, body);

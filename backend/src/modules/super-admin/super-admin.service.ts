@@ -13,6 +13,7 @@ import {
   NotificationType,
   ProjectStatus,
   CurrencyCode, // 🔥 AJOUT DE L'IMPORT ICI POUR LE PRICING
+  PostStatus,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { MailService } from '../../common/services/mail.service';
@@ -679,6 +680,88 @@ export class SuperAdminService {
       if (doc.fileId) await tx.fileAsset.delete({ where: { id: doc.fileId } });
       return { success: true };
     });
+  }
+
+  /* ── GESTION DES ANNONCES (AJOUT CHIRURGICAL) ── */
+  async listContents(associationId: string, page: number, pageSize: number, q?: string, status?: string) {
+    const skip = (page - 1) * pageSize;
+    const where: Prisma.NewsPostWhereInput = {
+      associationId,
+      ...(status ? { status: status as PostStatus } : {})
+    };
+
+    if (q) {
+      where.OR = [{ title: { contains: q, mode: 'insensitive' } }, { content: { contains: q, mode: 'insensitive' } }];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.newsPost.findMany({ 
+        where, 
+        skip, 
+        take: pageSize, 
+        orderBy: { createdAt: 'desc' }, 
+        include: { coverImageFile: true, attachments: { include: { file: true } } } 
+      }),
+      this.prisma.newsPost.count({ where }),
+    ]);
+
+    return {
+      items: items.map(c => ({
+        ...memberMapper.contentPost({ ...c, body: c.content }),
+        coverFileAssetId: c.coverImageFileId,
+        coverImageFile: c.coverImageFile ? { url: c.coverImageFile.url } : null,
+        attachments: c.attachments?.map(att => ({ id: att.file.id, url: att.file.url })) || []
+      })),
+      total, page, pageSize, totalPages: Math.ceil(total / pageSize)
+    };
+  }
+
+  async createContent(adminId: string, associationId: string, data: any) {
+    return this.prisma.newsPost.create({
+      data: {
+        title: data.title,
+        content: data.content || data.body || '',
+        status: data.status || PostStatus.DRAFT,
+        coverImageFileId: data.coverImageFileId || data.coverFileAssetId || null,
+        associationId,
+        createdByUserId: adminId,
+        scope: 'GLOBAL', // SuperAdmin publie pour tout le monde par défaut
+        ...(data.status === PostStatus.PUBLISHED ? { publishedAt: new Date(), publishedByUserId: adminId } : {}),
+        attachments: data.imageIds?.length > 0 ? {
+          create: data.imageIds.slice(0, 3).map((fileId: string) => ({ fileId }))
+        } : undefined
+      },
+    });
+  }
+
+  async updateContent(contentId: string, associationId: string, data: any) {
+    const post = await this.prisma.newsPost.findFirst({ where: { id: contentId, associationId } });
+    if (!post) throw new NotFoundException("Contenu introuvable.");
+
+    const imageId = data.coverImageFileId !== undefined ? data.coverImageFileId : data.coverFileAssetId;
+
+    if (data.imageIds !== undefined) {
+      await this.prisma.newsPostAttachment.deleteMany({ where: { newsPostId: contentId }});
+    }
+
+    return this.prisma.newsPost.update({
+      where: { id: contentId },
+      data: {
+        title: data.title,
+        content: data.content ?? data.body,
+        status: data.status,
+        ...(imageId !== undefined ? { coverImageFileId: imageId } : {}),
+        ...(data.imageIds?.length > 0 ? {
+          attachments: {
+            create: data.imageIds.slice(0, 3).map((fileId: string) => ({ fileId }))
+          }
+        } : {})
+      },
+    });
+  }
+
+  async deleteContent(contentId: string, associationId: string) {
+    return this.prisma.newsPost.delete({ where: { id: contentId, associationId } });
   }
 
   /* ── CONTRIBUTIONS ── */

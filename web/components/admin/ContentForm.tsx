@@ -10,20 +10,25 @@ import { api } from '../../lib/api-client';
 
 type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
+interface UploadedImage {
+  id: string;
+  preview: string;
+  name: string;
+}
+
 export function ContentForm({
   onCreated,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  isSuperAdmin = false, 
 }: {
   onCreated?: () => Promise<void> | void;
+  isSuperAdmin?: boolean;
 }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [status, setStatus] = useState<ContentStatus>('DRAFT');
   
-  // États pour l'image
-  const [coverFileAssetId, setCoverFileAssetId] = useState<string | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string | null>(null);
-  const [coverName, setCoverName] = useState<string | null>(null);
-  
+  const [images, setImages] = useState<UploadedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,44 +36,56 @@ export function ContentForm({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function handleCoverUpload(file: File | null) {
-    if (!file) return;
+  const MAX_IMAGES = 3;
+
+  async function handleFilesUpload(files: FileList | File[] | null) {
+    if (!files || files.length === 0) return;
     
-    // Vérification basique
-    if (!file.type.startsWith('image/')) {
-      setError('Veuillez sélectionner une image valide.');
+    const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+    
+    if (validFiles.length === 0) {
+      setError('Veuillez sélectionner des images valides.');
       return;
     }
-    
-    // Créer une URL temporaire pour la prévisualisation immédiate
-    const objectUrl = URL.createObjectURL(file);
-    setCoverPreview(objectUrl);
-    setCoverName(file.name);
-    
+
+    const availableSlots = MAX_IMAGES - images.length;
+    if (availableSlots <= 0) {
+      setError(`Vous ne pouvez pas ajouter plus de ${MAX_IMAGES} images.`);
+      return;
+    }
+
+    const filesToUpload = validFiles.slice(0, availableSlots);
     setUploading(true);
     setError(null);
-    try {
-      const uploaded = await api.uploadFile(file, {
-        category: 'NEWS_IMAGE', // <-- CORRECTION CHIRURGICALE: Utiliser l'enum Prisma correct
-        folder: 'antenna-content-covers',
-        description: 'Cover contenu antenne',
-      });
-      setCoverFileAssetId(uploaded.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur upload');
-      setCoverPreview(null);
-      setCoverName(null);
-      setCoverFileAssetId(null);
-    } finally {
-      setUploading(false);
+
+    const newUploadedImages = [...images];
+
+    for (const file of filesToUpload) {
+      try {
+        const preview = URL.createObjectURL(file);
+        const uploaded = await api.uploadFile(file, {
+          category: 'NEWS_IMAGE',
+          folder: 'content-covers',
+          description: 'Image contenu',
+        });
+        
+        newUploadedImages.push({ id: uploaded.id, preview, name: file.name });
+        setImages([...newUploadedImages]);
+      } catch {
+        // 🔥 Correction : suppression du "err" non utilisé
+        setError(`Erreur lors de l'upload de ${file.name}`);
+      }
     }
+    
+    setUploading(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function handleRemoveImage() {
-    if (coverPreview) URL.revokeObjectURL(coverPreview);
-    setCoverPreview(null);
-    setCoverName(null);
-    setCoverFileAssetId(null);
+  function handleRemoveImage(index: number) {
+    const imgToRemove = images[index];
+    if (imgToRemove?.preview) URL.revokeObjectURL(imgToRemove.preview);
+    
+    setImages(prev => prev.filter((_, i) => i !== index));
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -76,17 +93,27 @@ export function ContentForm({
     e.preventDefault();
     setLoading(true);
     setError(null);
+    
     try {
-      await api.createAntennaContent({
+      const payload = {
         title,
         body,
         status,
-        coverImageFileId: coverFileAssetId,
-      });
+        coverImageFileId: images[0]?.id || null,
+        imageIds: images.slice(1).map(img => img.id),
+      };
+
+      // 🔥 CORRECTION CHIRURGICALE : 
+      // Puisque nous avons autorisé le Super Admin sur le contrôleur "admin", 
+      // nous utilisons la même méthode API pour les deux rôles.
+      await api.createAntennaContent(payload);
+
       setTitle('');
       setBody('');
       setStatus('DRAFT');
-      handleRemoveImage();
+      images.forEach(img => URL.revokeObjectURL(img.preview));
+      setImages([]);
+      
       await onCreated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création');
@@ -102,12 +129,12 @@ export function ContentForm({
         .cf-dropzone.drag { background: rgba(239,246,255,0.8); border-color: #2563EB; }
         .cf-dropzone:hover { background: rgba(239,246,255,0.6); }
         .cf-icon-wrap { width: 42px; height: 42px; border-radius: 10px; background: white; border: 1px solid rgba(37,99,235,0.15); display: flex; align-items: center; justify-content: center; margin: 0 auto 0.8rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03); }
-        .cf-preview-container { position: relative; width: 100%; height: 160px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .cf-images-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem; }
+        .cf-preview-container { position: relative; width: 100%; aspect-ratio: 1; border-radius: 10px; overflow: hidden; border: 1px solid rgba(0,0,0,0.1); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
         .cf-preview-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .cf-preview-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.7), transparent 50%); opacity: 0; transition: opacity 0.2s; display: flex; align-items: flex-end; padding: 1rem; }
-        .cf-preview-container:hover .cf-preview-overlay { opacity: 1; }
-        .cf-remove-btn { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; background: rgba(0,0,0,0.6); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px); transition: transform 0.2s; }
+        .cf-remove-btn { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; border-radius: 50%; background: rgba(0,0,0,0.6); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(4px); transition: transform 0.2s; }
         .cf-remove-btn:hover { transform: scale(1.1); background: rgba(220,38,38,0.9); }
+        .cf-main-badge { position: absolute; bottom: 4px; left: 4px; background: rgba(37,99,235,0.9); color: white; font-size: 0.55rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 99px; letter-spacing: 0.05em; backdrop-filter: blur(4px); }
         .cf-upload-spinner { width: 16px; height: 16px; border: 2px solid rgba(37,99,235,0.2); border-top-color: #2563EB; border-radius: 50%; animation: cfspin 0.8s linear infinite; margin: 0 auto 0.5rem; }
         @keyframes cfspin { to { transform: rotate(360deg) } }
       `}</style>
@@ -134,44 +161,44 @@ export function ContentForm({
         />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
-            Image de couverture (optionnel)
-          </label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
+              Images (jusqu&apos;à 3)
+            </label>
+            <span style={{ fontSize: '0.7rem', color: images.length >= MAX_IMAGES ? '#DC2626' : '#6B7280', fontWeight: 700 }}>
+              {images.length} / {MAX_IMAGES}
+            </span>
+          </div>
           
           <input 
             ref={fileInputRef}
             type="file" 
             hidden 
+            multiple
             accept="image/*" 
-            onChange={(e) => void handleCoverUpload(e.target.files?.[0] ?? null)} 
+            onChange={(e) => void handleFilesUpload(e.target.files)} 
           />
 
-          {coverPreview ? (
-            <div className="cf-preview-container">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={coverPreview} alt="Aperçu" className="cf-preview-img" />
-              
-              <button type="button" onClick={handleRemoveImage} className="cf-remove-btn" title="Supprimer l'image">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+          {images.length > 0 && (
+            <div className="cf-images-grid">
+              {images.map((img, idx) => (
+                <div key={img.id} className="cf-preview-container">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.preview} alt={`Aperçu ${idx + 1}`} className="cf-preview-img" />
+                  
+                  <button type="button" onClick={() => handleRemoveImage(idx)} className="cf-remove-btn" title="Supprimer l'image">
+                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
 
-              <div className="cf-preview-overlay">
-                <div style={{ color: 'white', minWidth: 0 }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {coverName}
-                  </div>
-                  {uploading && (
-                    <div style={{ fontSize: '0.7rem', color: '#93C5FD', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.2rem' }}>
-                      <div style={{ width: 10, height: 10, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'cfspin 0.8s linear infinite' }} />
-                      Envoi en cours...
-                    </div>
-                  )}
+                  {idx === 0 && <span className="cf-main-badge">PRINCIPALE</span>}
                 </div>
-              </div>
+              ))}
             </div>
-          ) : (
+          )}
+
+          {images.length < MAX_IMAGES && (
             <div 
               className={`cf-dropzone ${drag ? 'drag' : ''}`}
               onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
@@ -179,21 +206,30 @@ export function ContentForm({
               onDrop={(e) => {
                 e.preventDefault();
                 setDrag(false);
-                if (e.dataTransfer.files?.[0]) handleCoverUpload(e.dataTransfer.files[0]);
+                void handleFilesUpload(e.dataTransfer.files);
               }}
               onClick={() => fileInputRef.current?.click()}
             >
-              <div className="cf-icon-wrap">
-                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E3A8A', marginBottom: '0.2rem' }}>
-                Cliquez ou glissez une image ici
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>
-                PNG, JPG, WEBP jusqu&apos;à 10MB
-              </div>
+              {uploading ? (
+                <>
+                  <div className="cf-upload-spinner" />
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2563EB' }}>Envoi en cours...</div>
+                </>
+              ) : (
+                <>
+                  <div className="cf-icon-wrap">
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E3A8A', marginBottom: '0.2rem' }}>
+                    Cliquez ou glissez vos images
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: '#6B7280' }}>
+                    PNG, JPG, WEBP
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
