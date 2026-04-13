@@ -72,15 +72,15 @@ function BudgetBar({ planned, spent }: { planned?: number | null; spent?: number
   const col = over ? '#DC2626' : pct > 80 ? '#D97706' : '#2563EB';
 
   return (
-    <div style={{ minWidth: 100 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.22rem', gap: '.4rem' }}>
-        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.7rem', fontWeight: 700, color: col }}>{pct}%</span>
-        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.65rem', color: '#9CA3AF', fontWeight: 600 }}>
-          {formatCurrency(planned)}
+    <div style={{ width: '100%' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.35rem', gap: '.4rem', alignItems: 'center' }}>
+        <span style={{ fontSize: '.75rem', fontWeight: 500, color: col }}>{pct}%</span>
+        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.75rem', color: '#374151', fontWeight: 500, letterSpacing: '-0.01em' }}>
+          {formatCurrency(spent ?? 0)} / {formatCurrency(planned)}
         </span>
       </div>
-      <div style={{ height: 4, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: col, borderRadius: 99, transition: 'width .5s ease' }} />
+      <div style={{ height: 6, borderRadius: 99, background: 'rgba(0,0,0,0.05)', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: col, borderRadius: 99, transition: 'width .6s cubic-bezier(0.4, 0, 0.2, 1)' }} />
       </div>
     </div>
   );
@@ -614,8 +614,7 @@ function ProjectModal({
                     <span style={{ color: '#D1D5DB' }}>Non défini</span>
                   )
                 }
-              />
-              <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
+              />              <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
 
               {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
                 <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid rgba(37,99,235,.08)' }}>
@@ -1017,15 +1016,12 @@ export default function AdminProjectsPage() {
   const completedCount = items.filter((i) => i.status === 'COMPLETED').length;
   const formOpen = formMode !== 'hidden';
 
-  const thStyle: React.CSSProperties = { padding: '.7rem 1.1rem', fontSize: '.63rem', fontWeight: 900, letterSpacing: '.11em', textTransform: 'uppercase', color: '#374151', background: 'rgba(37,99,235,.025)', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid rgba(37,99,235,.08)' };
-
   return (
     <AppShell title="Projets de l'antenne">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap');
         .pp-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.1rem,3vw,2rem);max-width:1100px;margin:0 auto}
         
-        /* 1. HEADER & BOUTON NOUVEAU */
         .pp-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: ppin .5s .04s cubic-bezier(.22,1,.36,1) forwards; }
         .pp-header-left { display: flex; flex-direction: column; }
         .pp-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#2563EB;margin-bottom:.3rem;display:flex;align-items:center;gap:.4rem}
@@ -1045,91 +1041,76 @@ export default function AdminProjectsPage() {
         }
 
         .pp-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(37,99,235,.09);box-shadow:0 2px 16px rgba(37,99,235,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:ppin .5s .09s cubic-bezier(.22,1,.36,1) forwards}
-        .pp-panel-head{padding:.9rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+        .pp-panel-head{padding:.9rem 1.3rem;border-bottom:1px solid rgba(0,0,0,0.03);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
         .pp-panel-titlerow{display:flex;align-items:center;gap:.5rem}
         .pp-panel-ico{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
         .pp-panel-title{font-size:.73rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
         .pp-count-chip{font-size:.67rem;font-weight:900;padding:.2rem .58rem;border-radius:99px;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
 
+        /* STAT CARDS - Refonte Capture 2 */
+        .pp-stat-grid { display: flex; gap: 0.75rem; padding: 1.25rem; border-bottom: 1px solid rgba(0,0,0,0.04); background: #FAFBFF; }
+        .pp-stat-card { flex: 1; min-width: 0; background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 1rem 0.5rem; text-align: center; position: relative; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.2s; }
+        .pp-stat-card:hover { transform: translateY(-2px); border-color: #BFDBFE; }
+        .pp-stat-card-bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+        .pp-stat-val { display: block; font-family: 'Cormorant Garamond', serif; font-size: 1.65rem; font-weight: 700; color: #0F172A; margin-bottom: 0.2rem; }
+        .pp-stat-lbl { display: block; font-size: 0.62rem; font-weight: 900; text-transform: uppercase; color: #94A3B8; letter-spacing: 0.05em; }
+
         .pp-form-panel{overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1),opacity .25s ease;max-height:0;opacity:0}
         .pp-form-panel.open{max-height:3000px;opacity:1}
         .pp-form-inner{padding:1.5rem 1.2rem;border-bottom:1px solid rgba(37,99,235,.07);background:rgba(239,246,255,.18)}
-        @media(max-width:560px){.pp-form-inner{padding:1.2rem .9rem}}
 
         .pp-form-section { background: rgba(255,255,255,.6); border: 1px solid rgba(37,99,235,.1); padding: 1.2rem; border-radius: 14px; margin-bottom: 1rem; }
         .pp-form-section-title { margin: 0 0 1rem; font-size: .8rem; font-weight: 800; color: #1D4ED8; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: .4rem; border-bottom: 1px dashed rgba(37,99,235,.15); padding-bottom: .6rem; }
 
-                .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
-        .pp-edit-dot{width:6px;height:6px;border-radius:50%;background:#2563EB;animation:pppulse 1.5s infinite;flex-shrink:0}
+        .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
         .pp-save-err{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;color:#B91C1C;font-size:.78rem;font-weight:800;margin-bottom:.7rem}
-        .pp-form-inner input:focus,.pp-form-inner textarea:focus,.pp-form-inner select:focus{border-color:rgba(37,99,235,.4)!important;box-shadow:0 0 0 3px rgba(37,99,235,.08)!important;background:white!important}
 
-        /* 2. BADGES CHIPS - SUR UNE SEULE LIGNE */
-        .pp-chips{display:flex;gap:.5rem;flex-wrap:nowrap;padding:.7rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);background:rgba(239,246,255,.12);width:100%;box-sizing:border-box}
-        .pp-chip{display:inline-flex;align-items:center;justify-content:center;gap:.32rem;padding:.28rem .4rem;border-radius:9px;font-size:.7rem;font-weight:700;border:1px solid;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .pp-chip-dot{width:5px;height:5px;border-radius:50%}
-        .pp-chip-num{font-family:'Cormorant Garamond',serif;font-size:.95rem;font-weight:700}
-        @media(max-width:500px){
-          .pp-chips{padding:.5rem;gap:.25rem}
-          .pp-chip{padding:.2rem}
-          .pp-chip-label{font-size:.55rem!important}
-          .pp-chip-num{font-size:.8rem!important}
-          .pp-chip-dot{display:none}
+        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:nowrap;padding:.8rem 1.3rem;border-bottom:1px solid rgba(0,0,0,0.03);width:100%;box-sizing:border-box}
+        .pp-finput{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:#111827;outline:none;flex:1 1 auto;min-width:0;background:rgba(255,255,255,.88)}
+        .pp-fselect{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);background:white;padding:0 1.8rem 0 .7rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer}
+        .pp-reload-btn{height:36px;padding:0 .85rem;background:rgba(239,246,255,.8);border:1.5px solid rgba(37,99,235,.18);border-radius:9px;cursor:pointer;color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:800;display:flex;align-items:center;gap:.32rem}
+
+        /* 🔥 NEW PROJECT CARD DESIGN - Refonte chirurgicale */
+        .pp-list-container { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; background: #FAFAFA; }
+        .pp-project-card { 
+          background: rgba(240, 247, 255, 0.5); 
+          border: 1px solid rgba(37, 99, 235, 0.12); 
+          border-left: 4px solid #D1D5DB;
+          border-radius: 18px; 
+          padding: 1.25rem; 
+          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+          cursor: pointer; 
+          box-shadow: 0 4px 12px rgba(0,0,0,0.03); 
+          display: flex; 
+          flex-direction: column; 
+          gap: 1.1rem; 
+          position: relative; 
+          overflow: hidden; 
         }
-
-        /* 3. RECHERCHE ET FILTRES - SUR UNE SEULE LIGNE */
-        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:nowrap;padding:.8rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);width:100%;box-sizing:border-box}
-        .pp-finput{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:#111827;outline:none;flex:1 1 auto;min-width:0;background:rgba(255,255,255,.88);transition:border-color .2s,box-shadow .2s}
-        .pp-finput:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
-        .pp-finput::placeholder{color:rgba(107,114,128,.4);font-weight:400}
-        .pp-fselect{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);background:rgba(255,255,255,.88);padding:0 1.8rem 0 .7rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer;flex:0 1 auto;min-width:0;background-image:url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .55rem center}
-        .pp-fselect:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08);outline:none}
-        .pp-reload-btn{height:36px;padding:0 .85rem;background:rgba(239,246,255,.8);border:1.5px solid rgba(37,99,235,.18);border-radius:9px;cursor:pointer;color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:800;display:flex;align-items:center;gap:.32rem;transition:all .18s;white-space:nowrap;flex:0 0 auto}
-        .pp-reload-btn:hover{background:#DBEAFE;border-color:#2563EB;transform:translateY(-1px)}
-        @media(max-width:500px){
-          .pp-filter-row{padding:.6rem .5rem;gap:.3rem}
-          .pp-finput{padding:0 .4rem;font-size:.7rem;height:34px}
-          .pp-fselect{padding:0 1.2rem 0 .4rem;font-size:.7rem;height:34px;background-position:right .3rem center}
-          .pp-reload-btn{padding:0 .5rem;font-size:.7rem;height:34px}
-          .btn-text{display:none} /* Cache le texte du bouton Rechercher pour éviter le scroll sur les très petits écrans */
-        }
-
-        .pp-tw{overflow-x:auto}
-        .pp-table{width:100%;border-collapse:collapse;min-width:480px}
-        .pp-table thead tr th{cursor:default}
-        .pp-table tbody tr{border-bottom:1px solid rgba(37,99,235,.04);transition:background .15s;animation:ppin .38s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
-        .pp-table tbody tr:last-child{border-bottom:none}
-        .pp-table tbody tr:hover{background:rgba(239,246,255,.55)}
-        .pp-table tbody tr:hover .pp-proj-title{color:#1D4ED8}
-        .pp-table tbody tr.pp-editing-row{background:rgba(239,246,255,.6)!important;box-shadow:inset 3px 0 0 #2563EB}
-        .pp-td{padding:.85rem 1.1rem;font-size:.84rem;color:#111827;vertical-align:middle}
-        .pp-proj-title{font-weight:900;font-size:.88rem;color:#0F172A;margin-bottom:.18rem;transition:color .15s}
-        .pp-proj-dates{font-family:'DM Mono',monospace;font-size:.68rem;font-weight:600;color:#9CA3AF}
-        .pp-hint{display:inline-flex;align-items:center;gap:.22rem;font-size:.67rem;font-weight:700;color:#93C5FD;margin-top:.18rem}
-
-        .pp-mob{display:none;flex-direction:column}
-        @media(max-width:600px){.pp-tw{display:none}.pp-mob{display:flex}}
-        .pp-mc{padding:.9rem 1.1rem;border-bottom:1px solid rgba(37,99,235,.06);animation:ppin .38s cubic-bezier(.22,1,.36,1) both;cursor:pointer;transition:background .15s}
-        .pp-mc:last-child{border-bottom:none}
-        .pp-mc:hover{background:rgba(239,246,255,.55)}
-        .pp-mc-top{display:flex;align-items:flex-start;gap:.65rem;margin-bottom:.5rem}
-        .pp-mc-info{flex:1;min-width:0}
+        .pp-project-card:hover { transform: translateY(-4px); box-shadow: 0 12px 28px rgba(37,99,235,0.08); border-color: rgba(37,99,235,0.3); }
+        .pp-project-card.status-IN_PROGRESS { border-left-color: #059669; }
+        .pp-project-card.status-COMPLETED { border-left-color: #7C3AED; }
+        .pp-project-card.status-APPROVED { border-left-color: #2563EB; }
+        
+        .pp-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; }
+        .pp-card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.45rem; font-weight: 700; color: #0F172A; line-height: 1.15; flex: 1; margin: 0; }
+        .pp-card-date { font-size: 0.72rem; color: #94A3B8; font-weight: 800; display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.3rem; letter-spacing: 0.02em; }
+        
+        .pp-card-divider { height: 1px; border: none; border-top: 1.5px dashed rgba(37, 99, 235, 0.12); margin: 0; }
+        
+        .pp-card-footer { display: flex; flex-direction: column; gap: 0.75rem; }
 
         .pp-loader{display:flex;align-items:center;justify-content:center;padding:2.5rem;gap:.7rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .pp-ring{width:22px;height:22px;border:2.5px solid rgba(37,99,235,.1);border-top-color:#2563EB;border-radius:50%;animation:ppspin .8s linear infinite}
         .pp-error{display:flex;align-items:center;gap:.6rem;padding:.85rem 1.1rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.8rem;font-weight:800;margin:1rem}
         .pp-empty{display:flex;flex-direction:column;align-items:center;padding:3rem 1rem;gap:.65rem;color:#9CA3AF}
-        .pp-empty-title{font-size:.88rem;font-weight:900;color:#374151}
-        .pp-empty-sub{font-size:.75rem;font-weight:600}
 
         @keyframes ppin{to{opacity:1;transform:translateY(0)}}
         @keyframes ppspin{to{transform:rotate(360deg)}}
-        @keyframes drawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
         @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       `}</style>
 
       <div className="pp-wrap">
-        {/* 👇 Le bouton "Nouveau projet" est désormais ici */}
         <div className="pp-header">
           <div className="pp-header-left">
             <div className="pp-eyebrow">
@@ -1176,7 +1157,7 @@ export default function AdminProjectsPage() {
             <div className="pp-form-inner">
               {formMode === 'edit' && editing && (
                 <div className="pp-edit-banner">
-                  <div className="pp-edit-dot" />
+                  <div className="pp-edit-dot" style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563EB', animation: 'pppulse 1.5s infinite', flexShrink: 0 }} />
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     Modification&nbsp;: <strong>{editing.title}</strong>
                   </span>
@@ -1205,16 +1186,17 @@ export default function AdminProjectsPage() {
             </div>
           </div>
 
-          <div className="pp-chips">
-            {([
-              { label: 'Brouillons', count: draftCount, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-              { label: 'En cours', count: inProgressCount, color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-              { label: 'Terminés', count: completedCount, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-            ] as const).map((c) => (
-              <div key={c.label} className="pp-chip" style={{ background: c.bg, borderColor: c.border, color: c.color }}>
-                <span className="pp-chip-dot" style={{ background: c.color }} />
-                <span className="pp-chip-num">{c.count}</span>
-                <span className="pp-chip-label" style={{ fontSize: '.67rem', opacity: 0.85 }}>{c.label}</span>
+          {/* 🔥 STATS CARDS - Refonte chirurgicale 3-en-ligne Capture 2 */}
+          <div className="pp-stat-grid">
+            {[
+              { label: 'Brouillons', count: draftCount, color: '#6B7280' },
+              { label: 'En cours', count: inProgressCount, color: '#059669' },
+              { label: 'Terminés', count: completedCount, color: '#7C3AED' },
+            ].map((c) => (
+              <div key={c.label} className="pp-stat-card">
+                <div className="pp-stat-card-bar" style={{ background: c.color }} />
+                <span className="pp-stat-val">{c.count}</span>
+                <span className="pp-stat-lbl">{c.label}</span>
               </div>
             ))}
           </div>
@@ -1259,78 +1241,40 @@ export default function AdminProjectsPage() {
             <div className="pp-empty">
               <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />              </svg>
-              <div className="pp-empty-title">Aucun projet trouvé</div>
-              <div className="pp-empty-sub">
+              <div className="pp-empty-title" style={{ fontSize: '.88rem', fontWeight: 900, color: '#374151' }}>Aucun projet trouvé</div>
+              <div style={{ fontSize: '.75rem', fontWeight: 600, color: '#9CA3AF' }}>
                 Cliquez sur <strong>Nouveau projet</strong> pour en créer un.
               </div>
             </div>
           ) : (
-            <>
-              <div className="pp-tw">
-                <table className="pp-table">
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>Projet</th>
-                      <th style={thStyle}>Statut</th>
-                      <th style={thStyle}>Budget</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((p, i) => (
-                      <tr
-                        key={p.id}
-                        className={editing?.id === p.id && formOpen ? 'pp-editing-row' : ''}
-                        style={{ animationDelay: `${i * .04}s` }}
-                        onClick={() => setDetailProject(p)}
-                      >
-                        <td className="pp-td">
-                          <div className="pp-proj-title">{p.title}</div>
-                          <div className="pp-proj-dates">
-                            {p.startsAt ? formatDate(p.startsAt) : '—'}&nbsp;&rarr;&nbsp;{p.endsAt ? formatDate(p.endsAt) : '—'}
-                          </div>
-                          <div className="pp-hint">
-                            <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                            </svg>
-                            Voir les détails
-                          </div>
-                        </td>
-                        <td className="pp-td">
-                          <StatusBadge status={p.status} />
-                        </td>
-                        <td className="pp-td">
-                          <BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="pp-mob">
-                {items.map((p, i) => (
-                  <div
-                    key={p.id}
-                    className="pp-mc"
-                    style={{ animationDelay: `${i * .04}s`, background: editing?.id === p.id && formOpen ? 'rgba(239,246,255,.55)' : undefined }}
-                    onClick={() => setDetailProject(p)}
-                  >
-                    <div className="pp-mc-top">
-                      <div className="pp-mc-info">
-                        <div className="pp-proj-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {p.title}
-                        </div>
-                        <div className="pp-proj-dates">
-                          {p.startsAt ? formatDate(p.startsAt) : '—'} → {p.endsAt ? formatDate(p.endsAt) : '—'}
-                        </div>
+            /* 🔥 PROJECT LIST - Refonte chirurgicale Card Design Modern Pro */
+            <div className="pp-list-container">
+              {items.map((p, i) => (
+                <div 
+                  key={p.id} 
+                  className={`pp-project-card status-${p.status}`}
+                  style={{ animation: `ppin 0.4s ${i * 0.05}s ease both` }}
+                  onClick={() => setDetailProject(p)}
+                >
+                  <div className="pp-card-top">
+                    <div style={{ flex: 1 }}>
+                      <div className="pp-card-date">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        {p.startsAt ? formatDate(p.startsAt) : '??'} &rarr; {p.endsAt ? formatDate(p.endsAt) : '??'}
                       </div>
-                      <StatusBadge status={p.status} />
+                      <h3 className="pp-card-title">{p.title}</h3>
                     </div>
+                    <StatusBadge status={p.status} />
+                  </div>
+                  
+                  <hr className="pp-card-divider" />
+                  
+                  <div className="pp-card-footer">
                     <BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} />
                   </div>
-                ))}
-              </div>
-            </>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

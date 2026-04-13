@@ -279,6 +279,7 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
     </div>
   );
 }
+
 // ----------------------------------------------------------------------
 // PAGE PRINCIPALE : ADMIN D'ANTENNE
 // ----------------------------------------------------------------------
@@ -345,11 +346,11 @@ export default function AdminEventsPage() {
             -webkit-overflow-scrolling: touch;
           }
 
-          .aev-table { width: 100%; border-collapse: collapse; min-width: 400px; }
-          .aev-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; white-space: nowrap; }
+          .aev-table { width: 100%; border-collapse: collapse; /* Suppression du min-width: 400px pour éviter le scroll */ }
+          .aev-table th { padding: 0.75rem 0.75rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; white-space: nowrap; }
           .aev-row { border-top: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
           .aev-row:hover { background: #F8FAFC; }
-          .aev-table td { padding: 1rem 1.4rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; }
+          .aev-table td { padding: 0.85rem 0.75rem; font-size: 0.8rem; font-weight: 600; color: #111827; vertical-align: middle; }
           .aev-status { padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid rgba(0,0,0,0.05); white-space: nowrap; }
           
           .aev-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
@@ -381,7 +382,12 @@ export default function AdminEventsPage() {
           @media (max-width: 600px) { 
             .aev-grid-2 { grid-template-columns: 1fr; } 
             .hide-mobile { display: none; } 
-            .aev-actions-td > div { flex-direction: column; align-items: flex-end; } 
+            .aev-actions-td > div { flex-direction: column; align-items: flex-end; gap: 0.3rem; } 
+            /* Ajustements mobiles pour éviter le scroll */
+            .aev-table th { padding: 0.5rem 0.4rem; font-size: 0.6rem; }
+            .aev-table td { padding: 0.6rem 0.4rem; font-size: 0.75rem; }
+            .aev-action-btn { padding: 0.3rem 0.5rem; font-size: 0.7rem; }
+            .aev-status { padding: 0.15rem 0.4rem; font-size: 0.6rem; }
           }
         `}</style>
         
