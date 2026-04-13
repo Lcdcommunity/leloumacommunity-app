@@ -655,6 +655,21 @@ export class MemberService {
         orderBy: [{ createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
+        include: {
+          attachments: {
+            include: {
+              file: {
+                select: {
+                  id: true,
+                  url: true,
+                  mimeType: true,
+                  sizeBytes: true,
+                  originalFilename: true,
+                }
+              }
+            }
+          }
+        }
       }),
     ]);
 
@@ -668,6 +683,71 @@ export class MemberService {
       page,
       pageSize,
     };
+  }
+  async updateProjectProposal(
+    userId: string,
+    proposalId: string,
+    dto: Partial<CreateProjectProposalDto> & { attachmentFileAssetId?: string | null },
+  ) {
+    const me = await this.getMeOrThrow(userId);
+
+    const proposal = await this.prisma.projectProposal.findUnique({
+      where: { id: proposalId },
+    });
+
+    if (!proposal || proposal.authorUserId !== me.id) {
+      throw new NotFoundException('Proposition introuvable.');
+    }
+
+    if (proposal.status !== ProposalStatus.SUBMITTED && proposal.status !== ProposalStatus.UNDER_REVIEW) {
+      throw new BadRequestException('Cette proposition ne peut plus être modifiée.');
+    }
+
+    const updated = await this.prisma.projectProposal.update({
+      where: { id: proposalId },
+      data: {
+        ...(dto.title ? { title: dto.title.trim() } : {}),
+        ...(dto.description ? { description: dto.description.trim() } : {}),
+        ...(dto.expectedBudget !== undefined
+          ? { estimatedBudget: dto.expectedBudget ? new Prisma.Decimal(dto.expectedBudget) : null }
+          : {}),
+        ...(dto.currency ? { currency: dto.currency as CurrencyCode } : {}),
+        ...(dto.attachmentFileAssetId !== undefined
+          ? {
+              attachments: dto.attachmentFileAssetId
+                ? {
+                    deleteMany: {},
+                    create: { fileId: dto.attachmentFileAssetId },
+                  }
+                : { deleteMany: {} },
+            }
+          : {}),
+      },
+    });
+
+    return memberMapper.projectProposal(updated);
+  }
+
+  async deleteProjectProposal(userId: string, proposalId: string) {
+    const me = await this.getMeOrThrow(userId);
+
+    const proposal = await this.prisma.projectProposal.findUnique({
+      where: { id: proposalId },
+    });
+
+    if (!proposal || proposal.authorUserId !== me.id) {
+      throw new NotFoundException('Proposition introuvable.');
+    }
+
+    if (proposal.status !== ProposalStatus.SUBMITTED && proposal.status !== ProposalStatus.UNDER_REVIEW) {
+      throw new BadRequestException('Cette proposition ne peut plus être supprimée.');
+    }
+
+    await this.prisma.projectProposal.delete({
+      where: { id: proposalId },
+    });
+
+    return { success: true };
   }
 
   async listDocuments(

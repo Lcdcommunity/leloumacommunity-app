@@ -94,7 +94,7 @@ export const memberMapper = {
       
       birthDate: toIso(u.birthDate),
       placeOfBirth: u.placeOfBirth ?? null,
-      birthCountry: u.birthCountry ?? null, // 🔥 Ajout de birthCountry
+      birthCountry: u.birthCountry ?? null,
       countryOfBirth: u.countryOfBirth ?? null,
       professionalStatus: u.professionalStatus ?? null,
       function: u.function ?? null,
@@ -127,12 +127,10 @@ export const memberMapper = {
       validatedAt: toIso(c.validatedAt),
       note: c.memberComment ?? null,
       purpose: c.purpose ?? 'REGULAR_QUOTA',
-      // Le payeur
       submitter: c.submitter ? {
         firstName: c.submitter.firstName,
         lastName: c.submitter.lastName,
       } : null,
-      // 🔥 NOUVEAU : Le bénéficiaire (celui pour qui on paie)
       beneficiary: c.member ? {
         firstName: c.member.firstName,
         lastName: c.member.lastName,
@@ -219,6 +217,15 @@ export const memberMapper = {
   },
 
   projectProposal(x: any) {
+    const firstAttachment = x.attachments?.[0]?.file;
+    const attachedFile = firstAttachment ? {
+      id: firstAttachment.id,
+      url: firstAttachment.url,
+      mimeType: firstAttachment.mimeType,
+      fileName: firstAttachment.originalFilename,
+      sizeBytes: toNumberOrNull(firstAttachment.sizeBytes),
+    } : null;
+
     return {
       id: x.id,
       associationId: x.associationId,
@@ -232,7 +239,9 @@ export const memberMapper = {
           : x.expectedBudget != null
             ? toNumberOrNull(x.expectedBudget)
             : null,
+      currency: x.currency ?? null,
       status: x.status,
+      attachedFile: attachedFile,
       attachmentFileAssetId: x.attachmentFileAssetId ?? null,
       createdAt: toIso(x.createdAt),
       updatedAt: toIso(x.updatedAt),

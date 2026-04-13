@@ -1,9 +1,12 @@
+//backend/src/modules/member/member.controller.ts
 import {
   Body,
   Controller,
   Get,
   Post,
   Patch,
+  Delete,
+  Param,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -30,6 +33,7 @@ import { PushSubscriptionDto } from './dto/push-subscription.dto';
 @Roles(UserRole.MEMBER)
 export class MemberController {
   constructor(private readonly service: MemberService) {}
+  
 
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {
@@ -99,6 +103,23 @@ export class MemberController {
     @Query() query: MemberProjectProposalsQueryDto,
   ) {
     return this.service.listMyProjectProposals(user.id, query);
+  }
+
+  @Patch('project-proposals/:id')
+  updateProjectProposal(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: Partial<CreateProjectProposalDto> & { attachmentFileAssetId?: string }
+  ) {
+    return this.service.updateProjectProposal(user.id, id, dto);
+  }
+
+  @Delete('project-proposals/:id')
+  deleteProjectProposal(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.deleteProjectProposal(user.id, id);
   }
 
   // Documents / contenus

@@ -1,4 +1,3 @@
-// web/lib/api-client.ts
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
@@ -505,7 +504,6 @@ export const api = {
   }) =>
     http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),
 
-  // 👇 AJOUT CHIRURGICAL: ROUTE UPDATE MEMBER
   updateAntennaMember: (id: string, body: Partial<{
     firstName: string;
     lastName: string;
@@ -680,7 +678,7 @@ export const api = {
       }`
     ),
 
- // ==========================================
+  // ==========================================
   // PROJETS & PROPOSITIONS
   // ==========================================
   listProjects: (params?: { page?: number; pageSize?: number; status?: string; q?: string }) =>
@@ -695,7 +693,7 @@ export const api = {
     summary?: string;
     description?: string;
     locationText?: string;
-    promoterName?: string;       // 🔥 CORRECTION : "promomerName" corrigé en "promoterName"
+    promoterName?: string;
     status?: string;
     budgetPlanned?: number;
     budgetSpent?: number;
@@ -761,10 +759,24 @@ export const api = {
     title: string;
     description: string;
     expectedBudget?: number;
-    currency?: string;           // 🔥 CORRECTION : Ajout de la devise manquante
+    currency?: string;
     attachmentFileAssetId?: string | null;
   }) =>
     http<ProjectProposal, typeof body>('/member/project-proposals', { method: 'POST', body }),
+
+  // 🔥 AJOUT CHIRURGICAL : Update de la proposition
+  updateProjectProposalMember: (id: string, body: Partial<{
+    title: string;
+    description: string;
+    expectedBudget?: number;
+    currency?: string;
+    attachmentFileAssetId?: string | null;
+  }>) =>
+    http<ProjectProposal, typeof body>(`/member/project-proposals/${id}`, { method: 'PATCH', body }),
+
+  // 🔥 AJOUT CHIRURGICAL : Suppression de la proposition
+  deleteProjectProposalMember: (id: string) =>
+    http(`/member/project-proposals/${id}`, { method: 'DELETE' }),
 
   listMyProjectProposals: (params?: { page?: number; pageSize?: number; status?: string }) =>
     http<ApiListResponse<ProjectProposal>>(
@@ -800,11 +812,10 @@ export const api = {
       `/admin/events?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.type ? `&type=${encodeURIComponent(params.type)}` : ''}${
-        params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''
+        params?.antennaId ? `&encodeURIComponent(params.antennaId)}` : ''
       }`
     ),
 
-  // Ajout chirurgical : le payload de création et d'update supporte désormais une ou plusieurs antennes (Super-Admin)
   createEvent: (body: Partial<EventItem> & { antennaIds?: string[] }) =>
     http<EventItem, typeof body>('/admin/events', { method: 'POST', body }),
 
@@ -814,7 +825,6 @@ export const api = {
   deleteEvent: (id: string) =>
     http(`/admin/events/${id}`, { method: 'DELETE' }),
 
-  // Ajout chirurgical : Route pour récupérer et filtrer les présences d'un événement
   listEventAttendances: (eventId: string, params?: { status?: string; page?: number; pageSize?: number }) =>
     http<ApiListResponse<{
       id: string;
@@ -1116,7 +1126,6 @@ export const api = {
       method: 'DELETE',
     }),
 
-  // 🔥 L'ERREUR ÉTAIT ICI : on remplace "any" par un type propre
   updateAssociationDetailsSystemAdmin: (id: string, body: { name?: string; code?: string; domainName?: string }) =>
     http<{ id: string; name: string; code: string; domainName: string | null }, typeof body>(`/system-admin/associations/${id}`, { method: 'PATCH', body }),
 

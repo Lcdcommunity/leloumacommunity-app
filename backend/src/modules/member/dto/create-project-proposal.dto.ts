@@ -3,7 +3,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
   MaxLength,
   Min,
   IsEnum,
@@ -31,6 +30,6 @@ export class CreateProjectProposalDto {
   currency?: CurrencyCode;
 
   @IsOptional()
-  @IsUUID()
+  @IsString()
   attachmentFileAssetId?: string | null;
 }
