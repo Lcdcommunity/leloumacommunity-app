@@ -277,6 +277,7 @@ function CurrencyBalancesModal({
     </div>
   );
 }
+
 function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', animation: 'mbin2 0.2s ease' }} onClick={onClose}>
@@ -358,9 +359,9 @@ function ProjectDetailModal({ project, onClose }: { project: ExtendedCarouselPro
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.75rem' }}>
             {[
-              { label: 'Début',         value: project.startsAt ? formatDate(project.startsAt as string | Date) : '—' },
-              { label: 'Fin prévue',    value: project.endsAt   ? formatDate(project.endsAt   as string | Date) : '—' },
-              { label: 'Budget prévu',  value: planned > 0 ? formatCurrency(planned) : '—' },
+              { label: 'Début',          value: project.startsAt ? formatDate(project.startsAt as string | Date) : '—' },
+              { label: 'Fin prévue',     value: project.endsAt   ? formatDate(project.endsAt   as string | Date) : '—' },
+              { label: 'Budget prévu',   value: planned > 0 ? formatCurrency(planned) : '—' },
               { label: 'Budget dépensé', value: spent > 0 ? formatCurrency(spent) : '—', urgent: over },
             ].map(row => (
               <div key={row.label} style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
@@ -461,7 +462,7 @@ export default function MemberHomePage() {
           api.listMyContributions({ page: 1, pageSize: 5 }),
           api.listProjectsForMembers({ page: 1, pageSize: 5 }),
           api.listContentsForMembers({ page: 1, pageSize: 5 }),
-          api.listLateMembersVisible({ page: 1, pageSize: 5 })
+          api.listLateMembersVisible({ page: 1, pageSize: 5 }),
         ]);
 
         if (dashRes.status === 'fulfilled') {
@@ -507,7 +508,7 @@ export default function MemberHomePage() {
                 amountSpent: p.amountSpent,
                 attachments: Array.isArray(p.attachments)
                   ? p.attachments.map(a => ({ file: { url: (a as unknown as { url?: string | null }).url || null } }))
-                  : null
+                  : null,
               })) as ExtendedCarouselProject[];
 
             if (res.stats) res.stats.activeProjects = res.projectsInProgress.length;
@@ -534,11 +535,10 @@ export default function MemberHomePage() {
   }, []);
 
   const me = data?.me;
-  
-  // 🔥 FIX : On mémorise recentContribs pour stabiliser sa référence
+
   const recentContribs = useMemo<ExtendedContribution[]>(() => {
-    return myContributions.length > 0 
-      ? myContributions 
+    return myContributions.length > 0
+      ? myContributions
       : (data?.recentContributions ?? []) as ExtendedContribution[];
   }, [myContributions, data?.recentContributions]);
 
@@ -548,12 +548,10 @@ export default function MemberHomePage() {
 
   const lateMonths = data?.stats?.lateMonths ?? 0;
 
-  // —— FIX CHIRURGICAL : Calcul dynamique de la dernière date de cotisation ——
   const lastContribDate = useMemo(() => {
     const fromStats = data?.stats?.myLastContributionAt;
     if (fromStats) return fromStats;
     if (recentContribs.length > 0) {
-      // On récupère la date la plus récente parmi les cotisations affichées
       const dates = recentContribs
         .map(c => new Date(c.depositedAt || c.createdAt).getTime())
         .filter(t => !isNaN(t));
@@ -669,16 +667,6 @@ export default function MemberHomePage() {
         .mb-span-1 { grid-column: span 1; }
 
         @media (max-width: 1100px) { .mb-stats { grid-template-columns: repeat(3, 1fr); } }
-        @media (max-width: 768px) {
-          .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
-          .mb-stat { padding: 0.6rem 0.5rem !important; border-radius: 12px !important; }
-          .mb-stat-value { font-size: 1.1rem !important; word-break: break-word; }
-          .mb-stat-label { font-size: 0.52rem !important; }
-          .mb-stat-sub   { font-size: 0.5rem !important; }
-          .mb-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
-          .mb-stat-icon svg { width: 12px; height: 12px; }
-          .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
-        }
 
         .mb-stat {
           display: flex; flex-direction: column; align-items: center; text-align: center;
@@ -751,9 +739,12 @@ export default function MemberHomePage() {
           font-size: 0.7rem; font-weight: 800; padding: 0.2rem 0.6rem;
           border-radius: 99px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
         }
-        .mb-panel-body { overflow-x: auto; }
 
-        .mb-table { width: 100%; border-collapse: collapse; min-width: 320px; }
+        /* ─── FIX : overflow-x hidden sur le panel body pour éviter le scroll horizontal ─── */
+        .mb-panel-body { overflow-x: hidden; width: 100%; }
+
+        /* ─── FIX : La table ne force plus une largeur minimale sur mobile ─── */
+        .mb-table { width: 100%; border-collapse: collapse; }
         .mb-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.1); }
         .mb-table thead th {
           padding: 0.75rem 1.4rem;
@@ -801,10 +792,9 @@ export default function MemberHomePage() {
           .mb-cards-track { animation: none; flex-wrap: wrap; width: 100%; }
         }
 
-        /* ─── FIX CHIRURGICAL : Hauteur identique pour les cartes de projets et d'infos ─── */
         .mb-true-card {
           min-width: 250px; max-width: 280px; flex: 0 0 auto;
-          min-height: 180px; /* Force une hauteur cohérente */
+          min-height: 180px;
           border-radius: 18px; padding: 1.1rem 1.25rem;
           display: flex; flex-direction: column; gap: 0.65rem;
           border: 1px solid rgba(255,255,255,0.6);
@@ -893,17 +883,40 @@ export default function MemberHomePage() {
 
         .truncate-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* ─── FIX CHIRURGICAL : Réduction de l'espace sur mobile pour éviter le scroll horizontal ─── */
+        /* ─── MOBILE ─────────────────────────────────────────────────────── */
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
-          .mb-table th { padding: 0.6rem 0.25rem; font-size: 0.58rem; letter-spacing: 0; text-align: center !important; }
-          .mb-table td { padding: 0.6rem 0.25rem; font-size: 0.72rem; text-align: center !important; }
-          .mb-table td.mono { font-size: 0.8rem; }
+
+          /* Stats grid */
+          .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
+          .mb-stat { padding: 0.6rem 0.5rem !important; border-radius: 12px !important; }
+          .mb-stat-value { font-size: 1.1rem !important; word-break: break-word; }
+          .mb-stat-label { font-size: 0.52rem !important; }
+          .mb-stat-sub   { font-size: 0.5rem !important; }
+          .mb-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
+          .mb-stat-icon svg { width: 12px; height: 12px; }
+          .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
+
+          /* Panel head */
           .mb-panel-head { padding: 1rem; }
+
+          /* ─── FIX COTISATIONS : table sans largeur forcée, colonnes compressées ─── */
+          .mb-table { min-width: unset; width: 100%; }
+          .mb-table th { padding: 0.5rem 0.2rem; font-size: 0.55rem; letter-spacing: 0; text-align: center !important; }
+          .mb-table td { padding: 0.5rem 0.2rem; font-size: 0.68rem; text-align: center !important; }
+          .mb-table td.mono { font-size: 0.75rem; }
+          .mb-status-badge { font-size: 0.52rem; padding: 0.1rem 0.28rem; gap: 0.18rem; }
+          .mb-motif-badge  { font-size: 0.52rem; padding: 0.1rem 0.28rem; }
+
+          /* Truncate cell */
           .truncate-cell { max-width: 90px; overflow-wrap: break-word; white-space: normal; line-height: 1.2; }
-          .mb-status-badge { font-size: 0.55rem; padding: 0.12rem 0.35rem; }
-          .mb-motif-badge { font-size: 0.55rem; padding: 0.12rem 0.35rem; }
+
+          /* ─── FIX CARTES INFOS : contenues dans le panel ─── */
+          .mb-true-card { min-width: 200px; max-width: 220px; }
+          .mb-cards-viewport { overflow: hidden; }
           .mb-cards-track { animation-duration: 10s; }
+
+          /* Membres retardataires */
           .mb-member-pill { gap: 0.4rem; }
           .mb-late-track { max-width: 45px; }
         }
@@ -1001,7 +1014,23 @@ export default function MemberHomePage() {
                     {recentContribs.map(c => {
                       const pc = getPurposeConfig(c.purpose);
                       return (
-                        <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)} title="Voir le détail"><td className="mono">{formatCurrency(c.amount, c.currency || cur)}</td><td>{pc ? (<span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}><span className="mb-motif-icon">{pc.icon}</span><span className="mb-motif-text">{pc.label}</span></span>) : (<span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}><span className="mb-motif-icon">📅</span><span className="mb-motif-text">Cotisation</span></span>)}</td><td><StatusBadge status={c.status}/></td></tr>
+                        <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)} title="Voir le détail">
+                          <td className="mono">{formatCurrency(c.amount, c.currency || cur)}</td>
+                          <td>
+                            {pc ? (
+                              <span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}>
+                                <span className="mb-motif-icon">{pc.icon}</span>
+                                <span className="mb-motif-text">{pc.label}</span>
+                              </span>
+                            ) : (
+                              <span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}>
+                                <span className="mb-motif-icon">📅</span>
+                                <span className="mb-motif-text">Cotisation</span>
+                              </span>
+                            )}
+                          </td>
+                          <td><StatusBadge status={c.status}/></td>
+                        </tr>
                       );
                     })}
                   </tbody>
