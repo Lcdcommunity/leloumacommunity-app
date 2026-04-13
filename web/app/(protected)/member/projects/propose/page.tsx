@@ -36,6 +36,7 @@ export default function MemberProjectProposalsPage() {
   // ── Liste propositions ──
   const [items,      setItems]      = useState<ProjectProposal[]>([]);
   const [status,     setStatus]     = useState<StatusKey>('');
+  const [search,     setSearch]     = useState(''); // 🔥 AJOUT : État pour la recherche
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [loading,    setLoading]    = useState(true);
 
@@ -81,6 +82,11 @@ export default function MemberProjectProposalsPage() {
   }, [status]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // 🔥 AJOUT : Filtrage côté client pour la barre de recherche
+  const filteredItems = items.filter(item => 
+    item.title.toLowerCase().includes(search.toLowerCase())
+  );
 
   // ── Upload pièce jointe ──
   async function handleAttachmentChange(e: ChangeEvent<HTMLInputElement>) {
@@ -203,8 +209,9 @@ export default function MemberProjectProposalsPage() {
         title:       title.trim(),
         description: description.trim(),
         expectedBudget:          budget ? Number(budget) : undefined,
-        currency:                budget ? currency : undefined, // Envoi de la devise sélectionnée
-        attachmentFileAssetId:   attachmentAssetId ?? photoAssetId ?? null,
+        currency:                budget ? currency : undefined, 
+        // 🔥 CORRECTION UUID : On envoie undefined si aucun fichier n'est présent (évite l'erreur de validation "must be a UUID" sur une chaîne vide/null)
+        attachmentFileAssetId:   attachmentAssetId || photoAssetId || undefined,
       });
       setTitle('');
       setDescription('');
@@ -357,7 +364,10 @@ export default function MemberProjectProposalsPage() {
         .pp-preview-thumb { width: 44px; height: 44px; border-radius: 8px; overflow: hidden; flex-shrink: 0; background: var(--b-pale); display: flex; align-items: center; justify-content: center; border: 1px solid var(--b-border); }
         .pp-preview-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .pp-preview-info { min-width: 0; flex: 1; }
-        .pp-preview-name { font-size: 0.73rem; font-weight: 600; color: var(--s-dark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        /* 🔥 CORRECTION SCROLL : Permet le retour à la ligne pour les noms de fichiers longs */
+        .pp-preview-name { font-size: 0.73rem; font-weight: 600; color: var(--s-dark); overflow-wrap: anywhere; word-break: break-word; white-space: normal; line-height: 1.3; }
+        
         .pp-preview-meta { font-size: 0.62rem; color: var(--s-muted); display: flex; gap: 0.4rem; align-items: center; margin-top: 1px; }
         .pp-preview-badge { font-size: 0.55rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.08rem 0.38rem; border-radius: 99px; background: var(--b-pale); color: var(--b-mid); border: 1px solid #BFDBFE; }
         .pp-preview-remove { width: 28px; height: 28px; border-radius: 50%; background: #FEF2F2; border: 1px solid #FECACA; color: #DC2626; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.18s; }
@@ -382,21 +392,21 @@ export default function MemberProjectProposalsPage() {
         .pp-form-msg.err { background: #FEF2F2; color: #B91C1C; border-color: #FECACA; }
         .pp-form-msg.ok  { background: #ECFDF5; color: #065F46; border-color: #A7F3D0; }
 
-        /* Chips */
-        .pp-chips { display: flex; gap: 0.55rem; flex-wrap: wrap; padding: 0.9rem 1.4rem; border-bottom: 1px solid var(--b-border); }
-        .pp-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.32rem 0.72rem; border-radius: 9px; font-size: 0.7rem; font-weight: 600; border: 1px solid; transition: transform 0.15s; }
-        .pp-chip:hover { transform: translateY(-1px); }
-        .pp-chip-dot { width: 5px; height: 5px; border-radius: 50%; }
-        .pp-chip-count { font-family: 'Cormorant Garamond', serif; font-size: 1rem; font-weight: 600; line-height: 1; }
+        /* 🔥 AJOUT : CSS des Cartes de Stats (Remplacement des Chips) */
+        .pp-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.75rem; padding: 1.2rem 1.4rem; border-bottom: 1px solid var(--b-border); background: rgba(248,250,255,0.5); }
+        .pp-stat-card { position: relative; background: white; border-radius: 12px; padding: 1rem 0.5rem; border: 1px solid rgba(37,99,235,0.08); text-align: center; box-shadow: 0 2px 8px rgba(37,99,235,0.03); overflow: hidden; transition: transform 0.15s; }
+        .pp-stat-card:hover { transform: translateY(-2px); }
+        .pp-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; color: var(--s-dark); display: block; line-height: 1; margin-bottom: 0.2rem; }
+        .pp-stat-lbl { font-size: 0.6rem; font-weight: 700; text-transform: uppercase; color: var(--s-muted); letter-spacing: 0.05em; }
 
-        /* Filters */
-        .pp-filter-bar { padding: 0.85rem 1.4rem; border-bottom: 1px solid var(--b-border); display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-        .pp-filter-lbl { font-size: 0.64rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--s-muted); white-space: nowrap; }
-        .pp-pills { display: flex; gap: 0.32rem; flex-wrap: wrap; }
-        .pp-pill { height: 28px; padding: 0 0.72rem; border-radius: 99px; border: 1.5px solid rgba(37,99,235,0.13); background: rgba(255,255,255,0.85); font-family: 'DM Sans', sans-serif; font-size: 0.68rem; font-weight: 600; color: var(--s-mid); cursor: pointer; transition: all 0.18s; white-space: nowrap; }
-        .pp-pill:hover { border-color: rgba(37,99,235,0.35); background: var(--b-pale); color: var(--b-mid); }
-        .pp-pill.active { background: var(--b-pale); border-color: var(--b-mid); color: var(--b-mid); box-shadow: 0 0 0 3px rgba(37,99,235,0.09); }
-        .pp-refresh-btn { margin-left: auto; height: 28px; padding: 0 0.8rem; background: none; border: 1.5px solid rgba(37,99,235,0.16); border-radius: 99px; cursor: pointer; color: var(--b-mid); font-family: 'DM Sans', sans-serif; font-size: 0.68rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.32rem; transition: all 0.18s; white-space: nowrap; }
+        /* 🔥 AJOUT : CSS de la nouvelle Barre de Filtres avec Recherche */
+        .pp-filter-bar { padding: 0.85rem 1.4rem; border-bottom: 1px solid var(--b-border); display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; background: white; }
+        .pp-search-box { display: flex; align-items: center; gap: 0.5rem; background: white; border: 1.5px solid rgba(37,99,235,0.15); border-radius: 99px; padding: 0.4rem 0.8rem; flex: 1; min-width: 150px; transition: border-color 0.2s; }
+        .pp-search-box:focus-within { border-color: var(--b-mid); }
+        .pp-search-box input { border: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; width: 100%; color: var(--s-dark); }
+        .pp-status-select { border: 1.5px solid rgba(37,99,235,0.15); border-radius: 99px; padding: 0.4rem 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 600; color: var(--s-mid); outline: none; background: white; appearance: none; cursor: pointer; transition: border-color 0.2s; }
+        .pp-status-select:focus { border-color: var(--b-mid); }
+        .pp-refresh-btn { height: 32px; padding: 0 0.8rem; background: none; border: 1.5px solid rgba(37,99,235,0.16); border-radius: 99px; cursor: pointer; color: var(--b-mid); font-family: 'DM Sans', sans-serif; font-size: 0.72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.32rem; transition: all 0.18s; white-space: nowrap; margin-left: auto; }
         .pp-refresh-btn:hover { background: var(--b-pale); border-color: var(--b-mid); }
         @media (max-width: 640px) { .pp-refresh-btn { margin-left: 0; width: 100%; justify-content: center; } }
 
@@ -407,7 +417,10 @@ export default function MemberProjectProposalsPage() {
         .pp-table td { padding: 0.95rem 1.4rem; vertical-align: middle; border-bottom: 1px solid rgba(37,99,235,0.05); color: var(--s-dark); }
         .pp-table tr:last-child td { border-bottom: none; }
         .pp-table tr:hover td { background: rgba(239,246,255,0.35); }
-        .pp-table-title { font-weight: 600; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        
+        /* 🔥 CORRECTION SCROLL : Titre de tableau qui revient à la ligne proprement */
+        .pp-table-title { font-weight: 600; max-width: 240px; overflow-wrap: anywhere; word-break: break-word; white-space: normal; line-height: 1.3; }
+        
         .pp-table-budget { font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--s-mid); }
         .pp-table-date { font-size: 0.76rem; color: var(--s-muted); white-space: nowrap; }
         .pp-status-badge { display: inline-flex; align-items: center; gap: 0.32rem; padding: 0.26rem 0.62rem; border-radius: 99px; font-size: 0.63rem; font-weight: 700; border: 1px solid; white-space: nowrap; }
@@ -596,7 +609,7 @@ export default function MemberProjectProposalsPage() {
                     <><div className="pp-spinner" />Envoi en cours…</>
                   ) : (
                     <>
-                      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19ll9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                       Envoyer la proposition
                     </>
                   )}
@@ -641,33 +654,36 @@ export default function MemberProjectProposalsPage() {
               <span className="pp-head-title">Mes propositions</span>
             </div>
 
-            {/* Stats chips */}
-            <div className="pp-chips">
+            {/* 🔥 Stats (Cartes au lieu de chips) */}
+            <div className="pp-stat-grid">
               {[
-                { label: 'Total',      count: total,     color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', dot: '#3B82F6' },
-                { label: 'Soumises',   count: submitted, color: '#B45309', bg: '#FFFBEB', border: '#FDE68A', dot: '#D97706' },
-                { label: 'En revue',   count: underRev,  color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', dot: '#3B82F6' },
-                { label: 'Approuvées', count: approved,  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', dot: '#10B981' },
-                { label: 'Rejetées',   count: rejected,  color: '#B91C1C', bg: '#FEF2F2', border: '#FECACA', dot: '#EF4444' },
+                { label: 'Total',      count: total,     color: '#1D4ED8' },
+                { label: 'Soumises',   count: submitted, color: '#B45309' },
+                { label: 'En revue',   count: underRev,  color: '#1D4ED8' },
+                { label: 'Approuvées', count: approved,  color: '#059669' },
+                { label: 'Rejetées',   count: rejected,  color: '#B91C1C' },
               ].map(c => (
-                <div key={c.label} className="pp-chip" style={{ background: c.bg, borderColor: c.border, color: c.color }}>
-                  <span className="pp-chip-dot" style={{ background: c.dot }} />
-                  <span className="pp-chip-count">{c.count}</span>
-                  <span style={{ fontSize: '0.66rem', opacity: 0.9 }}>{c.label}</span>
+                <div key={c.label} className="pp-stat-card">
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: c.color }} />
+                  <span className="pp-stat-val">{c.count}</span>
+                  <span className="pp-stat-lbl">{c.label}</span>
                 </div>
               ))}
             </div>
 
-            {/* Filtres */}
+            {/* 🔥 Filtres + Recherche */}
             <div className="pp-filter-bar">
-              <span className="pp-filter-lbl">Filtrer :</span>
-              <div className="pp-pills">
-                {STATUS_OPTIONS.map(opt => (
-                  <button key={opt.value} className={`pp-pill${status === opt.value ? ' active' : ''}`} onClick={() => setStatus(opt.value)} type="button">
-                    {opt.label}
-                  </button>
-                ))}
+              <div className="pp-search-box">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#6B7280" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" placeholder="Rechercher par titre..." value={search} onChange={e => setSearch(e.target.value)} />
               </div>
+              
+              <select className="pp-status-select" value={status} onChange={e => setStatus(e.target.value as StatusKey)}>
+                {STATUS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+
               <button className="pp-refresh-btn" onClick={() => void load()} type="button">
                 <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 Actualiser
@@ -682,13 +698,13 @@ export default function MemberProjectProposalsPage() {
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
                 {fetchError}
               </div>
-            ) : items.length === 0 ? (
+            ) : filteredItems.length === 0 ? (
               <div className="pp-empty">
                 <div className="pp-empty-ico">
                   <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#93C5FD" strokeWidth="1.6"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                 </div>
                 <p className="pp-empty-title">Aucune proposition</p>
-                <p className="pp-empty-sub">{status ? 'Aucune proposition avec ce statut.' : 'Soumettez votre première idée de projet !'}</p>
+                <p className="pp-empty-sub">{status || search ? 'Aucun résultat trouvé.' : 'Soumettez votre première idée de projet !'}</p>
               </div>
             ) : (
               <div className="pp-table-wrap">
@@ -703,7 +719,7 @@ export default function MemberProjectProposalsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map(item => {
+                    {filteredItems.map(item => {
                       const meta = STATUS_META[item.status] ?? { label: item.status, color: '#374151', bg: '#F3F4F6', border: '#E5E7EB', dot: '#9CA3AF' };
                       return (
                         <tr key={item.id}>

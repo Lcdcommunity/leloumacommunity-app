@@ -24,6 +24,7 @@ export class FileAssetsService {
     mimeType: string;
     size: number;
     label?: string;
+    category?: FileCategory;
   }): Promise<FileAssetResponse> {
     if (!params.storedFileName) throw new BadRequestException('Fichier manquant.');
 
@@ -36,7 +37,7 @@ export class FileAssetsService {
         mimeType: params.mimeType,
         sizeBytes: BigInt(params.size),
         url: `/uploads/${params.storedFileName}`,
-        category: FileCategory.OTHER,
+        category: params.category || FileCategory.OTHER,
         visibility: FileVisibility.PRIVATE,
       },
     });

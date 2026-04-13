@@ -6,7 +6,6 @@ import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '../../lib/api-client';
-import { logout } from '../../lib/auth';
 import type { UserRole } from '../../types/user';
 
 type NavItem = { href: string; label: string; icon: React.ReactNode };
@@ -55,7 +54,7 @@ const systemAdminItems: NavItem[] = [
 const superAdminItems: NavItem[] = [
   { href: '/super-admin',                 label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
   { href: '/super-admin/antennas',        label: 'Antennes',               icon: <Ico d={ICO.pin} /> },
-  { href: '/super-admin/admins',         label: 'Admins antenne',         icon: <Ico d={ICO.users} /> },
+  { href: '/super-admin/admins',         label: 'Admins antenne',        icon: <Ico d={ICO.users} /> },
   { href: '/super-admin/members',         label: 'Membres',                icon: <Ico d={ICO.group} /> },
   { href: '/super-admin/approvals',       label: 'Validations comptes',    icon: <Ico d={ICO.check} /> },
   { href: '/super-admin/contributions',   label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
@@ -64,7 +63,6 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/events',          label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
   { href: '/super-admin/sponsors',        label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
   { href: '/super-admin/documents',       label: 'Documents',              icon: <Ico d={ICO.doc} /> },
-  // 👇 AJOUT ICI
   { href: '/super-admin/contents',        label: 'Informations',           icon: <Ico d={ICO.news} /> },
   { href: '/super-admin/notifications',   label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
   { href: '/super-admin/audit',           label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
@@ -167,9 +165,9 @@ export function Sidebar() {
 
   const colors = ROLE_COLORS[role ?? 'MEMBER'] ?? ROLE_COLORS['MEMBER'];
 
-  async function handleLogout() {
-    await logout(false);
-    router.replace('/login');
+  // 🔥 FIX CHIRURGICAL : Redirection simple vers /logout pour que le rideau s'affiche, c'est lui qui fera le vrai "logout()"
+  function handleLogout() {
+    router.push('/logout');
   }
 
   const isActive = (href: string) => {

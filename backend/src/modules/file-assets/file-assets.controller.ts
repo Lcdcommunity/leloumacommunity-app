@@ -46,6 +46,7 @@ export class FileAssetsController {
       mimeType: file.mimetype,
       size: file.size,
       label: dto.label,
+      category: dto.category,
     });
   }
 

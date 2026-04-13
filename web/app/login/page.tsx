@@ -1,7 +1,7 @@
 // web/app/login/page.tsx
 'use client';
 
-import { FormEvent, useState, useEffect, useCallback } from 'react';
+import { FormEvent, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -23,6 +23,8 @@ const LANGUAGES = [
   { code: 'ar', flag: '🇸🇦', label: 'العربية' },
 ];
 
+const FOLDS_TOTAL = 14;
+
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useTranslation(); // 🔥 Retiré i18n d'ici
@@ -33,6 +35,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // --- ÉTAT DU RIDEAU THÉÂTRAL ---
+  const [showCurtain, setShowCurtain] = useState(false);
+  const [curtainOpen, setCurtainOpen] = useState(false);
+  const timerRef = useRef<number | null>(null);
 
   // 🔥 Gestion robuste de la langue
   const [currentLang, setCurrentLang] = useState('fr');
@@ -63,6 +70,7 @@ export default function LoginPage() {
 
   // --- EFFET DE MONTAGE ET SYNCHRONISATION LANGUE ---
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMounted(true);
 
     // Synchronise la langue avec i18n
@@ -79,6 +87,7 @@ export default function LoginPage() {
 
     return () => {
       i18n.off('languageChanged', handleLanguageChanged);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [handleLanguageChanged]); // 🔥 Dépendance stable
 
@@ -160,24 +169,29 @@ export default function LoginPage() {
       const res = await login(email, password);
       const role = res.user?.role;
 
-      if (role === 'SYSTEM_ADMIN') {
-        router.replace('/system-admin');
-      } else if (role === 'SUPER_ADMIN') {
-        router.replace('/super-admin');
-      } else if (role === 'ANTENNA_ADMIN') {
-        router.replace('/admin');
-      } else if (role === 'MEMBER') {
-        router.replace('/member');
-      } else {
-        router.replace('/dashboard');
-      }
+      // 1. Déclenchement du Rideau de Théâtre (fermé par défaut)
+      setShowCurtain(true);
+      setCurtainOpen(false);
+
+      // 2. Détermination de la route
+      let target = '/dashboard';
+      if (role === 'SYSTEM_ADMIN') target = '/system-admin';
+      else if (role === 'SUPER_ADMIN') target = '/super-admin';
+      else if (role === 'ANTENNA_ADMIN') target = '/admin';
+      else if (role === 'MEMBER') target = '/member';
+
+      // 3. Pause 1.5s (lecture "Bienvenue"), puis ouverture
+      timerRef.current = window.setTimeout(() => setCurtainOpen(true), 1500) as unknown as number;
+      
+      // 4. Redirection une fois le rideau bien ouvert (après 4.5s)
+      timerRef.current = window.setTimeout(() => router.replace(target), 4500) as unknown as number;
+
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : t('login.error', 'Identifiants incorrects.')
       );
-    } finally {
       setLoading(false);
     }
   }
@@ -192,6 +206,14 @@ export default function LoginPage() {
 
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
+
+  // Préparation des plis du rideau pour le JSX
+  const curtainFolds = Array.from({ length: FOLDS_TOTAL }, (_, i) => {
+    const goLeft = i < FOLDS_TOTAL / 2;
+    const distCenter = Math.abs(i - (FOLDS_TOTAL / 2 - 0.5));
+    const openDelay = distCenter * 0.12;
+    return { id: i, goLeft, openDelay };
+  });
 
   // Empêche le flash de contenu avant hydratation
   if (!mounted) return null;
@@ -212,10 +234,11 @@ export default function LoginPage() {
           --secondary: ${theme.secondary};
           --font-main: ${theme.fontFamily};
 
-          /* Couleurs exactes capture 2 */
+          /* Couleurs exactes */
           --text-deep: #0F5C4D;
           --text-muted: #6B7280;
           --error: #DC2626;
+          --gold-accent: #D4AF37;
         }
 
         .lp-root {
@@ -293,8 +316,8 @@ export default function LoginPage() {
           top: 1.5rem;
           ${isRTL ? 'left: 1.5rem;' : 'right: 1.5rem;'}
           z-index: 20;
-        }
-
+        }        
+        
         .lp-lang-select {
           appearance: none;
           background: white;
@@ -487,6 +510,73 @@ export default function LoginPage() {
           }
         }
 
+        /* ════════════════════════════════════════════════
+           RIDEAU DE THÉÂTRE (OUVERTURE)
+        ════════════════════════════════════════════════ */
+        .tc-container {
+          position: fixed; inset: 0; z-index: 9999;
+          pointer-events: none; overflow: hidden;
+        }
+
+        /* ── Emblème central au dessus du rideau ── */
+        .tc-emblem {
+          position: fixed; inset: 0; z-index: 10000;
+          display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.5rem;
+          opacity: 1; transform: scale(1); transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+        .tc-emblem--fade { opacity: 0; transform: scale(1.15); }
+        .tc-logo-wrap {
+          width: 140px; height: 140px; background: white; border-radius: 50%; padding: 12px;
+          box-shadow: 0 15px 40px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.1);
+          border: 4px solid var(--gold-accent); position: relative;
+        }
+        .tc-text {
+          font-family: 'Cormorant Garamond', serif; font-size: 3rem; font-weight: 700;
+          color: var(--gold-accent); letter-spacing: 0.18em; text-transform: uppercase;
+          text-shadow: 0 4px 15px rgba(0,0,0,0.6);
+          animation: tc-pulse 2s ease-in-out infinite alternate;
+        }
+        @keyframes tc-pulse { from { opacity: 0.85; text-shadow: 0 4px 10px rgba(0,0,0,0.4); } to { opacity: 1; text-shadow: 0 6px 20px rgba(0,0,0,0.7); } }
+
+        /* ── Plis du velours ── */
+        .tc-fold {
+          position: absolute; top: -10px; bottom: 0;
+          transform-origin: top center; box-shadow: 4px 0 20px rgba(0,0,0,0.4);
+          will-change: transform, opacity;
+        }
+        .tc-fabric {
+          position: absolute; inset: 0;
+          background: linear-gradient(90deg, 
+            var(--secondary) 0%, 
+            var(--primary) 30%, 
+            var(--primary) 65%, 
+            var(--secondary) 100%
+          );
+          box-shadow: inset 5px 0 15px rgba(0,0,0,0.4), inset -5px 0 15px rgba(0,0,0,0.4);
+          border-bottom: 15px solid var(--gold-accent);
+        }
+        .tc-fabric::after {
+          content: ''; position: absolute; inset: 0;
+          background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+        }
+
+        /* Animations d'ouverture (Effet rideau tiré vers les côtés) */
+        .tc-fold--open[data-go="left"] { animation: tc-open-left 2.6s cubic-bezier(0.65, 0, 0.25, 1) both; }
+        @keyframes tc-open-left {
+          0% { transform: scaleX(1) translateX(0) skewX(0); opacity: 1; }
+          15% { transform: scaleX(1.03) translateX(2px) skewX(0); opacity: 1; }
+          45% { transform: scaleX(0.4) translateX(-15vw) skewX(8deg); opacity: 0.9; }
+          100% { transform: scaleX(0.04) translateX(-120vw) skewX(15deg); opacity: 0; }
+        }
+
+        .tc-fold--open[data-go="right"] { animation: tc-open-right 2.6s cubic-bezier(0.65, 0, 0.25, 1) both; }
+        @keyframes tc-open-right {
+          0% { transform: scaleX(1) translateX(0) skewX(0); opacity: 1; }
+          15% { transform: scaleX(1.03) translateX(-2px) skewX(0); opacity: 1; }
+          45% { transform: scaleX(0.4) translateX(15vw) skewX(-8deg); opacity: 0.9; }
+          100% { transform: scaleX(0.04) translateX(120vw) skewX(-15deg); opacity: 0; }
+        }
+
         @media (max-width: 480px) {
           .lp-root {
             padding: 0;
@@ -505,8 +595,40 @@ export default function LoginPage() {
           .lp-orb {
             display: none;
           }
+          
+          .tc-logo-wrap { width: 110px; height: 110px; }
+          .tc-text { font-size: 2.2rem; }
         }
       `}</style>
+
+      {/* RIDEAU D'OUVERTURE */}
+      {showCurtain && (
+        <div className="tc-container" aria-hidden>
+          <div className={`tc-emblem ${curtainOpen ? 'tc-emblem--fade' : ''}`}>
+            {theme.logoUrl && (
+              <div className="tc-logo-wrap">
+                <Image src={theme.logoUrl} alt="Emblème" fill style={{ objectFit: 'contain', padding: '8px' }} unoptimized />
+              </div>
+            )}
+            <div className="tc-text">BIENVENUE</div>
+          </div>
+
+          {curtainFolds.map((fold) => (
+            <div
+              key={fold.id}
+              className={`tc-fold ${curtainOpen ? 'tc-fold--open' : ''}`}
+              data-go={fold.goLeft ? 'left' : 'right'}
+              style={{
+                left: `${(fold.id / FOLDS_TOTAL) * 100}%`,
+                width: `${100 / FOLDS_TOTAL + 0.5}%`,
+                animationDelay: curtainOpen ? `${fold.openDelay}s` : '0s',
+              }}
+            >
+              <div className="tc-fabric" />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div
         className="lp-root"
@@ -558,8 +680,7 @@ export default function LoginPage() {
                   />
                 )}
               </div>
-            </div>
-
+            </div>            
             <h1 className="lp-title">
               {t(
                 'login.welcome',

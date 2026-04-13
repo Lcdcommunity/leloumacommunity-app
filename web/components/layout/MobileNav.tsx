@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '../../lib/api-client';
-import { logout } from '../../lib/auth';
 import type { UserRole } from '../../types/user';
 
 function Ico({ d, size = 20 }: { d: string; size?: number }) {
@@ -55,7 +54,7 @@ const systemAdminItems: NavItem[] = [
 const superAdminItems: NavItem[] = [
   { href: '/super-admin',                 label: 'Dashboard',              ico: ICO.home,       section: 'Principal' },
   { href: '/super-admin/antennas',        label: 'Antennes',               ico: ICO.pin,        section: 'Principal' },
-  { href: '/super-admin/admins',         label: 'Admins antenne',         ico: ICO.users,      section: 'Principal' },
+  { href: '/super-admin/admins',         label: 'Admins antenne',        ico: ICO.users,      section: 'Principal' },
   { href: '/super-admin/members',         label: 'Membres',                ico: ICO.group,      section: 'Principal' },
   { href: '/super-admin/approvals',       label: 'Validations comptes',    ico: ICO.check,      section: 'Gestion' },
   { href: '/super-admin/contributions',   label: 'Cotisations',            ico: ICO.coin,       section: 'Gestion' },
@@ -64,7 +63,6 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/events',          label: 'Événements',             ico: ICO.calendar,   section: 'Gestion' },
   { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,       section: 'Gestion' },
   { href: '/super-admin/documents',       label: 'Documents',              ico: ICO.doc,        section: 'Gestion' },
-  // 👇 AJOUT ICI : Section Informations / Contenus
   { href: '/super-admin/contents',        label: 'Informations',           ico: ICO.news,       section: 'Gestion' },
   { href: '/super-admin/notifications',   label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
   { href: '/super-admin/audit',           label: 'Audit',                  ico: ICO.audit,      section: 'Outils' },
@@ -138,7 +136,7 @@ const ROLE_COLORS: Record<string, { accent: string; dim: string; pillBg: string;
   SYSTEM_ADMIN:  { accent: '#7C3AED', dim: 'rgba(124,58,237,0.12)', pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef' },
   SUPER_ADMIN:   { accent: '#DC2626', dim: 'rgba(220,38,38,0.12)',  pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin' },
   ANTENNA_ADMIN: { accent: '#2563EB', dim: 'rgba(37,99,235,0.12)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne' },
-  MEMBER:         { accent: '#059669', dim: 'rgba(5,150,105,0.12)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre' },
+  MEMBER:        { accent: '#059669', dim: 'rgba(5,150,105,0.12)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre' },
 };
 
 export function MobileNav() {
@@ -168,7 +166,6 @@ export function MobileNav() {
 
         setRole(me.role);
 
-        // Récupération sécurisée du nom
         if (me.association?.name) {
           setAssociationName(me.association.name);
         } else if (me.role !== 'SYSTEM_ADMIN') {
@@ -201,10 +198,10 @@ export function MobileNav() {
     return Array.from(map.entries());
   }, [allItems]);
 
-  const handleLogout = useCallback(async () => {
+  // 🔥 FIX CHIRURGICAL : Redirection vers /logout au lieu de faire logout() tout de suite
+  const handleLogout = useCallback(() => {
     setOpen(false);
-    await logout(false);
-    router.replace('/login');
+    router.push('/logout');
   }, [router]);
 
   const isActive = (href: string) =>

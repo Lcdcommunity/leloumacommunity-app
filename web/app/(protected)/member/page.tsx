@@ -277,7 +277,6 @@ function CurrencyBalancesModal({
     </div>
   );
 }
-
 function BalanceModal({ summary, onClose }: { summary: BalanceSummary | null; onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem', animation: 'mbin2 0.2s ease' }} onClick={onClose}>
@@ -535,14 +534,33 @@ export default function MemberHomePage() {
   }, []);
 
   const me = data?.me;
-  const recentContribs: ExtendedContribution[] = myContributions.length > 0 ? myContributions : (data?.recentContributions ?? []) as ExtendedContribution[];
+  
+  // 🔥 FIX : On mémorise recentContribs pour stabiliser sa référence
+  const recentContribs = useMemo<ExtendedContribution[]>(() => {
+    return myContributions.length > 0 
+      ? myContributions 
+      : (data?.recentContributions ?? []) as ExtendedContribution[];
+  }, [myContributions, data?.recentContributions]);
 
   const myAntennaId = data?.me?.antennaId;
   const myAntenna = data?.antennaBalances?.find(a => a.id === myAntennaId);
   const cur = data?.stats?.currency || myAntenna?.currency || balanceSummary?.currency || 'EUR';
 
-  const lateMonths      = data?.stats?.lateMonths              ?? 0;
-  const lastContribDate = data?.stats?.myLastContributionAt    ?? null;
+  const lateMonths = data?.stats?.lateMonths ?? 0;
+
+  // —— FIX CHIRURGICAL : Calcul dynamique de la dernière date de cotisation ——
+  const lastContribDate = useMemo(() => {
+    const fromStats = data?.stats?.myLastContributionAt;
+    if (fromStats) return fromStats;
+    if (recentContribs.length > 0) {
+      // On récupère la date la plus récente parmi les cotisations affichées
+      const dates = recentContribs
+        .map(c => new Date(c.depositedAt || c.createdAt).getTime())
+        .filter(t => !isNaN(t));
+      if (dates.length > 0) return new Date(Math.max(...dates)).toISOString();
+    }
+    return null;
+  }, [data?.stats?.myLastContributionAt, recentContribs]);
 
   const firstName = data?.me?.firstName || data?.virtualCard?.user?.firstName || 'Membre';
 
@@ -571,7 +589,7 @@ export default function MemberHomePage() {
         value: formatCurrency(grp.total, fc),
         icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>,
         color, bg,
-        sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic pour détails` : 'Aucune antenne · Clic pour détails',
+        sub: grp.antennas.length > 0 ? `${grp.antennas.length} antenne${grp.antennas.length > 1 ? 's' : ''} · Clic` : 'Aucune antenne · Clic',
         clickable: true,
         onClick: () => setSelectedCurrency(fc),
         spanClass: 'mb-span-1',
@@ -584,7 +602,7 @@ export default function MemberHomePage() {
       sub: lateMonths > 0 ? 'Mois non cotisés' : 'À jour !', urgent: lateMonths > 2, spanClass: 'mb-span-1',
     },
     {
-      label: 'Dernière cotisation', value: formatDate(lastContribDate),
+      label: 'Dernière cotisation', value: lastContribDate ? formatDate(lastContribDate) : '—',
       icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
       color: '#4B5563', bg: '#F3F4F6', sub: 'Date du dernier versement', spanClass: 'mb-span-1',
     },
@@ -783,8 +801,10 @@ export default function MemberHomePage() {
           .mb-cards-track { animation: none; flex-wrap: wrap; width: 100%; }
         }
 
+        /* ─── FIX CHIRURGICAL : Hauteur identique pour les cartes de projets et d'infos ─── */
         .mb-true-card {
           min-width: 250px; max-width: 280px; flex: 0 0 auto;
+          min-height: 180px; /* Force une hauteur cohérente */
           border-radius: 18px; padding: 1.1rem 1.25rem;
           display: flex; flex-direction: column; gap: 0.65rem;
           border: 1px solid rgba(255,255,255,0.6);
@@ -797,7 +817,6 @@ export default function MemberHomePage() {
         .mb-tc-title { font-size: 0.95rem; font-weight: 800; color: #111827; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
         .mb-tc-meta { font-size: 0.72rem; color: #4B5563; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; margin-top: auto; }
         .mb-tc-btn { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.4rem; }
-
         .mb-empty { text-align: center; padding: 2.5rem 1rem; color: #9CA3AF; font-size: 0.85rem; font-weight: 500; }
 
         .mb-member-pill { display: flex; align-items: center; gap: 0.6rem; }
@@ -874,16 +893,19 @@ export default function MemberHomePage() {
 
         .truncate-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+        /* ─── FIX CHIRURGICAL : Réduction de l'espace sur mobile pour éviter le scroll horizontal ─── */
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
-          .mb-table th { padding: 0.6rem 0.4rem; font-size: 0.6rem; letter-spacing: 0; }
-          .mb-table td { padding: 0.7rem 0.4rem; font-size: 0.75rem; }
-          .mb-table td.mono { font-size: 0.85rem; }
+          .mb-table th { padding: 0.6rem 0.25rem; font-size: 0.58rem; letter-spacing: 0; text-align: center !important; }
+          .mb-table td { padding: 0.6rem 0.25rem; font-size: 0.72rem; text-align: center !important; }
+          .mb-table td.mono { font-size: 0.8rem; }
           .mb-panel-head { padding: 1rem; }
-          .truncate-cell { max-width: 120px; }
-          .mb-status-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
-          .mb-motif-badge { font-size: 0.6rem; padding: 0.15rem 0.4rem; }
+          .truncate-cell { max-width: 90px; overflow-wrap: break-word; white-space: normal; line-height: 1.2; }
+          .mb-status-badge { font-size: 0.55rem; padding: 0.12rem 0.35rem; }
+          .mb-motif-badge { font-size: 0.55rem; padding: 0.12rem 0.35rem; }
           .mb-cards-track { animation-duration: 10s; }
+          .mb-member-pill { gap: 0.4rem; }
+          .mb-late-track { max-width: 45px; }
         }
       `}</style>
 
@@ -967,9 +989,9 @@ export default function MemberHomePage() {
                 <table className="mb-table">
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'center' }}>Montant</th>
-                      <th style={{ textAlign: 'center' }}>Motif</th>
-                      <th style={{ textAlign: 'center' }}>Statut</th>
+                      <th>Montant</th>
+                      <th>Motif</th>
+                      <th>Statut</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -979,8 +1001,7 @@ export default function MemberHomePage() {
                     {recentContribs.map(c => {
                       const pc = getPurposeConfig(c.purpose);
                       return (
-                        // ─── FIX HYDRATION : pas de whitespace entre <tr> et les <td> ───
-                        <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)} title="Voir le détail"><td className="mono" style={{ textAlign: 'center' }}>{formatCurrency(c.amount, c.currency || cur)}</td><td style={{ textAlign: 'center' }}>{pc ? (<span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}><span className="mb-motif-icon">{pc.icon}</span><span className="mb-motif-text">{pc.label}</span></span>) : (<span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}><span className="mb-motif-icon">📅</span><span className="mb-motif-text">Cotisation</span></span>)}</td><td style={{ textAlign: 'center' }}><StatusBadge status={c.status}/></td></tr>
+                        <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)} title="Voir le détail"><td className="mono">{formatCurrency(c.amount, c.currency || cur)}</td><td>{pc ? (<span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}><span className="mb-motif-icon">{pc.icon}</span><span className="mb-motif-text">{pc.label}</span></span>) : (<span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}><span className="mb-motif-icon">📅</span><span className="mb-motif-text">Cotisation</span></span>)}</td><td><StatusBadge status={c.status}/></td></tr>
                       );
                     })}
                   </tbody>
@@ -1081,7 +1102,7 @@ export default function MemberHomePage() {
                 <table className="mb-table">
                   <thead>
                     <tr>
-                      <th>Membre</th>
+                      <th style={{ textAlign: 'left' }}>Membre</th>
                       <th>Retard</th>
                     </tr>
                   </thead>
