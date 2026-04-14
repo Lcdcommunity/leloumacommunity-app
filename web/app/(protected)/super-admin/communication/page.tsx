@@ -2,6 +2,7 @@
 'use client';
 
 import React, { type FormEvent, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation'; // 🔥 AJOUT CHIRURGICAL : Pour le bouton retour
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 export default function SuperAdminCommunicationPage() {
   const { i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
+  const router = useRouter(); // 🔥 AJOUT CHIRURGICAL
 
   const [antennas, setAntennas] = useState<{id: string, name: string}[]>([]);
   
@@ -75,12 +77,30 @@ export default function SuperAdminCommunicationPage() {
     }
   };
 
+  // 🔥 AJOUT CHIRURGICAL : Logique de verrouillage du bouton d'envoi
+  const isSendDisabled = 
+    loading || 
+    !title.trim() || 
+    !message.trim() || 
+    (targetType !== 'ALL' && !targetId.trim()) || 
+    (!channels.inApp && !channels.push && !channels.email && !channels.sms);
+
   return (
     <AppShell title="Communication">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
         .comm-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:900px;margin:0 auto}
         
+        /* 🔥 AJOUT CHIRURGICAL : Style pour le bouton de retour */
+        .comm-back-btn {
+          display: inline-flex; align-items: center; gap: 0.4rem;
+          font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700;
+          color: #6B7280; background: none; border: none; cursor: pointer;
+          transition: all 0.2s cubic-bezier(.22,1,.36,1); padding: 0; margin-bottom: 1.25rem;
+          opacity: 0; transform: translateX(-10px); animation: commin 0.4s ease forwards;
+        }
+        .comm-back-btn:hover { color: #111827; transform: translateX(-4px); }
+
         .comm-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:commin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
         .comm-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}
         .comm-dot{width:6px;height:6px;background:#EF4444;border-radius:50%;animation:commpulse 2s ease-in-out infinite}
@@ -118,12 +138,21 @@ export default function SuperAdminCommunicationPage() {
         .comm-msg-success{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:800;color:#059669}
         .comm-msg-error{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:800;color:#DC2626}
         
-        @keyframes commin{to{opacity:1;transform:translateY(0)}}
+        @keyframes commin{to{opacity:1;transform:translateY(0);transform:translateX(0);}}
         @keyframes commpulse{0%,100%{opacity:1}50%{opacity:.3}}
         @keyframes commspin{to{transform:rotate(360deg)}}
       `}</style>
 
       <div className="comm-wrap" dir={isRTL ? 'rtl' : 'ltr'}>
+        
+        {/* 🔥 AJOUT CHIRURGICAL : Bouton retour */}
+        <button type="button" className="comm-back-btn" onClick={() => router.back()}>
+          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Retour
+        </button>
+
         <div className="comm-header">
           <div className="comm-eyebrow"><div className="comm-dot" />Super Admin</div>
           <h1 className="comm-title">Centre de <span>Diffusion</span></h1>
@@ -242,7 +271,7 @@ export default function SuperAdminCommunicationPage() {
                 </div>
               )}
             </div>
-            <button type="submit" className="comm-submit" disabled={loading || (!channels.inApp && !channels.push && !channels.email && !channels.sms)}>
+            <button type="submit" className="comm-submit" disabled={isSendDisabled}>
               {loading 
                 ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'commspin .7s linear infinite' }} />Envoi en cours...</>
                 : <><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>Envoyer la diffusion</>

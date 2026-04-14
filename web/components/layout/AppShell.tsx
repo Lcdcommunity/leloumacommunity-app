@@ -1,7 +1,7 @@
 //web/components/layout/AppShell.tsx
 'use client'; // ⚡ Indispensable pour les hooks et les timers
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -9,92 +9,126 @@ import { MobileNav } from './MobileNav';
 import { api } from '../../lib/api-client';
 import { clearAuthState } from '../../lib/auth-store';
 
+type AppShellProps = {
+  title: string;
+  children: React.ReactNode;
+};
+
 export function AppShell({
   title,
   children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+}: AppShellProps) {
   const router = useRouter();
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastActivityRef = useRef<number>(Date.now()); // ⚡ Stocke l'heure de la dernière activité
+  const lastActivityRef = useRef<number>(Date.now());
 
   const TIMEOUT_IN_MS = 15 * 60 * 1000; // 15 minutes
 
-  const logoutUser = async () => {
+  const logoutUser = useCallback(async () => {
     try {
-      await api.logout('', { logoutAll: false });
-    } catch (e) {
-      console.warn("Déconnexion forcée par inactivité.");
+      await api.logout();
+    } catch (error) {
+      console.warn('Déconnexion forcée par inactivité.', error);
     } finally {
       clearAuthState();
       router.push('/login?reason=idle');
     }
-  };
+  }, [router]);
 
-  const resetTimer = () => {
-    lastActivityRef.current = Date.now(); // ⚡ Met à jour l'heure réelle de l'activité
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(logoutUser, TIMEOUT_IN_MS);
-  };
+  const resetTimer = useCallback(() => {
+    lastActivityRef.current = Date.now();
 
-  const checkInactivityOnResume = () => {
-    // ⚡ Vérifie si l'utilisateur revient après une mise en veille/verrouillage
-    if (document.visibilityState === 'visible') {
-      const now = Date.now();
-      if (now - lastActivityRef.current >= TIMEOUT_IN_MS) {
-        logoutUser();
-      } else {
-        // Si le délai n'est pas encore dépassé, on relance le timer avec le temps restant
-        const remaining = TIMEOUT_IN_MS - (now - lastActivityRef.current);
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(logoutUser, remaining);
-      }
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
     }
-  };
+
+    timerRef.current = setTimeout(() => {
+      void logoutUser();
+    }, TIMEOUT_IN_MS);
+  }, [logoutUser, TIMEOUT_IN_MS]);
+
+  const checkInactivityOnResume = useCallback(() => {
+    // ⚡ Vérifie si l'utilisateur revient après verrouillage / veille
+    if (document.visibilityState !== 'visible') {
+      return;
+    }
+
+    const now = Date.now();
+    const elapsed = now - lastActivityRef.current;
+
+    if (elapsed >= TIMEOUT_IN_MS) {
+      void logoutUser();
+      return;
+    }
+
+    const remaining = TIMEOUT_IN_MS - elapsed;
+
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+
+    timerRef.current = setTimeout(() => {
+      void logoutUser();
+    }, remaining);
+  }, [logoutUser, TIMEOUT_IN_MS]);
 
   useEffect(() => {
-    // Événements d'interaction (inclut touchstart pour mobile)
-    const events = [
-      'mousedown', 
-      'mousemove', 
-      'keypress', 
-      'scroll', 
-      'touchstart', 
-      'click'
+    const events: Array<keyof DocumentEventMap> = [
+      'mousedown',
+      'mousemove',
+      'keypress',
+      'scroll',
+      'touchstart',
+      'click',
     ];
-    
+
     // Initialisation
     resetTimer();
 
     // Écouteurs d'activité
-    events.forEach(event => {
+    events.forEach((event) => {
       document.addEventListener(event, resetTimer);
     });
 
-    // ⚡ GESTION SPÉCIFIQUE MOBILE & VERROUILLAGE
-    // Se déclenche quand l'utilisateur déverrouille son tel ou revient sur l'onglet
-    document.addEventListener('visibilitychange', checkInactivityOnResume);
+    // ⚡ Mobile / reprise après verrouillage écran
+    document.addEventListener(
+      'visibilitychange',
+      checkInactivityOnResume
+    );
 
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      events.forEach(event => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+
+      events.forEach((event) => {
         document.removeEventListener(event, resetTimer);
       });
-      document.removeEventListener('visibilitychange', checkInactivityOnResume);
+
+      document.removeEventListener(
+        'visibilitychange',
+        checkInactivityOnResume
+      );
     };
-  }, []);
+  }, [resetTimer, checkInactivityOnResume]);
 
   return (
     <>
       <style>{`
-        *, *::before, *::after { box-sizing: border-box; }
+        *, *::before, *::after {
+          box-sizing: border-box;
+        }
 
         .app-shell {
           display: flex;
           min-height: 100vh;
-          background: linear-gradient(150deg, #EEF2F8 0%, #F0F4FC 50%, #E4ECF7 100%);
+          background: linear-gradient(
+            150deg,
+            #EEF2F8 0%,
+            #F0F4FC 50%,
+            #E4ECF7 100%
+          );
         }
 
         .app-main {
@@ -112,21 +146,30 @@ export function AppShell({
         }
 
         @media (max-width: 768px) {
-          .app-shell { flex-direction: column; }
+          .app-shell {
+            flex-direction: column;
+          }
+
           .page-content {
-            padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: calc(
+              64px + env(safe-area-inset-bottom, 0px)
+            );
           }
         }
 
         @media (min-width: 769px) {
-          .app-mobile-nav { display: none; }
+          .app-mobile-nav {
+            display: none;
+          }
         }
       `}</style>
 
       <div className="app-shell">
         <Sidebar />
+
         <div className="app-main">
           <Topbar title={title} />
+
           <main className="page-content">
             {children}
           </main>

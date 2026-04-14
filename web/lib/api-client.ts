@@ -174,6 +174,48 @@ export const api = {
   // ==========================================
   // AUTH / ENRÔLEMENT MEMBRE
   // ==========================================
+  login: (body: { email: string; password: string }) =>
+    http<{
+      accessToken: string;
+      refreshToken: string;
+      refreshTokenExpiresAt?: string;
+      user: {
+        id: string;
+        email: string;
+        role: string;
+        firstName: string;
+        lastName: string;
+      };
+    }, typeof body>('/auth/login', {
+      method: 'POST',
+      body,
+    }),
+
+  logout: (
+    refreshToken?: string,
+    body?: {
+      logoutAll?: boolean;
+      refreshToken?: string;
+    }
+  ) =>
+    http<{
+      revokedSessions: number;
+      mode: 'all' | 'single' | 'all-fallback';
+    }, {
+      logoutAll?: boolean;
+      refreshToken?: string;
+    }>('/auth/logout', {
+      method: 'POST',
+      body: {
+        logoutAll: body?.logoutAll ?? false,
+        refreshToken:
+          body?.refreshToken ??
+          refreshToken ??
+          getRefreshToken() ??
+          undefined,
+      },
+    }),
+
   // ⚡ MODIFICATION CHIRURGICALE : Remplacement par fetch natif pour gérer le FormData
   memberSignup: async (formData: FormData): Promise<{ id: string; message: string }> => {
     const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
@@ -276,7 +318,7 @@ export const api = {
     return api.uploadAvatar(form);
   },
 
-  // 🔥 AJOUT CHIRURGICAL ICI : La méthode GET manquante pour récupérer les préférences
+  // Récupération des préférences utilisateur
   getMemberPreferences: () =>
     http<{
       emailNotifications: boolean;
@@ -286,6 +328,7 @@ export const api = {
       theme: string;
     }>('/member/preferences'),
 
+  // Mise à jour des préférences utilisateur
   updateMemberPreferences: async (body: {
     emailNotifications?: boolean;
     smsNotifications?: boolean;
@@ -293,14 +336,14 @@ export const api = {
     language?: 'fr' | 'en' | 'es' | 'pt' | 'ar' | 'ff' | string;
     theme?: 'light' | 'dark' | 'system' | string;
   }) => {
-    // 🌍 Mise à jour du cookie pour i18next (Middleware & SSR)
+    // 🌍 Mise à jour du cookie pour i18next (nécessaire pour le Middleware & SSR)
     if (body.language) {
       document.cookie = `i18next=${body.language}; path=/; max-age=31536000; SameSite=Lax`;
     }
     return http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body });
   },
 
-  // Enregistrement de l'abonnement Push
+  // Enregistrement de l'abonnement Push (Notifications navigateur)
   subscribeToPushNotifications: (subscription: PushSubscriptionPayload) =>
     http<{ message: string }, PushSubscriptionPayload>('/member/push-subscription', { method: 'POST', body: subscription }),
 
