@@ -1,5 +1,4 @@
 // web/app/(protected)/admin/notifications/page.tsx
-// web/app/(protected)/admin/notifications/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -32,7 +31,6 @@ export default function AdminNotificationsPage() {
     setLoading(true);
     setError(null);
     try {
-      // 👇 CORRECTION API : Retour au bon endpoint (listNotifications tape sur /notifications)
       const res = await api.listNotifications();
       const data = Array.isArray(res) ? res : (res?.items || []);
       setItems(data);
@@ -49,11 +47,10 @@ export default function AdminNotificationsPage() {
 
   const handleMarkAsRead = async (id: string) => {
     try {
-      // Optimistic UI update
-      setItems(items.map(n => n.id === id ? { ...n, isRead: true } : n));
+      // 🔥 CORRECTION : Utilisation de "prev" pour éviter l'écrasement d'état lors des boucles rapides
+      setItems(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
       await api.markNotificationRead(id);
     } catch (err) {
-      // 👇 CORRECTION ESLINT : Utilisation de la variable err
       console.error("Erreur marquage notification :", err);
       // Rollback on fail
       void load();
@@ -64,10 +61,9 @@ export default function AdminNotificationsPage() {
   const markAllAsRead = async () => {
     const unread = items.filter(i => !i.isRead);
     if (unread.length === 0) return;
-    
-    for (const item of unread) {
-      await handleMarkAsRead(item.id);
-    }
+
+    // 🔥 CORRECTION : Exécution en parallèle pour plus de rapidité et de sécurité
+    await Promise.all(unread.map(item => handleMarkAsRead(item.id)));
   };
 
   const displayedItems = items.filter(i => filter === 'ALL' || !i.isRead);
@@ -221,7 +217,7 @@ export default function AdminNotificationsPage() {
               {error}
             </div>
           )}
-          
+
           {loading ? (
              <div className="nt-empty">
                <svg width="40" height="40" className="animate-spin" style={{ color: '#2563EB' }} fill="none" viewBox="0 0 24 24">
@@ -244,17 +240,17 @@ export default function AdminNotificationsPage() {
             <div className="nt-list">
               {displayedItems.map((n) => {
                 const style = getNotificationStyle(n.type);
-                
+
                 return (
                   <div key={n.id} className={`nt-item ${!n.isRead ? 'unread' : ''}`}>
                     {!n.isRead && <div className="nt-unread-dot" />}
-                    
+
                     <div className="nt-icon" style={{ background: style.bg, color: style.color }}>
                       <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                         <path strokeLinecap="round" strokeLinejoin="round" d={style.icon} />
                       </svg>
                     </div>
-                    
+
                     <div className="nt-content">
                       <p className={`nt-message ${!n.isRead ? 'unread' : ''}`}>{n.message}</p>
                       <div className="nt-meta">
@@ -263,7 +259,7 @@ export default function AdminNotificationsPage() {
                         <span>{formatDate(n.createdAt)}</span>
                       </div>
                     </div>
-                    
+
                     {!n.isRead && (
                       <div className="nt-action">
                         <button 

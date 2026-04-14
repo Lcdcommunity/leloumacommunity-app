@@ -4,10 +4,10 @@ import { SuperAdminController } from './super-admin.controller';
 import { SuperAdminService } from './super-admin.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/services/mail.service';
-import { NotificationsModule } from '../notifications/notifications.module'; // <-- Ajout de l'import
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [NotificationsModule], // <-- Injection du module ici
+  imports: [NotificationsModule],
   controllers: [SuperAdminController],
   providers: [SuperAdminService, PrismaService, MailService],
   exports: [SuperAdminService],

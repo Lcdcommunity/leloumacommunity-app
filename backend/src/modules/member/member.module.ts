@@ -3,10 +3,10 @@ import { Module } from '@nestjs/common';
 import { MemberController } from './member.controller';
 import { MemberService } from './member.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotificationsModule } from '../notifications/notifications.module'; // <-- Ajout de l'import
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [NotificationsModule], // <-- Injection du module ici
+  imports: [NotificationsModule],
   controllers: [MemberController],
   providers: [MemberService, PrismaService],
   exports: [MemberService],

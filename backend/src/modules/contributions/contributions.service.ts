@@ -367,6 +367,17 @@ export class ContributionsService {
         },
       );
 
+    // 🔥 AJOUT CHIRURGICAL : Déclenchement de la notification (In-App + Push)
+    await this.notifications.createForUserWithPush({
+      associationId: contribution.associationId,
+      userId: contribution.memberUserId,
+      type: NotificationType.CONTRIBUTION_VALIDATED,
+      title: 'Cotisation validée',
+      message: `Votre cotisation de ${contribution.amount} ${contribution.currency} a été validée avec succès.`,
+      pushTitle: '✅ Cotisation validée',
+      pushBody: `Votre dépôt de ${contribution.amount} ${contribution.currency} a bien été enregistré sur le compte de l'antenne.`,
+    });
+
     return result;
   }
 
@@ -395,7 +406,7 @@ export class ContributionsService {
       contribution.antennaId,
     );
 
-    return this.prisma.contribution.update({
+    const updatedContribution = await this.prisma.contribution.update({
       where: { id },
       data: {
         status:
@@ -408,6 +419,19 @@ export class ContributionsService {
           dto.adminComment?.trim(),
       },
     });
+
+    // 🔥 AJOUT CHIRURGICAL : Déclenchement de la notification (In-App + Push)
+    await this.notifications.createForUserWithPush({
+      associationId: contribution.associationId,
+      userId: contribution.memberUserId,
+      type: NotificationType.CONTRIBUTION_REJECTED,
+      title: 'Cotisation refusée',
+      message: `Votre dépôt de ${contribution.amount} ${contribution.currency} a été refusé. Motif : ${dto.rejectionReason.trim()}`,
+      pushTitle: '❌ Cotisation refusée',
+      pushBody: `Motif : ${dto.rejectionReason.trim()}`,
+    });
+
+    return updatedContribution;
   }
 
   // 🔥 CORRECTION : L'historique ramène les cotisations payées ET les cotisations effectuées pour autrui

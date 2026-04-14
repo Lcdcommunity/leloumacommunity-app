@@ -34,7 +34,6 @@ export class ProjectsService {
       include: { author: true }
     });
 
-    // ✅ NOTIFICATION : Informer les admins de l'antenne
     await this.notifications.notifyAntennaAdmins(
       antennaId,
       associationId,
@@ -46,19 +45,16 @@ export class ProjectsService {
     return proposal;
   }
 
-  // 🔥 AJOUT CHIRURGICAL : Le paramètre associationId
   async approveProposal(proposalId: string, associationId: string, adminId: string, reviewComment?: string) {
     const proposal = await this.prisma.projectProposal.findUnique({
-      // 🔥 CLOISONNEMENT STRICT : Vérification de l'associationId
       where: { id: proposalId, associationId },
     });
 
     if (!proposal) throw new NotFoundException("Proposition introuvable ou vous n'avez pas les droits.");
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Update Proposition
       const updated = await tx.projectProposal.update({
-        where: { id: proposalId }, // Plus besoin du associationId ici car on est sûr qu'il existe grâce au findUnique
+        where: { id: proposalId }, 
         data: {
           status: ProposalStatus.APPROVED,
           reviewedByUserId: adminId,
@@ -67,7 +63,6 @@ export class ProjectsService {
         },
       });
 
-      // 2. Créer le projet réel
       const project = await tx.project.create({
         data: {
           associationId: proposal.associationId,
@@ -81,7 +76,6 @@ export class ProjectsService {
         },
       });
 
-      // 3. Notifier l'auteur
       await this.notifications.createForUser({
         associationId: proposal.associationId,
         userId: proposal.authorUserId,
@@ -93,10 +87,8 @@ export class ProjectsService {
     });
   }
 
-  // 🔥 AJOUT CHIRURGICAL : Le paramètre associationId
   async rejectProposal(proposalId: string, associationId: string, adminId: string, reviewComment: string) {
     const proposal = await this.prisma.projectProposal.findUnique({
-      // 🔥 CLOISONNEMENT STRICT : Vérification de l'associationId
       where: { id: proposalId, associationId },
     });
 
@@ -112,7 +104,6 @@ export class ProjectsService {
       },
     });
 
-    // ✅ NOTIFICATION : Informer le membre
     await this.notifications.createForUser({
       associationId: proposal.associationId,
       userId: proposal.authorUserId,
@@ -123,16 +114,40 @@ export class ProjectsService {
     return updated;
   }
 
-  // ─── GESTION DES PROJETS (ADMIN / SUPER-ADMIN) ──────────────────────
+  // ─── GESTION DES PROJETS (ADMIN / SUPER-ADMIN / MEMBER) ───────────────
 
   async listProjects(params: { associationId: string; antennaId?: string; q?: string; status?: ProjectStatus; page: number; pageSize: number }) {
     const skip = (params.page - 1) * params.pageSize;
+    
     const where: Prisma.ProjectWhereInput = {
-      associationId: params.associationId, // Cloisonnement déjà en place
-      ...(params.antennaId ? { antennaId: params.antennaId } : {}),
+      associationId: params.associationId,
       ...(params.status ? { status: params.status } : {}),
-      ...(params.q ? { title: { contains: params.q, mode: 'insensitive' } } : {}),
     };
+
+    const andConditions: Prisma.ProjectWhereInput[] = [];
+
+    // 🔥 CORRECTION : Règle de visibilité partagée
+    if (params.antennaId) {
+      andConditions.push({
+        OR: [
+          { antennaId: params.antennaId },
+          { status: { notIn: [ProjectStatus.PROPOSED, ProjectStatus.UNDER_REVIEW] } }
+        ]
+      });
+    }
+
+    if (params.q) {
+      andConditions.push({
+        OR: [
+          { title: { contains: params.q, mode: 'insensitive' } },
+          { description: { contains: params.q, mode: 'insensitive' } }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
 
     const [items, total] = await Promise.all([
       this.prisma.project.findMany({
@@ -157,14 +172,13 @@ export class ProjectsService {
     const project = await this.prisma.project.create({
       data: {
         ...data,
-        associationId, // Cloisonnement à la création
+        associationId,
         antennaId,
         createdByUserId: adminId,
         status: data.status || ProjectStatus.APPROVED,
       },
     });
 
-    // ✅ NOTIFICATION : Informer le Super Admin
     await this.notifications.notifySuperAdmins(
       associationId,
       `Un nouveau projet officiel "${project.title}" a été lancé.`,
@@ -174,9 +188,7 @@ export class ProjectsService {
     return project;
   }
 
-  // 🔥 AJOUT CHIRURGICAL : Le paramètre associationId
   async deleteProject(id: string, associationId: string) {
-    // 🔥 CLOISONNEMENT STRICT : On vérifie que le projet appartient bien à cette association
     const project = await this.prisma.project.findUnique({ where: { id, associationId } });
     if (!project) throw new NotFoundException("Projet introuvable ou vous n'avez pas les droits de le supprimer.");
     return this.prisma.project.delete({ where: { id } });

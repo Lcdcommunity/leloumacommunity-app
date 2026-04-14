@@ -9,33 +9,26 @@ import type { Project, ProjectStatus } from '../../../../types/project';
 import { formatCurrency, formatDate } from '../../../../lib/format';
 
 /* ══════════════════════════════════════════════════════ STATUS MAP */
-// Correction chirurgicale : Alignement strict avec l'Enum Prisma ProjectStatus
 const PROJ_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
   PROPOSED:         { label: 'Brouillon',     color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  UNDER_REVIEW:     { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
   APPROVED:         { label: 'Approuvé',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   IN_PROGRESS:      { label: 'En cours',      color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
   COMPLETED:        { label: 'Terminé',       color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  ON_HOLD:          { label: 'Suspendu',      color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  CANCELLED:        { label: 'Annulé',        color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
-  ARCHIVED:         { label: 'Archivé',       color: '#4B5563', bg: '#E5E7EB', border: '#D1D5DB' },
 };
 
 const STATUS_FORM_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'PROPOSED',         label: 'Brouillon' },
-  { value: 'UNDER_REVIEW',     label: "En attente d'approbation" },
   { value: 'APPROVED',         label: 'Approuvé' },
   { value: 'IN_PROGRESS',      label: 'En cours' },
   { value: 'COMPLETED',        label: 'Terminé' },
-  { value: 'ON_HOLD',          label: 'Suspendu' },
-  { value: 'CANCELLED',        label: 'Annulé' },
 ];
 
 const STATUS_LIST_OPTIONS = [
   { value: '',            label: 'Tous les statuts' },
-  { value: 'PROPOSED',    label: 'Brouillon' },
+  { value: 'PROPOSED',    label: 'Brouillons' },
+  { value: 'APPROVED',    label: 'Approuvés' },
   { value: 'IN_PROGRESS', label: 'En cours' },
-  { value: 'COMPLETED',   label: 'Terminé' },
+  { value: 'COMPLETED',   label: 'Terminés' },
 ];
 
 /* ══════════════════════════════════════════════════════ STATUS BADGE */
@@ -309,9 +302,7 @@ function GalleryThumb({
       )}
     </button>
   );
-}
-
-/* ══════════════════════════════════════════════════════ PROJECT DETAIL MODAL */
+}/* ══════════════════════════════════════════════════════ PROJECT DETAIL MODAL */
 function ProjectModal({
   project,
   onClose,
@@ -626,7 +617,6 @@ function ProjectModal({
                   <DetailRow vertical icon={<span />} label="Impact environnemental" value={project.environmentalImpact} />
                 </div>
               )}
-
               {(project.implementationMethod || project.risksAndMitigation) && (
                 <div style={{ marginTop: '1rem', background: '#FFFBEB', padding: '1rem', borderRadius: 12, border: '1px solid #FDE68A' }}>
                   <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#D97706', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
@@ -793,8 +783,7 @@ function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.65rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem' }}>
           <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(37,99,235,.3)' }}>
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
-          </div>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>          </div>
           <span style={{ fontSize: '.78rem', fontWeight: 900, color: '#1F2937', letterSpacing: '.04em', textTransform: 'uppercase' }}>Galerie photos</span>
         </div>
         <span style={{ fontSize: '.7rem', fontWeight: 800, color: photos.length > 0 ? '#2563EB' : '#9CA3AF', background: photos.length > 0 ? '#EFF6FF' : '#F3F4F6', border: `1px solid ${photos.length > 0 ? '#BFDBFE' : '#E5E7EB'}`, borderRadius: 99, padding: '.18rem .55rem', fontFamily: "'DM Mono',monospace" }}>
@@ -839,7 +828,6 @@ interface FormValues {
   title: string; summary: string; description: string; locationText: string; promoterName: string; status: string; budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string; targetBeneficiaries: string; populationImpact: string; environmentalImpact: string; risksAndMitigation: string; implementationMethod: string; specificObjectives: string; expectedResults: string; successIndicators: string;
 }
 
-// Correction chirurgicale : Statut par défaut aligné avec Prisma
 const EMPTY: FormValues = { title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'PROPOSED', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '', targetBeneficiaries: '', populationImpact: '', environmentalImpact: '', risksAndMitigation: '', implementationMethod: '', specificObjectives: '', expectedResults: '', successIndicators: '' };
 
 function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploadProgress }: { initial?: FormValues; onSave: (v: FormValues, p: File[]) => void; onCancel: () => void; submitting: boolean; submitLabel: string; uploadProgress: string | null; }) {
@@ -1010,8 +998,8 @@ export default function AdminProjectsPage() {
     successIndicators: typeof editing.successIndicators === 'string' ? editing.successIndicators : JSON.stringify(editing.successIndicators ?? ''),
   } : undefined;
 
-  // Correction chirurgicale : Filtres basés sur les statuts Prisma
   const draftCount = items.filter((i) => i.status === 'PROPOSED').length;
+  const approvedCount = items.filter((i) => i.status === 'APPROVED').length;
   const inProgressCount = items.filter((i) => i.status === 'IN_PROGRESS').length;
   const completedCount = items.filter((i) => i.status === 'COMPLETED').length;
   const formOpen = formMode !== 'hidden';
@@ -1028,8 +1016,7 @@ export default function AdminProjectsPage() {
         .pp-dot{width:6px;height:6px;background:#3B82F6;border-radius:50%;animation:pppulse 2s ease-in-out infinite}
         @keyframes pppulse{0%,100%{opacity:1}50%{opacity:.3}}
         .pp-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.4rem,3vw,1.85rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15;margin:0;}
-        .pp-title span{background:linear-gradient(135deg,#1D4ED8,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        
+        .pp-title span{background:linear-gradient(135deg,#1D4ED8,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}        
         .pp-new-btn{height:36px;padding:0 1rem;border-radius:10px;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;color:white;font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:900;cursor:pointer;display:flex;align-items:center;gap:.4rem;box-shadow:0 3px 10px rgba(37,99,235,.3);transition:all .18s;white-space:nowrap}
         .pp-new-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(37,99,235,.4)}
         .pp-new-btn.open{background:rgba(37,99,235,.08);color:#1D4ED8;border:1.5px solid rgba(37,99,235,.2);box-shadow:none}
@@ -1047,13 +1034,17 @@ export default function AdminProjectsPage() {
         .pp-panel-title{font-size:.73rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
         .pp-count-chip{font-size:.67rem;font-weight:900;padding:.2rem .58rem;border-radius:99px;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
 
-        /* STAT CARDS - Refonte Capture 2 */
-        .pp-stat-grid { display: flex; gap: 0.75rem; padding: 1.25rem; border-bottom: 1px solid rgba(0,0,0,0.04); background: #FAFBFF; }
-        .pp-stat-card { flex: 1; min-width: 0; background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 1rem 0.5rem; text-align: center; position: relative; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.2s; }
+        /* STAT CARDS - Adapté pour 4 cartes */
+        .pp-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; padding: 1.25rem; border-bottom: 1px solid rgba(0,0,0,0.04); background: #FAFBFF; }
+        .pp-stat-card { background: white; border: 1px solid #E2E8F0; border-radius: 14px; padding: 1rem 0.5rem; text-align: center; position: relative; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.2s; }
         .pp-stat-card:hover { transform: translateY(-2px); border-color: #BFDBFE; }
         .pp-stat-card-bar { position: absolute; top: 0; left: 0; right: 0; height: 4px; }
         .pp-stat-val { display: block; font-family: 'Cormorant Garamond', serif; font-size: 1.65rem; font-weight: 700; color: #0F172A; margin-bottom: 0.2rem; }
         .pp-stat-lbl { display: block; font-size: 0.62rem; font-weight: 900; text-transform: uppercase; color: #94A3B8; letter-spacing: 0.05em; }
+        
+        @media (max-width: 640px) {
+          .pp-stat-grid { grid-template-columns: repeat(2, 1fr); }
+        }
 
         .pp-form-panel{overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1),opacity .25s ease;max-height:0;opacity:0}
         .pp-form-panel.open{max-height:3000px;opacity:1}
@@ -1065,12 +1056,22 @@ export default function AdminProjectsPage() {
         .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
         .pp-save-err{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;color:#B91C1C;font-size:.78rem;font-weight:800;margin-bottom:.7rem}
 
-        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:nowrap;padding:.8rem 1.3rem;border-bottom:1px solid rgba(0,0,0,0.03);width:100%;box-sizing:border-box}
-        .pp-finput{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:#111827;outline:none;flex:1 1 auto;min-width:0;background:rgba(255,255,255,.88)}
-        .pp-fselect{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);background:white;padding:0 1.8rem 0 .7rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer}
-        .pp-reload-btn{height:36px;padding:0 .85rem;background:rgba(239,246,255,.8);border:1.5px solid rgba(37,99,235,.18);border-radius:9px;cursor:pointer;color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:800;display:flex;align-items:center;gap:.32rem}
+        /* FILTRES RESPONSIVE MOBILE FIX */
+        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;padding:.8rem 1.3rem;border-bottom:1px solid rgba(0,0,0,0.03);width:100%;box-sizing:border-box}
+        .pp-finput{height:38px;border-radius:9px;border:1px solid rgba(37,99,235,.14);padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:#111827;outline:none;flex:1 1 200px;min-width:150px;background:rgba(255,255,255,.88);transition:border-color .2s,box-shadow .2s}
+        .pp-finput:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+        .pp-fselect{height:38px;border-radius:9px;border:1px solid rgba(37,99,235,.14);background:white;padding:0 1.8rem 0 .7rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer;flex:0 1 auto;background-image:url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .55rem center}
+        .pp-reload-btn{height:38px;padding:0 .85rem;background:rgba(239,246,255,.8);border:1.5px solid rgba(37,99,235,.18);border-radius:9px;cursor:pointer;color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:800;display:flex;align-items:center;gap:.32rem;flex:0 0 auto;transition:all .18s;white-space:nowrap}
+        
+        @media(max-width:550px){
+          .pp-filter-row { padding: .8rem; gap: .5rem; }
+          .pp-finput { flex: 1 1 100%; height: 40px; font-size: 0.85rem; }
+          .pp-fselect { flex: 1 1 auto; height: 40px; font-size: 0.8rem; }
+          .pp-reload-btn { flex: 1 1 auto; height: 40px; justify-content: center; }
+          .btn-text { display: block; }
+        }
 
-        /* 🔥 NEW PROJECT CARD DESIGN - Refonte chirurgicale */
+        /* NEW PROJECT CARD DESIGN */
         .pp-list-container { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; background: #FAFAFA; }
         .pp-project-card { 
           background: rgba(240, 247, 255, 0.5); 
@@ -1186,10 +1187,10 @@ export default function AdminProjectsPage() {
             </div>
           </div>
 
-          {/* 🔥 STATS CARDS - Refonte chirurgicale 3-en-ligne Capture 2 */}
           <div className="pp-stat-grid">
             {[
               { label: 'Brouillons', count: draftCount, color: '#6B7280' },
+              { label: 'Approuvés', count: approvedCount, color: '#2563EB' },
               { label: 'En cours', count: inProgressCount, color: '#059669' },
               { label: 'Terminés', count: completedCount, color: '#7C3AED' },
             ].map((c) => (
@@ -1247,7 +1248,6 @@ export default function AdminProjectsPage() {
               </div>
             </div>
           ) : (
-            /* 🔥 PROJECT LIST - Refonte chirurgicale Card Design Modern Pro */
             <div className="pp-list-container">
               {items.map((p, i) => (
                 <div 
@@ -1266,9 +1266,9 @@ export default function AdminProjectsPage() {
                     </div>
                     <StatusBadge status={p.status} />
                   </div>
-                  
+
                   <hr className="pp-card-divider" />
-                  
+
                   <div className="pp-card-footer">
                     <BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} />
                   </div>
@@ -1290,7 +1290,6 @@ export default function AdminProjectsPage() {
           onDelete={() => setDeleteTarget(detailProject)}
         />
       )}
-
       {deleteTarget && (
         <DeleteModal
           project={deleteTarget}

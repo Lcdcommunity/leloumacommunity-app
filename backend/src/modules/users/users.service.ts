@@ -72,7 +72,7 @@ export class UsersService {
     if (dto.postalCode          !== undefined) data.postalCode          = this.normalize(dto.postalCode);
     if (dto.city                !== undefined) data.city                = this.normalize(dto.city);
     if (dto.country             !== undefined) data.country             = this.normalize(dto.country);
-    
+
     if (dto.function            !== undefined) data.function            = this.normalize(dto.function);
     if (dto.professionalStatus  !== undefined) data.professionalStatus  = this.normalize(dto.professionalStatus);
 
@@ -82,13 +82,18 @@ export class UsersService {
       include: meUserInclude,
     });
 
-    await this.notifications.createForUser({
-      associationId: updatedUser.associationId,
-      userId: updatedUser.id,
-      message: 'Vos informations de profil ont été mises à jour avec succès.',
-      type: NotificationType.SYSTEM_ALERT,
-      title: 'Profil mis à jour',
-    });
+    // 🔥 AJOUT CHIRURGICAL : Upgrade en createForUserWithPush
+    if (updatedUser.associationId) {
+      await this.notifications.createForUserWithPush({
+        associationId: updatedUser.associationId,
+        userId: updatedUser.id,
+        message: 'Vos informations de profil ont été mises à jour avec succès.',
+        type: NotificationType.SYSTEM_ALERT,
+        title: 'Profil mis à jour',
+        pushTitle: '📝 Profil mis à jour',
+        pushBody: 'Vos informations personnelles ont bien été enregistrées.',
+      });
+    }
 
     await this.auditService.create({
       associationId: updatedUser.associationId,
@@ -107,6 +112,15 @@ export class UsersService {
 
   // ⚡ MÉTHODE POUR CHANGER LE MOT DE PASSE
   async updatePassword(userId: string, newPasswordRaw: string) {
+    // 1. Récupérer l'utilisateur pour avoir son associationId (requis pour la notification)
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Utilisateur introuvable');
+    }
+
     const saltRounds = 10;
     const passwordHash = await bcrypt.hash(newPasswordRaw, saltRounds);
 
@@ -114,6 +128,19 @@ export class UsersService {
       where: { id: userId },
       data: { passwordHash },
     });
+
+    // 🔥 AJOUT CHIRURGICAL : Alerte de sécurité (In-App + Push)
+    if (user.associationId) {
+      await this.notifications.createForUserWithPush({
+        associationId: user.associationId,
+        userId: user.id,
+        type: NotificationType.SYSTEM_ALERT,
+        title: 'Sécurité du compte',
+        message: 'Votre mot de passe a été modifié avec succès. Si vous n\'êtes pas à l\'origine de cette action, contactez un administrateur immédiatement.',
+        pushTitle: '🔒 Mot de passe modifié',
+        pushBody: 'Le mot de passe de votre compte vient d\'être changé.',
+      });
+    }
 
     return { message: 'Mot de passe mis à jour avec succès' };
   }
@@ -204,7 +231,7 @@ export class UsersService {
       postalCode: user.postalCode,
       city: user.city,
       country: user.country,
-      
+
       function: user.function, 
       professionalStatus: user.professionalStatus,
 

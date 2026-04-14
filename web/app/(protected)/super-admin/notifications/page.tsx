@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/notifications/page.tsx
+// web/app/(protected)/super-admin/notifications/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -26,6 +26,17 @@ export default function SuperAdminNotificationsPage() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  // 🔥 AJOUT CHIRURGICAL : Fonction pour marquer une notification comme lue en temps réel
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await api.markNotificationRead(id);
+      // Mise à jour optimiste de l'état local
+      setItems(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (err) {
+      console.error('Erreur lors du marquage de la notification:', err);
+    }
+  };
 
   const unreadCount = items.filter(n => !n.isRead).length;
   const readCount   = items.filter(n =>  n.isRead).length;
@@ -84,6 +95,16 @@ export default function SuperAdminNotificationsPage() {
 
         .sn-badge{display:inline-flex;align-items:center;gap:.28rem;padding:.22rem .65rem;border-radius:99px;font-size:.7rem;font-weight:900;white-space:nowrap;border:1px solid}
         .sn-badge-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+
+        /* 🔥 BOUTON MARQUER COMME LU 🔥 */
+        .sn-mark-btn {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 26px; height: 26px; border-radius: 6px;
+          background: rgba(5,150,105,.1); color: #059669;
+          border: 1px solid rgba(5,150,105,.2); cursor: pointer;
+          transition: all .2s; outline: none; padding: 0; flex-shrink: 0;
+        }
+        .sn-mark-btn:hover { background: #D1FAE5; border-color: rgba(5,150,105,.4); transform: scale(1.05); }
 
         .sn-date{font-family:'DM Mono',monospace;font-size:.74rem;font-weight:600;color:#9CA3AF;white-space:nowrap}
 
@@ -210,14 +231,22 @@ export default function SuperAdminNotificationsPage() {
                           </div>
                         </td>
                         <td>
-                          <span className="sn-badge" style={{ 
-                            color: n.isRead ? '#6B7280' : '#D97706', 
-                            background: n.isRead ? '#F9FAFB' : '#FFFBEB', 
-                            borderColor: n.isRead ? '#E5E7EB' : '#FDE68A' 
-                          }}>
-                            <span className="sn-badge-dot" style={{ background: n.isRead ? '#9CA3AF' : '#D97706' }} />
-                            {n.isRead ? 'Lue' : 'Non lue'}
-                          </span>
+                          {/* 🔥 L'état de la pastille et le bouton d'action */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                            <span className="sn-badge" style={{ 
+                              color: n.isRead ? '#6B7280' : '#D97706', 
+                              background: n.isRead ? '#F9FAFB' : '#FFFBEB', 
+                              borderColor: n.isRead ? '#E5E7EB' : '#FDE68A' 
+                            }}>
+                              <span className="sn-badge-dot" style={{ background: n.isRead ? '#9CA3AF' : '#D97706' }} />
+                              {n.isRead ? 'Lue' : 'Non lue'}
+                            </span>
+                            {!n.isRead && (
+                              <button className="sn-mark-btn" onClick={() => handleMarkAsRead(n.id)} title="Marquer comme lue">
+                                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td><span className="sn-date">{formatDate(n.createdAt)}</span></td>
                       </tr>
@@ -235,14 +264,22 @@ export default function SuperAdminNotificationsPage() {
                       <span className={`sn-msg-text${n.isRead ? ' read' : ''}`} style={{ flex: 1 }}>{n.message}</span>
                     </div>
                     <div className="sn-mc-footer">
-                      <span className="sn-badge" style={{ 
-                        color: n.isRead ? '#6B7280' : '#D97706', 
-                        background: n.isRead ? '#F9FAFB' : '#FFFBEB', 
-                        borderColor: n.isRead ? '#E5E7EB' : '#FDE68A' 
-                      }}>
-                        <span className="sn-badge-dot" style={{ background: n.isRead ? '#9CA3AF' : '#D97706' }} />
-                        {n.isRead ? 'Lue' : 'Non lue'}
-                      </span>
+                      {/* 🔥 L'état de la pastille et le bouton d'action (Version Mobile) */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                        <span className="sn-badge" style={{ 
+                          color: n.isRead ? '#6B7280' : '#D97706', 
+                          background: n.isRead ? '#F9FAFB' : '#FFFBEB', 
+                          borderColor: n.isRead ? '#E5E7EB' : '#FDE68A' 
+                        }}>
+                          <span className="sn-badge-dot" style={{ background: n.isRead ? '#9CA3AF' : '#D97706' }} />
+                          {n.isRead ? 'Lue' : 'Non lue'}
+                        </span>
+                        {!n.isRead && (
+                          <button className="sn-mark-btn" onClick={() => handleMarkAsRead(n.id)} title="Marquer comme lue">
+                            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                          </button>
+                        )}
+                      </div>
                       <span className="sn-date">{formatDate(n.createdAt)}</span>
                     </div>
                   </div>

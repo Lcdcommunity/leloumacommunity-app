@@ -10,12 +10,14 @@ import { AuthMailerService } from './auth.mailer.service';
 import { JwtStrategy } from './jwt.strategy';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { UploadsModule } from '../uploads/uploads.module'; // ⚡ AJOUT CHIRURGICAL : Import du module d'uploads
 
 @Module({
   imports: [
     JwtModule.register({}),
     NotificationsModule,
     PrismaModule,
+    UploadsModule, // ⚡ AJOUT CHIRURGICAL : Injection du module pour que CloudinaryService soit disponible
   ],
   controllers: [
     AuthController, 

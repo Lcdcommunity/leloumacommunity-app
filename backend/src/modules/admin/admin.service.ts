@@ -1,5 +1,5 @@
 // backend/src/modules/admin/admin.service.ts
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType } from '@prisma/client';
 import { memberMapper } from '../member/member.mapper';
@@ -185,7 +185,7 @@ export class AdminService {
 
   async listLateMembers(adminId: string, page: number, pageSize: number) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
-    
+
     const users = await this.prisma.user.findMany({ 
       where: { 
         associationId,
@@ -235,7 +235,7 @@ export class AdminService {
 
   async createMember(adminId: string, data: CreateMemberDto) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
-    
+
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
       throw new ConflictException("Cet email est déjà utilisé.");
@@ -243,7 +243,6 @@ export class AdminService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    // Si SuperAdmin crée sans antenne spécifiée, on prend la première de l'asso par défaut
     const targetAntennaId = antennaId || (await this.prisma.antenna.findFirst({ where: { associationId } })).id;
 
     const newUser = await this.prisma.user.create({
@@ -317,7 +316,6 @@ export class AdminService {
 
     return updated;
   }
-
   async activateUser(userId: string, adminId: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
@@ -529,7 +527,7 @@ export class AdminService {
     });
 
     return updated;
-  }
+  }  
 
   async updateContribution(contributionId: string, adminId: string, amount: number) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
@@ -566,17 +564,39 @@ export class AdminService {
   async listProjects(adminId: string, page: number, pageSize: number, status?: string, q?: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
+
     const where: Prisma.ProjectWhereInput = { 
       associationId,
-      ...(antennaId ? { antennaId } : {}), 
       ...(status ? { status: status as ProjectStatus } : {}) 
     };
-    if (q) { 
-      where.OR = [
-        { title: { contains: q, mode: 'insensitive' } }, 
-        { description: { contains: q, mode: 'insensitive' } }
-      ]; 
+
+    const andConditions: Prisma.ProjectWhereInput[] = [];
+
+    // 🔥 CORRECTION : Visibilité croisée inter-antennes
+    // Les brouillons et mises en attente sont strictement limités à l'antenne créatrice.
+    // Le reste (Approuvé, En cours, Terminé) est partagé au niveau de l'association entière.
+    if (antennaId) {
+      andConditions.push({
+        OR: [
+          { antennaId: antennaId },
+          { status: { notIn: [ProjectStatus.PROPOSED, ProjectStatus.UNDER_REVIEW] } }
+        ]
+      });
     }
+
+    if (q) { 
+      andConditions.push({
+        OR: [
+          { title: { contains: q, mode: 'insensitive' } }, 
+          { description: { contains: q, mode: 'insensitive' } }
+        ]
+      }); 
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
+    }
+
     const [items, total] = await Promise.all([
       this.prisma.project.findMany({ 
         where, 
@@ -612,7 +632,12 @@ export class AdminService {
       where: { 
         id: projectId, 
         associationId,
-        ...(antennaId ? { antennaId } : {})
+        ...(antennaId ? { 
+          OR: [
+            { antennaId: antennaId },
+            { status: { notIn: [ProjectStatus.PROPOSED, ProjectStatus.UNDER_REVIEW] } }
+          ]
+        } : {})
       },
       include: { attachments: { include: { file: true } } }
     });
@@ -722,7 +747,7 @@ export class AdminService {
       total, page, pageSize, totalPages: Math.ceil(total / pageSize) 
     };
   }
-
+  
   async createProject(adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
 
@@ -879,7 +904,6 @@ export class AdminService {
   }
 
   // --- GESTION DES CONTENUS (ANNONCES) ---
-  // 🔥 CORRECTION APPLIQUÉE : Compatibilité multi-images et SuperAdmin
 
   async listContents(adminId: string, page: number, pageSize: number, q?: string, status?: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
@@ -903,8 +927,8 @@ export class AdminService {
         include: { coverImageFile: true, attachments: { include: { file: true } } } 
       }),
       this.prisma.newsPost.count({ where }),
-    ]);
-
+    ]);    
+    
     return {
       items: items.map(c => ({
         ...memberMapper.contentPost({ ...c, body: c.content }),

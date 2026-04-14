@@ -267,7 +267,6 @@ export class MemberService {
         auth: dto.keys.auth,
       },
     });
-
     return { message: 'Abonnement push enregistré avec succès.' };
   }
 
@@ -352,12 +351,15 @@ export class MemberService {
     });
 
     const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
-    await this.notifications.notifyAntennaAdmins(
+    
+    // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour alerter les admins d'antenne
+    await this.notifications.notifyAntennaAdminsWithPush(
       finalAntennaId,
       me.associationId,
       `Un nouveau versement de ${dto.amount} ${dto.currency || 'EUR'} a été déclaré pour ${targetName}.`,
       NotificationType.CONTRIBUTION_SUBMITTED,
       { contributionId: created.id },
+      '💰 Nouveau dépôt soumis'
     );
 
     return memberMapper.contribution(created);
@@ -581,7 +583,6 @@ export class MemberService {
         },
       }),
     ]);
-
     return {
       items: items.map(memberMapper.project),
       total,
@@ -622,12 +623,14 @@ export class MemberService {
     });
 
     if (me.antennaId) {
-      await this.notifications.notifyAntennaAdmins(
+      // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour alerter les admins d'antenne
+      await this.notifications.notifyAntennaAdminsWithPush(
         me.antennaId,
         me.associationId,
         `Une nouvelle proposition de projet "${dto.title.trim()}" a été soumise par ${me.firstName} ${me.lastName}.`,
         NotificationType.PROJECT_PROPOSAL_SUBMITTED,
         { proposalId: created.id },
+        '💡 Nouvelle proposition de projet'
       );
     }
 
@@ -842,7 +845,6 @@ export class MemberService {
           },
         ]
       : [];
-
     const where: Prisma.NewsPostWhereInput = {
       associationId: me.associationId,
       status: PostStatus.PUBLISHED,

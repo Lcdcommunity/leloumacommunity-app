@@ -117,6 +117,23 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     setMounted(true);
     
+    // 🔥 CORRECTION : Récupérer les préférences sauvegardées au chargement
+    const loadPreferences = async () => {
+      try {
+        // Remplace `getMemberPreferences` par le vrai nom de ta fonction dans api-client.ts si différent
+        const prefs = await api.getMemberPreferences();
+        if (prefs) {
+          setEmailNotifications(prefs.emailNotifications ?? true);
+          setSmsNotifications(prefs.smsNotifications ?? false);
+          // Le push est géré juste en dessous via le ServiceWorker, mais tu peux aussi te baser sur prefs.pushNotifications si ton backend le stocke.
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des préférences:', error);
+      }
+    };
+
+    loadPreferences();
+
     // Vérifier au chargement si l'utilisateur a déjà activé les notifications Push
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(registration => {
@@ -203,8 +220,7 @@ export default function AdminSettingsPage() {
              keys: {
                p256dh: subJson.keys.p256dh,
                auth: subJson.keys.auth
-             }
-          });
+             }});
           setPrefMsg({ text: 'Notifications push activées et enregistrées !', ok: true });
         }
 
@@ -391,7 +407,6 @@ export default function AdminSettingsPage() {
           @keyframes astin { to { opacity: 1; transform: translateY(0); } }
           @keyframes astspin { to { transform: rotate(360deg); } }
         `}</style>
-
         <div className="ast-wrap">
           {/* Header */}
           <div className="ast-header">
@@ -578,8 +593,7 @@ export default function AdminSettingsPage() {
                         hint={t('settings.passwordHint', 'Utilisez au moins 8 caractères.')}
                         autoComplete="new-password"
                         isRTL={isRTL}
-                      />
-                      <Field
+                      /> <Field
                         label={t('settings.confirmPassword', 'Confirmer nouveau mot de passe')}
                         type="password"
                         value={confirmPassword}

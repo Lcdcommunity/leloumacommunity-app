@@ -1,3 +1,4 @@
+// web/lib/api-client.ts
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
@@ -29,6 +30,7 @@ export interface VirtualCardData {
     firstName: string;
     lastName: string;
     function?: string | null;
+    professionalStatus?: string | null; // ⚡ AJOUT CHIRURGICAL ICI
     birthDate?: string | null;
     placeOfBirth?: string | null;
     birthCountry?: string | null;
@@ -58,6 +60,7 @@ export interface FullUserProfile extends UserSummary {
   originSubPrefecture?: string | null;
   originVillage?: string | null;
   function?: string | null;
+  professionalStatus?: string | null; // ⚡ SÉCURITÉ TYPAGE
   cardNumber?: string | null;
   isCardLocked?: boolean;
   cardExpiresAt?: string | null;
@@ -171,29 +174,21 @@ export const api = {
   // ==========================================
   // AUTH / ENRÔLEMENT MEMBRE
   // ==========================================
-  memberSignup: (body: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    password?: string;
-    antennaId: string;
-    phone?: string;
-    originSubPrefecture?: string;
-    birthDate?: string;
-    placeOfBirth?: string;
-    birthCountry?: string;
-    city?: string;
-    country?: string;
-    postalCode?: string;
-    addressLine1?: string;
-    addressLine2?: string;
-    function?: string;
-    currency?: string; 
-  }) =>
-    http<{ id: string; message: string }, typeof body>('/public/signup', {
+  // ⚡ MODIFICATION CHIRURGICALE : Remplacement par fetch natif pour gérer le FormData
+  memberSignup: async (formData: FormData): Promise<{ id: string; message: string }> => {
+    const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
+    const res = await fetch(`${baseUrl}/public/signup`, {
       method: 'POST',
-      body,
-    }),
+      body: formData, // Laisse le navigateur gérer automatiquement le Content-Type: multipart/form-data
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { message?: string };
+      throw new Error(err.message ?? 'Erreur lors de l\'inscription.');
+    }
+
+    return res.json();
+  },
 
   verifyEmailToken: (body: { token: string }) =>
     http<{ emailVerified: boolean }, typeof body>('/public/verify-email-token', {
@@ -280,6 +275,16 @@ export const api = {
     form.append('avatar', file);
     return api.uploadAvatar(form);
   },
+
+  // 🔥 AJOUT CHIRURGICAL ICI : La méthode GET manquante pour récupérer les préférences
+  getMemberPreferences: () =>
+    http<{
+      emailNotifications: boolean;
+      smsNotifications: boolean;
+      pushNotifications: boolean;
+      language: string;
+      theme: string;
+    }>('/member/preferences'),
 
   updateMemberPreferences: async (body: {
     emailNotifications?: boolean;
@@ -603,8 +608,7 @@ export const api = {
   }) =>
     http<ProjectionResult, typeof body>('/admin/projections/contributions', { method: 'POST', body }),
 
-  // ==========================================
-  // DÉPENSES (EXPENSES)
+  // ==========================================// DÉPENSES (EXPENSES)
   // ==========================================
   listAntennaExpenses: (params?: { page?: number; pageSize?: number; status?: string; category?: string; q?: string }) =>
     http<ApiListResponse<Expense>>(

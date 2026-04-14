@@ -9,33 +9,26 @@ import type { Project, ProjectStatus } from '../../../../types/project';
 import { formatCurrency, formatDate } from '../../../../lib/format';
 
 /* ══════════════════════════════════════════════════════ STATUS MAP */
-// Alignement strict avec l'Enum Prisma ProjectStatus
 const PROJ_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
   PROPOSED:         { label: 'Brouillon',     color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  UNDER_REVIEW:     { label: 'En attente',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
   APPROVED:         { label: 'Approuvé',      color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
   IN_PROGRESS:      { label: 'En cours',      color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
   COMPLETED:        { label: 'Terminé',       color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  ON_HOLD:          { label: 'Suspendu',      color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  CANCELLED:        { label: 'Annulé',        color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
-  ARCHIVED:         { label: 'Archivé',       color: '#4B5563', bg: '#E5E7EB', border: '#D1D5DB' },
 };
 
 const STATUS_FORM_OPTIONS: { value: ProjectStatus; label: string }[] = [
   { value: 'PROPOSED',         label: 'Brouillon' },
-  { value: 'UNDER_REVIEW',     label: "En attente d'approbation" },
   { value: 'APPROVED',         label: 'Approuvé' },
   { value: 'IN_PROGRESS',      label: 'En cours' },
   { value: 'COMPLETED',        label: 'Terminé' },
-  { value: 'ON_HOLD',          label: 'Suspendu' },
-  { value: 'CANCELLED',        label: 'Annulé' },
 ];
 
 const STATUS_LIST_OPTIONS = [
   { value: '',            label: 'Tous les statuts' },
-  { value: 'PROPOSED',    label: 'Brouillon' },
+  { value: 'PROPOSED',    label: 'Brouillons' },
+  { value: 'APPROVED',    label: 'Approuvés' },
   { value: 'IN_PROGRESS', label: 'En cours' },
-  { value: 'COMPLETED',   label: 'Terminé' },
+  { value: 'COMPLETED',   label: 'Terminés' },
 ];
 
 /* ══════════════════════════════════════════════════════ STATUS BADGE */
@@ -333,7 +326,6 @@ function ProjectModal({
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isExporting, setIsExporting] = useState(false);
-
   const validImages = rawImages.filter((img) => !failedImages.has(img.url)).slice(0, MAX_PHOTOS);
   const maxImageIndex = Math.max(validImages.length - 1, 0);
   const effectiveSelectedIndex = Math.min(selectedIndex, maxImageIndex);
@@ -351,7 +343,6 @@ function ProjectModal({
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
       const token = getAccessToken(); 
 
-      // 🔥 CORRECTION : Appel à l'exportation PDF côté Super Admin
       const response = await fetch(`${apiUrl}/super-admin/projects/${project.id}/export`, {
         method: 'GET',
         headers: {
@@ -940,7 +931,6 @@ export default function SuperAdminProjectsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      // 🔥 CORRECTION : Appel à l'API Super Admin
       const res = await api.listProjects({ page: 1, pageSize: 100, q: q || undefined, status: statusFilter || undefined });
       setItems(res?.items ?? []);
       setError(null);
@@ -980,7 +970,6 @@ export default function SuperAdminProjectsPage() {
         startsAt: values.startsAt || null, endsAt: values.endsAt || null, ...(photoIds.length > 0 && { photoIds }),
       };
 
-      // 🔥 CORRECTION : Appels à l'API Super Admin
       if (editing) {
         await api.updateProject(editing.id, payload as Parameters<typeof api.updateProject>[1]);
       } else {
@@ -998,7 +987,6 @@ export default function SuperAdminProjectsPage() {
   async function handleDelete(project: Project) {
     setBusyId(project.id); setDeleteTarget(null);
     try {
-      // 🔥 CORRECTION : Appel à l'API Super Admin
       await api.deleteProject(project.id);
       if (editing?.id === project.id) closeForm();
       if (detailProject?.id === project.id) setDetailProject(null);
@@ -1019,6 +1007,7 @@ export default function SuperAdminProjectsPage() {
   } : undefined;
 
   const draftCount = items.filter((i) => i.status === 'PROPOSED').length;
+  const approvedCount = items.filter((i) => i.status === 'APPROVED').length;
   const inProgressCount = items.filter((i) => i.status === 'IN_PROGRESS').length;
   const completedCount = items.filter((i) => i.status === 'COMPLETED').length;
   const formOpen = formMode !== 'hidden';
@@ -1065,39 +1054,39 @@ export default function SuperAdminProjectsPage() {
         .pp-form-section { background: rgba(255,255,255,.6); border: 1px solid rgba(37,99,235,.1); padding: 1.2rem; border-radius: 14px; margin-bottom: 1rem; }
         .pp-form-section-title { margin: 0 0 1rem; font-size: .8rem; font-weight: 800; color: #1D4ED8; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: .4rem; border-bottom: 1px dashed rgba(37,99,235,.15); padding-bottom: .6rem; }
 
-                .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
+        .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
         .pp-edit-dot{width:6px;height:6px;border-radius:50%;background:#2563EB;animation:pppulse 1.5s infinite;flex-shrink:0}
         .pp-save-err{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;color:#B91C1C;font-size:.78rem;font-weight:800;margin-bottom:.7rem}
         .pp-form-inner input:focus,.pp-form-inner textarea:focus,.pp-form-inner select:focus{border-color:rgba(37,99,235,.4)!important;box-shadow:0 0 0 3px rgba(37,99,235,.08)!important;background:white!important}
 
-        /* 2. BADGES CHIPS - SUR UNE SEULE LIGNE */
+        /* 2. STATS CHIPS - ADAPTÉ POUR 4 STATUTS */
         .pp-chips{display:flex;gap:.5rem;flex-wrap:nowrap;padding:.7rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);background:rgba(239,246,255,.12);width:100%;box-sizing:border-box}
         .pp-chip{display:inline-flex;align-items:center;justify-content:center;gap:.32rem;padding:.28rem .4rem;border-radius:9px;font-size:.7rem;font-weight:700;border:1px solid;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .pp-chip-dot{width:5px;height:5px;border-radius:50%}
         .pp-chip-num{font-family:'Cormorant Garamond',serif;font-size:.95rem;font-weight:700}
         @media(max-width:500px){
-          .pp-chips{padding:.5rem;gap:.25rem}
-          .pp-chip{padding:.2rem}
+          .pp-chips{padding:.5rem;gap:.25rem;flex-wrap:wrap;}
+          .pp-chip{padding:.2rem; flex: 1 1 40%;}
           .pp-chip-label{font-size:.55rem!important}
           .pp-chip-num{font-size:.8rem!important}
           .pp-chip-dot{display:none}
         }
 
-        /* 3. RECHERCHE ET FILTRES - SUR UNE SEULE LIGNE */
-        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:nowrap;padding:.8rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);width:100%;box-sizing:border-box}
-        .pp-finput{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:#111827;outline:none;flex:1 1 auto;min-width:0;background:rgba(255,255,255,.88);transition:border-color .2s,box-shadow .2s}
+        /* 3. RECHERCHE ET FILTRES - SUR UNE SEULE LIGNE ET WRAP MOBILE */
+        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;padding:.8rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);width:100%;box-sizing:border-box}
+        .pp-finput{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:#111827;outline:none;flex:1 1 150px;min-width:150px;background:rgba(255,255,255,.88);transition:border-color .2s,box-shadow .2s}
         .pp-finput:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
         .pp-finput::placeholder{color:rgba(107,114,128,.4);font-weight:400}
         .pp-fselect{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);background:rgba(255,255,255,.88);padding:0 1.8rem 0 .7rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer;flex:0 1 auto;min-width:0;background-image:url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .55rem center}
         .pp-fselect:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08);outline:none}
         .pp-reload-btn{height:36px;padding:0 .85rem;background:rgba(239,246,255,.8);border:1.5px solid rgba(37,99,235,.18);border-radius:9px;cursor:pointer;color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:800;display:flex;align-items:center;gap:.32rem;transition:all .18s;white-space:nowrap;flex:0 0 auto}
         .pp-reload-btn:hover{background:#DBEAFE;border-color:#2563EB;transform:translateY(-1px)}
-        @media(max-width:500px){
-          .pp-filter-row{padding:.6rem .5rem;gap:.3rem}
-          .pp-finput{padding:0 .4rem;font-size:.7rem;height:34px}
-          .pp-fselect{padding:0 1.2rem 0 .4rem;font-size:.7rem;height:34px;background-position:right .3rem center}
-          .pp-reload-btn{padding:0 .5rem;font-size:.7rem;height:34px}
-          .btn-text{display:none} /* Cache le texte du bouton Rechercher pour éviter le scroll sur les très petits écrans */
+        @media(max-width:550px){
+          .pp-filter-row{padding:.6rem .5rem;gap:.4rem}
+          .pp-finput{flex: 1 1 100%; height:38px; font-size:.85rem}
+          .pp-fselect{flex: 1 1 auto; height:38px; font-size:.8rem; padding:0 1.2rem 0 .4rem; background-position:right .3rem center}
+          .pp-reload-btn{flex: 1 1 auto; height:38px; font-size:.8rem; justify-content: center}
+          .btn-text{display:block}
         }
 
         .pp-tw{overflow-x:auto}
@@ -1170,7 +1159,7 @@ export default function SuperAdminProjectsPage() {
               <div className="pp-panel-ico" style={{ background: '#F5F3FF' }}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#7C3AED" strokeWidth="2.3">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />                
-                </svg>
+                                </svg>
               </div>
               <span className="pp-panel-title">Projets actifs et terminés</span>
               {items.length > 0 && <span className="pp-count-chip">{items.length}</span>}
@@ -1213,6 +1202,7 @@ export default function SuperAdminProjectsPage() {
           <div className="pp-chips">
             {([
               { label: 'Brouillons', count: draftCount, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+              { label: 'Approuvés', count: approvedCount, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
               { label: 'En cours', count: inProgressCount, color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
               { label: 'Terminés', count: completedCount, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
             ] as const).map((c) => (

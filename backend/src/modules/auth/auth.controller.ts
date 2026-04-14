@@ -1,4 +1,4 @@
-/////// backend/src/modules/auth/auth.controller.ts
+// backend/src/modules/auth/auth.controller.ts
 import { Body, Controller, Post, Get, Req, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';

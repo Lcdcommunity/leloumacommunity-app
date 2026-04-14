@@ -89,7 +89,7 @@ export class SuperAdminService {
     // On boucle sur chaque devise envoyée par le front et on fait un Upsert dans la vraie table Pricing
     const updatePromises = Object.entries(pricingData).map(([currencyStr, data]) => {
       const currency = currencyStr as CurrencyCode;
-      
+
       return this.prisma.pricing.upsert({
         where: {
           associationId_currency: {
@@ -113,7 +113,7 @@ export class SuperAdminService {
     });
 
     await Promise.all(updatePromises);
-    
+
     return { success: true, message: 'Tarifs mis à jour avec succès.' };
   }
 
@@ -239,10 +239,12 @@ export class SuperAdminService {
       return { antenna, createdAdmin };
     });
 
-    await this.notifications.notifySuperAdmins(
+    // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour les Super Admins
+    await this.notifications.notifySuperAdminsWithPush(
       associationId,
       `Une nouvelle antenne "${created.antenna.name}" a été créée.`,
       NotificationType.SYSTEM_ALERT,
+      '🏢 Nouvelle antenne',
     );
 
     if (created.createdAdmin?.sendInvite !== false) {
@@ -316,7 +318,9 @@ export class SuperAdminService {
         },
       }),
       this.prisma.user.count({ where }),
-    ]);    return {
+    ]);
+
+    return {
       items,
       total,
       page,
@@ -324,6 +328,7 @@ export class SuperAdminService {
       totalPages: Math.ceil(total / pageSize),
     };
   }
+
   async approveUser(userId: string, adminId: string, associationId: string) {
     const user = await this.prisma.user.update({
       where: { id: userId, associationId }, // 🔥 FILTRÉ
@@ -334,12 +339,15 @@ export class SuperAdminService {
       },
     });
 
-    await this.notifications.createForUser({
+    // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour l'utilisateur
+    await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
-      message: `Votre compte a été approuvé.`,
+      message: `Votre compte a été approuvé. Vous pouvez désormais accéder à toutes les fonctionnalités.`,
       type: NotificationType.ACCOUNT_APPROVED,
       title: 'Compte activé',
+      pushTitle: '🎉 Compte activé',
+      pushBody: 'Votre compte a été approuvé avec succès.',
     });
 
     return user;
@@ -356,12 +364,15 @@ export class SuperAdminService {
       },
     });
 
-    await this.notifications.createForUser({
+    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
+    await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
       message: `Votre demande d'adhésion a été refusée. Motif : ${reason}`,
       type: NotificationType.ACCOUNT_REJECTED,
       title: 'Demande refusée',
+      pushTitle: '❌ Demande refusée',
+      pushBody: `Motif : ${reason}`,
     });
 
     return user;
@@ -401,12 +412,15 @@ export class SuperAdminService {
       },
     });
 
-    await this.notifications.createForUser({
+    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
+    await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
-      message: `Votre compte a été suspendu par un administrateur.`,
+      message: `Votre compte a été suspendu par un administrateur. Veuillez nous contacter pour plus d'informations.`,
       type: NotificationType.ACCOUNT_SUSPENDED,
       title: 'Compte suspendu',
+      pushTitle: '⚠️ Compte suspendu',
+      pushBody: 'Votre compte a été temporairement suspendu.',
     });
 
     return user;
@@ -424,11 +438,15 @@ export class SuperAdminService {
       },
     });
 
-    await this.notifications.createForUser({
+    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
+    await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
-      message: `Votre compte a été réactivé avec succès.`,
+      message: `Votre compte a été réactivé avec succès. Bon retour parmi nous !`,
       type: NotificationType.ACCOUNT_APPROVED,
+      title: 'Compte réactivé',
+      pushTitle: '✅ Compte réactivé',
+      pushBody: 'Votre compte est de nouveau actif.',
     });
 
     return user;
@@ -473,12 +491,15 @@ export class SuperAdminService {
       actorId,
     );
 
-    await this.notifications.createForUser({
+    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
+    await this.notifications.createForUserWithPush({
       associationId,
       userId: result.user.id,
       message: `Bienvenue ! Vous avez été nommé administrateur pour l'antenne "${antenna.name}".`,
       type: NotificationType.SYSTEM_ALERT,
       title: 'Promotion Admin',
+      pushTitle: '👑 Promotion Admin',
+      pushBody: `Vous êtes maintenant administrateur de l'antenne ${antenna.name}.`,
     });
 
     if (data.sendInvite !== false) {
@@ -622,11 +643,15 @@ export class SuperAdminService {
         endDate: data.endDate ? new Date(data.endDate) : undefined,
       },
     });
-  }  async deleteProject(id: string, associationId: string) {
+  }
+
+  async deleteProject(id: string, associationId: string) {
     return this.prisma.project.delete({ where: { id, associationId } }); // 🔥 FILTRÉ
   }
 
-  /* ── DOCUMENTS ── */  async createDocument(data: CreateDocumentInput, actorId: string, associationId: string) {
+  /* ── DOCUMENTS ── */
+
+  async createDocument(data: CreateDocumentInput, actorId: string, associationId: string) {
     if (!data.fileAssetId) throw new BadRequestException('Un fichier est requis.');
 
     return this.prisma.document.create({

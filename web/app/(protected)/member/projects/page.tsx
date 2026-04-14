@@ -40,21 +40,18 @@ interface RichProject extends Project {
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 const STATUS_OPTIONS = [
   { value: '',             label: 'Tous les projets' },
+  { value: 'PROPOSED',     label: 'Brouillons' },
   { value: 'APPROVED',     label: 'Approuvés' },
   { value: 'IN_PROGRESS',  label: 'En cours' },
   { value: 'COMPLETED',    label: 'Terminés' },
-  { value: 'SUSPENDED',    label: 'Suspendus' },
-  { value: 'CANCELLED',    label: 'Annulés' },
 ];
 
 function getStatusCfg(status: string) {
   const map: Record<string, { label: string; color: string; bg: string; border: string; bar: string }> = {
-    IN_PROGRESS: { label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', bar: '#3B82F6' },
+    PROPOSED:    { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
     APPROVED:    { label: 'Approuvé',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', bar: '#10B981' },
+    IN_PROGRESS: { label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', bar: '#3B82F6' },
     COMPLETED:   { label: 'Terminé',   color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', bar: '#8B5CF6' },
-    SUSPENDED:   { label: 'Suspendu',  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', bar: '#F59E0B' },
-    CANCELLED:   { label: 'Annulé',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', bar: '#EF4444' },
-    DRAFT:       { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
   };
   return map[status] ?? { label: status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' };
 }
@@ -274,9 +271,7 @@ function ProjectDetailModal({ project, onClose }: { project: RichProject; onClos
               <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>Description</div>
               <p style={{ fontSize: '0.84rem', color: '#374151', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{project.description}</p>
             </div>
-          )}
-
-          {/* Promoteur */}
+          )}          {/* Promoteur */}
           {project.promoterName && (
             <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: '#F8FAFC', borderRadius: 14, border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -472,9 +467,10 @@ export default function MemberProjectsPage() {
     }
   };
 
+  const draftCount = items.filter(p => p.status === 'PROPOSED').length;
+  const approved   = items.filter(p => p.status === 'APPROVED').length;
   const inProgress = items.filter(p => p.status === 'IN_PROGRESS').length;
   const completed  = items.filter(p => p.status === 'COMPLETED').length;
-  const approved   = items.filter(p => p.status === 'APPROVED').length;
 
   return (
     <AppShell title="Projets">
@@ -506,15 +502,15 @@ export default function MemberProjectsPage() {
         .mp-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
         .mp-stat-lbl { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; }
 
-        /* ── TOOLBAR RECHERCHE & FILTRES (LIGNE UNIQUE) ── */
-        .mp-toolbar { display: flex; flex-wrap: nowrap; gap: 0.6rem; align-items: center; width: 100%; box-sizing: border-box; margin-bottom: 1.5rem; opacity: 0; animation: mpin 0.5s 0.12s cubic-bezier(.22,1,.36,1) forwards; }
-        .mp-search-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
+        /* ── TOOLBAR RECHERCHE & FILTRES (CORRIGÉ MOBILE) ── */
+        .mp-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; width: 100%; box-sizing: border-box; margin-bottom: 1.5rem; opacity: 0; animation: mpin 0.5s 0.12s cubic-bezier(.22,1,.36,1) forwards; }
+        .mp-search-wrap { position: relative; flex: 1 1 200px; min-width: 150px; }
         .mp-search-ico { position: absolute; left: 0.8rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
         .mp-search-input { width: 100%; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 0.8rem 0 2.2rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; outline: none; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; }
         .mp-search-input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
         .mp-search-input::placeholder { color: rgba(107,114,128,0.5); }
         
-        .mp-select { flex: 0 1 auto; min-width: 0; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 2rem 0 0.8rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; appearance: none; background-color: white; color: #111827; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.7rem center; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
+        .mp-select { flex: 0 1 auto; min-width: 140px; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 2rem 0 0.8rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; appearance: none; background-color: white; color: #111827; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.7rem center; cursor: pointer; transition: border-color 0.2s, box-shadow 0.2s; }
         .mp-select:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); outline: none; }
 
         .mp-view-toggle { display: flex; gap: 0.3rem; flex-shrink: 0; }
@@ -527,7 +523,6 @@ export default function MemberProjectsPage() {
           .mp-header { align-items: center; margin-bottom: 1.25rem; }
           .mp-title { font-size: 1.4rem !important; }
           .mp-propose-btn { height: 38px; padding: 0 0.85rem; font-size: 0.75rem; }
-          
           /* Grille de stats : 2 par ligne */
           .mp-stats { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1.5rem; }
           .mp-stat-card { padding: 0.85rem 0.5rem; border-radius: 12px; }
@@ -536,14 +531,14 @@ export default function MemberProjectsPage() {
         }
 
         @media (max-width: 500px) {
-          /* Force la ligne unique pour recherche & filtres */
-          .mp-toolbar { gap: 0.4rem; }
-          .mp-search-input, .mp-select, .mp-view-btn { height: 38px; font-size: 0.75rem; }
+          /* Flexbox wrap pour que la recherche et le select ne soient pas écrasés */
+          .mp-toolbar { gap: 0.5rem; flex-wrap: wrap; }
+          .mp-search-wrap { flex: 1 1 100%; }
+          .mp-select { flex: 1 1 100%; }
+          .mp-search-input, .mp-select, .mp-view-btn { height: 40px; font-size: 0.8rem; }
           .mp-search-input { padding-left: 1.8rem; }
-          .mp-search-ico { left: 0.5rem; width: 14px; height: 14px; }
-          .mp-select { padding: 0 1.5rem 0 0.5rem; background-position: right 0.4rem center; }
-          
-          /* On cache le toggle vue sur mobile pour gagner de la place (la vue liste est de toute façon cachée sur petit écran) */
+          .mp-search-ico { left: 0.6rem; width: 14px; height: 14px; }
+          .mp-select { padding: 0 1.5rem 0 0.6rem; background-position: right 0.5rem center; }
           .mp-view-toggle { display: none; }
         }
 
@@ -600,17 +595,17 @@ export default function MemberProjectsPage() {
 
         {/* CARTES STATISTIQUES */}
         <div className="mp-stats">
-          <div className="mp-stat-card" style={{ borderBottomColor: '#2563EB' }}>
-            <span className="mp-stat-val" style={{ color: '#1D4ED8' }}>{items.length}</span>
-            <span className="mp-stat-lbl">Total</span>
-          </div>
-          <div className="mp-stat-card" style={{ borderBottomColor: '#2563EB' }}>
-            <span className="mp-stat-val" style={{ color: '#1D4ED8' }}>{inProgress}</span>
-            <span className="mp-stat-lbl">En cours</span>
+          <div className="mp-stat-card" style={{ borderBottomColor: '#6B7280' }}>
+            <span className="mp-stat-val" style={{ color: '#4B5563' }}>{draftCount}</span>
+            <span className="mp-stat-lbl">Brouillons</span>
           </div>
           <div className="mp-stat-card" style={{ borderBottomColor: '#059669' }}>
             <span className="mp-stat-val" style={{ color: '#047857' }}>{approved}</span>
             <span className="mp-stat-lbl">Approuvés</span>
+          </div>
+          <div className="mp-stat-card" style={{ borderBottomColor: '#2563EB' }}>
+            <span className="mp-stat-val" style={{ color: '#1D4ED8' }}>{inProgress}</span>
+            <span className="mp-stat-lbl">En cours</span>
           </div>
           <div className="mp-stat-card" style={{ borderBottomColor: '#7C3AED' }}>
             <span className="mp-stat-val" style={{ color: '#6D28D9' }}>{completed}</span>

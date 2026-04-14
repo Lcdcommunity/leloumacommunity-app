@@ -1,5 +1,7 @@
 // backend/src/modules/auth/auth-member.controller.ts
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { AuthMemberService } from './auth-member.service';
 import { MemberSignupDto } from './dto/member-signup.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
@@ -9,8 +11,12 @@ export class AuthMemberController {
   constructor(private readonly service: AuthMemberService) {}
 
   @Post('member-signup')
-  memberSignup(@Body() dto: MemberSignupDto) {
-    return this.service.memberSignup(dto);
+  @UseInterceptors(FileInterceptor('avatar', { storage: memoryStorage() }))
+  memberSignup(
+    @Body() dto: MemberSignupDto,
+    @UploadedFile() file?: Express.Multer.File
+  ) {
+    return this.service.memberSignup(dto, file);
   }
 
   @Post('verify-email')

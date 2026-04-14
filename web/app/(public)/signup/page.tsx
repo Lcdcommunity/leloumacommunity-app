@@ -1,4 +1,4 @@
-/////// web/app/(public)/signup/page.tsx
+/////////// web/app/(public)/signup/page.tsx
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState, useCallback } from 'react';
@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '../../../lib/api-client';
 import { useTranslation } from 'react-i18next';
-import i18n from '../../../lib/i18n'; // 🔥 Import pour la gestion de la langue
+import i18n from '../../../lib/i18n';
 
 type PublicAntenna = {
   id: string;
@@ -16,7 +16,6 @@ type PublicAntenna = {
   country?: string;
 };
 
-// Les listes de valeurs restent en dur car le backend attend probablement ces chaînes exactes.
 export const ASSOCIATION_ROLES = [
   'Membre (simple)',
   "Secrétaire à l'organisation",
@@ -78,7 +77,7 @@ export const COUNTRIES = [
 
 export default function MemberSignupPage() {
   const { t } = useTranslation();
-  
+
   const [currentLang, setCurrentLang] = useState('fr');
   const isRTL = currentLang === 'ar';
 
@@ -94,7 +93,6 @@ export default function MemberSignupPage() {
   const [mounted, setMounted] = useState(false);
   const [step, setStep] = useState(0);
 
-  // --- ÉTAT DU THÈME DYNAMIQUE (Marque Blanche) ---
   const [theme, setTheme] = useState<{
     name: string;
     logoUrl: string | null;
@@ -102,19 +100,17 @@ export default function MemberSignupPage() {
     secondary: string;
     fontFamily: string;
   }>({
-    name: 'Lélouma', // Fallback par défaut
+    name: 'Lélouma',
     logoUrl: null,
-    primary: '#2563EB', // Ancien --theme-blue
-    secondary: '#059669', // Ancien --theme-green
+    primary: '#2563EB',
+    secondary: '#059669',
     fontFamily: "'DM Sans', sans-serif",
   });
 
-  // ── Étape 0 : Identité ──
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [antennaId, setAntennaId] = useState('');
 
-  // ── Étape 1 : Contact & Origine ──
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
@@ -135,13 +131,11 @@ export default function MemberSignupPage() {
   const [profession, setProfession] = useState('');
   const [associationRole, setAssociationRole] = useState('');
 
-  // ── Étape 2 : Photo ──
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Étape 3 : Sécurité ──
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -154,7 +148,6 @@ export default function MemberSignupPage() {
 
   const initials = `${firstName[0] ?? ''}${lastName[0] ?? ''}`.toUpperCase();
 
-  // 🔥 Fonction de mise à jour de la langue
   const handleLanguageChanged = useCallback((lng: string) => {
     setCurrentLang(lng);
     document.documentElement.lang = lng;
@@ -162,7 +155,6 @@ export default function MemberSignupPage() {
   }, []);
 
   useEffect(() => {
-    // ── RESTAURATION DES DONNÉES AU MONTAGE ──
     const savedData = sessionStorage.getItem('signupFormState');
     if (savedData) {
       try {
@@ -204,7 +196,6 @@ export default function MemberSignupPage() {
       }
     })();
 
-    // Synchronise la langue avec i18n
     if (i18n.isInitialized) {
       const detectedLang = i18n.language || localStorage.getItem('i18nextLng') || 'fr';
       setCurrentLang(detectedLang);
@@ -216,7 +207,6 @@ export default function MemberSignupPage() {
     };
   }, [handleLanguageChanged]);
 
-  // ── RÉCUPÉRATION DU THÈME (Marque Blanche) ──
   useEffect(() => {
     const fetchTheme = async () => {
       try {
@@ -249,7 +239,6 @@ export default function MemberSignupPage() {
     fetchTheme();
   }, []);
 
-  // ── SAUVEGARDE EN TEMPS RÉEL ──
   useEffect(() => {
     if (!mounted) return;
     const dataToSave = {
@@ -269,18 +258,21 @@ export default function MemberSignupPage() {
     if (country && country !== 'Autre (Non listé)') {
       const selectedCountry = COUNTRIES.find(c => c.name === country);
       if (selectedCountry) {
-        if (!phone || phone.trim() === '' || !phone.includes(' ')) {
-          setPhone(`${selectedCountry.dial} `);
-        } else {
-          const phoneParts = phone.split(' ');
-          if (phoneParts.length > 1) {
-            phoneParts[0] = selectedCountry.dial;
-            setPhone(phoneParts.join(' '));
+        setPhone(prevPhone => {
+          if (!prevPhone || prevPhone.trim() === '' || !prevPhone.includes(' ')) {
+            return `${selectedCountry.dial} `;
+          } else {
+            const phoneParts = prevPhone.split(' ');
+            if (phoneParts.length > 1) {
+              phoneParts[0] = selectedCountry.dial;
+              return phoneParts.join(' ');
+            }
+            return prevPhone;
           }
-        }
+        });
       }
     }
-  }, [country]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [country]);
 
   const handleBirthDateChange = (e: ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
@@ -315,7 +307,7 @@ export default function MemberSignupPage() {
     setSelectedPhotoFile(file);
     setPhotoPreviewUrl(URL.createObjectURL(file));
   }
-
+  
   function removePhoto() {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     setSelectedPhotoFile(null);
@@ -403,6 +395,7 @@ export default function MemberSignupPage() {
     setStep(s => Math.max(s - 1, 0));
   }
 
+  // ⚡ LA FONCTION CHIRURGICALE POUR TOUT ENVOYER D'UN SEUL COUP ⚡
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const err = validateStep(3);
@@ -413,38 +406,38 @@ export default function MemberSignupPage() {
     try {
       const finalBirthCountry = birthCountry === 'Autre (Non listé)' ? customBirthCountry : birthCountry;
       const finalCountry = country === 'Autre (Non listé)' ? customCountry : country;
+      const formattedBirthDate = convertDateToISO(birthDate);
 
-      await api.memberSignup({
-        firstName,
-        lastName,
-        email,
-        phone: phone || undefined,
-        password,
-        antennaId,
-        originSubPrefecture,
-        birthDate: convertDateToISO(birthDate),
-        placeOfBirth: placeOfBirth || undefined,
-        birthCountry: finalBirthCountry || undefined,
-        city: city || undefined,
-        country: finalCountry || undefined,
-        postalCode: postalCode || undefined,
-        addressLine1: addressLine1 || undefined,
-        addressLine2: addressLine2 || undefined,
-        function: associationRole || undefined,
-        professionalStatus: profession || undefined,
-        termsAccepted,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any); 
+      // Création d'un FormData unique pour inclure l'image et TOUTES les données saisies
+      const formData = new FormData();
+      formData.append('firstName', firstName.trim());
+      formData.append('lastName', lastName.trim());
+      formData.append('email', email.trim());
+      formData.append('password', password);
+      formData.append('antennaId', antennaId);
       
+      if (phone) formData.append('phone', phone.trim());
+      if (originSubPrefecture) formData.append('originSubPrefecture', originSubPrefecture.trim());
+      if (formattedBirthDate) formData.append('birthDate', formattedBirthDate);
+      if (placeOfBirth) formData.append('placeOfBirth', placeOfBirth.trim());
+      if (finalBirthCountry) formData.append('birthCountry', finalBirthCountry.trim());
+      if (city) formData.append('city', city.trim());
+      if (finalCountry) formData.append('country', finalCountry.trim());
+      if (postalCode) formData.append('postalCode', postalCode.trim());
+      if (addressLine1) formData.append('addressLine1', addressLine1.trim());
+      if (addressLine2) formData.append('addressLine2', addressLine2.trim());
+      if (associationRole) formData.append('function', associationRole.trim());
+      if (profession) formData.append('professionalStatus', profession.trim());
+      formData.append('termsAccepted', String(termsAccepted));
+
+      // Ajout de la photo de manière native
       if (selectedPhotoFile) {
-        const formData = new FormData();
         formData.append('avatar', selectedPhotoFile);
-        try { 
-          await api.uploadAvatar(formData); 
-        } catch (uploadErr) { 
-          console.warn("La photo ne peut pas être uploadée (401). Elle sera demandée plus tard.", uploadErr);
-        }
       }
+
+      // ⚠️ Assure-toi que la méthode api.memberSignup accepte le FormData dans ton fichier api-client.ts
+      await api.memberSignup(formData);
+
       setSuccess(true);
       sessionStorage.removeItem('signupFormState'); 
     } catch (err) {
@@ -467,7 +460,6 @@ export default function MemberSignupPage() {
   const strengthLabel = ['', t('signup.pwdWeak', 'Faible'), t('signup.pwdFair', 'Moyen'), t('signup.pwdGood', 'Bon'), t('signup.pwdStrong', 'Fort')][pwdStrength];
   const strengthColor = ['', '#E05050', '#E09030', '#059669', '#047857'][pwdStrength];
 
-  // --- UTILITAIRE COULEUR ---
   const getLightColor = (hex: string, opacity: number) => {
     hex = hex.replace('#', '');
     const r = parseInt(hex.substring(0, 2), 16) || 5;
@@ -485,14 +477,13 @@ export default function MemberSignupPage() {
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-          /* Injection des couleurs du thème récupéré */
-          --theme-blue: ${theme.primary};
-          --theme-blue-dark: ${theme.primary}; /* Ou un shade plus sombre généré si besoin */
-          --theme-green: ${theme.secondary};
-          --theme-green-light: ${theme.secondary};
-          --font-main: ${theme.fontFamily};
-          --bg-color: #F8FAFC;
-          --err: #B91C1C;
+          var(--theme-blue): ${theme.primary};
+          var(--theme-blue-dark): ${theme.primary};
+          var(--theme-green): ${theme.secondary};
+          var(--theme-green-light): ${theme.secondary};
+          var(--font-main): ${theme.fontFamily};
+          var(--bg-color): #F8FAFC;
+          var(--err): #B91C1C;
         }
 
         .sp-root {
@@ -521,8 +512,6 @@ export default function MemberSignupPage() {
         .sp-title span { background: linear-gradient(135deg, var(--theme-blue-dark), var(--theme-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
         .sp-subtitle { font-size: 0.82rem; color: #64748B; margin-top: 0.45rem; line-height: 1.6; font-weight: 500; }
 
-        /* Le reste du CSS (stepper, formulaires, bouttons) est préservé, 
-           il utilise désormais dynamiquement --theme-blue et --theme-green */
         .sp-stepper { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.75rem; }
         .sp-step-item { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; position: relative; flex: 1; }
         .sp-step-item:not(:last-child)::after { content: ''; position: absolute; top: 13px; left: calc(50% + 14px); width: calc(100% - 28px); height: 1px; background: #E2E8F0; transition: background 0.4s; }
@@ -550,9 +539,7 @@ export default function MemberSignupPage() {
         .sp-pwd-strength { display: flex; gap: 4px; margin-top: 0.4rem; align-items: center; }
         .sp-pwd-bar { flex: 1; height: 4px; border-radius: 99px; background: #E2E8F0; overflow: hidden; }
         .sp-pwd-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.4s; }
-        .sp-pwd-label { font-size: 0.65rem; font-weight: 700; margin-left: 0.4rem; min-width: 36px; }
-
-        .sp-notice { background: ${getLightColor(theme.primary, 0.1)}; border: 1px solid ${getLightColor(theme.primary, 0.2)}; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.78rem; color: var(--theme-blue-dark); font-weight: 500; line-height: 1.5; margin-bottom: 1.2rem; display: flex; gap: 0.6rem; align-items: flex-start; }
+        .sp-pwd-label { font-size: 0.65rem; font-weight: 700; margin-left: 0.4rem; min-width: 36px; }        .sp-notice { background: ${getLightColor(theme.primary, 0.1)}; border: 1px solid ${getLightColor(theme.primary, 0.2)}; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.78rem; color: var(--theme-blue-dark); font-weight: 500; line-height: 1.5; margin-bottom: 1.2rem; display: flex; gap: 0.6rem; align-items: flex-start; }
         .sp-error { display: flex; align-items: center; gap: 0.55rem; padding: 0.8rem 1rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; color: var(--err); font-size: 0.8rem; font-weight: 600; }
         .sp-toast-ok { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 1rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
         .sp-success { text-align: center; padding: 1rem 0; }
@@ -578,7 +565,6 @@ export default function MemberSignupPage() {
         .sp-file-input { display: none; }
         .sp-photo-remove-btn { min-height: 46px; padding: 0 1rem; border-radius: 12px; border: 1.5px solid rgba(220,38,38,0.2); background: rgba(254,242,242,0.6); color: #DC2626; font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; }
 
-        /* ── Highlight du champ Poste occupé ── */
         .sp-role-select {
           width: 100%; min-height: 48px; border-radius: 12px;
           border: 1.5px solid ${getLightColor(theme.secondary, 0.3)};
@@ -602,7 +588,6 @@ export default function MemberSignupPage() {
           display: flex; align-items: center; gap: 0.4rem;
         }
         
-        /* ── Case à cocher Légale ── */
         .sp-checkbox-wrapper {
           display: flex; align-items: flex-start; gap: 0.75rem;
           margin-top: 1.5rem; padding: 1rem; background: #F8FAFC;
@@ -738,9 +723,7 @@ export default function MemberSignupPage() {
                     </select>
                   </div>
                 </div>
-              )}
-
-              {/* ── STEP 1 : Contact, Origine & Naissance ── */}
+              )}              {/* ── STEP 1 : Contact, Origine & Naissance ── */}
               {step === 1 && (
                 <div className="sp-panel sp-stack">
                   <p className="sp-section-title">{t('signup.communityIdentity', 'Identité communautaire')}</p>
@@ -879,13 +862,6 @@ export default function MemberSignupPage() {
               {step === 2 && (
                 <div className="sp-panel sp-stack">
                   <p className="sp-section-title">{t('signup.profilePhoto', 'Photo de profil')}</p>
-
-                  <div className="sp-notice" style={{ marginBottom: '1.25rem', padding: '0.65rem 0.85rem', fontSize: '0.75rem', border: '1px solid #FDE68A', background: '#FEF3C7', color: '#92400E' }}>
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: '2px' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    {t('signup.photoWarning', 'Attention: Pour des raisons de sécurité, la photo de profil définitive devra être re-sauvegardée depuis votre tableau de bord lors de votre première connexion.')}
-                  </div>
 
                   <div className="sp-photo-box">
                     <div className="sp-photo-avatar">

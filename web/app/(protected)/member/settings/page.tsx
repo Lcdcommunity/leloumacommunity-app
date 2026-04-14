@@ -112,6 +112,23 @@ export default function MemberSettingsPage() {
 
   useEffect(() => {
     setMounted(true);
+
+    // 🔥 CORRECTION : Charger les préférences utilisateur depuis le backend
+    const loadPreferences = async () => {
+      try {
+        const prefs = await api.getMemberPreferences();
+        if (prefs) {
+          setEmailNotifications(prefs.emailNotifications ?? true);
+          setSmsNotifications(prefs.smsNotifications ?? false);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des préférences:', error);
+      }
+    };
+    
+    loadPreferences();
+
+    // Vérification locale pour le Push navigateur
     if ('serviceWorker' in navigator && 'PushManager' in window) {
       navigator.serviceWorker.ready.then(registration => {
         registration.pushManager.getSubscription().then(subscription => {
@@ -279,7 +296,6 @@ export default function MemberSettingsPage() {
             padding: clamp(1.25rem, 3vw, 2rem);
             max-width: 1050px; margin: 0 auto;
           }
-
           .ms-header {
             margin-bottom: 1.75rem;
             opacity: 0; transform: translateY(10px);
@@ -395,7 +411,7 @@ export default function MemberSettingsPage() {
 
           <div className="ms-layout">
             <div className="ms-left-col">
-              
+
               {/* Panel 1 : Préférences */}
               <div className="ms-panel-left">
                 <form onSubmit={handleSubmit}>
@@ -535,7 +551,7 @@ export default function MemberSettingsPage() {
                     </div>
                     <span className="ms-panel-title">{t('settings.securityTitle', 'Sécurité du compte')}</span>
                   </div>
-                  
+
                   <div className="ms-panel-body">
                     {!showSecurityFields ? (
                       <button 

@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 import { UserRole, UserStatus, TokenType } from '@prisma/client';
 import { AuthMailerService } from './auth.mailer.service';
 import { ConfigService } from '@nestjs/config';
+import { CloudinaryService } from '../uploads/cloudinary.service'; // ⚡ AJOUT CHIRURGICAL
 
 @Injectable()
 export class AuthMemberService {
@@ -19,13 +20,14 @@ export class AuthMemberService {
     private readonly prisma: PrismaService,
     private readonly authMailer: AuthMailerService,
     private readonly config: ConfigService,
+    private readonly cloudinaryService: CloudinaryService, // ⚡ AJOUT CHIRURGICAL
   ) {}
 
   private getFrontendBaseUrl(): string {
     return this.config.get<string>('FRONTEND_URL') || 'http://localhost:3000';
   }
 
-  async memberSignup(dto: MemberSignupDto): Promise<{ message: string }> {
+  async memberSignup(dto: MemberSignupDto, file?: Express.Multer.File): Promise<{ message: string }> {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.prisma.user.findUnique({
       where: { email },
@@ -47,11 +49,40 @@ export class AuthMemberService {
       throw new BadRequestException('Antenne invalide ou inactive.');
     }
 
+    // ⚡ TRAITEMENT DE L'IMAGE SI ELLE EXISTE
+    let fileAssetData: any = null;
+    if (file) {
+      const cloudinaryRes = await this.cloudinaryService.uploadFile(file);
+      fileAssetData = {
+        storageProvider: 'cloudinary',
+        storageKey: cloudinaryRes.public_id,
+        originalFilename: file.originalname,
+        mimeType: file.mimetype,
+        sizeBytes: BigInt(file.size),
+        category: 'PROFILE_PHOTO',
+        visibility: 'PUBLIC',
+        url: cloudinaryRes.secure_url,
+      };
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const verificationToken = randomUUID() + randomUUID();
     const tokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24h
 
     await this.prisma.$transaction(async (tx) => {
+      let profilePhotoFileId: string | null = null;
+
+      // Création du FileAsset avant l'utilisateur s'il y a une photo
+      if (fileAssetData) {
+        const createdFileAsset = await tx.fileAsset.create({
+          data: {
+            associationId: antenna.associationId,
+            ...fileAssetData,
+          },
+        });
+        profilePhotoFileId = createdFileAsset.id;
+      }
+
       const newUser = await tx.user.create({
         data: {
           firstName: dto.firstName.trim(),
@@ -66,10 +97,27 @@ export class AuthMemberService {
           country: dto.country?.trim() || null,
           addressLine1: dto.addressLine1?.trim() || null,
           addressLine2: dto.addressLine2?.trim() || null,
-          // 👇 NOUVEAU CHAMP : Trace légale de l'acceptation
           termsAcceptedAt: new Date(), 
+
+          // ⚡ NOUVEAUX CHAMPS SYNCHRONISÉS
+          birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+          function: dto.function?.trim() || null,
+          professionalStatus: dto.professionalStatus?.trim() || null,
+          originSubPrefecture: dto.originSubPrefecture?.trim() || null,
+          placeOfBirth: dto.placeOfBirth?.trim() || null,
+          countryOfBirth: dto.birthCountry?.trim() || null,
+          postalCode: dto.postalCode?.trim() || null,
+          profilePhotoFileId,
         },
       });
+
+      // Lier l'uploader au FileAsset après la création du User
+      if (profilePhotoFileId) {
+        await tx.fileAsset.update({
+          where: { id: profilePhotoFileId },
+          data: { uploadedByUserId: newUser.id },
+        });
+      }
 
       await tx.membership.create({
         data: {
@@ -92,7 +140,7 @@ export class AuthMemberService {
       });
     });
 
-    // 🚀 ENVOI DU MAIL DE VÉRIFICATION (Marque Blanche)
+    // 🚀 ENVOI DU MAIL DE VÉRIFICATION
     const front = this.getFrontendBaseUrl();
     const verifyUrl = `${front}/verify-email?token=${encodeURIComponent(verificationToken)}`;
 

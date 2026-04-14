@@ -1,12 +1,16 @@
 // backend/src/modules/expenses/expenses.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ExpenseStatus, LedgerEntryType, UserRole, ExpenseCategory, CurrencyCode, Prisma } from '@prisma/client';
+import { ExpenseStatus, LedgerEntryType, UserRole, ExpenseCategory, CurrencyCode, Prisma, NotificationType } from '@prisma/client';
 import { CreateExpenseDto, RejectExpenseDto } from './dto/expense.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ExpensesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService, // 🔥 AJOUT CHIRURGICAL : Injection du service de notifications
+  ) {}
 
   // ==========================================
   // LOGIQUE ADMIN D'ANTENNE
@@ -88,6 +92,14 @@ export class ExpensesService {
           createdByUserId: adminUserId,
         }
       });
+    } else {
+      // 🔥 AJOUT CHIRURGICAL : Si au-dessus du seuil, on notifie les Super Admins (In-App + Push)
+      await this.notifications.notifySuperAdminsWithPush(
+        association.id,
+        `Une dépense de ${expense.amount} ${expense.currency} pour l'antenne "${antenna.name}" nécessite votre validation.`,
+        NotificationType.EXPENSE_REQUIRES_VALIDATION,
+        '⚠️ Validation de dépense requise'
+      );
     }
 
     return expense;
@@ -214,6 +226,17 @@ export class ExpensesService {
       })
     ]);
 
+    // 🔥 AJOUT CHIRURGICAL : Notifie l'admin d'antenne que sa dépense est validée (In-App + Push)
+    await this.notifications.createForUserWithPush({
+      associationId: updatedExpense.associationId,
+      userId: updatedExpense.engagedByUserId,
+      type: NotificationType.EXPENSE_VALIDATED,
+      title: 'Dépense validée',
+      message: `Votre demande de dépense de ${updatedExpense.amount} ${updatedExpense.currency} ("${updatedExpense.title}") a été validée.`,
+      pushTitle: '✅ Dépense validée',
+      pushBody: `${updatedExpense.title} (${updatedExpense.amount} ${updatedExpense.currency}) a été approuvée.`
+    });
+
     return { message: "Dépense validée avec succès", expense: updatedExpense };
   }
 
@@ -237,6 +260,17 @@ export class ExpensesService {
         validatedByUserId: superAdminId,
         validatedAt: new Date()
       }
+    });
+
+    // 🔥 AJOUT CHIRURGICAL : Notifie l'admin d'antenne du rejet (In-App + Push)
+    await this.notifications.createForUserWithPush({
+      associationId: updated.associationId,
+      userId: updated.engagedByUserId,
+      type: NotificationType.EXPENSE_REJECTED,
+      title: 'Dépense refusée',
+      message: `Votre demande de dépense de ${updated.amount} ${updated.currency} ("${updated.title}") a été refusée. Motif: ${reason}`,
+      pushTitle: '❌ Dépense refusée',
+      pushBody: `Motif : ${reason}`
     });
 
     return { message: "Dépense rejetée.", expense: updated };
