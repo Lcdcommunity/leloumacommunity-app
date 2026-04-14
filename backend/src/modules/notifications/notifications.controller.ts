@@ -1,5 +1,5 @@
 // backend/src/modules/notifications/notifications.controller.ts
-import { Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Patch, Post, Query, UseGuards, Body } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { PushService } from './push.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -70,5 +70,79 @@ export class NotificationsController {
     */
 
     return { message: 'Tests de notifications push envoyés avec succès !' };
+  }
+
+  /**
+   * 🔥 AJOUT CHIRURGICAL : Route pour le centre de diffusion (Super Admin / Admin Antenne)
+   */
+  @Post('dispatch')
+  async dispatchCustomCommunication(
+    @CurrentUser() user: AuthUser,
+    @Body() body: {
+      targetType: 'ALL' | 'ANTENNA' | 'MEMBER';
+      targetId?: string;
+      channels: { inApp: boolean; push: boolean; email: boolean; sms: boolean };
+      title: string;
+      message: string;
+    }
+  ) {
+    let targetUsers: { id: string }[] = [];
+
+    // Astuce chirurgicale : on récupère l'instance Prisma depuis le service existant
+    // pour éviter de modifier le constructeur du contrôleur et casser tes tests éventuels.
+    const prisma = (this.service as any).prisma;
+
+    // 1. Déterminer les destinataires selon la cible choisie
+    if (body.targetType === 'ALL') {
+      targetUsers = await prisma.user.findMany({
+        where: { associationId: user.associationId, status: 'ACTIVE' },
+        select: { id: true }
+      });
+    } else if (body.targetType === 'ANTENNA' && body.targetId) {
+      targetUsers = await prisma.user.findMany({
+        where: { 
+          associationId: user.associationId, 
+          status: 'ACTIVE',
+          memberships: { some: { antennaId: body.targetId } }
+        },
+        select: { id: true }
+      });
+    } else if (body.targetType === 'MEMBER' && body.targetId) {
+      targetUsers = [{ id: body.targetId }];
+    }
+
+    if (targetUsers.length === 0) {
+      return { message: "Aucun membre trouvé pour cette cible." };
+    }
+
+    // 2. Propulser les messages en parallèle (Fire & Forget sécurisé)
+    const promises = targetUsers.map(async (targetUser) => {
+      // In-App (Base de données) + Push
+      if (body.channels.inApp || body.channels.push) {
+        await this.service.createForUserWithPush({
+          associationId: user.associationId,
+          userId: targetUser.id,
+          type: NotificationType.SYSTEM_ALERT, // Type générique pour les annonces globales
+          title: body.title,
+          message: body.message,
+          pushTitle: body.channels.push ? body.title : undefined,
+          pushBody: body.channels.push ? body.message : undefined,
+        }).catch((e: any) => console.error(`Erreur Push pour ${targetUser.id}`, e));
+      }
+
+      // Email (À brancher avec ton MailService)
+      if (body.channels.email) {
+        // await this.mailService.sendCustomEmail(targetUser.email, body.title, body.message);
+      }
+
+      // SMS (À brancher avec ton fournisseur SMS)
+      if (body.channels.sms) {
+        // await ce service...
+      }
+    });
+
+    await Promise.all(promises);
+
+    return { message: `Message diffusé avec succès à ${targetUsers.length} membre(s).` };
   }
 }

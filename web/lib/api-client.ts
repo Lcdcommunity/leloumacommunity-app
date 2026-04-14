@@ -310,7 +310,20 @@ export const api = {
       method: 'DELETE',
       body: { endpoint },
     }),
-
+// ==========================================
+  // COMMUNICATION & DIFFUSION
+  // ==========================================
+  sendCustomCommunication: (body: {
+    targetType: 'ALL' | 'ANTENNA' | 'MEMBER';
+    targetId?: string;
+    channels: { inApp: boolean; push: boolean; email: boolean; sms: boolean };
+    title: string;
+    message: string;
+  }) =>
+    http<{ message: string }, typeof body>('/notifications/dispatch', {
+      method: 'POST',
+      body,
+    }),
   // ==========================================
   // TARIFICATION & SAAS 
   // ==========================================

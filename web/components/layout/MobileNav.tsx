@@ -39,22 +39,23 @@ const ICO = {
   logout:     'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
   calendar:   'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   star:       'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
+  send:       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', // 🔥 AJOUT: Icône de communication
 };
 
 type NavItem = { href: string; label: string; ico: string; section?: string };
 
 const systemAdminItems: NavItem[] = [
   { href: '/system-admin',                  label: 'Dashboard SaaS',      ico: ICO.home,       section: 'Plateforme' },
-  { href: '/system-admin/associations/new', label: 'Nouvelle Instance',      ico: ICO.plus,       section: 'Plateforme' },
-  { href: '/system-admin/audit',            label: 'Logs Système',           ico: ICO.audit,      section: 'Sécurité' },
-  { href: '/system-admin/profile',          label: 'Mon profil',             ico: ICO.user,       section: 'Compte' },
-  { href: '/system-admin/settings',         label: 'Paramètres SaaS',        ico: ICO.gear,       section: 'Compte' },
+  { href: '/system-admin/associations/new', label: 'Nouvelle Instance',   ico: ICO.plus,       section: 'Plateforme' },
+  { href: '/system-admin/audit',            label: 'Logs Système',        ico: ICO.audit,      section: 'Sécurité' },
+  { href: '/system-admin/profile',          label: 'Mon profil',          ico: ICO.user,       section: 'Compte' },
+  { href: '/system-admin/settings',         label: 'Paramètres SaaS',     ico: ICO.gear,       section: 'Compte' },
 ];
 
 const superAdminItems: NavItem[] = [
   { href: '/super-admin',                 label: 'Dashboard',              ico: ICO.home,       section: 'Principal' },
   { href: '/super-admin/antennas',        label: 'Antennes',               ico: ICO.pin,        section: 'Principal' },
-  { href: '/super-admin/admins',         label: 'Admins antenne',        ico: ICO.users,      section: 'Principal' },
+  { href: '/super-admin/admins',          label: 'Admins antenne',         ico: ICO.users,      section: 'Principal' },
   { href: '/super-admin/members',         label: 'Membres',                ico: ICO.group,      section: 'Principal' },
   { href: '/super-admin/approvals',       label: 'Validations comptes',    ico: ICO.check,      section: 'Gestion' },
   { href: '/super-admin/contributions',   label: 'Cotisations',            ico: ICO.coin,       section: 'Gestion' },
@@ -64,6 +65,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,       section: 'Gestion' },
   { href: '/super-admin/documents',       label: 'Documents',              ico: ICO.doc,        section: 'Gestion' },
   { href: '/super-admin/contents',        label: 'Informations',           ico: ICO.news,       section: 'Gestion' },
+  { href: '/super-admin/communication',   label: 'Envoi SMS & Push',       ico: ICO.send,       section: 'Outils' }, // 🔥 AJOUT CHIRURGICAL
   { href: '/super-admin/notifications',   label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
   { href: '/super-admin/audit',           label: 'Audit',                  ico: ICO.audit,      section: 'Outils' },
   { href: '/super-admin/profile',         label: 'Mon profil',             ico: ICO.user,       section: 'Outils' },
@@ -83,6 +85,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/documents',             label: 'Documents & photos',     ico: ICO.doc,        section: 'Contenu' },
   { href: '/admin/contents',              label: 'Informations',           ico: ICO.news,       section: 'Contenu' },
   { href: '/admin/late-members',          label: 'Retardataires +3 mois',  ico: ICO.clock,      section: 'Contenu' },
+  { href: '/admin/communication',         label: 'Envoi SMS & Push',       ico: ICO.send,       section: 'Outils' }, // 🔥 AJOUT CHIRURGICAL
   { href: '/admin/notifications',         label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
   { href: '/admin/audit',                 label: 'Audit',                  ico: ICO.audit,      section: 'Outils' },
   { href: '/admin/settings',              label: 'Paramètres',             ico: ICO.gear,       section: 'Outils' },
@@ -146,6 +149,9 @@ export function MobileNav() {
   const [associationName, setAssociationName] = useState('Plateforme');
   const [open, setOpen] = useState(false);
   const [prevPath, setPrevPath] = useState(pathname);
+  
+  // 🔥 AJOUT CHIRURGICAL : État pour le compteur de notifications non lues
+  const [unreadCount, setUnreadCount] = useState(0);
 
   if (pathname !== prevPath) {
     setPrevPath(pathname);
@@ -176,6 +182,23 @@ export function MobileNav() {
     })();
     return () => { mounted = false; };
   }, []);
+
+  // 🔥 AJOUT CHIRURGICAL : Récupération du nombre de notifications non lues (rafraîchi au changement de route ou ouverture menu)
+  useEffect(() => {
+    let mounted = true;
+    void (async () => {
+      try {
+        const res = await api.listMyNotifications();
+        if (!mounted) return;
+        const data = Array.isArray(res) ? res : (res?.items || []);
+        const unread = data.filter(n => !n.isRead).length;
+        setUnreadCount(unread);
+      } catch {
+        // Silencieux pour ne pas gêner la navigation en cas de coupure réseau
+      }
+    })();
+    return () => { mounted = false; };
+  }, [pathname, open]);
 
   const allItems = useMemo(() => {
     if (role === 'SYSTEM_ADMIN')   return systemAdminItems;
@@ -275,8 +298,7 @@ export function MobileNav() {
           border-radius: 14px; margin: 0.3rem 0.1rem;
           -webkit-tap-highlight-color: transparent;
           transition: color 0.18s, transform 0.15s;
-        }
-        .mn-burger:active { transform: scale(0.9); }
+        }        .mn-burger:active { transform: scale(0.9); }
         .mn-burger.open { color: var(--mn-accent); }
 
         .mn-burger-lines {
@@ -293,6 +315,17 @@ export function MobileNav() {
         .mn-burger.open .mn-burger-line:nth-child(1) { transform: translateY(5.5px) rotate(45deg); width: 17px; }
         .mn-burger.open .mn-burger-line:nth-child(2) { opacity: 0; transform: scaleX(0); }
         .mn-burger.open .mn-burger-line:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); width: 17px; }
+
+        /* 🔥 AJOUT CHIRURGICAL : Styles pour les badges de notifications 🔥 */
+        .mn-badge-dot {
+          position: absolute; top: -3px; right: -3px; width: 10px; height: 10px;
+          background: #EF4444; border: 2.5px solid white; border-radius: 50%;
+        }
+        .mn-badge-count {
+          background: #EF4444; color: white; font-size: 0.65rem; font-weight: 800;
+          padding: 0.15rem 0.45rem; border-radius: 99px; line-height: 1;
+          box-shadow: 0 2px 6px rgba(239,68,68,0.25);
+        }
 
         /* ════ OVERLAY ════ */
         .mn-drawer-overlay {
@@ -441,21 +474,31 @@ export function MobileNav() {
             <div key={section}>
               <div className="mn-section-label">{section}</div>
               <div className="mn-group">
-                {items.map(item => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`mn-link${isActive(item.href) ? ' active' : ''}`}
-                  >
-                    <span className="mn-link-ico"><Ico d={item.ico} size={16} /></span>
-                    <span className="mn-link-text">{item.label}</span>
-                    <span className="mn-link-chevron">
-                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-                      </svg>
-                    </span>
-                  </Link>
-                ))}
+                {items.map(item => {
+                  // 🔥 AJOUT CHIRURGICAL : Vérification si on est sur la ligne "Notifications"
+                  const isNotifLink = item.href.includes('/notifications');
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`mn-link${isActive(item.href) ? ' active' : ''}`}
+                    >
+                      <span className="mn-link-ico"><Ico d={item.ico} size={16} /></span>
+                      <span className="mn-link-text">{item.label}</span>
+                      
+                      {/* 🔥 Affichage conditionnel du badge vs chevron */}
+                      {isNotifLink && unreadCount > 0 ? (
+                        <span className="mn-badge-count">{unreadCount}</span>
+                      ) : (
+                        <span className="mn-link-chevron">
+                          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
+                          </svg>
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -497,12 +540,14 @@ export function MobileNav() {
           onClick={() => setOpen(v => !v)}
           aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
         >
-          <span className="mn-tab-ico-wrap">
+          <span className="mn-tab-ico-wrap" style={{ position: 'relative' }}>
             <div className="mn-burger-lines">
               <div className="mn-burger-line" />
               <div className="mn-burger-line" />
               <div className="mn-burger-line" />
             </div>
+            {/* 🔥 AJOUT CHIRURGICAL : Le petit point rouge sur le bouton Menu */}
+            {unreadCount > 0 && <div className="mn-badge-dot" />}
           </span>
           Menu
         </button>
