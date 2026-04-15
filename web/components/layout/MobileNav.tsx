@@ -229,13 +229,13 @@ export function MobileNav() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
-        .mn-container, .mn-overlay { display: none; }
-        
-        @media (max-width: 768px) {
-          .mn-container { display: flex; }
-          .mn-overlay { display: block; }
+        /* ════ MASQUER SUR DESKTOP ════ */
+        @media (min-width: 769px) {
+          .mn-container, .mn-overlay, .mn-drawer { 
+            display: none !important; 
+          }
         }
-
+        
         /* ════ NEUMORPHIC FLOATING PILL ════ */
         .mn-container {
           position: fixed; 
@@ -383,8 +383,8 @@ export function MobileNav() {
           color: var(--mn-accent);
           background: #E8EDF2;
           box-shadow: 
-            inset 4px 4px 8px rgba(163, 177, 198, 0.3), 
-            inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+            inset 4px 4px 8px rgba(163, 177, 198, 0.4), 
+            inset -4px -4px 8px rgba(255, 255, 255, 0.9);
         }
 
         /* 🇬🇳 THE GUINEA FLAG NEUMORPHIC CIRCLE */
@@ -477,7 +477,6 @@ export function MobileNav() {
           font-family: 'DM Sans', sans-serif;
           overflow: hidden;
         }
-        @media (min-width: 769px) { .mn-drawer { display: none; } }
         
         .mn-drawer.closed { 
           transform: translateY(20px) scale(0.95); 
@@ -602,8 +601,6 @@ export function MobileNav() {
         className={`mn-drawer ${open ? 'opened' : 'closed'}`}
         style={{ '--mn-accent': colors.accent, '--mn-dim': colors.dim, '--mn-shadow': colors.shadow } as React.CSSProperties}
       >
-        <div className="mn-handle" />
-
         <div className="mn-drawer-head">
           <div className="mn-drawer-logo">
             {associationName.charAt(0)}
