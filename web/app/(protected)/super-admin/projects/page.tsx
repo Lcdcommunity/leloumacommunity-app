@@ -8,6 +8,30 @@ import { getAccessToken } from '../../../../lib/auth-store';
 import type { Project, ProjectStatus } from '../../../../types/project';
 import { formatCurrency, formatDate } from '../../../../lib/format';
 
+/* ══════════════════════════════════════════════════════ FIX ENCODING */
+function fixEncoding(str?: string | null): string {
+  if (!str) return '';
+  try {
+    if (str.includes('Ã')) {
+      return decodeURIComponent(escape(str));
+    }
+    return str;
+  } catch {
+    return str.replace(/RÃ©union/g, 'Réunion')
+              .replace(/NÂ°/g, 'N°')
+              .replace(/Ã©/g, 'é')
+              .replace(/Ã¨/g, 'è')
+              .replace(/Ã /g, 'à')
+              .replace(/Ã¢/g, 'â')
+              .replace(/Ãª/g, 'ê')
+              .replace(/Ã®/g, 'î')
+              .replace(/Ã´/g, 'ô')
+              .replace(/Ã»/g, 'û')
+              .replace(/Ã§/g, 'ç')
+              .replace(/Â/g, '');
+  }
+}
+
 /* ══════════════════════════════════════════════════════ STATUS MAP */
 const PROJ_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
   PROPOSED:         { label: 'Brouillon',     color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
@@ -39,42 +63,49 @@ function StatusBadge({ status }: { status: string }) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: '.28rem',
-        fontSize: '.67rem',
-        fontWeight: 900,
+        gap: '.3rem',
+        fontSize: '.7rem',
+        fontWeight: 800,
         color: s.color,
         background: s.bg,
         border: `1px solid ${s.border}`,
         borderRadius: 99,
-        padding: '.2rem .6rem',
+        padding: '.25rem .7rem',
         whiteSpace: 'nowrap',
       }}
     >
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
       {s.label}
     </span>
   );
 }
 
 /* ══════════════════════════════════════════════════════ BUDGET BAR */
-function BudgetBar({ planned, spent }: { planned?: number | null; spent?: number | null }) {
-  if (!planned) return <span style={{ color: '#D1D5DB', fontWeight: 700 }}>—</span>;
+function BudgetBar({ planned, spent, showLabels = true }: { planned?: number | null; spent?: number | null; showLabels?: boolean }) {
+  if (!planned) return <span style={{ color: '#D1D5DB', fontWeight: 700, fontSize: '.75rem' }}>Budget non défini</span>;
 
   const pct = Math.min(100, Math.round(((spent ?? 0) / planned) * 100));
   const over = (spent ?? 0) > planned;
   const col = over ? '#DC2626' : pct > 80 ? '#D97706' : '#2563EB';
 
   return (
-    <div style={{ minWidth: 100 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.22rem', gap: '.4rem' }}>
-        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.7rem', fontWeight: 700, color: col }}>{pct}%</span>
-        <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.65rem', color: '#9CA3AF', fontWeight: 600 }}>
-          {formatCurrency(planned)}
-        </span>
-      </div>
-      <div style={{ height: 4, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
+    <div style={{ width: '100%', minWidth: 120 }}>
+      {showLabels && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.3rem', gap: '.4rem', alignItems: 'center' }}>
+          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.85rem', fontWeight: 800, color: col }}>{pct}%</span>
+          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.7rem', color: '#6B7280', fontWeight: 700 }}>
+            {formatCurrency(planned)}
+          </span>
+        </div>
+      )}
+      <div style={{ height: 6, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${pct}%`, background: col, borderRadius: 99, transition: 'width .5s ease' }} />
       </div>
+      {!showLabels && (
+        <div style={{ marginTop: '.3rem', display: 'flex', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '.75rem', fontWeight: 800, color: col }}>{pct}%</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -358,7 +389,7 @@ function ProjectModal({
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Projet_${project.title.replace(/\s+/g, '_')}.pdf`;
+      link.download = `Projet_${fixEncoding(project.title).replace(/\s+/g, '_')}.pdf`;
       document.body.appendChild(link);
       link.click();
 
@@ -386,7 +417,7 @@ function ProjectModal({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: '1.25rem',
+          padding: '1rem',
         }}
         onClick={onClose}
       >
@@ -436,7 +467,7 @@ function ProjectModal({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
-                  {project.locationText}
+                  {fixEncoding(project.locationText)}
                 </div>
               )}
               <h2
@@ -449,11 +480,11 @@ function ProjectModal({
                   lineHeight: 1.15,
                 }}
               >
-                {project.title}
+                {fixEncoding(project.title)}
               </h2>
               {project.summary && (
                 <p style={{ fontSize: '.85rem', color: '#64748B', margin: '.4rem 0 0', fontWeight: 500, lineHeight: 1.4 }}>
-                  {project.summary}
+                  {fixEncoding(project.summary)}
                 </p>
               )}
             </div>
@@ -566,7 +597,7 @@ function ProjectModal({
               <DetailRow
                 icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>}
                 label="Promoteur"
-                value={project.promoterName}
+                value={fixEncoding(project.promoterName)}
               />
 
               <DetailRow
@@ -578,7 +609,8 @@ function ProjectModal({
                     {project.endsAt ? formatDate(project.endsAt) : '—'}
                   </span>
                 }
-              />              <DetailRow
+              />              
+              <DetailRow
                 icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 label="Budget"
                 value={
@@ -607,17 +639,18 @@ function ProjectModal({
                     <span style={{ color: '#D1D5DB' }}>Non défini</span>
                   )
                 }
-              />
-              <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
+              />              
+              
+              <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={fixEncoding(project.description)} />
 
               {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
                 <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid rgba(37,99,235,.08)' }}>
                   <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#1D4ED8', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
                     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg> Impact &amp; Cibles
                   </div>
-                  <DetailRow vertical icon={<span />} label="Bénéficiaires cibles" value={project.targetBeneficiaries} />
-                  <DetailRow vertical icon={<span />} label="Impact sur la population" value={project.populationImpact} />
-                  <DetailRow vertical icon={<span />} label="Impact environnemental" value={project.environmentalImpact} />
+                  <DetailRow vertical icon={<span />} label="Bénéficiaires cibles" value={fixEncoding(project.targetBeneficiaries)} />
+                  <DetailRow vertical icon={<span />} label="Impact sur la population" value={fixEncoding(project.populationImpact)} />
+                  <DetailRow vertical icon={<span />} label="Impact environnemental" value={fixEncoding(project.environmentalImpact)} />
                 </div>
               )}
 
@@ -626,8 +659,8 @@ function ProjectModal({
                   <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#D97706', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.8rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
                     <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> Exécution &amp; Risques
                   </div>
-                  <DetailRow vertical icon={<span />} label="Méthode d'implémentation" value={project.implementationMethod} />
-                  <DetailRow vertical icon={<span />} label="Risques &amp; Mitigations" value={project.risksAndMitigation} />
+                  <DetailRow vertical icon={<span />} label="Méthode d'implémentation" value={fixEncoding(project.implementationMethod)} />
+                  <DetailRow vertical icon={<span />} label="Risques &amp; Mitigations" value={fixEncoding(project.risksAndMitigation)} />
                 </div>
               )}
 
@@ -643,7 +676,7 @@ function ProjectModal({
                           {fileIcon(doc.mimeType)}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fileName ?? `Document ${i + 1}`}</div>
+                          <div style={{ fontSize: '.78rem', fontWeight: 700, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.fileName ? fixEncoding(doc.fileName) : `Document ${i + 1}`}</div>
                           {doc.sizeBytes != null && <div style={{ fontSize: '.64rem', color: '#94A3B8' }}>{fmtSize(doc.sizeBytes)}</div>}
                         </div>
                       </a>
@@ -654,23 +687,20 @@ function ProjectModal({
             </div>
           </div>
 
-          {/* Footer */}
-          <div style={{ background: 'white', borderTop: '1px solid #E5E7EB', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
-            <StatusBadge status={project.status} />
-            <div style={{ display: 'flex', gap: '.5rem' }}>
-              <button onClick={onDelete} style={{ height: 38, padding: '0 1rem', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', fontFamily: "'DM Sans',sans-serif", fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', transition: 'all .2s' }}>
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                Supprimer
-              </button>
-              <button onClick={downloadPDF} disabled={isExporting} style={{ height: 38, padding: '0 1rem', borderRadius: 10, background: '#F8FAFC', border: '1px solid #CBD5E1', color: '#374151', fontFamily: "'DM Sans',sans-serif", fontSize: '.8rem', fontWeight: 800, cursor: isExporting ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', opacity: isExporting ? 0.7 : 1 }}>
-                {isExporting ? <div style={{ width: 14, height: 14, border: '2px solid rgba(55,65,81,.3)', borderTopColor: '#374151', borderRadius: '50%', animation: 'ppspin .7s linear infinite' }} /> : <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4" /></svg>}
-                PDF
-              </button>
-              <button onClick={onEdit} style={{ height: 38, padding: '0 1.2rem', borderRadius: 10, background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', border: 'none', color: 'white', fontFamily: "'DM Sans',sans-serif", fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', boxShadow: '0 4px 12px rgba(37,99,235,.25)' }}>
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Modifier
-              </button>
-            </div>
+          {/* Footer MODERNE : 3 boutons alignés pour éviter le débordement sur mobile */}
+          <div className="sd-modal-footer">
+            <button onClick={onDelete} className="sd-modal-btn sd-modal-btn-del">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              <span>Supprimer</span>
+            </button>
+            <button onClick={onEdit} className="sd-modal-btn sd-modal-btn-edit">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              <span>Modifier</span>
+            </button>
+            <button onClick={downloadPDF} disabled={isExporting} className="sd-modal-btn sd-modal-btn-pdf">
+              {isExporting ? <div style={{ width: 14, height: 14, border: '2px solid rgba(55,65,81,.3)', borderTopColor: '#374151', borderRadius: '50%', animation: 'ppspin .7s linear infinite' }} /> : <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4" /></svg>}
+              <span>PDF</span>
+            </button>
           </div>
         </div>
       </div>
@@ -699,7 +729,7 @@ function DeleteModal({
         </div>
         <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.25rem', fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: '.35rem' }}>Supprimer ce projet&nbsp;?</h2>
         <p style={{ fontSize: '.82rem', color: '#6B7280', textAlign: 'center', marginBottom: '1.4rem', fontWeight: 600, lineHeight: 1.55 }}>
-          <strong style={{ color: '#111827' }}>{project.title}</strong> sera supprimé définitivement.
+          <strong style={{ color: '#111827' }}>{fixEncoding(project.title)}</strong> sera supprimé définitivement.
         </p>
         <div style={{ display: 'flex', gap: '.55rem', justifyContent: 'center' }}>
           <button onClick={onCancel} disabled={busy} style={{ height: 40, padding: '0 1.2rem', borderRadius: 10, border: '1px solid #D1D5DB', background: '#F9FAFB', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Annuler</button>
@@ -832,7 +862,6 @@ const SS: React.CSSProperties = { ...IS, appearance: 'none', cursor: 'pointer', 
 interface FormValues {
   title: string; summary: string; description: string; locationText: string; promoterName: string; status: ProjectStatus; budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string; targetBeneficiaries: string; populationImpact: string; environmentalImpact: string; risksAndMitigation: string; implementationMethod: string; specificObjectives: string; expectedResults: string; successIndicators: string;
 }
-
 const EMPTY: FormValues = { title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'PROPOSED', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '', targetBeneficiaries: '', populationImpact: '', environmentalImpact: '', risksAndMitigation: '', implementationMethod: '', specificObjectives: '', expectedResults: '', successIndicators: '' };
 
 function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploadProgress }: { initial?: FormValues; onSave: (v: FormValues, p: File[]) => void; onCancel: () => void; submitting: boolean; submitLabel: string; uploadProgress: string | null; }) {
@@ -1012,15 +1041,13 @@ export default function SuperAdminProjectsPage() {
   const completedCount = items.filter((i) => i.status === 'COMPLETED').length;
   const formOpen = formMode !== 'hidden';
 
-  const thStyle: React.CSSProperties = { padding: '.7rem 1.1rem', fontSize: '.63rem', fontWeight: 900, letterSpacing: '.11em', textTransform: 'uppercase', color: '#374151', background: 'rgba(37,99,235,.025)', textAlign: 'left', whiteSpace: 'nowrap', borderBottom: '2px solid rgba(37,99,235,.08)' };
-
   return (
     <AppShell title="Projets — pilotage global">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
         .pp-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.1rem,3vw,2rem);max-width:1100px;margin:0 auto}
         
-        /* 1. HEADER & BOUTON NOUVEAU */
+        /* HEADER & BOUTON NOUVEAU */
         .pp-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 0.5rem; margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: ppin .5s .04s cubic-bezier(.22,1,.36,1) forwards; }
         .pp-header-left { display: flex; flex-direction: column; }
         .pp-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#2563EB;margin-bottom:.3rem;display:flex;align-items:center;gap:.4rem}
@@ -1029,26 +1056,69 @@ export default function SuperAdminProjectsPage() {
         .pp-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.4rem,3vw,1.85rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15;margin:0;}
         .pp-title span{background:linear-gradient(135deg,#1D4ED8,#3B82F6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
         
-        .pp-new-btn{height:36px;padding:0 1rem;border-radius:10px;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;color:white;font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:900;cursor:pointer;display:flex;align-items:center;gap:.4rem;box-shadow:0 3px 10px rgba(37,99,235,.3);transition:all .18s;white-space:nowrap}
+        .pp-new-btn{height:38px;padding:0 1rem;border-radius:12px;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;color:white;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:900;cursor:pointer;display:flex;align-items:center;gap:.4rem;box-shadow:0 3px 10px rgba(37,99,235,.3);transition:all .18s;white-space:nowrap}
         .pp-new-btn:hover{transform:translateY(-1px);box-shadow:0 5px 16px rgba(37,99,235,.4)}
         .pp-new-btn.open{background:rgba(37,99,235,.08);color:#1D4ED8;border:1.5px solid rgba(37,99,235,.2);box-shadow:none}
 
-        @media(max-width:500px){
+        /* 4 STATS CARDS */
+        .stats-grid { display: flex; gap: 0.8rem; margin-bottom: 1.5rem; overflow-x: auto; padding-bottom: 0.5rem; opacity: 0; transform: translateY(10px); animation: ppin .5s .08s cubic-bezier(.22,1,.36,1) forwards; }
+        .stat-card { flex: 1; min-width: 80px; background: white; border-radius: 16px; padding: 1.2rem 0.5rem; text-align: center; border: 1.5px solid; box-shadow: 0 4px 12px rgba(0,0,0,0.02); }
+        .stat-num { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
+        .stat-label { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; }
+
+        @media(max-width:600px){
           .pp-header { align-items: center; }
           .pp-title { font-size: 1.15rem !important; }
-          .pp-new-btn { padding: 0 0.6rem !important; height: 32px !important; font-size: 0.7rem !important; }
+          .pp-new-btn { padding: 0 0.8rem !important; height: 36px !important; font-size: 0.75rem !important; }
+          .stats-grid { gap: 0.5rem; }
+          .stat-card { padding: 0.8rem 0.3rem; border-radius: 12px; }
+          .stat-num { font-size: 1.4rem; }
+          .stat-label { font-size: 0.55rem; letter-spacing: 0; }
         }
 
-        .pp-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(37,99,235,.09);box-shadow:0 2px 16px rgba(37,99,235,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:ppin .5s .09s cubic-bezier(.22,1,.36,1) forwards}
-        .pp-panel-head{padding:.9rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
-        .pp-panel-titlerow{display:flex;align-items:center;gap:.5rem}
-        .pp-panel-ico{width:27px;height:27px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .pp-panel-title{font-size:.73rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
-        .pp-count-chip{font-size:.67rem;font-weight:900;padding:.2rem .58rem;border-radius:99px;background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+        /* RECHERCHE ET FILTRES */
+        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;margin-bottom: 1.5rem;width:100%;box-sizing:border-box; opacity: 0; transform: translateY(10px); animation: ppin .5s .10s cubic-bezier(.22,1,.36,1) forwards;}
+        .pp-finput{height:42px;border-radius:12px;border:1px solid rgba(37,99,235,.14);padding:0 1rem;font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;color:#111827;outline:none;flex:1 1 200px;min-width:200px;background:rgba(255,255,255,.88);transition:border-color .2s,box-shadow .2s}
+        .pp-finput:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+        .pp-finput::placeholder{color:rgba(107,114,128,.5);font-weight:500}
+        .pp-fselect{height:42px;border-radius:12px;border:1px solid rgba(37,99,235,.14);background:rgba(255,255,255,.88);padding:0 2rem 0 .9rem;font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer;flex:0 1 auto;min-width:0;background-image:url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .75rem center}
+        .pp-fselect:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08);outline:none}
+        .pp-reload-btn{height:42px;padding:0 1.2rem;background:linear-gradient(135deg,#1D4ED8,#2563EB);border:none;border-radius:12px;cursor:pointer;color:white;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:800;display:flex;align-items:center;gap:.4rem;box-shadow:0 4px 12px rgba(37,99,235,.25);transition:all .18s;white-space:nowrap;flex:0 0 auto}
+        .pp-reload-btn:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(37,99,235,.35)}
+        @media(max-width:600px){
+          .pp-filter-row{gap:.5rem}
+          .pp-finput{flex: 1 1 100%; height:40px;}
+          .pp-fselect{flex: 1 1 auto; height:40px; font-size:.8rem; padding:0 1.5rem 0 .6rem; background-position:right .5rem center}
+          .pp-reload-btn{flex: 1 1 auto; height:40px; justify-content: center}
+        }
 
+        /* PROJECT CARDS GRID */
+        .proj-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; opacity: 0; transform: translateY(10px); animation: ppin .5s .12s cubic-bezier(.22,1,.36,1) forwards; }
+        @media (max-width: 400px) { .proj-cards-grid { grid-template-columns: 1fr; } }
+        
+        .proj-card { background: #fff; border-radius: 20px; border: 1px solid rgba(0,0,0,0.04); padding: 1.2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 0.5rem; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; }
+        .proj-card:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0,0,0,0.06); border-color: rgba(37,99,235,0.1); }
+        .proj-card-top { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .proj-card-img { width: 85px; height: 85px; border-radius: 14px; object-fit: cover; background: #f3f4f6; box-shadow: 0 2px 8px rgba(0,0,0,0.05); flex-shrink: 0; }
+        .proj-card-img-placeholder { width: 85px; height: 85px; border-radius: 14px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; color: #9CA3AF; border: 1px solid #E2E8F0; flex-shrink: 0; }
+        .proj-card-info { flex: 1; min-width: 0; }
+        .proj-card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.35rem; font-weight: 700; color: #111827; line-height: 1.1; margin-bottom: 0.4rem; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .proj-card-desc { font-size: 0.8rem; color: #4B5563; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        .proj-card-meta { display: flex; flex-wrap: wrap; gap: 0.8rem; padding: 0.8rem 0; border-top: 1px solid #F3F4F6; border-bottom: 1px solid #F3F4F6; font-size: 0.75rem; color: #6B7280; font-weight: 600; }
+        .proj-card-meta-item { display: flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+        .proj-card-meta-item svg { color: #9CA3AF; }
+        
+        .proj-card-bottom { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 1rem; gap: 1rem; }
+        .proj-card-progress { flex: 1; max-width: 150px; }
+        .proj-card-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem; }
+        .proj-card-details-btn { height: 32px; padding: 0 1rem; border-radius: 8px; border: 1.5px solid rgba(37,99,235,.2); background: rgba(239,246,255,.5); color: #1D4ED8; font-family: 'DM Sans', sans-serif; font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; transition: all 0.2s; }
+        .proj-card:hover .proj-card-details-btn { background: #DBEAFE; border-color: #2563EB; }
+
+        /* FORM PANEL */
         .pp-form-panel{overflow:hidden;transition:max-height .35s cubic-bezier(.22,1,.36,1),opacity .25s ease;max-height:0;opacity:0}
-        .pp-form-panel.open{max-height:3000px;opacity:1}
-        .pp-form-inner{padding:1.5rem 1.2rem;border-bottom:1px solid rgba(37,99,235,.07);background:rgba(239,246,255,.18)}
+        .pp-form-panel.open{max-height:3000px;opacity:1; margin-bottom: 1.5rem; background:rgba(253,253,255,.94); border-radius:22px; border:1px solid rgba(37,99,235,.09); box-shadow:0 2px 16px rgba(37,99,235,.06);}
+        .pp-form-inner{padding:1.5rem 1.2rem; background:rgba(239,246,255,.18)}
         @media(max-width:560px){.pp-form-inner{padding:1.2rem .9rem}}
 
         .pp-form-section { background: rgba(255,255,255,.6); border: 1px solid rgba(37,99,235,.1); padding: 1.2rem; border-radius: 14px; margin-bottom: 1rem; }
@@ -1059,71 +1129,40 @@ export default function SuperAdminProjectsPage() {
         .pp-save-err{display:flex;align-items:center;gap:.5rem;padding:.65rem .85rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:9px;color:#B91C1C;font-size:.78rem;font-weight:800;margin-bottom:.7rem}
         .pp-form-inner input:focus,.pp-form-inner textarea:focus,.pp-form-inner select:focus{border-color:rgba(37,99,235,.4)!important;box-shadow:0 0 0 3px rgba(37,99,235,.08)!important;background:white!important}
 
-        /* 2. STATS CHIPS - ADAPTÉ POUR 4 STATUTS */
-        .pp-chips{display:flex;gap:.5rem;flex-wrap:nowrap;padding:.7rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);background:rgba(239,246,255,.12);width:100%;box-sizing:border-box}
-        .pp-chip{display:inline-flex;align-items:center;justify-content:center;gap:.32rem;padding:.28rem .4rem;border-radius:9px;font-size:.7rem;font-weight:700;border:1px solid;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .pp-chip-dot{width:5px;height:5px;border-radius:50%}
-        .pp-chip-num{font-family:'Cormorant Garamond',serif;font-size:.95rem;font-weight:700}
-        @media(max-width:500px){
-          .pp-chips{padding:.5rem;gap:.25rem;flex-wrap:wrap;}
-          .pp-chip{padding:.2rem; flex: 1 1 40%;}
-          .pp-chip-label{font-size:.55rem!important}
-          .pp-chip-num{font-size:.8rem!important}
-          .pp-chip-dot{display:none}
+        /* MODAL FOOTER - 3 BOUTONS ALIGNÉS */
+        .sd-modal-footer { display: flex; gap: 0.6rem; padding: 1rem 1.5rem; background: white; border-top: 1px solid #E5E7EB; justify-content: space-between; }
+        .sd-modal-btn { flex: 1; height: 42px; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 0.4rem; cursor: pointer; transition: all 0.2s; text-decoration: none; min-width: 0; }
+        .sd-modal-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .sd-modal-btn-del { background: rgba(254,242,242,.8); border: 1.5px solid rgba(220,38,38,.2); color: #DC2626; }
+        .sd-modal-btn-del:hover { background: #FEE2E2; }
+        .sd-modal-btn-edit { background: white; border: 1.5px solid #CBD5E1; color: #1D4ED8; }
+        .sd-modal-btn-edit:hover { background: #F8FAFC; border-color: #94A3B8; }
+        .sd-modal-btn-pdf { background: linear-gradient(135deg,#1D4ED8,#2563EB); border: none; color: white; box-shadow: 0 4px 12px rgba(37,99,235,.25); }
+        .sd-modal-btn-pdf:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37,99,235,.35); }
+        
+        @media (max-width: 480px) { 
+          .sd-modal-footer { padding: 1rem; gap: 0.4rem; }
+          .sd-modal-btn { font-size: 0.75rem; height: 40px; padding: 0 0.2rem; } 
+          .sd-modal-btn svg { width: 16px; height: 16px; flex-shrink: 0; } 
         }
-
-        /* 3. RECHERCHE ET FILTRES - SUR UNE SEULE LIGNE ET WRAP MOBILE */
-        .pp-filter-row{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;padding:.8rem 1.3rem;border-bottom:1px solid rgba(37,99,235,.07);width:100%;box-sizing:border-box}
-        .pp-finput{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);padding:0 .8rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;color:#111827;outline:none;flex:1 1 150px;min-width:150px;background:rgba(255,255,255,.88);transition:border-color .2s,box-shadow .2s}
-        .pp-finput:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08)}
-        .pp-finput::placeholder{color:rgba(107,114,128,.4);font-weight:400}
-        .pp-fselect{height:36px;border-radius:9px;border:1px solid rgba(37,99,235,.14);background:rgba(255,255,255,.88);padding:0 1.8rem 0 .7rem;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:700;color:#111827;outline:none;appearance:none;cursor:pointer;flex:0 1 auto;min-width:0;background-image:url("data:image/svg+xml,%3Csvg width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .55rem center}
-        .pp-fselect:focus{border-color:rgba(37,99,235,.4);box-shadow:0 0 0 3px rgba(37,99,235,.08);outline:none}
-        .pp-reload-btn{height:36px;padding:0 .85rem;background:rgba(239,246,255,.8);border:1.5px solid rgba(37,99,235,.18);border-radius:9px;cursor:pointer;color:#1D4ED8;font-family:'DM Sans',sans-serif;font-size:.76rem;font-weight:800;display:flex;align-items:center;gap:.32rem;transition:all .18s;white-space:nowrap;flex:0 0 auto}
-        .pp-reload-btn:hover{background:#DBEAFE;border-color:#2563EB;transform:translateY(-1px)}
-        @media(max-width:550px){
-          .pp-filter-row{padding:.6rem .5rem;gap:.4rem}
-          .pp-finput{flex: 1 1 100%; height:38px; font-size:.85rem}
-          .pp-fselect{flex: 1 1 auto; height:38px; font-size:.8rem; padding:0 1.2rem 0 .4rem; background-position:right .3rem center}
-          .pp-reload-btn{flex: 1 1 auto; height:38px; font-size:.8rem; justify-content: center}
-          .btn-text{display:block}
+        @media (max-width: 380px) { 
+          .sd-modal-btn span { display: none; } 
         }
-
-        .pp-tw{overflow-x:auto}
-        .pp-table{width:100%;border-collapse:collapse;min-width:480px}
-        .pp-table thead tr th{cursor:default}
-        .pp-table tbody tr{border-bottom:1px solid rgba(37,99,235,.04);transition:background .15s;animation:ppin .38s cubic-bezier(.22,1,.36,1) both;cursor:pointer}
-        .pp-table tbody tr:last-child{border-bottom:none}
-        .pp-table tbody tr:hover{background:rgba(239,246,255,.55)}
-        .pp-table tbody tr:hover .pp-proj-title{color:#1D4ED8}
-        .pp-table tbody tr.pp-editing-row{background:rgba(239,246,255,.6)!important;box-shadow:inset 3px 0 0 #2563EB}
-        .pp-td{padding:.85rem 1.1rem;font-size:.84rem;color:#111827;vertical-align:middle}
-        .pp-proj-title{font-weight:900;font-size:.88rem;color:#0F172A;margin-bottom:.18rem;transition:color .15s}
-        .pp-proj-dates{font-family:'DM Mono',monospace;font-size:.68rem;font-weight:600;color:#9CA3AF}
-        .pp-hint{display:inline-flex;align-items:center;gap:.22rem;font-size:.67rem;font-weight:700;color:#93C5FD;margin-top:.18rem}
-
-        .pp-mob{display:none;flex-direction:column}
-        @media(max-width:600px){.pp-tw{display:none}.pp-mob{display:flex}}
-        .pp-mc{padding:.9rem 1.1rem;border-bottom:1px solid rgba(37,99,235,.06);animation:ppin .38s cubic-bezier(.22,1,.36,1) both;cursor:pointer;transition:background .15s}
-        .pp-mc:last-child{border-bottom:none}
-        .pp-mc:hover{background:rgba(239,246,255,.55)}
-        .pp-mc-top{display:flex;align-items:flex-start;gap:.65rem;margin-bottom:.5rem}
-        .pp-mc-info{flex:1;min-width:0}
 
         .pp-loader{display:flex;align-items:center;justify-content:center;padding:2.5rem;gap:.7rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .pp-ring{width:22px;height:22px;border:2.5px solid rgba(37,99,235,.1);border-top-color:#2563EB;border-radius:50%;animation:ppspin .8s linear infinite}
         .pp-error{display:flex;align-items:center;gap:.6rem;padding:.85rem 1.1rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.8rem;font-weight:800;margin:1rem}
-        .pp-empty{display:flex;flex-direction:column;align-items:center;padding:3rem 1rem;gap:.65rem;color:#9CA3AF}
-        .pp-empty-title{font-size:.88rem;font-weight:900;color:#374151}
-        .pp-empty-sub{font-size:.75rem;font-weight:600}
+        .pp-empty{display:flex;flex-direction:column;align-items:center;padding:3rem 1rem;gap:.65rem;color:#9CA3AF; text-align: center;}
+        .pp-empty-title{font-size:.9rem;font-weight:900;color:#374151}
+        .pp-empty-sub{font-size:.8rem;font-weight:500;color:#6B7280}
 
         @keyframes ppin{to{opacity:1;transform:translateY(0)}}
         @keyframes ppspin{to{transform:rotate(360deg)}}
-        @keyframes drawerIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
         @keyframes modalPop { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       `}</style>
 
       <div className="pp-wrap">
+        {/* En-tête */}
         <div className="pp-header">
           <div className="pp-header-left">
             <div className="pp-eyebrow">
@@ -1137,14 +1176,14 @@ export default function SuperAdminProjectsPage() {
           <button className={`pp-new-btn${formOpen && formMode === 'create' ? ' open' : ''}`} onClick={formOpen ? closeForm : openCreate}>
             {formOpen && formMode === 'create' ? (
               <>
-                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8">
                   <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 <span className="btn-text-new">Fermer</span>
               </>
             ) : (
               <>
-                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8">
                   <path strokeLinecap="round" d="M12 4v16m8-8H4" />
                 </svg>
                 <span className="btn-text-new">Nouveau projet</span>
@@ -1153,183 +1192,173 @@ export default function SuperAdminProjectsPage() {
           </button>
         </div>
 
-        <div className="pp-panel">
-          <div className="pp-panel-head">
-            <div className="pp-panel-titlerow">
-              <div className="pp-panel-ico" style={{ background: '#F5F3FF' }}>
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#7C3AED" strokeWidth="2.3">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />                
-                                </svg>
+        {/* Formulaire (dépliant) */}
+        <div className={`pp-form-panel${formOpen ? ' open' : ''}`}>
+          <div className="pp-form-inner">
+            {formMode === 'edit' && editing && (
+              <div className="pp-edit-banner">
+                <div className="pp-edit-dot" />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Modification&nbsp;: <strong>{fixEncoding(editing.title)}</strong>
+                </span>
               </div>
-              <span className="pp-panel-title">Projets actifs et terminés</span>
-              {items.length > 0 && <span className="pp-count-chip">{items.length}</span>}
-            </div>
-          </div>
-
-          <div className={`pp-form-panel${formOpen ? ' open' : ''}`}>
-            <div className="pp-form-inner">
-              {formMode === 'edit' && editing && (
-                <div className="pp-edit-banner">
-                  <div className="pp-edit-dot" />
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    Modification&nbsp;: <strong>{editing.title}</strong>
-                  </span>
-                </div>
-              )}
-              {saveError && (
-                <div className="pp-save-err">
-                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
-                    <circle cx="12" cy="12" r="10" />
-                    <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-                  </svg>
-                  {saveError}
-                </div>
-              )}
-              {formOpen && (
-                <ProjectForm
-                  key={editing?.id ?? 'new'}
-                  initial={editingInitial}
-                  onSave={(v, p) => void handleSave(v, p)}
-                  onCancel={closeForm}
-                  submitting={submitting}
-                  submitLabel={formMode === 'edit' ? 'Mettre à jour' : 'Créer le projet'}
-                  uploadProgress={uploadProgress}
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="pp-chips">
-            {([
-              { label: 'Brouillons', count: draftCount, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-              { label: 'Approuvés', count: approvedCount, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-              { label: 'En cours', count: inProgressCount, color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-              { label: 'Terminés', count: completedCount, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-            ] as const).map((c) => (
-              <div key={c.label} className="pp-chip" style={{ background: c.bg, borderColor: c.border, color: c.color }}>
-                <span className="pp-chip-dot" style={{ background: c.color }} />
-                <span className="pp-chip-num">{c.count}</span>
-                <span className="pp-chip-label" style={{ fontSize: '.67rem', opacity: 0.85 }}>{c.label}</span>
+            )}
+            {saveError && (
+              <div className="pp-save-err">
+                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+                </svg>
+                {saveError}
               </div>
-            ))}
+            )}
+            {formOpen && (
+              <ProjectForm
+                key={editing?.id ?? 'new'}
+                initial={editingInitial}
+                onSave={(v, p) => void handleSave(v, p)}
+                onCancel={closeForm}
+                submitting={submitting}
+                submitLabel={formMode === 'edit' ? 'Mettre à jour' : 'Créer le projet'}
+                uploadProgress={uploadProgress}
+              />
+            )}
           </div>
+        </div>
 
-          <div className="pp-filter-row">
-            <input
-              className="pp-finput"
-              placeholder="Rechercher par titre…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && void load()}
-            />
-            <select className="pp-fselect" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              {STATUS_LIST_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
+        {/* CORRECTION: La liste, les filtres et les stats sont masqués
+          si le formulaire est ouvert.
+        */}
+        {!formOpen && (
+          <div style={{ animation: 'ppin .4s ease-out forwards' }}>
+            {/* 4 Cartes de Statistiques */}
+            <div className="stats-grid">
+              {[
+                { label: 'Brouillons', count: draftCount, color: '#6B7280', bg: '#F9FAFB', border: '#E5E7EB' },
+                { label: 'Approuvés', count: approvedCount, color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+                { label: 'En cours', count: inProgressCount, color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+                { label: 'Terminés', count: completedCount, color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+              ].map((c) => (
+                <div key={c.label} className="stat-card" style={{ borderColor: c.color, background: c.bg }}>
+                  <div className="stat-num" style={{ color: c.color }}>{c.count}</div>
+                  <div className="stat-label" style={{ color: c.color }}>{c.label}</div>
+                </div>
               ))}
-            </select>
-            <button className="pp-reload-btn" onClick={() => void load()}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              <span className="btn-text">Rechercher</span>
-            </button>
-          </div>
+            </div>
 
-          {loading ? (
-            <div className="pp-loader">
-              <div className="pp-ring" />
-              Chargement&#8230;
+            {/* Barre de Recherche et Filtres */}
+            <div className="pp-filter-row">
+              <input
+                className="pp-finput"
+                placeholder="Rechercher par titre..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && void load()}
+              />
+              <select className="pp-fselect" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                {STATUS_LIST_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <button className="pp-reload-btn" onClick={() => void load()}>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="btn-text">Rechercher</span>
+              </button>
             </div>
-          ) : error ? (
-            <div className="pp-error">
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
-                <circle cx="12" cy="12" r="10" />
-                <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-              </svg>
-              {error}
-            </div>
-          ) : items.length === 0 ? (
-            <div className="pp-empty">
-              <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />              </svg>
-              <div className="pp-empty-title">Aucun projet trouvé</div>
-              <div className="pp-empty-sub">
-                Cliquez sur <strong>Nouveau projet</strong> pour en créer un.
+
+            {/* Contenu principal (Cartes Projets) */}
+            {loading ? (
+              <div className="pp-loader">
+                <div className="pp-ring" />
+                Chargement&#8230;
               </div>
-            </div>
-          ) : (
-            <>
-              <div className="pp-tw">
-                <table className="pp-table">
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>Projet</th>
-                      <th style={thStyle}>Statut</th>
-                      <th style={thStyle}>Budget</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((p, i) => (
-                      <tr
-                        key={p.id}
-                        className={editing?.id === p.id && formOpen ? 'pp-editing-row' : ''}
-                        style={{ animationDelay: `${i * .04}s` }}
-                        onClick={() => setDetailProject(p)}
-                      >
-                        <td className="pp-td">
-                          <div className="pp-proj-title">{p.title}</div>
-                          <div className="pp-proj-dates">
-                            {p.startsAt ? formatDate(p.startsAt) : '—'}&nbsp;&rarr;&nbsp;{p.endsAt ? formatDate(p.endsAt) : '—'}
-                          </div>
-                          <div className="pp-hint">
-                            <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            ) : error ? (
+              <div className="pp-error">
+                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+                </svg>
+                {error}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="pp-empty">
+                <svg width="50" height="50" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                <div className="pp-empty-title">Aucun projet trouvé</div>
+                <div className="pp-empty-sub">
+                  {q || statusFilter ? 'Modifiez vos filtres de recherche.' : 'Cliquez sur Nouveau projet pour commencer.'}
+                </div>
+              </div>
+            ) : (
+              <div className="proj-cards-grid">
+                {items.map((p, i) => {
+                  const allAttachments = (p.attachments ?? []) as Attachment[];
+                  const dedicatedPhotos = ((p as Project & { photos?: Attachment[] }).photos ?? []) as Attachment[];
+                  const firstPhotoUrl = dedicatedPhotos[0]?.url || allAttachments.find(a => isImageAttachment(a))?.url;
+
+                  return (
+                    <div
+                      key={p.id}
+                      className="proj-card"
+                      style={{ animationDelay: `${i * .04}s` }}
+                      onClick={() => setDetailProject(p)}
+                    >
+                      <div className="proj-card-top">
+                        {firstPhotoUrl ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={firstPhotoUrl} alt="Cover" className="proj-card-img" />
+                        ) : (
+                          <div className="proj-card-img-placeholder">
+                            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
-                            Voir les détails
                           </div>
-                        </td>
-                        <td className="pp-td">
-                          <StatusBadge status={p.status} />
-                        </td>
-                        <td className="pp-td">
-                          <BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="pp-mob">
-                {items.map((p, i) => (
-                  <div
-                    key={p.id}
-                    className="pp-mc"
-                    style={{ animationDelay: `${i * .04}s`, background: editing?.id === p.id && formOpen ? 'rgba(239,246,255,.55)' : undefined }}
-                    onClick={() => setDetailProject(p)}
-                  >
-                    <div className="pp-mc-top">
-                      <div className="pp-mc-info">
-                        <div className="pp-proj-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {p.title}
-                        </div>
-                        <div className="pp-proj-dates">
-                          {p.startsAt ? formatDate(p.startsAt) : '—'} → {p.endsAt ? formatDate(p.endsAt) : '—'}
+                        )}
+                        <div className="proj-card-info">
+                          <div className="proj-card-title">{fixEncoding(p.title)}</div>
+                          <div className="proj-card-desc">{fixEncoding(p.summary || p.description || 'Aucune description disponible')}</div>
                         </div>
                       </div>
-                      <StatusBadge status={p.status} />
+
+                      <div className="proj-card-meta">
+                        <div className="proj-card-meta-item" style={{ minWidth: '40%' }}>
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          {fixEncoding(p.locationText) || 'Non spécifié'}
+                        </div>
+                        <div className="proj-card-meta-item">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          {p.startsAt ? formatDate(p.startsAt) : '—'} &rarr; {p.endsAt ? formatDate(p.endsAt) : '—'}
+                        </div>
+                        <div className="proj-card-meta-item w-full">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          {p.budgetPlanned ? formatCurrency(p.budgetPlanned) : 'Budget non défini'}
+                        </div>
+                      </div>
+
+                      <div className="proj-card-bottom">
+                        <div className="proj-card-progress">
+                          <BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} showLabels={false} />
+                        </div>
+                        <div className="proj-card-actions">
+                          <StatusBadge status={p.status} />
+                          <div className="proj-card-details-btn">Détails</div>
+                        </div>
+                      </div>
                     </div>
-                    <BudgetBar planned={p.budgetPlanned} spent={p.budgetSpent} />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
+      {/* Modales */}
       {detailProject && (
         <ProjectModal
           project={detailProject}

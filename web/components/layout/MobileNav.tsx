@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { api } from '../../lib/api-client';
 import type { UserRole } from '../../types/user';
@@ -10,7 +10,7 @@ import type { UserRole } from '../../types/user';
 function Ico({ d, size = 20 }: { d: string; size?: number }) {
   return (
     <svg width={size} height={size} fill="none" viewBox="0 0 24 24"
-      stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d={d} />
     </svg>
   );
@@ -39,7 +39,7 @@ const ICO = {
   logout:     'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
   calendar:   'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   star:       'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
-  send:       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', // 🔥 AJOUT: Icône de communication
+  send:       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
 };
 
 type NavItem = { href: string; label: string; ico: string; section?: string };
@@ -65,7 +65,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,       section: 'Gestion' },
   { href: '/super-admin/documents',       label: 'Documents',              ico: ICO.doc,        section: 'Gestion' },
   { href: '/super-admin/contents',        label: 'Informations',           ico: ICO.news,       section: 'Gestion' },
-  { href: '/super-admin/communication',   label: 'Envoi SMS & Push',       ico: ICO.send,       section: 'Outils' }, // 🔥 AJOUT CHIRURGICAL
+  { href: '/super-admin/communication',   label: 'Envoi SMS & Push',       ico: ICO.send,       section: 'Outils' },
   { href: '/super-admin/notifications',   label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
   { href: '/super-admin/audit',           label: 'Audit',                  ico: ICO.audit,      section: 'Outils' },
   { href: '/super-admin/profile',         label: 'Mon profil',             ico: ICO.user,       section: 'Outils' },
@@ -85,7 +85,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/documents',             label: 'Documents & photos',     ico: ICO.doc,        section: 'Contenu' },
   { href: '/admin/contents',              label: 'Informations',           ico: ICO.news,       section: 'Contenu' },
   { href: '/admin/late-members',          label: 'Retardataires +3 mois',  ico: ICO.clock,      section: 'Contenu' },
-  { href: '/admin/communication',         label: 'Envoi SMS & Push',       ico: ICO.send,       section: 'Outils' }, // 🔥 AJOUT CHIRURGICAL
+  { href: '/admin/communication',         label: 'Envoi SMS & Push',       ico: ICO.send,       section: 'Outils' },
   { href: '/admin/notifications',         label: 'Notifications',          ico: ICO.bell,       section: 'Outils' },
   { href: '/admin/audit',                 label: 'Audit',                  ico: ICO.audit,      section: 'Outils' },
   { href: '/admin/settings',              label: 'Paramètres',             ico: ICO.gear,       section: 'Outils' },
@@ -135,11 +135,12 @@ const quickTabs: Record<string, { href: string; label: string; ico: string }[]> 
   ],
 };
 
-const ROLE_COLORS: Record<string, { accent: string; dim: string; pillBg: string; pillText: string; label: string }> = {
-  SYSTEM_ADMIN:  { accent: '#7C3AED', dim: 'rgba(124,58,237,0.12)', pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef' },
-  SUPER_ADMIN:   { accent: '#DC2626', dim: 'rgba(220,38,38,0.12)',  pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin' },
-  ANTENNA_ADMIN: { accent: '#2563EB', dim: 'rgba(37,99,235,0.12)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne' },
-  MEMBER:        { accent: '#059669', dim: 'rgba(5,150,105,0.12)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre' },
+// Couleurs du Neumorphic Glow (Lueur LED)
+const ROLE_COLORS: Record<string, { accent: string; dim: string; pillBg: string; pillText: string; label: string; shadow: string }> = {
+  SYSTEM_ADMIN:  { accent: '#8B5CF6', dim: 'rgba(139,92,246,0.15)', pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef', shadow: 'rgba(139,92,246,0.5)' },
+  SUPER_ADMIN:   { accent: '#EF4444', dim: 'rgba(239,68,68,0.15)',  pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin', shadow: 'rgba(239,68,68,0.5)' },
+  ANTENNA_ADMIN: { accent: '#3B82F6', dim: 'rgba(59,130,246,0.15)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne', shadow: 'rgba(59,130,246,0.5)' },
+  MEMBER:        { accent: '#10B981', dim: 'rgba(16,185,129,0.15)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre', shadow: 'rgba(16,185,129,0.5)' },
 };
 
 export function MobileNav() {
@@ -149,8 +150,6 @@ export function MobileNav() {
   const [associationName, setAssociationName] = useState('Plateforme');
   const [open, setOpen] = useState(false);
   const [prevPath, setPrevPath] = useState(pathname);
-  
-  // 🔥 AJOUT CHIRURGICAL : État pour le compteur de notifications non lues
   const [unreadCount, setUnreadCount] = useState(0);
 
   if (pathname !== prevPath) {
@@ -169,9 +168,7 @@ export function MobileNav() {
       try {
         const me = await api.me();
         if (!mounted) return;
-
         setRole(me.role);
-
         if (me.association?.name) {
           setAssociationName(me.association.name);
         } else if (me.role !== 'SYSTEM_ADMIN') {
@@ -183,7 +180,6 @@ export function MobileNav() {
     return () => { mounted = false; };
   }, []);
 
-  // 🔥 AJOUT CHIRURGICAL : Récupération du nombre de notifications non lues (rafraîchi au changement de route ou ouverture menu)
   useEffect(() => {
     let mounted = true;
     void (async () => {
@@ -193,15 +189,13 @@ export function MobileNav() {
         const data = Array.isArray(res) ? res : (res?.items || []);
         const unread = data.filter(n => !n.isRead).length;
         setUnreadCount(unread);
-      } catch {
-        // Silencieux pour ne pas gêner la navigation en cas de coupure réseau
-      }
+      } catch {}
     })();
     return () => { mounted = false; };
   }, [pathname, open]);
 
   const allItems = useMemo(() => {
-    if (role === 'SYSTEM_ADMIN')   return systemAdminItems;
+    if (role === 'SYSTEM_ADMIN')  return systemAdminItems;
     if (role === 'SUPER_ADMIN')   return superAdminItems;
     if (role === 'ANTENNA_ADMIN') return adminItems;
     if (role === 'MEMBER')        return memberItems;
@@ -221,7 +215,6 @@ export function MobileNav() {
     return Array.from(map.entries());
   }, [allItems]);
 
-  // 🔥 FIX CHIRURGICAL : Redirection vers /logout au lieu de faire logout() tout de suite
   const handleLogout = useCallback(() => {
     setOpen(false);
     router.push('/logout');
@@ -234,157 +227,295 @@ export function MobileNav() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
 
-        .mn-bar, .mn-drawer-overlay { display: none; }
+        .mn-container, .mn-overlay { display: none; }
+        
         @media (max-width: 768px) {
-          .mn-bar { display: flex; }
-          .mn-drawer-overlay { display: block; }
+          .mn-container { display: flex; }
+          .mn-overlay { display: block; }
         }
 
-        /* ════ BOTTOM BAR ════ */
-        .mn-bar {
-          position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+        /* ════ NEUMORPHIC FLOATING PILL ════ */
+        .mn-container {
+          position: fixed; 
+          bottom: calc(1rem + env(safe-area-inset-bottom, 0)); 
+          left: 1rem; 
+          right: 1rem; 
+          z-index: 50;
           height: 64px;
-          background: rgba(255,255,255,0.96);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-top: 1px solid rgba(0,0,0,0.07);
-          box-shadow: 0 -4px 24px rgba(0,0,0,0.06);
-          padding: 0 0.35rem;
-          padding-bottom: env(safe-area-inset-bottom, 0);
+          
+          /* Neumorphic Base */
+          background: #F0F3F7; /* Gris très doux */
+          border-radius: 32px;
+          
+          /* Soft Shadows for Floating Neumorphism */
+          box-shadow: 
+            6px 6px 16px rgba(163, 177, 198, 0.4), 
+            -6px -6px 16px rgba(255, 255, 255, 0.9),
+            inset 1px 1px 2px rgba(255, 255, 255, 0.6),
+            inset -1px -1px 2px rgba(163, 177, 198, 0.1);
+          
+          padding: 0 0.5rem;
+          display: flex;
           align-items: center;
+          justify-content: space-between;
         }
 
+        /* ════ TABS ════ */
         .mn-tab {
-          flex: 1; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; gap: 3px;
+          flex: 1; 
+          height: 52px;
+          display: flex; 
+          flex-direction: column;
+          align-items: center; 
+          justify-content: center; 
           text-decoration: none;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.575rem; font-weight: 600; letter-spacing: 0.02em;
           color: #9CA3AF;
-          padding: 0.35rem 0.2rem 0.25rem;
-          border-radius: 14px; margin: 0.3rem 0.1rem;
-          transition: color 0.18s, background 0.18s, transform 0.15s;
+          border-radius: 20px; 
+          position: relative;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           -webkit-tap-highlight-color: transparent;
         }
-        .mn-tab:active { transform: scale(0.9); }
-        .mn-tab.active { color: var(--mn-accent); }
-        .mn-tab.active .mn-tab-ico-wrap { background: var(--mn-dim); border-radius: 10px; }
 
+        /* L'icône par défaut */
         .mn-tab-ico-wrap {
-          width: 36px; height: 28px;
-          display: flex; align-items: center; justify-content: center;
-          transition: background 0.18s;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 2;
         }
 
-        .mn-tab.mn-cta .mn-tab-ico-wrap {
-          width: 42px; height: 42px; border-radius: 50%;
-          background: linear-gradient(135deg, var(--mn-accent), var(--mn-accent)) !important;
-          box-shadow: 0 4px 14px var(--mn-dim);
-          margin-top: -14px; border: 3px solid white;
-        }
-        .mn-tab.mn-cta { color: #6B7280; }
-        .mn-tab.mn-cta.active { color: var(--mn-accent); }
-        .mn-tab.mn-cta .mn-tab-ico-wrap svg { color: white; width: 20px; height: 20px; }
-
-        .mn-burger {
-          flex: 1; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; gap: 3px;
-          background: none; border: none; cursor: pointer;
+        /* Le texte caché par défaut */
+        .mn-tab-label {
           font-family: 'DM Sans', sans-serif;
-          font-size: 0.575rem; font-weight: 600;
-          color: #9CA3AF; padding: 0.35rem 0.2rem 0.25rem;
-          border-radius: 14px; margin: 0.3rem 0.1rem;
+          font-size: 0.6rem; 
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          opacity: 0;
+          transform: translateY(10px) scale(0.8);
+          position: absolute;
+          bottom: 4px;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          pointer-events: none;
+        }
+
+        /* Interaction au clic (Active) */
+        .mn-tab.active {
+          color: var(--mn-accent);
+          /* Inset shadow to look "pressed" */
+          background: #E8EDF2;
+          box-shadow: 
+            inset 4px 4px 8px rgba(163, 177, 198, 0.3), 
+            inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+        }
+
+        .mn-tab.active .mn-tab-ico-wrap {
+          transform: translateY(-8px);
+          color: var(--mn-accent);
+        }
+
+        .mn-tab.active .mn-tab-label {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+
+        /* 💡 THE GLOW (Lueur LED Neumorphique) */
+        .mn-glow {
+          position: absolute;
+          bottom: 2px;
+          width: 24px;
+          height: 3px;
+          border-radius: 99px;
+          background: var(--mn-accent);
+          opacity: 0;
+          transform: scaleX(0);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          /* Lueur LED intense */
+          box-shadow: 0 0 10px 1px var(--mn-shadow), 0 0 20px 2px var(--mn-shadow);
+        }
+        
+        .mn-tab.active .mn-glow {
+          opacity: 1;
+          transform: scaleX(1);
+        }
+
+        /* ════ CENTER FAB (Guinea Flag Neumorphism) ════ */
+        .mn-fab-container {
+          position: relative;
+          width: 58px;
+          height: 58px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-top: -24px; /* Déborde vers le haut */
+        }
+
+        .mn-fab {
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          border: none;
+          cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          transition: color 0.18s, transform 0.15s;
-        }        .mn-burger:active { transform: scale(0.9); }
-        .mn-burger.open { color: var(--mn-accent); }
-
-        .mn-burger-lines {
-          display: flex; flex-direction: column; gap: 3.5px;
-          width: 17px; align-items: flex-end;        }
-        .mn-burger-line {
-          height: 2px; background: currentColor; border-radius: 99px;
-          transition: all 0.25s cubic-bezier(.22,1,.36,1);
-          transform-origin: center;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0;
+          overflow: hidden;
+          
+          /* Neumorphic base for the FAB itself */
+          background: #F0F3F7; 
+          box-shadow: 
+            inset 2px 2px 4px rgba(255,255,255,0.7),
+            inset -2px -2px 4px rgba(163,177,198,0.2),
+            0 8px 18px rgba(163, 177, 198, 0.4);
         }
-        .mn-burger-line:nth-child(1) { width: 17px; }
-        .mn-burger-line:nth-child(2) { width: 12px; }
-        .mn-burger-line:nth-child(3) { width: 17px; }
-        .mn-burger.open .mn-burger-line:nth-child(1) { transform: translateY(5.5px) rotate(45deg); width: 17px; }
-        .mn-burger.open .mn-burger-line:nth-child(2) { opacity: 0; transform: scaleX(0); }
-        .mn-burger.open .mn-burger-line:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); width: 17px; }
 
-        /* 🔥 AJOUT CHIRURGICAL : Styles pour les badges de notifications 🔥 */
+        .mn-fab:active {
+          transform: scale(0.92);
+          box-shadow: 0 4px 10px rgba(163, 177, 198, 0.3);
+        }
+
+        .mn-fab.open {
+          color: var(--mn-accent);
+          background: #E8EDF2;
+          box-shadow: 
+            inset 4px 4px 8px rgba(163, 177, 198, 0.3), 
+            inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+        }
+
+        /* 🇬🇳 THE GUINEA FLAG NEUMORPHIC CIRCLE */
+        .mn-guinea-flag {
+          width: 100%; height: 100%; border-radius: 50%;
+          display: flex; overflow: hidden;
+          transition: opacity 0.3s ease;
+        }
+        .mn-fab.open .mn-guinea-flag { opacity: 0; position: absolute; } /* Masqué quand ouvert */
+
+        .mn-flag-red, .mn-flag-yellow, .mn-flag-green { flex: 1; height: 100%; position: relative; }
+        .mn-flag-red { background: #EF4444; }
+        .mn-flag-yellow { background: #FBBF24; }
+        .mn-flag-green { background: #10B981; }
+
+        /* Effet "creusé" neumorphique à l'intérieur du drapeau */
+        .mn-guinea-flag::after {
+          content: ""; position: absolute; inset: 0; border-radius: 50%;
+          box-shadow: 
+            inset 8px 8px 16px rgba(163, 177, 198, 0.2), 
+            inset -8px -8px 16px rgba(255, 255, 255, 0.3),
+            inset 2px 2px 4px rgba(0,0,0,0.1),
+            inset -2px -2px 4px rgba(255,255,255,0.1);
+        }
+        
+        /* 💡 THE GLOW (Lueur LED pour le drapeau) */
+        .mn-guinea-glow {
+          position: absolute; inset: -4px; border-radius: 50%; z-index: -1;
+          box-shadow: 0 0 15px 1px rgba(251,191,36,0.6); /* Glow doré de base */
+          transition: box-shadow 0.3s ease;
+        }
+        .mn-fab:hover .mn-guinea-glow {
+          box-shadow: 0 0 25px 3px rgba(251,191,36,0.8); /* Glow doré intense au survol */
+        }
+
+        /* ════ NOTIFICATION BADGE ════ */
         .mn-badge-dot {
-          position: absolute; top: -3px; right: -3px; width: 10px; height: 10px;
-          background: #EF4444; border: 2.5px solid white; border-radius: 50%;
+          position: absolute; 
+          top: 0px; 
+          right: 0px; 
+          width: 12px; 
+          height: 12px;
+          background: #EF4444; 
+          border: 2px solid #F0F3F7; 
+          border-radius: 50%;
+          box-shadow: 0 0 8px rgba(239,68,68,0.6);
         }
+        
+        .mn-tab .mn-badge-dot { top: 0; right: 0; border-color: #F0F3F7; }
+        
+        .mn-fab .mn-badge-dot {
+           top: -4px; right: -4px; border-color: transparent;
+           box-shadow: 0 0 8px rgba(239,68,68,0.8);
+        }
+
         .mn-badge-count {
           background: #EF4444; color: white; font-size: 0.65rem; font-weight: 800;
           padding: 0.15rem 0.45rem; border-radius: 99px; line-height: 1;
-          box-shadow: 0 2px 6px rgba(239,68,68,0.25);
+          box-shadow: 0 2px 6px rgba(239,68,68,0.3);
         }
 
         /* ════ OVERLAY ════ */
-        .mn-drawer-overlay {
+        .mn-overlay {
           position: fixed; inset: 0; z-index: 48;
-          background: rgba(15,23,42,0.4);
-          backdrop-filter: blur(4px);
-          transition: opacity 0.28s ease;
+          background: rgba(240, 243, 247, 0.7);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          transition: opacity 0.3s ease;
         }
-        .mn-drawer-overlay.hidden  { opacity: 0; pointer-events: none; }
-        .mn-drawer-overlay.visible { opacity: 1; }
+        .mn-overlay.hidden  { opacity: 0; pointer-events: none; }
+        .mn-overlay.visible { opacity: 1; }
 
-        /* ════ DRAWER (Modern iOS Bottom Sheet style) ════ */
+        /* ════ NEUMORPHIC DRAWER ════ */
         .mn-drawer {
-          position: fixed; bottom: 0; left: 0; right: 0; z-index: 49;
-          background: #F8FAFC;
-          border-radius: 24px 24px 0 0;
-          box-shadow: 0 -8px 40px rgba(0,0,0,0.12);
-          max-height: 85vh;
+          position: fixed; 
+          bottom: 100px; /* Au-dessus de la pilule */
+          left: 1rem; 
+          right: 1rem; 
+          z-index: 49;
+          background: #F0F3F7;
+          border-radius: 32px;
+          box-shadow: 
+            10px 10px 30px rgba(163, 177, 198, 0.4), 
+            -10px -10px 30px rgba(255, 255, 255, 0.9),
+            inset 1px 1px 2px rgba(255, 255, 255, 0.6);
+          max-height: calc(100vh - 140px);
           display: flex; flex-direction: column;
-          transition: transform 0.32s cubic-bezier(.22,1,.36,1);
-          padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); /* Elastic Bouncing */
+          transform-origin: bottom center;
           font-family: 'DM Sans', sans-serif;
+          overflow: hidden;
         }
         @media (min-width: 769px) { .mn-drawer { display: none; } }
-        .mn-drawer.closed { transform: translateY(100%); }
-        .mn-drawer.opened { transform: translateY(0); }
-
-        .mn-handle {
-          width: 40px; height: 5px; border-radius: 99px;
-          background: #CBD5E1; margin: 10px auto 0; flex-shrink: 0;
+        
+        .mn-drawer.closed { 
+          transform: translateY(20px) scale(0.95); 
+          opacity: 0; 
+          pointer-events: none; 
+        }
+        .mn-drawer.opened { 
+          transform: translateY(0) scale(1); 
+          opacity: 1; 
         }
 
         .mn-drawer-head {
-          display: flex; align-items: center; gap: 0.75rem;
-          padding: 1rem 1.25rem 0.85rem;
-          background: #F8FAFC;
+          display: flex; align-items: center; gap: 0.8rem;
+          padding: 1.5rem 1.5rem 1rem;
           flex-shrink: 0;
+          border-bottom: 1px solid rgba(163, 177, 198, 0.15);
         }
         .mn-drawer-logo {
-          width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+          width: 44px; height: 44px; border-radius: 14px; flex-shrink: 0;
           display: flex; align-items: center; justify-content: center;
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.3rem; font-weight: 700; color: white;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          font-size: 1.4rem; font-weight: 700; color: white;
+          box-shadow: 0 4px 12px var(--mn-shadow);
           text-transform: uppercase;
+          background: linear-gradient(135deg, var(--mn-accent), var(--mn-accent));
         }
         .mn-drawer-appname {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 1.15rem; font-weight: 600; color: #111827;
-          line-height: 1.1;
+          font-size: 1.1rem; font-weight: 800; color: #111827;
+          line-height: 1.1; letter-spacing: -0.02em;
         }
         .mn-drawer-rolepill {
-          font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em;
-          text-transform: uppercase; padding: 0.15rem 0.5rem;
-          border-radius: 99px; display: inline-flex; margin-top: 3px;
+          font-size: 0.6rem; font-weight: 800; letter-spacing: 0.05em;
+          text-transform: uppercase; padding: 0.2rem 0.6rem;
+          border-radius: 99px; display: inline-flex; margin-top: 4px;
         }        
         
         .mn-drawer-scroll {
-          flex: 1; overflow-y: auto; padding: 0.5rem 1.25rem 1rem;
+          flex: 1; overflow-y: auto; padding: 0.5rem 1.5rem 1.5rem;
           scrollbar-width: none;
         }
         .mn-drawer-scroll::-webkit-scrollbar { display: none; }
@@ -392,73 +523,89 @@ export function MobileNav() {
         .mn-section-label {
           font-size: 0.65rem; font-weight: 800;
           letter-spacing: 0.1em; text-transform: uppercase;
-          color: #64748B; padding: 0.5rem 0 0.4rem 0.5rem;
+          color: #9CA3AF; padding: 1rem 0 0.5rem 0.5rem;
         }
 
         .mn-group {
-          background: white; border-radius: 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-          border: 1px solid rgba(0,0,0,0.03);
-          margin-bottom: 1.25rem; overflow: hidden;
+          background: #F0F3F7; 
+          border-radius: 20px;
+          box-shadow: 
+            inset 4px 4px 8px rgba(163, 177, 198, 0.3), 
+            inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+          margin-bottom: 0.5rem; overflow: hidden;
+          padding: 0.5rem;
         }
 
         .mn-link {
           display: flex; align-items: center; gap: 0.75rem;
-          padding: 0.85rem 1rem;
-          text-decoration: none; color: #334155;
-          font-size: 0.875rem; font-weight: 600;
-          border-bottom: 1px solid #F1F5F9;
-          transition: background 0.15s;
+          padding: 0.85rem;
+          text-decoration: none; color: #4B5563;
+          font-size: 0.85rem; font-weight: 600;
+          border-radius: 14px;
+          transition: all 0.2s;
           -webkit-tap-highlight-color: transparent;
         }
-        .mn-link:last-child { border-bottom: none; }
-        .mn-link:active { background: #F8FAFC; }
-        .mn-link.active { color: var(--mn-accent); background: var(--mn-dim); }
+        
+        .mn-link:active { 
+          background: rgba(163, 177, 198, 0.15); 
+        }
+        
+        .mn-link.active { 
+          color: var(--mn-accent); 
+          background: white;
+          box-shadow: 0 2px 8px rgba(163, 177, 198, 0.2);
+        }
 
         .mn-link-ico {
-          width: 32px; height: 32px; border-radius: 10px;
+          width: 34px; height: 34px; border-radius: 10px;
           display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; background: #F1F5F9; color: #64748B;
+          flex-shrink: 0; color: #9CA3AF;
           transition: all 0.2s;
         }
-        .mn-link.active .mn-link-ico { background: var(--mn-accent); color: white; }
+        .mn-link.active .mn-link-ico { 
+          background: var(--mn-dim); 
+          color: var(--mn-accent); 
+        }
         
         .mn-link-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .mn-link-chevron { color: #CBD5E1; display: flex; transition: color 0.2s; }
-        .mn-link.active .mn-link-chevron { color: var(--mn-accent); }
-
+        
         .mn-logout-group {
-          background: white; border-radius: 16px;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-          border: 1px solid rgba(0,0,0,0.03);
-          margin-bottom: 2rem; overflow: hidden;
+          margin-top: 2rem;
         }
         .mn-logout {
           display: flex; align-items: center; gap: 0.75rem;
-          width: 100%; padding: 0.85rem 1rem;
-          background: none; border: none; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 700; color: #DC2626;
-          transition: background 0.15s; -webkit-tap-highlight-color: transparent; text-align: left;
+          width: 100%; padding: 1rem;
+          background: #F0F3F7; 
+          border-radius: 20px;
+          box-shadow: 
+            6px 6px 12px rgba(163, 177, 198, 0.3), 
+            -6px -6px 12px rgba(255, 255, 255, 0.8);
+          border: none; cursor: pointer;
+          font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 800; color: #DC2626;
+          transition: all 0.2s; -webkit-tap-highlight-color: transparent; text-align: left;
         }
-        .mn-logout:active { background: #FEF2F2; }
+        .mn-logout:active { 
+          box-shadow: 
+            inset 4px 4px 8px rgba(163, 177, 198, 0.3), 
+            inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+        }
       `}</style>
 
+      {/* Overlay global flouté */}
       <div
-        className={`mn-drawer-overlay ${open ? 'visible' : 'hidden'}`}
+        className={`mn-overlay ${open ? 'visible' : 'hidden'}`}
         onClick={() => setOpen(false)}
       />
 
+      {/* Le Menu Neumorphique (S'ouvre vers le haut) */}
       <div
         className={`mn-drawer ${open ? 'opened' : 'closed'}`}
-        style={{ '--mn-accent': colors.accent, '--mn-dim': colors.dim } as React.CSSProperties}
+        style={{ '--mn-accent': colors.accent, '--mn-dim': colors.dim, '--mn-shadow': colors.shadow } as React.CSSProperties}
       >
         <div className="mn-handle" />
 
         <div className="mn-drawer-head">
-          <div
-            className="mn-drawer-logo"
-            style={{ background: `linear-gradient(135deg, ${colors.accent === '#7C3AED' ? '#6D28D9' : colors.accent === '#DC2626' ? '#B91C1C' : colors.accent === '#059669' ? '#047857' : '#1D4ED8'}, ${colors.accent})` }}
-          >
+          <div className="mn-drawer-logo">
             {associationName.charAt(0)}
           </div>
           <div>
@@ -475,7 +622,6 @@ export function MobileNav() {
               <div className="mn-section-label">{section}</div>
               <div className="mn-group">
                 {items.map(item => {
-                  // 🔥 AJOUT CHIRURGICAL : Vérification si on est sur la ligne "Notifications"
                   const isNotifLink = item.href.includes('/notifications');
                   return (
                     <Link
@@ -483,18 +629,11 @@ export function MobileNav() {
                       href={item.href}
                       className={`mn-link${isActive(item.href) ? ' active' : ''}`}
                     >
-                      <span className="mn-link-ico"><Ico d={item.ico} size={16} /></span>
+                      <span className="mn-link-ico"><Ico d={item.ico} size={18} /></span>
                       <span className="mn-link-text">{item.label}</span>
-                      
-                      {/* 🔥 Affichage conditionnel du badge vs chevron */}
-                      {isNotifLink && unreadCount > 0 ? (
+
+                      {isNotifLink && unreadCount > 0 && (
                         <span className="mn-badge-count">{unreadCount}</span>
-                      ) : (
-                        <span className="mn-link-chevron">
-                          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-                          </svg>
-                        </span>
                       )}
                     </Link>
                   );
@@ -505,8 +644,8 @@ export function MobileNav() {
 
           <div className="mn-logout-group">
             <button className="mn-logout" onClick={handleLogout}>
-              <span className="mn-link-ico" style={{ background: '#FEF2F2', color: '#DC2626' }}>
-                <Ico d={ICO.logout} size={16} />
+              <span className="mn-link-ico" style={{ color: '#DC2626' }}>
+                <Ico d={ICO.logout} size={20} />
               </span>
               <span className="mn-link-text">Déconnexion</span>
             </button>
@@ -514,43 +653,59 @@ export function MobileNav() {
         </div>
       </div>
 
+      {/* La Pilule Flottante Principale */}
       <nav
-        className="mn-bar"
-        style={{ '--mn-accent': colors.accent, '--mn-dim': colors.dim } as React.CSSProperties}
+        className="mn-container"
+        style={{ '--mn-accent': colors.accent, '--mn-dim': colors.dim, '--mn-shadow': colors.shadow } as React.CSSProperties}
       >
-        {tabs.map(tab => {
+        {tabs.map((tab, index) => {
           const active = isActive(tab.href);
-          const isCta  = tab.ico === ICO.plus;
+          
           return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={`mn-tab${active ? ' active' : ''}${isCta ? ' mn-cta' : ''}`}
-            >
-              <span className="mn-tab-ico-wrap">
-                <Ico d={tab.ico} size={isCta ? 22 : 20} />
-              </span>
-              {tab.label}
-            </Link>
+            <React.Fragment key={`frag-${tab.href}`}>
+              {/* On insère le bouton FAB central pile au milieu des onglets (index 2) */}
+              {index === 2 && (
+                <div className="mn-fab-container">
+                  <button
+                    className={`mn-fab ${open ? 'open' : ''}`}
+                    onClick={() => setOpen(v => !v)}
+                    aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
+                  >
+                    {/* 🇬🇳 THE GUINEA FLAG NEUMORPHIC CIRCLE */}
+                    <div className="mn-guinea-flag">
+                      <div className="mn-flag-red" />
+                      <div className="mn-flag-yellow" />
+                      <div className="mn-flag-green" />
+                    </div>
+
+                    {/* Icône x quand ouvert, remplace le drapeau */}
+                    {open && (
+                      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ zIndex: 3 }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                    
+                    {/* 💡 THE GLOW (Lueur LED Neumorphique pour le drapeau) */}
+                    {!open && <div className="mn-guinea-glow" />}
+
+                    {/* Badge de notification central */}
+                    {unreadCount > 0 && !open && <div className="mn-badge-dot" />}
+                  </button>
+                </div>
+              )}
+              
+              <Link href={tab.href} className={`mn-tab ${active ? 'active' : ''}`}>
+                <span className="mn-tab-ico-wrap">
+                  <Ico d={tab.ico} size={22} />
+                  {tab.href.includes('/notifications') && unreadCount > 0 && <div className="mn-badge-dot" />}
+                </span>
+                <span className="mn-tab-label">{tab.label}</span>
+                {/* Lueur LED Neumorphique */}
+                <div className="mn-glow" />
+              </Link>
+            </React.Fragment>
           );
         })}
-
-        <button
-          className={`mn-burger${open ? ' open' : ''}`}
-          onClick={() => setOpen(v => !v)}
-          aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
-        >
-          <span className="mn-tab-ico-wrap" style={{ position: 'relative' }}>
-            <div className="mn-burger-lines">
-              <div className="mn-burger-line" />
-              <div className="mn-burger-line" />
-              <div className="mn-burger-line" />
-            </div>
-            {/* 🔥 AJOUT CHIRURGICAL : Le petit point rouge sur le bouton Menu */}
-            {unreadCount > 0 && <div className="mn-badge-dot" />}
-          </span>
-          Menu
-        </button>
       </nav>
     </>
   );

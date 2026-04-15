@@ -17,7 +17,10 @@ export default function SuperAdminNotificationsPage() {
     setError(null); setLoading(true);
     try {
       const res = await api.listNotifications();
-      setItems(res?.items ?? []);
+      // 🔥 CORRECTION : On vérifie si la réponse est directement un tableau,
+      // sinon on tente de récupérer .items (au cas où la route soit paginée plus tard)
+      const data = Array.isArray(res) ? res : (res?.items ?? []);
+      setItems(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement des notifications');
     } finally {
