@@ -7,15 +7,38 @@ import { api } from '../../../../lib/api-client';
 import type { DocumentItem } from '../../../../types/document';
 import { formatDate, formatDateTime } from '../../../../lib/format';
 
+/* ══════════════════════════════════════════════════════ FIX ENCODING */
+function fixEncoding(str?: string | null): string {
+  if (!str) return '';
+  try {
+    if (str.includes('Ã')) return decodeURIComponent(escape(str));
+    return str;
+  } catch {
+    return str
+      .replace(/RÃ©union/g, 'Réunion')
+      .replace(/NÂ°/g, 'N°')
+      .replace(/Ã©/g, 'é')
+      .replace(/Ã¨/g, 'è')
+      .replace(/Ã /g, 'à')
+      .replace(/Ã¢/g, 'â')
+      .replace(/Ãª/g, 'ê')
+      .replace(/Ã®/g, 'î')
+      .replace(/Ã´/g, 'ô')
+      .replace(/Ã»/g, 'û')
+      .replace(/Ã§/g, 'ç')
+      .replace(/Â/g, '');
+  }
+}
+
 /* ══════════════════════════════════════════════════════ FILE TYPE BADGE */
 function FileTypeBadge({ mimeType }: { mimeType?: string | null }) {
   const mime = mimeType ?? '';
   let ext = 'FILE'; let color = '#6B7280'; let bg = '#F3F4F6'; let border = '#E5E7EB';
-  if (mime.includes('pdf'))                                     { ext = 'PDF';  color = '#DC2626'; bg = '#FEF2F2'; border = '#FECACA'; }
-  else if (mime.includes('word') || mime.includes('document')) { ext = 'DOC';  color = '#2563EB'; bg = '#EFF6FF'; border = '#BFDBFE'; }
-  else if (mime.includes('sheet') || mime.includes('excel'))   { ext = 'XLS';  color = '#059669'; bg = '#ECFDF5'; border = '#A7F3D0'; }
-  else if (mime.includes('image'))                             { ext = 'IMG';  color = '#7C3AED'; bg = '#F5F3FF'; border = '#DDD6FE'; }
-  else if (mime.includes('zip') || mime.includes('compress'))  { ext = 'ZIP';  color = '#D97706'; bg = '#FFFBEB'; border = '#FDE68A'; }
+  if (mime.includes('pdf'))                                     { ext = 'PDF'; color = '#DC2626'; bg = '#FEF2F2'; border = '#FECACA'; }
+  else if (mime.includes('word') || mime.includes('document')) { ext = 'DOC'; color = '#2563EB'; bg = '#EFF6FF'; border = '#BFDBFE'; }
+  else if (mime.includes('sheet') || mime.includes('excel'))   { ext = 'XLS'; color = '#059669'; bg = '#ECFDF5'; border = '#A7F3D0'; }
+  else if (mime.includes('image'))                             { ext = 'IMG'; color = '#7C3AED'; bg = '#F5F3FF'; border = '#DDD6FE'; }
+  else if (mime.includes('zip') || mime.includes('compress'))  { ext = 'ZIP'; color = '#D97706'; bg = '#FFFBEB'; border = '#FDE68A'; }
   return (
     <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '.62rem', fontWeight: 800, color, background: bg, border: `1px solid ${border}`, borderRadius: 6, padding: '.15rem .45rem', whiteSpace: 'nowrap', display: 'inline-block' }}>
       {ext}
@@ -58,7 +81,7 @@ function DeleteModal({
         </div>
         <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.3rem', fontWeight: 700, color: '#111827', textAlign: 'center', marginBottom: '.4rem' }}>Supprimer ce document&nbsp;?</h2>
         <p style={{ fontSize: '.82rem', color: '#6B7280', textAlign: 'center', marginBottom: '1.5rem', fontWeight: 600, lineHeight: 1.55 }}>
-          <strong style={{ color: '#111827' }}>{doc.title}</strong> sera supprim&eacute; d&eacute;finitivement.
+          <strong style={{ color: '#111827' }}>{fixEncoding(doc.title)}</strong> sera supprim&eacute; d&eacute;finitivement.
         </p>
         <div style={{ display: 'flex', gap: '.6rem', justifyContent: 'center' }}>
           <button onClick={onCancel} disabled={busy} style={{ height: 40, padding: '0 1.2rem', borderRadius: 10, border: '1px solid rgba(220,38,38,.18)', background: 'rgba(249,250,251,.95)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Annuler</button>
@@ -74,11 +97,11 @@ function DeleteModal({
 
 /* ══════════════════════════════════════════════════════ UPLOAD MODAL */
 function UploadModal({
-  onUpload, onCancel, busy
-}: { 
-  onUpload: (data: { file: File; title: string; visibility: string; description: string }) => void; 
-  onCancel: () => void; 
-  busy: boolean 
+  onUpload, onCancel, busy,
+}: {
+  onUpload: (data: { file: File; title: string; visibility: string; description: string }) => void;
+  onCancel: () => void;
+  busy: boolean;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
@@ -95,14 +118,12 @@ function UploadModal({
     <>
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }} onClick={() => !busy && onCancel()} />
       <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 101, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)', width: 'min(500px,calc(100vw - 2rem))', border: '1px solid rgba(220,38,38,.15)', boxShadow: '0 24px 60px rgba(220,38,38,.12)', maxHeight: '90vh', overflowY: 'auto' }}>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', marginBottom: '1.25rem' }}>
           <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,#991B1B,#DC2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(220,38,38,.3)' }}>
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           </div>
-          <div>
-            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', lineHeight: 1 }}>Ajouter un document</h2>
-          </div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, color: '#111827', lineHeight: 1 }}>Ajouter un document</h2>
         </div>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -110,11 +131,11 @@ function UploadModal({
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
               Fichier <span style={{ color: '#DC2626' }}>*</span>
             </label>
-            <input 
-              type="file" 
-              required 
+            <input
+              type="file"
+              required
               disabled={busy}
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               style={{ width: '100%', padding: '.5rem', border: '1.5px dashed rgba(220,38,38,.3)', borderRadius: 11, background: '#FEF2F2', color: '#111827', fontSize: '.85rem', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
             />
           </div>
@@ -122,10 +143,10 @@ function UploadModal({
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
               Titre du document
             </label>
-            <input 
-              type="text" 
-              value={title} 
-              onChange={(e) => setTitle(e.target.value)} 
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
               disabled={busy}
               placeholder="Ex: Règlement intérieur 2026"
               style={{ width: '100%', height: 42, borderRadius: 11, border: '1.5px solid rgba(220,38,38,.18)', background: 'white', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 600, color: '#111827', outline: 'none' }}
@@ -135,13 +156,13 @@ function UploadModal({
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
               Visibilité (Type d&apos;accès) <span style={{ color: '#DC2626' }}>*</span>
             </label>
-            <select 
-              value={visibility} 
-              onChange={(e) => setVisibility(e.target.value)} 
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value)}
               disabled={busy}
               style={{ width: '100%', height: 42, borderRadius: 11, border: '1.5px solid rgba(220,38,38,.18)', background: 'white', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 600, color: '#111827', outline: 'none', cursor: 'pointer' }}
             >
-              <option value="ALL">Tous (Admins & Membres)</option>
+              <option value="ALL">Tous (Admins &amp; Membres)</option>
               <option value="ADMIN">Admins d&apos;antenne uniquement</option>
               <option value="MEMBER">Membres uniquement</option>
             </select>
@@ -150,9 +171,9 @@ function UploadModal({
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
               Corps / Description du document
             </label>
-            <textarea 
-              value={description} 
-              onChange={(e) => setDescription(e.target.value)} 
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               disabled={busy}
               placeholder="Ajoutez une description, le contexte ou un résumé du document..."
               style={{ width: '100%', height: 80, borderRadius: 11, border: '1.5px solid rgba(220,38,38,.18)', background: 'white', padding: '.75rem .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 500, color: '#111827', outline: 'none', resize: 'vertical' }}
@@ -173,40 +194,48 @@ function UploadModal({
 
 /* ══════════════════════════════════════════════════════ DETAILS MODAL */
 function DocumentDetailsModal({
-  doc, onClose, onDelete
-}: { doc: DocumentItem; onClose: () => void; onDelete: () => void; }) {
+  doc, onClose, onDelete,
+}: { doc: DocumentItem; onClose: () => void; onDelete: () => void }) {
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(4px)', zIndex: 100 }} onClick={onClose} />
       <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', zIndex: 101, background: 'rgba(253,253,255,.98)', backdropFilter: 'blur(18px)', borderRadius: 22, padding: 'clamp(1.5rem,4vw,2rem)', width: 'min(550px,calc(100vw - 2rem))', border: '1px solid rgba(220,38,38,.15)', boxShadow: '0 24px 60px rgba(220,38,38,.12)', maxHeight: '90vh', overflowY: 'auto' }}>
-        
+
+        {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.2rem' }}>
           <div>
             <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#111827', lineHeight: 1.1, marginBottom: '.5rem' }}>
-              {doc.title}
+              {fixEncoding(doc.title)}
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
               <VisibilityBadge visibility={doc.visibility} />
               <FileTypeBadge mimeType={doc.fileAsset?.mimeType} />
             </div>
           </div>
-          <button onClick={onClose} style={{ background: '#F3F4F6', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6B7280', flexShrink: 0 }}>
+          <button
+            onClick={onClose}
+            style={{ background: '#F3F4F6', border: 'none', width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6B7280', flexShrink: 0 }}
+          >
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
+        {/* Description */}
         <div style={{ background: 'rgba(249,250,251,.8)', border: '1px solid #E5E7EB', borderRadius: 14, padding: '1rem', marginBottom: '1.2rem' }}>
           <h4 style={{ fontSize: '.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.08em', color: '#9CA3AF', marginBottom: '.4rem' }}>Description du document</h4>
           <p style={{ fontSize: '.86rem', color: '#374151', lineHeight: 1.5, whiteSpace: 'pre-wrap', margin: 0, fontWeight: 500 }}>
-            {doc.description || <span style={{ fontStyle: 'italic', color: '#9CA3AF' }}>Aucune description fournie.</span>}
+            {doc.description
+              ? fixEncoding(doc.description)
+              : <span style={{ fontStyle: 'italic', color: '#9CA3AF' }}>Aucune description fournie.</span>}
           </p>
         </div>
 
+        {/* Meta */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem', padding: '0 .5rem' }}>
           <div>
             <div style={{ fontSize: '.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '.08em', color: '#9CA3AF', marginBottom: '.2rem' }}>Fichier original</div>
             <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '.8rem', fontWeight: 600, color: '#111827', wordBreak: 'break-all' }}>
-              {doc.fileAsset?.fileName ?? '—'}
+              {doc.fileAsset?.fileName ? fixEncoding(doc.fileAsset.fileName) : '—'}
             </div>
           </div>
           <div>
@@ -223,21 +252,68 @@ function DocumentDetailsModal({
           </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '1.2rem', borderTop: '1px solid rgba(220,38,38,.08)', gap: '1rem', flexWrap: 'wrap' }}>
-          <button onClick={onDelete} style={{ background: 'rgba(254,242,242,.8)', border: '1px solid rgba(220,38,38,.2)', padding: '0 1rem', height: 38, borderRadius: 10, color: '#DC2626', fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', transition: 'all .15s' }} className="sd-btn-del-modal">
-            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            Supprimer
+        {/* ── FOOTER : icônes uniquement, sans bouton Fermer ── */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', paddingTop: '1.2rem', borderTop: '1px solid rgba(220,38,38,.08)', gap: '.65rem' }}>
+
+          {/* Supprimer — icône poubelle */}
+          <button
+            onClick={onDelete}
+            title="Supprimer ce document"
+            aria-label="Supprimer"
+            style={{
+              width: 42, height: 42, borderRadius: 12,
+              background: '#FEF2F2', border: '1.5px solid #FECACA',
+              color: '#DC2626', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'all .17s', flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#FEE2E2';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 10px rgba(220,38,38,.18)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#FEF2F2';
+              (e.currentTarget as HTMLButtonElement).style.transform = 'none';
+              (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
+            }}
+          >
+            <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
           </button>
 
-          <div style={{ display: 'flex', gap: '.6rem' }}>
-            <button onClick={onClose} style={{ height: 38, padding: '0 1rem', borderRadius: 10, border: '1px solid #D1D5DB', background: 'transparent', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Fermer</button>
-            {doc.fileAsset?.url && (
-              <a href={doc.fileAsset.url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '.4rem', height: 38, padding: '0 1.2rem', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 800, color: 'white', cursor: 'pointer', textDecoration: 'none', boxShadow: '0 4px 12px rgba(37,99,235,.25)' }}>
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                Télécharger
-              </a>
-            )}
-          </div>
+          {/* Télécharger — icône flèche bas */}
+          {doc.fileAsset?.url && (
+            <a
+              href={doc.fileAsset.url}
+              target="_blank"
+              rel="noreferrer"
+              title="Télécharger le fichier"
+              aria-label="Télécharger"
+              style={{
+                width: 42, height: 42, borderRadius: 12,
+                background: 'linear-gradient(135deg,#1D4ED8,#2563EB)',
+                border: 'none', color: 'white', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                textDecoration: 'none', flexShrink: 0,
+                boxShadow: '0 4px 12px rgba(37,99,235,.28)',
+                transition: 'all .17s',
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.transform = 'translateY(-1px)';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 6px 18px rgba(37,99,235,.38)';
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.transform = 'none';
+                (e.currentTarget as HTMLAnchorElement).style.boxShadow = '0 4px 12px rgba(37,99,235,.28)';
+              }}
+            >
+              <svg width="17" height="17" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </a>
+          )}
         </div>
       </div>
     </>
@@ -246,22 +322,22 @@ function DocumentDetailsModal({
 
 /* ══════════════════════════════════════════════════════ PAGE */
 export default function SuperAdminDocumentsPage() {
-  const [items, setItems] = useState<DocumentItem[]>([]);
-  const [q, setQ] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [items,   setItems]   = useState<DocumentItem[]>([]);
+  const [q,       setQ]       = useState('');
+  const [error,   setError]   = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  
-  const [deleteTarget, setDeleteTarget] = useState<DocumentItem | null>(null);
-  const [viewingDoc, setViewingDoc] = useState<DocumentItem | null>(null);
+  const [busyId,  setBusyId]  = useState<string | null>(null);
+
+  const [deleteTarget,      setDeleteTarget]      = useState<DocumentItem | null>(null);
+  const [viewingDoc,        setViewingDoc]        = useState<DocumentItem | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  const [uploadMsg,         setUploadMsg]         = useState<string | null>(null);
 
   const load = useCallback(async (searchQuery?: string) => {
     setError(null); setLoading(true);
     try {
-      const res = await api.listDocuments({ q: searchQuery || undefined, page: 1, pageSize: 100 });
+      const res = await api.listDocuments({ q: searchQuery ?? undefined, page: 1, pageSize: 100 });
       setItems(res.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement documents');
@@ -270,9 +346,7 @@ export default function SuperAdminDocumentsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    void load('');
-  }, [load]);
+  useEffect(() => { void load(''); }, [load]);
 
   async function handleModalUpload(data: { file: File; title: string; visibility: string; description: string }) {
     setUploading(true); setError(null); setUploadMsg(null);
@@ -282,15 +356,13 @@ export default function SuperAdminDocumentsPage() {
         folder: 'association-docs',
         description: data.description || 'Upload super admin',
       });
-
       await api.createSuperAdminDocument({
         title: data.title,
         description: data.description,
         visibility: data.visibility,
         fileAssetId: uploaded.id,
       });
-
-      setUploadMsg(`\u00ab\u00a0${data.title}\u00a0\u00bb upload\u00e9 avec succ\u00e8s.`);
+      setUploadMsg(`« ${fixEncoding(data.title)} » uploadé avec succès.`);
       setIsUploadModalOpen(false);
       await load(q);
     } catch (err) {
@@ -312,9 +384,6 @@ export default function SuperAdminDocumentsPage() {
     }
   }
 
-  const thStyle: React.CSSProperties = { padding: '.75rem 1.2rem', fontSize: '.63rem', fontWeight: 900, letterSpacing: '.11em', textTransform: 'uppercase', color: '#374151', background: 'rgba(254,242,242,.35)', textAlign: 'left', whiteSpace: 'nowrap' };
-  const tdStyle: React.CSSProperties = { padding: '.9rem 1.2rem', fontSize: '.82rem', color: '#111827', verticalAlign: 'middle' };
-
   return (
     <AppShell title="Documents / médias">
       <style>{`
@@ -328,66 +397,50 @@ export default function SuperAdminDocumentsPage() {
         .sd-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,3vw,1.9rem);font-weight:700;color:#111827;letter-spacing:-.02em;line-height:1.15}
         .sd-title span{background:linear-gradient(135deg,#991B1B,#EF4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 
-        /* Stats - Forcé sur une ligne sur mobile */
-        .sd-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1.4rem;opacity:0;transform:translateY(10px);animation:sdin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
+        .sd-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:2rem;opacity:0;transform:translateY(10px);animation:sdin .5s .08s cubic-bezier(.22,1,.36,1) forwards}
         .sd-stat{background:rgba(253,253,255,.93);border-radius:14px;border:1px solid rgba(220,38,38,.09);border-top:3px solid;box-shadow:0 2px 8px rgba(220,38,38,.04);padding:.7rem .5rem;text-align:center}
         .sd-stat-val{font-family:'Cormorant Garamond',serif;font-size:1.45rem;font-weight:700;line-height:1;margin-bottom:.2rem}
         .sd-stat-lbl{font-size:.58rem;font-weight:900;color:#6B7280;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
 
-        .sd-panel{background:rgba(253,253,255,.94);backdrop-filter:blur(14px);border-radius:22px;border:1px solid rgba(220,38,38,.09);box-shadow:0 2px 18px rgba(220,38,38,.06),0 0 0 1px rgba(255,255,255,.9) inset;overflow:hidden;opacity:0;transform:translateY(10px);animation:sdin .5s .14s cubic-bezier(.22,1,.36,1) forwards}
-        .sd-panel-head{padding:1rem 1.4rem;border-bottom:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
-        .sd-panel-titlerow{display:flex;align-items:center;gap:.55rem}
-        .sd-panel-ico{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,#991B1B,#DC2626);display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(220,38,38,.3)}
-        .sd-panel-title{font-size:.75rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#1F2937}
-        .sd-count-chip{font-size:.68rem;font-weight:900;padding:.2rem .6rem;border-radius:99px;background:#FEF2F2;color:#B91C1C;border:1px solid #FECACA}
+        .sd-section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;animation:sdin .5s .10s both}
+        .sd-section-title{font-size:1rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#111827}
+        .sd-btn-add{height:38px;padding:0 1rem;border-radius:12px;background:#b91c1c;border:none;color:white;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.45rem;transition:all .18s;white-space:nowrap;box-shadow:0 4px 10px rgba(220,38,38,.25)}
+        .sd-btn-add:hover{background:#991b1b;transform:translateY(-1px)}
+        .sd-btn-add:disabled{opacity:.6;cursor:not-allowed;transform:none}
 
-        .sd-btn-upload{height:38px;padding:0 1rem;border-radius:10px;background:rgba(254,242,242,.6);border:1.5px solid rgba(220,38,38,.2);color:#B91C1C;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:800;cursor:pointer;display:flex;align-items:center;gap:.45rem;transition:all .18s;white-space:nowrap}
-        .sd-btn-upload:hover{background:#FEE2E2;border-color:rgba(220,38,38,.4);transform:translateY(-1px)}
+        .sd-search-bar{display:flex;align-items:center;gap:.5rem;margin-bottom:1.5rem;position:relative;animation:sdin .5s .12s both}
+        .sd-search-input{flex:1;height:46px;border-radius:16px;border:1px solid rgba(0,0,0,.05);background:white;padding:0 1rem 0 2.8rem;font-family:'DM Sans',sans-serif;font-size:.88rem;font-weight:500;color:#111827;outline:none;box-shadow:0 2px 10px rgba(0,0,0,.02);transition:all .2s;width:100%}
+        .sd-search-input:focus{border-color:rgba(220,38,38,.3);box-shadow:0 0 0 3px rgba(220,38,38,.08)}
+        .sd-search-icon{position:absolute;left:1rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
+        .sd-search-btn-new{height:46px;width:46px;border-radius:14px;background:#b91c1c;border:none;color:white;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 10px rgba(220,38,38,.25);flex-shrink:0;transition:all .2s}
+        .sd-search-btn-new:hover{background:#991b1b}
 
-        /* Toolbar - Forcé sur une ligne sur mobile */
-        .sd-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap;padding:.9rem 1.1rem;border-bottom:1px solid rgba(220,38,38,.07)}
-        .sd-sw{position:relative;flex:1;min-width:0}
-        .sd-si{position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:#9CA3AF;pointer-events:none}
-        .sd-input{width:100%;height:40px;border-radius:11px;border:1px solid rgba(220,38,38,.15);background:rgba(255,255,255,.88);padding:0 .7rem 0 2.2rem;font-family:'DM Sans',sans-serif;font-size:.82rem;font-weight:600;color:#111827;outline:none;transition:border-color .2s}
-        .sd-input:focus{border-color:rgba(220,38,38,.4);box-shadow:0 0 0 3px rgba(220,38,38,.08);background:white}
-        .sd-input::placeholder{color:rgba(107,114,128,.45)}
-        .sd-search-btn{height:40px;padding:0 .85rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.78rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:.35rem;box-shadow:0 3px 10px rgba(220,38,38,.3);transition:all .18s;flex-shrink: 0}
+        .sd-cards-grid{display:flex;flex-direction:column;gap:1rem;animation:sdin .5s .14s both}
+        .sd-card{background:white;border-radius:1.5rem;border:1px solid #f3f4f6;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.02);cursor:pointer;transition:all .2s}
+        .sd-card:hover{transform:translateY(-2px);box-shadow:0 8px 16px rgba(0,0,0,.04)}
+        .sd-card-top{background:#fff5f5;padding:1.25rem;display:flex;gap:1rem;align-items:flex-start}
+        .sd-card-icon{width:3rem;height:3rem;border-radius:1rem;background:#fee2e2;border:1px solid #fecaca;display:flex;align-items:center;justify-content:center;color:#dc2626;flex-shrink:0;box-shadow:0 2px 4px rgba(220,38,38,.1)}
+        .sd-card-content{flex:1;padding-top:.1rem;width:100%;overflow:hidden}
+        .sd-card-title-row{display:flex;flex-direction:column;align-items:flex-start;gap:.35rem;margin-bottom:.5rem}
+        .sd-card-title{font-family:'Cormorant Garamond',serif;font-size:1.25rem;font-weight:700;color:#111827;line-height:1.1;word-break:break-word}
+        .sd-card-desc{font-size:.85rem;color:#374151;font-weight:500;margin-top:.5rem;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        .sd-card-date{font-size:.85rem;color:#6B7280;margin:.75rem 0}
+        .sd-card-filename{font-family:'DM Mono',monospace;font-size:.75rem;color:#4B5563;background:rgba(255,255,255,.6);padding:.5rem;border-radius:.5rem;border:1px solid #fef2f2;word-break:break-all}
+        .sd-card-bottom{background:white;padding:.875rem 1.25rem;border-top:1px solid rgba(243,244,246,.8);display:flex;align-items:center}
+        .sd-card-action{display:flex;align-items:center;gap:.5rem;font-size:.85rem;font-weight:600;color:#374151}
 
-        .sd-upload-success{display:flex;align-items:center;gap:.55rem;padding:.75rem 1.4rem;background:rgba(236,253,245,.8);border-bottom:1px solid rgba(5,150,105,.15);font-size:.8rem;font-weight:700;color:#059669}
-
-        .sd-tw{overflow-x:auto}
-        .sd-table{width:100%;border-collapse:collapse;min-width:700px}
-        .sd-table thead tr{border-bottom:2px solid rgba(220,38,38,.1)}
-        .sd-table tbody tr{border-bottom:1px solid rgba(220,38,38,.05);transition:background .15s;animation:sdin .4s cubic-bezier(.22,1,.36,1) both}
-        .sd-row-clickable { cursor: pointer; }
-        .sd-row-clickable:hover { background: rgba(220,38,38,.03) !important; }
-
-        .sd-doc-title{font-weight:800;font-size:.88rem;color:#0F172A;margin-bottom:4px}
-        .sd-doc-desc{font-size:.74rem;font-weight:500;color:#6B7280;margin-top:4px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
-        .sd-filename{font-family:'DM Mono',monospace;font-size:.75rem;font-weight:600;color:#2563EB;text-decoration:none;display:inline-flex;align-items:center;gap:.3rem;transition:color .15s; padding: .2rem .4rem; border-radius: 6px; margin-left: -.4rem;}
-        .sd-filename:hover{color:#1D4ED8; background: rgba(37,99,235,.08);}
-
-        .sd-mob{display:none;flex-direction:column}
-        @media(max-width:768px){.sd-tw{display:none}.sd-mob{display:flex}}
-        .sd-mc{padding:1rem 1.2rem;border-bottom:1px solid rgba(220,38,38,.07);animation:sdin .4s cubic-bezier(.22,1,.36,1) both; cursor: pointer; transition: background .15s;}
-        .sd-mc:last-child{border-bottom:none}
-        .sd-mc:hover{background: rgba(220,38,38,.02);}
-        .sd-mc-top{display:flex;align-items:flex-start;justify-content:space-between;gap:.6rem;margin-bottom:.5rem}
+        .sd-upload-success{display:flex;align-items:center;gap:.55rem;padding:.75rem 1.4rem;background:rgba(236,253,245,.8);border-bottom:1px solid rgba(5,150,105,.15);border-radius:12px;margin-bottom:1rem;font-size:.8rem;font-weight:700;color:#059669}
+        .sd-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin-bottom:1rem}
 
         .sd-loader{display:flex;align-items:center;justify-content:center;padding:3rem;gap:.75rem;color:#6B7280;font-size:.84rem;font-weight:700}
         .sd-ring{width:24px;height:24px;border:2.5px solid rgba(220,38,38,.12);border-top-color:#DC2626;border-radius:50%;animation:sdspin .8s linear infinite}
-        .sd-error{display:flex;align-items:center;gap:.65rem;padding:.9rem 1.2rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;color:#B91C1C;font-size:.82rem;font-weight:800;margin:1rem}
-        .sd-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1rem;gap:.75rem;color:#9CA3AF}
+
+        .sd-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1rem;gap:.75rem;color:#9CA3AF;text-align:center}
         .sd-empty-title{font-size:.9rem;font-weight:800;color:#374151}
         .sd-empty-sub{font-size:.78rem;font-weight:600}
 
         @keyframes sdin{to{opacity:1;transform:translateY(0)}}
         @keyframes sdspin{to{transform:rotate(360deg)}}
-
-        @media (max-width: 400px) {
-          .sd-search-btn span { display: none; }
-          .sd-search-btn { width: 44px; padding: 0; }
-        }
       `}</style>
 
       <div className="sd-wrap">
@@ -398,12 +451,12 @@ export default function SuperAdminDocumentsPage() {
           <h1 className="sd-title">Documents <span>&amp; m&eacute;dias</span></h1>
         </div>
 
-        {/* Stats - Forcés sur une ligne */}
+        {/* Stats */}
         <div className="sd-stats">
           {([
-            { label: 'Documents',    value: items.length,                                      color: '#DC2626' },
-            { label: 'Avec fichier', value: items.filter(d => d.fileAsset?.url).length,        color: '#2563EB' },
-            { label: 'Sans fichier', value: items.filter(d => !d.fileAsset?.url).length,       color: '#9CA3AF' },
+            { label: 'Documents',    value: items.length,                                color: '#DC2626' },
+            { label: 'Avec fichier', value: items.filter(d => d.fileAsset?.url).length,  color: '#2563EB' },
+            { label: 'Sans fichier', value: items.filter(d => !d.fileAsset?.url).length, color: '#9CA3AF' },
           ] as const).map(s => (
             <div key={s.label} className="sd-stat" style={{ borderTopColor: s.color }}>
               <div className="sd-stat-val" style={{ color: s.color }}>{s.value}</div>
@@ -412,166 +465,101 @@ export default function SuperAdminDocumentsPage() {
           ))}
         </div>
 
-        {/* Panel */}
-        <div className="sd-panel">
-          <div className="sd-panel-head">
-            <div className="sd-panel-titlerow">
-              <div className="sd-panel-ico">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.3">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <span className="sd-panel-title">Documents t&eacute;l&eacute;chargeables</span>
-              {items.length > 0 && <span className="sd-count-chip">{items.length}</span>}
-            </div>
-
-            <button 
-              className="sd-btn-upload" 
-              onClick={() => setIsUploadModalOpen(true)}
-              disabled={uploading}
-            >
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M12 4v16m8-8H4"/></svg>
-              Ajouter un document
-            </button>
-          </div>
-          
-          {/* Toolbar - Forcée sur une ligne */}
-          <div className="sd-toolbar">
-            <div className="sd-sw">
-              <span className="sd-si">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
-              </span>
-              <input
-                className="sd-input"
-                type="text"
-                placeholder="Mots-cl&eacute;s, titre&#8230;"
-                value={q}
-                onChange={e => setQ(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && void load(q)}
-              />
-            </div>
-            <button className="sd-search-btn" onClick={() => void load(q)}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
-              <span>Rechercher</span>
-            </button>
-          </div>
-
-          {/* Success msg */}
-          {uploadMsg && (
-            <div className="sd-upload-success">
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              {uploadMsg}
-              <button onClick={() => setUploadMsg(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#059669', fontSize: '.85rem', lineHeight: 1, padding: 0 }}>✕</button>
-            </div>
-          )}
-
-          {/* Error */}
-          {error && (
-            <div className="sd-error">
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
-              {error}
-            </div>
-          )}
-
-          {/* Content */}
-          {loading ? (
-            <div className="sd-loader"><div className="sd-ring" />Chargement&#8230;</div>
-          ) : !error && items.length === 0 ? (
-            <div className="sd-empty">
-              <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <div className="sd-empty-title">Aucun document trouv&eacute;</div>
-              <div className="sd-empty-sub">Uploadez votre premier fichier ci-dessus.</div>
-            </div>
-          ) : !error ? (
-            <>
-              {/* Desktop table */}
-              <div className="sd-tw">
-                <table className="sd-table">
-                  <thead>
-                    <tr>
-                      <th style={thStyle}>Document</th>
-                      <th style={thStyle}>Type</th>
-                      <th style={thStyle}>Fichier</th>
-                      <th style={thStyle}>Visibilité</th>
-                      <th style={thStyle}>Cr&eacute;&eacute; le</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((d, i) => (
-                      <tr 
-                        key={d.id} 
-                        className="sd-row-clickable" 
-                        style={{ animationDelay: `${i * 0.04}s` }}
-                        onClick={() => setViewingDoc(d)}
-                      >
-                        <td style={tdStyle}>
-                          <div className="sd-doc-title">{d.title}</div>
-                          {d.description && <div className="sd-doc-desc">{d.description}</div>}
-                        </td>
-                        <td style={tdStyle}><FileTypeBadge mimeType={d.fileAsset?.mimeType} /></td>
-                        <td style={tdStyle}>
-                          {d.fileAsset?.url
-                            ? (
-                              <a 
-                                className="sd-filename" 
-                                href={d.fileAsset.url} 
-                                target="_blank" 
-                                rel="noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                Télécharger
-                              </a>
-                            )
-                            : <span style={{color:'#D1D5DB', fontWeight:700}}>—</span>
-                          }
-                        </td>
-                        <td style={tdStyle}><VisibilityBadge visibility={d.visibility} /></td>
-                        <td style={tdStyle}><span style={{whiteSpace:'nowrap', fontSize:'.78rem', fontWeight:600, color:'#374151'}}>{formatDate(d.createdAt)}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile cards */}
-              <div className="sd-mob">
-                {items.map((d, i) => (
-                  <div 
-                    key={d.id} 
-                    className="sd-mc" 
-                    style={{ animationDelay: `${i * 0.04}s` }}
-                    onClick={() => setViewingDoc(d)}
-                  >
-                    <div className="sd-mc-top">
-                      <div>
-                        <div className="sd-doc-title">{d.title}</div>
-                        <div style={{ marginBottom: '.35rem' }}><VisibilityBadge visibility={d.visibility} /></div>
-                        {d.description && <div className="sd-doc-desc">{d.description}</div>}
-                      </div>
-                      <FileTypeBadge mimeType={d.fileAsset?.mimeType} />
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '.8rem' }}>
-                      {d.fileAsset?.url && (
-                        <div className="sd-filename">
-                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                          Détails / Téléchargement
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : null}
+        {/* Section header */}
+        <div className="sd-section-header">
+          <h3 className="sd-section-title">DOCUMENTS</h3>
+          <button className="sd-btn-add" onClick={() => setIsUploadModalOpen(true)} disabled={uploading}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M12 4v16m8-8H4" /></svg>
+            Ajouter
+          </button>
         </div>
+
+        {/* Search */}
+        <div className="sd-search-bar">
+          <div className="sd-search-icon">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
+          </div>
+          <input
+            className="sd-search-input"
+            type="text"
+            placeholder="Mots-clés, titre..."
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && void load(q)}
+          />
+          <button className="sd-search-btn-new" onClick={() => void load(q)}>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" /></svg>
+          </button>
+        </div>
+
+        {/* Messages */}
+        {uploadMsg && (
+          <div className="sd-upload-success">
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {uploadMsg}
+            <button onClick={() => setUploadMsg(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#059669', fontSize: '.85rem', lineHeight: 1, padding: 0 }}>✕</button>
+          </div>
+        )}
+
+        {error && (
+          <div className="sd-error">
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+            {error}
+          </div>
+        )}
+
+        {/* Content */}
+        {loading ? (
+          <div className="sd-loader"><div className="sd-ring" />Chargement&#8230;</div>
+        ) : !error && items.length === 0 ? (
+          <div className="sd-empty">
+            <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <div className="sd-empty-title">Aucun document trouv&eacute;</div>
+            <div className="sd-empty-sub">Uploadez votre premier fichier ci-dessus.</div>
+          </div>
+        ) : !error ? (
+          <div className="sd-cards-grid">
+            {items.map((d, i) => (
+              <div
+                key={d.id}
+                className="sd-card"
+                style={{ animationDelay: `${i * 0.04}s` }}
+                onClick={() => setViewingDoc(d)}
+              >
+                <div className="sd-card-top">
+                  <div className="sd-card-icon">
+                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div className="sd-card-content">
+                    <div className="sd-card-title-row">
+                      <div className="sd-card-title">{fixEncoding(d.title)}</div>
+                      <VisibilityBadge visibility={d.visibility} />
+                    </div>
+                    {d.description && <div className="sd-card-desc">{fixEncoding(d.description)}</div>}
+                    <div className="sd-card-date">{formatDate(d.createdAt)}</div>
+                    {d.fileAsset?.fileName && (
+                      <div className="sd-card-filename">{fixEncoding(d.fileAsset.fileName)}</div>
+                    )}
+                  </div>
+                </div>
+                <div className="sd-card-bottom">
+                  <div className="sd-card-action">
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Détails / Téléchargement
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {isUploadModalOpen && (
-        <UploadModal 
+        <UploadModal
           busy={uploading}
           onCancel={() => setIsUploadModalOpen(false)}
           onUpload={handleModalUpload}

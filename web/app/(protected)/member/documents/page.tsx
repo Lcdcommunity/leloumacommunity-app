@@ -1,29 +1,62 @@
 // web/app/(protected)/member/documents/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
 import type { DocumentItem } from '../../../../types/document';
 import { formatDate } from '../../../../lib/format';
 
-function getFileIcon(fileName?: string) {
-  const ext = fileName?.split('.').pop()?.toLowerCase();
-  if (ext === 'pdf') return { icon: 'PDF', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
-  if (['jpg','jpeg','png','gif','webp'].includes(ext ?? '')) return { icon: 'IMG', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
-  if (['doc','docx'].includes(ext ?? '')) return { icon: 'DOC', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
-  if (['xls','xlsx'].includes(ext ?? '')) return { icon: 'XLS', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
-  return { icon: 'FILE', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
+/* ══════════════════════════════════════════════════════ FIX ENCODING */
+function fixEncoding(str?: string | null): string {
+  if (!str) return '';
+  try {
+    if (str.includes('Ã')) {
+      return decodeURIComponent(escape(str));
+    }
+    return str;
+  } catch (e) {
+    return str.replace(/RÃ©union/g, 'Réunion')
+              .replace(/NÂ°/g, 'N°')
+              .replace(/Ã©/g, 'é')
+              .replace(/Ã¨/g, 'è')
+              .replace(/Ã /g, 'à')
+              .replace(/Ã¢/g, 'â')
+              .replace(/Ãª/g, 'ê')
+              .replace(/Ã®/g, 'î')
+              .replace(/Ã´/g, 'ô')
+              .replace(/Ã»/g, 'û')
+              .replace(/Ã§/g, 'ç')
+              .replace(/Â/g, '');
+  }
 }
 
+/* ══════════════════════════════════════════════════════ FILE TYPE BADGE */
+function FileTypeBadge({ mimeType, fileName }: { mimeType?: string | null; fileName?: string }) {
+  const ext = fileName?.split('.').pop()?.toUpperCase() ?? '—';
+  const mime = mimeType ?? '';
+
+  let color = '#6B7280', bg = '#F3F4F6', border = '#E5E7EB';
+  if (mime.includes('pdf'))   { color = '#DC2626'; bg = '#FEF2F2'; border = '#FECACA'; }
+  else if (mime.includes('image')) { color = '#7C3AED'; bg = '#F5F3FF'; border = '#DDD6FE'; }
+  else if (mime.includes('word') || mime.includes('document')) { color = '#2563EB'; bg = '#EFF6FF'; border = '#BFDBFE'; }
+  else if (mime.includes('sheet') || mime.includes('excel'))   { color = '#059669'; bg = '#ECFDF5'; border = '#A7F3D0'; }
+
+  return (
+    <span style={{ display:'inline-flex', alignItems:'center', gap:'0.22rem', fontSize:'0.65rem', fontWeight:800, letterSpacing:'0.05em', color, background:bg, border:`1px solid ${border}`, borderRadius:6, padding:'0.15rem 0.45rem' }}>
+      {ext}
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════════════════ PAGE */
 export default function MemberDocumentsPage() {
   const [items, setItems] = useState<DocumentItem[]>([]);
   const [q, setQ] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'grid' | 'list'>('grid');
 
-  const loadData = async (query?: string) => {
+  const loadData = useCallback(async (query?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -34,7 +67,7 @@ export default function MemberDocumentsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -53,443 +86,172 @@ export default function MemberDocumentsPage() {
     return () => { isMounted = false; };
   }, []);
 
+  // Filtrage local additionnel pour plus de réactivité si besoin
   const filtered = q
     ? items.filter(d =>
         d.title?.toLowerCase().includes(q.toLowerCase()) ||
-        d.description?.toLowerCase().includes(q.toLowerCase())
+        d.description?.toLowerCase().includes(q.toLowerCase()) ||
+        d.fileAsset?.fileName?.toLowerCase().includes(q.toLowerCase())
       )
     : items;
 
   return (
     <AppShell title="Documents &amp; photos">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
-
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500;600&display=swap');
+        
         .md-wrap {
           font-family: 'DM Sans', sans-serif;
-          padding: clamp(1.25rem, 3vw, 2rem);
-          max-width: 1200px; margin: 0 auto;
-          box-sizing: border-box; /* Empêcher le dépassement */
-          width: 100%;
+          padding: clamp(1rem, 3vw, 2rem);
+          max-width: 1200px; 
+          margin: 0 auto;
         }
 
         /* ── Header ── */
-        .md-header {
-          margin-bottom: 1.75rem;
-          opacity: 0; transform: translateY(10px);
-          animation: mdin 0.5s 0.04s cubic-bezier(.22,1,.36,1) forwards;
-        }
-        .md-eyebrow {
-          font-size: 0.67rem; font-weight: 700; letter-spacing: 0.12em;
-          text-transform: uppercase; color: #2563EB;
-          margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem;
-        }
-        .md-eyebrow-dot {
-          width: 6px; height: 6px; background: #3B82F6;
-          border-radius: 50%; animation: mdpulse 2s ease-in-out infinite;
-        }
-        @keyframes mdpulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
-        .md-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 500;
-          color: #111827; letter-spacing: -0.02em; line-height: 1.15;
-          margin: 0; /* Corriger les marges par défaut */
-        }
-        .md-title span {
-          background: linear-gradient(135deg,#1D4ED8,#3B82F6);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-        }
+        .md-header { margin-bottom: 1.5rem; opacity: 0; transform: translateY(10px); animation: mdin .5s .04s cubic-bezier(.22,1,.36,1) forwards; }
+        .md-eyebrow { font-size: .67rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #16A34A; margin-bottom: .35rem; display: flex; align-items: center; gap: .4rem; }
+        .md-dot { width: 6px; height: 6px; background: #22C55E; border-radius: 50%; animation: mdpulse 2s ease-in-out infinite; }
+        @keyframes mdpulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+        .md-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; color: #111827; letter-spacing: -.02em; line-height: 1.15; }
+        .md-title span { background: linear-gradient(135deg, #16A34A, #22C55E); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-        /* ── Toolbar REVISITÉE ── */
-        .md-toolbar {
-          display: flex; flex-direction: column; gap: 0.75rem;
-          margin-bottom: 1.25rem;
-          opacity: 0; transform: translateY(10px);
-          animation: mdin 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards;
-          width: 100%; box-sizing: border-box;
-        }
+        /* ── Search Bar ── */
+        .md-search-bar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; position: relative; animation: mdin .5s .12s both; }
+        .md-search-input { flex: 1; height: 46px; border-radius: 16px; border: 1px solid rgba(0,0,0,0.05); background: white; padding: 0 1rem 0 2.8rem; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; font-weight: 500; color: #111827; outline: none; box-shadow: 0 2px 10px rgba(0,0,0,0.02); transition: all 0.2s; width: 100%; }
+        .md-search-input:focus { border-color: rgba(22, 163, 74, 0.3); box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.08); }
+        .md-search-icon { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
+        .md-search-btn-new { height: 46px; width: 46px; border-radius: 14px; background: #16A34A; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(22, 163, 74, 0.25); flex-shrink: 0; transition: all 0.2s; }
+        .md-search-btn-new:hover { background: #15803D; }
+
+        /* ── Cards Grid (Fond Vert Transparent) ── */
+        .md-cards-grid { display: flex; flex-direction: column; gap: 1rem; animation: mdin .5s .14s both; }
+        .md-card { background: white; border-radius: 1.5rem; border: 1px solid #f3f4f6; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.02); cursor: pointer; transition: all 0.2s; }
+        .md-card:hover { transform: translateY(-2px); box-shadow: 0 8px 16px rgba(0,0,0,0.04); }
         
-        /* Ligne 1 : Recherche */
-        .md-search-row {
-          display: flex; align-items: center; gap: 0.65rem; width: 100%; flex-wrap: nowrap;
-        }
-        .md-search-wrap { position: relative; flex: 1 1 auto; min-width: 0; }
-        .md-search-ico { position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
-        .md-search-input {
-          width: 100%; height: 42px; padding: 0 0.9rem 0 2.5rem;
-          border-radius: 11px; border: 1px solid rgba(37,99,235,0.14);
-          background: rgba(255,255,255,0.88); font-family: 'DM Sans', sans-serif;
-          font-size: 0.83rem; color: #111827; outline: none;
-          transition: border-color 0.2s, box-shadow 0.2s;
-          box-sizing: border-box;
-        }
-        .md-search-input:focus {
-          border-color: rgba(37,99,235,0.45);
-          box-shadow: 0 0 0 3px rgba(37,99,235,0.09);
-          background: white;
-        }
-        .md-search-input::placeholder { color: rgba(107,114,128,0.45); }
-
-        .md-search-btn {
-          flex: 0 0 auto; height: 42px; padding: 0 1.1rem;
-          background: linear-gradient(135deg,#1D4ED8,#2563EB);
-          color: white; border: none; border-radius: 11px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.8rem; font-weight: 700; letter-spacing: 0.04em;
-          cursor: pointer; display: flex; align-items: center; gap: 0.4rem;
-          box-shadow: 0 4px 12px rgba(37,99,235,0.28);
-          transition: transform 0.15s, box-shadow 0.2s;
-          white-space: nowrap;
-        }
-        .md-search-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.38); }
-
-        /* Ligne 2 : Filtres & Vues */
-        .md-filters-row {
-          display: flex; justify-content: space-between; align-items: center; width: 100%;
-        }
-        .md-count-chip {
-          font-size: 0.72rem; font-weight: 700;
-          padding: 0.28rem 0.7rem; border-radius: 99px;
-          background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
-        }
-
-        .md-view-toggle { display: flex; gap: 0.3rem; }
-        .md-view-btn {
-          width: 36px; height: 36px; border-radius: 10px;
-          border: 1.5px solid rgba(37,99,235,0.13);
-          background: rgba(255,255,255,0.8); cursor: pointer;
-          display: flex; align-items: center; justify-content: center; color: #94A3B8;
-          transition: all 0.2s;
-        }
-        .md-view-btn.active { background: #EFF6FF; border-color: #2563EB; color: #2563EB; }
-        .md-view-btn:hover:not(.active) { background: #F8FAFC; color: #374151; }
-
-        @media (max-width: 500px) {
-          .md-search-row { gap: 0.4rem; }
-          .md-search-input { height: 38px; font-size: 0.75rem; padding-left: 2.2rem; }
-          .md-search-ico { left: 0.6rem; width: 14px; height: 14px; }
-          .md-search-btn { height: 38px; padding: 0 0.8rem; font-size: 0.75rem; }
-          .btn-text { display: none; } /* Sur très petit écran, le texte 'Rechercher' saute, juste la loupe reste */
-          
-          .md-view-btn { width: 34px; height: 34px; }
-          .md-count-chip { font-size: 0.65rem; padding: 0.2rem 0.5rem; }
-        }
-
-        /* ── Grid View ── */
-        .md-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-          gap: 1rem;
-          opacity: 0; animation: mdin 0.5s 0.16s cubic-bezier(.22,1,.36,1) forwards;
-        }
-        @media (max-width: 560px) { .md-grid { grid-template-columns: 1fr 1fr; } }
-        @media (max-width: 380px) { .md-grid { grid-template-columns: 1fr; } }
-
-        .md-card {
-          background: rgba(253,253,255,0.92);
-          backdrop-filter: blur(10px);
-          border-radius: 16px;
-          border: 1px solid rgba(37,99,235,0.09);
-          box-shadow: 0 2px 10px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.85) inset;
-          padding: 1.1rem;
-          display: flex; flex-direction: column; gap: 0.7rem;
-          transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .md-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 22px rgba(37,99,235,0.1), 0 0 0 1px rgba(255,255,255,0.9) inset;
-        }
-
-        .md-card-top { display: flex; gap: 0.7rem; align-items: flex-start; }
-        .md-file-badge {
-          width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-          font-size: 0.55rem; font-weight: 800; letter-spacing: 0.05em;
-          border: 1px solid;
-        }
-        .md-card-info { flex: 1; min-width: 0; }
-        .md-card-title {
-          font-size: 0.85rem; font-weight: 700; color: #111827;
-          line-height: 1.35; word-break: break-word;
-          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-        }
-        .md-card-date { font-size: 0.68rem; color: #9CA3AF; margin-top: 2px; }
-
-        .md-card-desc {
-          font-size: 0.76rem; color: #6B7280; line-height: 1.55;
-          display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-        }
-
-        .md-dl-btn {
-          display: inline-flex; align-items: center; gap: 0.35rem;
-          height: 34px; padding: 0 0.85rem;
-          border-radius: 9px; border: 1.5px solid rgba(37,99,235,0.18);
-          background: #EFF6FF; color: #1D4ED8; text-decoration: none;
-          font-size: 0.73rem; font-weight: 700;
-          transition: background 0.15s, border-color 0.15s, transform 0.15s;
-          width: 100%; justify-content: center; box-sizing: border-box;
-        }
-        .md-dl-btn:hover { background: #DBEAFE; border-color: #2563EB; transform: translateY(-1px); }
-        .md-no-file {
-          display: inline-flex; align-items: center; justify-content: center;
-          height: 34px; width: 100%;
-          font-size: 0.72rem; color: #CBD5E1;
-        }
-
-        /* ── List View ── */
-        .md-list {
-          background: rgba(253,253,255,0.92);
-          backdrop-filter: blur(10px);
-          border-radius: 18px;
-          border: 1px solid rgba(37,99,235,0.09);
-          box-shadow: 0 2px 12px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.85) inset;
-          overflow: hidden;
-          opacity: 0; animation: mdin 0.5s 0.16s cubic-bezier(.22,1,.36,1) forwards;
-        }
-        .md-list-head {
-          display: grid; grid-template-columns: 2fr 2fr 1fr 110px;
-          padding: 0.65rem 1.2rem;
-          border-bottom: 1px solid rgba(37,99,235,0.07);
-        }
-        .md-list-head span {
-          font-size: 0.62rem; font-weight: 700; letter-spacing: 0.09em;
-          text-transform: uppercase; color: #9CA3AF;
-        }
-        .md-list-row {
-          display: grid; grid-template-columns: 2fr 2fr 1fr 110px;
-          padding: 0.85rem 1.2rem;
-          border-bottom: 1px solid rgba(37,99,235,0.05);
-          align-items: center; transition: background 0.15s;
-          gap: 0.5rem;
-        }
-        .md-list-row:last-child { border-bottom: none; }
-        .md-list-row:hover { background: rgba(37,99,235,0.022); }
-
-        @media (max-width: 700px) {
-          .md-list-head { display: none; }
-          .md-list-row {
-            grid-template-columns: auto 1fr auto;
-            grid-template-rows: auto auto;
-          }
-          .md-list-row > *:nth-child(2) { grid-column: 2; }
-          .md-list-row > *:nth-child(3) { display: none; }
-          .md-list-row > *:nth-child(4) { grid-column: 3; grid-row: 1; }
-        }
-
-        .md-list-title { font-size: 0.83rem; font-weight: 700; color: #111827; word-break: break-word; }
-        .md-list-desc { font-size: 0.74rem; color: #6B7280; line-height: 1.45; word-break: break-word; }
-        .md-list-date { font-size: 0.72rem; color: #9CA3AF; }
-        .md-list-dl {
-          display: inline-flex; align-items: center; gap: 0.3rem;
-          height: 32px; padding: 0 0.75rem; border-radius: 8px;
-          border: 1.5px solid rgba(37,99,235,0.18);
-          background: #EFF6FF; color: #1D4ED8; text-decoration: none;
-          font-size: 0.7rem; font-weight: 700; white-space: nowrap;
-          transition: background 0.15s, border-color 0.15s;
-        }
-        .md-list-dl:hover { background: #DBEAFE; border-color: #2563EB; }
+        .md-card-top { background: #F0FDF4; padding: 1.25rem; display: flex; gap: 1rem; align-items: flex-start; }
+        .md-card-icon { width: 3rem; height: 3rem; border-radius: 1rem; background: #DCFCE7; border: 1px solid #BBF7D0; display: flex; align-items: center; justify-content: center; color: #16A34A; flex-shrink: 0; box-shadow: 0 2px 4px rgba(22,163,74,0.1); }
+        
+        .md-card-content { flex: 1; padding-top: 0.1rem; width: 100%; overflow: hidden; }
+        .md-card-title-row { display: flex; flex-direction: column; align-items: flex-start; gap: 0.35rem; margin-bottom: 0.5rem; }
+        .md-card-title { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 700; color: #111827; line-height: 1.1; word-break: break-word; }
+        .md-card-desc { font-size: 0.85rem; color: #374151; font-weight: 500; margin-top: 0.5rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .md-card-date { font-size: 0.85rem; color: #6B7280; margin: 0.75rem 0; }
+        .md-card-filename { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: #4B5563; background: rgba(255,255,255,0.7); padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #dcfce7; word-break: break-all; }
+        
+        .md-card-bottom { background: white; padding: 0.875rem 1.25rem; border-top: 1px solid rgba(243,244,246,0.8); display: flex; align-items: center; justify-content: space-between; }
+        .md-card-action { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: #374151; text-decoration: none; }
+        .md-card-action:hover { color: #16A34A; }
 
         /* ── States ── */
-        .md-empty {
-          display: flex; flex-direction: column; align-items: center;
-          justify-content: center; padding: 3.5rem 1rem; gap: 0.8rem; color: #9CA3AF;
-          text-align: center;
-        }
-        .md-empty-ico {
-          width: 54px; height: 54px; border-radius: 50%;
-          background: #F9FAFB; border: 1px solid #E5E7EB;
-          display: flex; align-items: center; justify-content: center;
-        }
-        .md-empty p { font-size: 0.82rem; font-weight: 500; margin: 0; }
-        .md-empty small { font-size: 0.72rem; color: #CBD5E1; }
+        .md-error { display: flex; align-items: center; gap: .65rem; padding: .9rem 1.2rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; color: #B91C1C; font-size: .82rem; font-weight: 800; margin-bottom: 1rem; }
+        .md-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: .75rem; color: #6B7280; font-size: .84rem; font-weight: 700; }
+        .md-ring { width: 24px; height: 24px; border: 2.5px solid rgba(22, 163, 74, 0.12); border-top-color: #16A34A; border-radius: 50%; animation: mdspin .8s linear infinite; }
+        .md-empty { display: flex; flex-direction: column; align-items: center; padding: 3.5rem 1rem; gap: .75rem; color: #9CA3AF; text-align: center; }
+        .md-empty-title { font-size: .9rem; font-weight: 800; color: #374151; }
+        .md-empty-sub { font-size: .78rem; font-weight: 600; }
 
-        .md-loader {
-          display: flex; align-items: center; justify-content: center;
-          padding: 3rem; gap: 0.75rem; color: #6B7280; font-size: 0.82rem;
-        }
-        .md-ring {
-          width: 24px; height: 24px;
-          border: 2.5px solid rgba(37,99,235,0.1);
-          border-top-color: #2563EB; border-radius: 50%;
-          animation: mdspin 0.8s linear infinite;
-        }
-        @keyframes mdspin { to { transform: rotate(360deg); } }        
-        
-        .md-error {
-          display: flex; align-items: center; gap: 0.6rem;
-          padding: 1rem; color: #B91C1C; font-size: 0.8rem;
-          background: #FEF2F2; border-radius: 12px; border: 1px solid #FECACA;
-          margin-bottom: 1rem;
-        }
-
-        @keyframes mdin { to { opacity: 1; transform: translateY(0); } }
+        @keyframes mdin { to { opacity: 1; transform: translateY(0) } }
+        @keyframes mdspin { to { transform: rotate(360deg) } }
       `}</style>
 
       <div className="md-wrap">
 
         {/* Header */}
         <div className="md-header">
-          <div className="md-eyebrow"><div className="md-eyebrow-dot" />Espace membre</div>
+          <div className="md-eyebrow"><div className="md-dot" />Espace membre</div>
           <h1 className="md-title">Documents <span>&amp; photos</span></h1>
         </div>
 
-        {/* Toolbar - NOUVELLE STRUCTURE */}
-        <div className="md-toolbar">
-          
-          {/* Ligne 1: Recherche */}
-          <div className="md-search-row">
-            <div className="md-search-wrap">
-              <span className="md-search-ico">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
-                </svg>
-              </span>
-              <input
-                className="md-search-input"
-                placeholder="Rechercher un document&#8230;"
-                value={q}
-                onChange={e => setQ(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && void loadData(q)}
-              />
-            </div>
-
-            <button className="md-search-btn" onClick={() => void loadData(q)}>
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                <circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/>
-              </svg>
-              <span className="btn-text">Rechercher</span>
-            </button>
+        {/* Barre de recherche */}
+        <div className="md-search-bar">
+          <div className="md-search-icon">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </svg>
           </div>
-
-          {/* Ligne 2: Boutons vue & Compteur */}
-          <div className="md-filters-row">
-            {!loading ? (
-              <span className="md-count-chip">
-                {filtered.length} document{filtered.length !== 1 ? 's' : ''}
-              </span>
-            ) : <div/>}
-
-            <div className="md-view-toggle">
-              <button className={`md-view-btn${view === 'grid' ? ' active' : ''}`} onClick={() => setView('grid')} title="Vue grille">
-                <svg width="13" height="13" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M1 2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1V2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1V2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V2zM1 7a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1V7zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1V7zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V7zM1 12a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H2a1 1 0 01-1-1v-2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1H7a1 1 0 01-1-1v-2zm5 0a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 01-1 1h-2a1 1 0 01-1-1v-2z"/>
-                </svg>
-              </button>
-              <button className={`md-view-btn${view === 'list' ? ' active' : ''}`} onClick={() => setView('list')} title="Vue liste">
-                <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" d="M4 6h16M4 12h16M4 18h16"/>
-                </svg>
-              </button>
-            </div>
-          </div>
+          <input
+            className="md-search-input"
+            type="text"
+            placeholder="Rechercher un document, un titre..."
+            value={q}
+            onChange={e => setQ(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && void loadData(q)}
+          />
+          <button className="md-search-btn-new" onClick={() => void loadData(q)}>
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35" />
+            </svg>
+          </button>
         </div>
 
         {/* Error */}
         {error && (
           <div className="md-error">
-            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2" style={{ flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
+            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
             </svg>
             {error}
           </div>
         )}
 
-        {/* Loading */}
+        {/* Contenu */}
         {loading ? (
           <div className="md-loader"><div className="md-ring" />Chargement&#8230;</div>
-        ) : filtered.length === 0 ? (
+        ) : !error && filtered.length === 0 ? (
           <div className="md-empty">
-            <div className="md-empty-ico">
-              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.5">
-                <path strokeLinecap="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-            </div>
-            <p>Aucun document{q ? ' pour cette recherche' : ''}</p>
-            {q && <small>Essayez avec d&#8217;autres mots-cl&eacute;s</small>}
+            <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            <div className="md-empty-title">Aucun document trouv&eacute;</div>
+            <div className="md-empty-sub">Il n'y a pas de document disponible pour le moment.</div>
           </div>
-
-        ) : view === 'grid' ? (
-
-          /* ── GRID ── */
-          <div className="md-grid">
-            {filtered.map((d, i) => {
-              const fileCfg = getFileIcon(d.fileAsset?.fileName);
-              return (
-                <div key={d.id} className="md-card" style={{ animationDelay: `${0.04 * i}s` }}>
-                  <div className="md-card-top">
-                    <div
-                      className="md-file-badge"
-                      style={{ color: fileCfg.color, background: fileCfg.bg, borderColor: fileCfg.border }}
-                    >
-                      {fileCfg.icon}
-                    </div>
-                    <div className="md-card-info">
-                      <div className="md-card-title">{d.title}</div>
-                      <div className="md-card-date">{formatDate(d.createdAt)}</div>
-                    </div>
+        ) : !error ? (
+          <div className="md-cards-grid">
+            {filtered.map((d, i) => (
+              <div 
+                key={d.id} 
+                className="md-card"
+                style={{ animationDelay: `${i * 0.04}s` }}
+              >
+                <div className="md-card-top">
+                  <div className="md-card-icon">
+                    <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
                   </div>
-
-                  {d.description && (
-                    <p className="md-card-desc">{d.description}</p>
-                  )}
-
-                  {d.fileAsset?.url ? (
-                    <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="md-dl-btn">
-                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"/>
-                      </svg>
-                      {d.fileAsset.fileName ?? 'T\u00e9l\u00e9charger'}
-                    </a>
-                  ) : (
-                    <span className="md-no-file">Aucun fichier</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-        ) : (
-
-          /* ── LIST ── */
-          <div className="md-list">
-            <div className="md-list-head">
-              <span>Titre</span>
-              <span>Description</span>
-              <span>Date</span>
-              <span>Fichier</span>
-            </div>
-            {filtered.map(d => {
-              const fileCfg = getFileIcon(d.fileAsset?.fileName);
-              return (
-                <div key={d.id} className="md-list-row">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <div
-                      className="md-file-badge"
-                      style={{ color: fileCfg.color, background: fileCfg.bg, borderColor: fileCfg.border, width: 32, height: 32, fontSize: '0.5rem' }}
-                    >
-                      {fileCfg.icon}
+                  <div className="md-card-content">
+                    <div className="md-card-title-row">
+                      <div className="md-card-title">{fixEncoding(d.title)}</div>
+                      <FileTypeBadge mimeType={d.fileAsset?.mimeType} fileName={d.fileAsset?.fileName} />
                     </div>
-                    <div className="md-list-title">{d.title}</div>
-                  </div>
-                  <div className="md-list-desc">{d.description ?? '—'}</div>
-                  <div className="md-list-date">{formatDate(d.createdAt)}</div>
-                  <div>
-                    {d.fileAsset?.url ? (
-                      <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="md-list-dl">
-                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4"/>
-                        </svg>
-                        T&eacute;l&eacute;charger
-                      </a>
-                    ) : (
-                      <span style={{ fontSize: '0.72rem', color: '#CBD5E1' }}>—</span>
+                    {d.description && <div className="md-card-desc">{fixEncoding(d.description)}</div>}
+                    <div className="md-card-date">{formatDate(d.createdAt)}</div>
+                    {d.fileAsset?.fileName && (
+                      <div className="md-card-filename">{fixEncoding(d.fileAsset.fileName)}</div>
                     )}
                   </div>
                 </div>
-              );
-            })}
+                <div className="md-card-bottom">
+                  {d.fileAsset?.url ? (
+                    <a href={d.fileAsset.url} target="_blank" rel="noreferrer" className="md-card-action w-full">
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4-4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Détails / Téléchargement
+                    </a>
+                  ) : (
+                    <span className="md-card-action" style={{ color: '#9CA3AF' }}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      Fichier indisponible
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+        ) : null}
       </div>
     </AppShell>
   );
