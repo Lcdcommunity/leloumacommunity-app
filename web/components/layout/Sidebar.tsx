@@ -355,7 +355,7 @@ export function Sidebar() {
             Déconnexion
           </button>
         </div>
-      </aside>
+      </aside> 
     </>
   );
 }
