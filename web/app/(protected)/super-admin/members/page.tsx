@@ -197,7 +197,7 @@ function MemberModal({
   };
 
   const canApprove = user.status === 'PENDING_APPROVAL' || user.status === 'EMAIL_UNVERIFIED';
-  
+
   const formattedBirthDateForInput = editValues.birthDate 
     ? new Date(editValues.birthDate).toISOString().split('T')[0] 
     : '';
@@ -286,8 +286,7 @@ function MemberModal({
           <div className="sm-section-divider">Résidence & Adresse</div>
           <div className="sm-dp-grid">
              <div className="sm-dp-field">
-                <label>Pays actuel</label>
-                {isEditing ? (
+                <label>Pays actuel</label>                {isEditing ? (
                   <select className="sm-dp-input" value={editValues.country || ''} onChange={e => handleChange('country', e.target.value)}>
                     <option value="">Sélectionner...</option>
                     {COUNTRIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
@@ -352,6 +351,10 @@ export default function SuperAdminMembersPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editValues, setEditValues] = useState<Partial<ExtendedUser>>({});
   const [actionBusy, setActionBusy] = useState(false);
+  
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // 💡 Nouvel état pour le texte de confirmation saisi par l'admin
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const load = useCallback(async (qVal?: string, sVal?: string) => {
     setError(null); setLoading(true);
@@ -371,6 +374,7 @@ export default function SuperAdminMembersPage() {
     setSelectedUser(user);
     setEditValues(user);
     setIsEditing(false);
+    setShowDeleteConfirm(false);
   };
 
   const handleSaveEdit = async () => {
@@ -417,8 +421,15 @@ export default function SuperAdminMembersPage() {
     finally { setActionBusy(false); }
   };
 
-  const handleDelete = async () => {
-    if (!selectedUser || !confirm('Supprimer définitivement ce compte ?')) return;
+  // 💡 On réinitialise le texte de confirmation à chaque ouverture
+  const handleDeleteRequest = () => {
+    setDeleteConfirmText('');
+    setShowDeleteConfirm(true);
+  };
+
+  const executeDelete = async () => {
+    if (!selectedUser) return;
+    setShowDeleteConfirm(false);
     setActionBusy(true);
     try {
       await api.deleteUserSuperAdmin(selectedUser.id);
@@ -483,24 +494,38 @@ export default function SuperAdminMembersPage() {
         .btn-cancel { height:40px; padding:0 1rem; border:1.5px solid #e2e8f0; border-radius:10px; font-weight:700; cursor: pointer; }
         .sp-icon-btn { width:34px; height:34px; border-radius:9px; border:1.5px solid var(--border); background:var(--bg); color:var(--color); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; }
         .sp-icon-btn:hover { background:var(--hover-bg); transform:translateY(-1px); }
+
+        /* MODALE DE CONFIRMATION DE SUPPRESSION */
+        .confirm-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.8); backdrop-filter:blur(8px); z-index:2000; display:flex; align-items:center; justify-content:center; padding:1.5rem; animation: fadeIn 0.2s ease-out; }
+        .confirm-content { background:white; width:100%; max-width:400px; border-radius:24px; padding:2rem 1.5rem; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .confirm-icon { width:64px; height:64px; background:#FEF2F2; color:#DC2626; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem; border:8px solid #FFF5F5; }
+        .confirm-title { font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:700; color:#111827; margin-bottom:.5rem; line-height:1.2; }
+        .confirm-text { font-family:'DM Sans',sans-serif; font-size:.9rem; color:#64748b; margin-bottom:1.5rem; line-height:1.5; }
+        .confirm-actions { display:flex; gap:1rem; flex-direction:column; }
+        @media(min-width:600px){ .confirm-actions { flex-direction:row; } .confirm-actions > * { flex:1; } }
+        .btn-confirm-del { height:44px; background:#DC2626; color:white; border:none; border-radius:12px; font-size:.9rem; font-weight:800; display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
+        .btn-confirm-del:hover:not(:disabled) { background:#B91C1C; }
+        .btn-confirm-cancel { height:44px; background:#f1f5f9; color:#475569; border:none; border-radius:12px; font-size:.9rem; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
+        .btn-confirm-cancel:hover { background:#e2e8f0; }
+        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes slideUp { from { opacity:0; transform:translateY(20px) scale(0.95); } to { opacity:1; transform:translateY(0) scale(1); } }
       `}</style>
 
       <div className="sm-wrap">
-  <header style={{ marginBottom: '1.5rem' }}>
-    <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#DC2626', letterSpacing: '.1em', textTransform: 'uppercase' }}>Super Admin</div>
-    <h1 
-      className="sm-title" 
-      style={{ 
-        whiteSpace: 'nowrap', 
-        overflow: 'hidden', 
-        textOverflow: 'ellipsis',
-        // Optionnel : permet au texte de rétrécir sur mobile pour éviter d'être coupé trop vite
-        fontSize: 'clamp(1.3rem, 6vw, 2rem)' 
-      }}
-    >
-      Membres — <span>vue globale</span>
-    </h1>
-  </header>
+        <header style={{ marginBottom: '1.5rem' }}>
+          <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#DC2626', letterSpacing: '.1em', textTransform: 'uppercase' }}>Super Admin</div>
+          <h1 
+            className="sm-title" 
+            style={{ 
+              whiteSpace: 'nowrap', 
+              overflow: 'hidden', 
+              textOverflow: 'ellipsis',
+              fontSize: 'clamp(1.3rem, 6vw, 2rem)' 
+            }}
+          >
+            Membres — <span>vue globale</span>
+          </h1>
+        </header>
 
         {error && (
           <div style={{ background: '#FEF2F2', color: '#B91C1C', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #FECACA', fontWeight: 700 }}>
@@ -601,7 +626,8 @@ export default function SuperAdminMembersPage() {
           </div>
         </div>
       </div>
-
+      
+      {/* Modale de détails principale */}
       {selectedUser && (
         <MemberModal
           user={selectedUser}
@@ -615,8 +641,56 @@ export default function SuperAdminMembersPage() {
           onSave={handleSaveEdit}
           onToggleSuspend={handleToggleSuspend}
           onApprove={handleApprove}
-          onDelete={handleDelete}
+          onDelete={handleDeleteRequest}
         />
+      )}
+
+      {/* 💡 Modale de Confirmation de Suppression (avec sécurité de saisie) */}
+      {showDeleteConfirm && selectedUser && (
+        <div className="confirm-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="confirm-content" onClick={e => e.stopPropagation()}>
+            <div className="confirm-icon">
+              <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="confirm-title">Suppression définitive</h3>
+            <p className="confirm-text">
+              Êtes-vous sûr de vouloir supprimer le compte de <strong style={{color:'#111827'}}>{fullName(selectedUser)}</strong> ?<br />Cette action est immédiate et effacera toutes ses données.
+            </p>
+            
+            {/* 💡 Zone de vérification */}
+            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #e2e8f0' }}>
+              <label style={{ display: 'block', fontSize: '.75rem', fontWeight: 800, color: '#475569', marginBottom: '.5rem' }}>
+                Saisissez <span style={{ color: '#DC2626', userSelect: 'all' }}>{selectedUser.email}</span> pour confirmer :
+              </label>
+              <input 
+                type="text" 
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                style={{ width: '100%', height: '40px', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '0 .75rem', fontSize: '.85rem', outline: 'none' }}
+                placeholder="Tapez l'email ici..."
+              />
+            </div>
+
+            <div className="confirm-actions">
+              <button className="btn-confirm-cancel" onClick={() => setShowDeleteConfirm(false)}>
+                Annuler
+              </button>
+              <button 
+                className="btn-confirm-del" 
+                onClick={executeDelete} 
+                disabled={actionBusy || deleteConfirmText !== selectedUser.email}
+                style={{ 
+                  opacity: (actionBusy || deleteConfirmText !== selectedUser.email) ? 0.5 : 1, 
+                  cursor: (actionBusy || deleteConfirmText !== selectedUser.email) ? 'not-allowed' : 'pointer' 
+                }}
+              >
+                {actionBusy ? 'Suppression...' : 'Oui, supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AppShell>
   );
