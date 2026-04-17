@@ -120,13 +120,16 @@ async function bootstrap() {
         callback(null, true);
       } else {
         console.error('❌ CORS BLOCKED:', origin);
-        callback(new Error(`CORS blocked: ${origin}`), false);
+        // CORRECTION CRITIQUE : Ne jamais faire `new Error` ici.
+        // On renvoie juste `false` pour que le navigateur gère le blocage sans faire crasher le réseau.
+        callback(null, false); 
       }
     },
     credentials: true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: [
       'Content-Type',
+      'Accept',
       'Authorization',
       'x-tenant-id',
     ],
