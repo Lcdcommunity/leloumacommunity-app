@@ -872,7 +872,7 @@ export const api = {
       `/admin/events?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.type ? `&type=${encodeURIComponent(params.type)}` : ''}${
-        params?.antennaId ? `&encodeURIComponent(params.antennaId)}` : ''
+        params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''
       }`
     ),
 
