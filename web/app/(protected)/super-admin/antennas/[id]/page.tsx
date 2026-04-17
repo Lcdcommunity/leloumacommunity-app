@@ -231,7 +231,6 @@ export default function AntennaDetailPage() {
             {isEditing ? <>Modifier l&apos;<span>antenne</span></> : <>Détails de l&apos;<span>antenne</span></>}
           </h1>
         </div>
-
         {/* Error */}
         {error && !loading && (
           <div className="ea-error-box">
@@ -398,7 +397,6 @@ export default function AntennaDetailPage() {
                 </div>
                 <div className="ea-edit-body">
                   <AntennaForm
-                    isEditMode={true}
                     initialValues={{
                       name:            antenna.name,
                       email:           antenna.email || '',
@@ -416,10 +414,7 @@ export default function AntennaDetailPage() {
                     onSubmit={async (values) => {
                       setBusy(true); setError(null); setSaveSuccess(false);
                       try {
-                        // On nettoie les objets inutiles pour le backend (ex: admin)
-                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                        const { admin, ...cleanValues } = values; 
-                        const updated = await api.updateAntenna(id, cleanValues);
+                        const updated = await api.updateAntenna(id, values);
                         setAntenna(updated);
                         setIsEditing(false);
                         setSaveSuccess(true);
