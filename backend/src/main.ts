@@ -25,73 +25,8 @@ if (typeof BigInt !== 'undefined' && !(BigInt.prototype as any).toJSON) {
   };
 }
 
-/**
- * Nettoie les origins (trim + remove trailing slash)
- */
-function normalizeOrigins(values: string[]): string[] {
-  return values
-    .map((v) => v.trim())
-    .filter(Boolean)
-    .map((v) => v.replace(/\/+$/, ''));
-}
-
-/**
- * Récupère les origins depuis ENV
- */
-function getAllowedOrigins(): string[] {
-  const raw =
-    process.env.CORS_ORIGINS ||
-    process.env.FRONTEND_URL ||
-    '';
-
-  return normalizeOrigins([
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    ...raw.split(','),
-  ]);
-}
-
-/**
- * Vérifie si une origin est autorisée
- */
-function isAllowedOrigin(origin: string | undefined, allowed: string[]): boolean {
-  if (!origin) return true; // Postman, curl, etc.
-
-  const clean = origin.replace(/\/+$/, '');
-
-  // match exact
-  if (allowed.includes(clean)) {
-    return true;
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(clean);
-  } catch {
-    return false;
-  }
-
-  const hostname = parsed.hostname.toLowerCase();
-
-  // localhost
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return true;
-  }
-
-  // Vercel preview
-  if (hostname.endsWith('.vercel.app')) {
-    return true;
-  }
-
-  // 🔥 TON DOMAINE (IMPORTANT)
-  if (hostname.endsWith('leloumacommunity.com')) {
-    return true;
-  }
-
-  return false;
-}
-
 async function bootstrap() {
+  // On désactive totalement le CORS de NestJS
   const app = await NestFactory.create(AppModule, { cors: false });
 
   // VAPID
@@ -107,32 +42,36 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  const allowedOrigins = getAllowedOrigins();
+  // 🔥 INTERCEPTEUR CORS BRUTAL (BYPASS TOTAL) 🔥
+  // Ce code s'exécute avant toute autre chose et force les en-têtes de sécurité
+  app.use((req, res, next) => {
+    // On récupère l'URL exacte qui fait la requête (ex: https://www.leloumacommunity.com)
+    const origin = req.headers.origin;
+    
+    // Si une origine est détectée, on lui dit expressément "Tu es autorisé"
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
 
-  console.log('🌍 CORS ORIGINS (ENV):', allowedOrigins);
+    // Autorisations requises pour les cookies/tokens
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    // Méthodes autorisées
+    res.setHeader('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
+    // En-têtes autorisés (très important pour x-tenant-id et Authorization)
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-tenant-id'
+    );
 
-  // ✅ CORS CONFIG PRODUCTION SAFE
-  app.enableCors({
-    origin: (origin, callback) => {
-      const ok = isAllowedOrigin(origin, allowedOrigins);
+    // Si le navigateur fait une requête de vérification (OPTIONS / Preflight)
+    // On coupe court et on lui renvoie un succès (200) immédiatement.
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
 
-      if (ok) {
-        callback(null, true);
-      } else {
-        console.error('❌ CORS BLOCKED:', origin);
-        // CORRECTION CRITIQUE : Ne jamais faire `new Error` ici.
-        // On renvoie juste `false` pour que le navigateur gère le blocage sans faire crasher le réseau.
-        callback(null, false); 
-      }
-    },
-    credentials: true,
-    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-    allowedHeaders: [
-      'Content-Type',
-      'Accept',
-      'Authorization',
-      'x-tenant-id',
-    ],
+    next();
   });
 
   // Validation globale
@@ -181,7 +120,7 @@ async function bootstrap() {
     ),
   );
 
-  const port = Number(process.env.PORT || 3001);
+  const port = Number(process.env.PORT || 10000);
 
   await app.listen(port);
 
