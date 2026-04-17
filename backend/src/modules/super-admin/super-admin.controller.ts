@@ -1,4 +1,4 @@
-// backend/src/modules/super-admin/super-admin.controller.ts
+/////// backend/src/modules/super-admin/super-admin.controller.ts
 import {
   Body,
   Controller,
@@ -24,7 +24,6 @@ import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-// 🔥 AJOUT CHIRURGICAL : On autorise le SYSTEM_ADMIN à accéder à tout le panel Super Admin
 @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
 export class SuperAdminController {
   constructor(private readonly service: SuperAdminService) {}
@@ -37,7 +36,6 @@ export class SuperAdminController {
 
   @Put('settings/pricing')
   updatePricing(
-    // 🔥 CORRECTION : On enlève le "?" pour matcher exactement avec la signature du Service
     @Body() pricingData: Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold: number | null }>,
     @CurrentUser() actor: AuthUser
   ) {
@@ -49,7 +47,7 @@ export class SuperAdminController {
   @Get('members')
   listMembers(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listUsersByRole(
-      actor.associationId, // 🔥 FILTRE INJECTÉ
+      actor.associationId,
       UserRole.MEMBER,
       query.page,
       query.pageSize,
@@ -61,7 +59,7 @@ export class SuperAdminController {
   @Get('admins')
   listAdmins(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listUsersByRole(
-      actor.associationId, // 🔥 FILTRE INJECTÉ
+      actor.associationId,
       UserRole.ANTENNA_ADMIN,
       query.page,
       query.pageSize,
@@ -76,7 +74,7 @@ export class SuperAdminController {
   }
 
   @Patch('admins/:id')
-  updateAdmin(@Param('id') id: string, @Body() body: any, @CurrentUser() actor: AuthUser) {
+  updateAdmin(@Param('id') id: string, @Body() body: Partial<CreateAntennaAdminDto>, @CurrentUser() actor: AuthUser) {
     return this.service.updateAntennaAdmin(id, body, actor.id, actor.associationId);
   }
 
@@ -130,7 +128,7 @@ export class SuperAdminController {
   @Get('antennas')
   listAntennas(@CurrentUser() actor: AuthUser, @Query() query: ListAntennasQueryDto) {
     return this.service.listAntennas(
-      actor.associationId, // 🔥 FILTRE INJECTÉ
+      actor.associationId,
       query.page,
       query.pageSize,
       query.q,
@@ -198,7 +196,6 @@ export class SuperAdminController {
     @Query('pageSize') pageSize?: string,
     @Query('status') status?: string,
   ) {
-    // 🔥 On force la conversion en Nombre pour éviter que Prisma ne crashe en PROD
     return this.service.listAllContributions(
       actor.associationId,
       Number(page) || 1,
@@ -207,7 +204,7 @@ export class SuperAdminController {
     );
   }
 
-  /* ── GESTION DES CONTENUS (ANNONCES) (AJOUT CHIRURGICAL) ── */
+  /* ── GESTION DES CONTENUS (ANNONCES) ── */
   @Get('contents')
   listContents(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listContents(

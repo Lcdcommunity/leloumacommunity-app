@@ -1,6 +1,8 @@
-// backend/src/modules/super-admin/dto/create-antenna-admin.dto.ts
+/////// backend/src/modules/super-admin/dto/create-antenna-admin.dto.ts
 import { Transform } from 'class-transformer';
 import {
+  ArrayNotEmpty,
+  IsArray,
   IsBoolean,
   IsEmail,
   IsOptional,
@@ -9,8 +11,10 @@ import {
 } from 'class-validator';
 
 export class CreateAntennaAdminDto {
-  @IsString()
-  antennaId!: string;
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayNotEmpty({ message: 'Vous devez sélectionner au moins une antenne.' })
+  antennaIds!: string[];
 
   @IsString()
   @MaxLength(120)
@@ -33,11 +37,15 @@ export class CreateAntennaAdminDto {
   @MaxLength(160)
   associationTitle?: string;
 
-  // 🔥 AJOUT CHIRURGICAL : On autorise le champ 'function' pour le poste occupé
   @IsOptional()
   @IsString()
   @MaxLength(160)
   function?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  professionalStatus?: string;
 
   @IsOptional()
   @IsString()

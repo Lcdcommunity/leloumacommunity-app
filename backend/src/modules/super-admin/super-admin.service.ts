@@ -1,4 +1,4 @@
-// backend/src/modules/super-admin/super-admin.service.ts
+/////// backend/src/modules/super-admin/super-admin.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -12,7 +12,7 @@ import {
   UserStatus,
   NotificationType,
   ProjectStatus,
-  CurrencyCode, // 🔥 AJOUT DE L'IMPORT ICI POUR LE PRICING
+  CurrencyCode,
   PostStatus,
 } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
@@ -26,12 +26,13 @@ type PrismaLike = PrismaService | Prisma.TransactionClient;
 
 type InternalAdminPayload = {
   associationId: string;
-  antennaId: string;
+  antennaIds: string[];
   firstName: string;
   lastName: string;
   email: string;
   phone?: string;
   associationTitle?: string;
+  professionalStatus?: string;
   addressLine1?: string;
   addressLine2?: string;
   postalCode?: string;
@@ -65,7 +66,6 @@ export class SuperAdminService {
   /* ── GESTION DES PRIX (RÉÉCRITE POUR UTILISER LA VRAIE TABLE PRICING) ── */
 
   async getPricingConfig(associationId: string) {
-    // On va chercher dans la VRAIE table Pricing
     const pricings = await this.prisma.pricing.findMany({
       where: { associationId }
     });
@@ -83,10 +83,9 @@ export class SuperAdminService {
 
   async updatePricingConfig(
     associationId: string,
-    pricingData: Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold: number | null }>, // 🔥 ON ACCEPTE ENFIN LE SEUIL ICI
+    pricingData: Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold: number | null }>,
     actorId: string,
   ) {
-    // On boucle sur chaque devise envoyée par le front et on fait un Upsert dans la vraie table Pricing
     const updatePromises = Object.entries(pricingData).map(([currencyStr, data]) => {
       const currency = currencyStr as CurrencyCode;
 
@@ -121,7 +120,7 @@ export class SuperAdminService {
 
   async listAntennas(associationId: string, page: number, pageSize: number, q?: string, isActive?: boolean) {
     const skip = (page - 1) * pageSize;
-    const where: Prisma.AntennaWhereInput = { associationId }; // 🔥 FILTRÉ
+    const where: Prisma.AntennaWhereInput = { associationId };
 
     if (q) {
       where.OR = [
@@ -156,7 +155,7 @@ export class SuperAdminService {
 
   async listAntennasByAssociation(associationId: string) {
     return this.prisma.antenna.findMany({
-      where: { associationId }, // 🔥 FILTRÉ
+      where: { associationId },
       include: {
         _count: {
           select: { members: true },
@@ -168,7 +167,7 @@ export class SuperAdminService {
 
   async getAntennaById(id: string, associationId: string) {
     const antenna = await this.prisma.antenna.findFirst({
-      where: { id, associationId }, // 🔥 FILTRÉ
+      where: { id, associationId },
     });
 
     if (!antenna) throw new NotFoundException('Antenne introuvable.');
@@ -182,88 +181,37 @@ export class SuperAdminService {
       data.name,
     );
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      const antenna = await tx.antenna.create({
-        data: {
-          associationId,
-          code,
-          name: data.name,
-          addressLine1: data.addressLine1,
-          addressLine2: data.addressLine2,
-          postalCode: data.postalCode,
-          city: data.city,
-          country: data.country,
-          phone: data.phone,
-          email: data.email,
-          isActive: data.isActive ?? true,
-          defaultCurrency: data.defaultCurrency,
-          createdByUserId: actorId,
-        },
-      });
-
-      let createdAdmin = null;
-
-      if (data.admin?.email) {
-        const result = await this.createAntennaAdminRecord(
-          tx,
-          {
-            associationId,
-            antennaId: antenna.id,
-            firstName: data.admin.firstName,
-            lastName: data.admin.lastName,
-            email: data.admin.email,
-            phone: data.admin.phone,
-            associationTitle: data.admin.associationTitle,
-            addressLine1: data.admin.addressLine1,
-            addressLine2: data.admin.addressLine2,
-            postalCode: data.admin.postalCode,
-            city: data.admin.city,
-            country: data.admin.country,
-            originSubPrefecture: data.admin.originSubPrefecture,
-            sendInvite: data.admin.sendInvite,
-          },
-          actorId,
-        );
-
-        createdAdmin = {
-          email: result.user.email,
-          firstName: result.user.firstName,
-          lastName: result.user.lastName,
-          temporaryPassword: result.temporaryPassword,
-          antennaName: antenna.name,
-          associationTitle: data.admin.associationTitle,
-          sendInvite: data.admin.sendInvite,
-        };
-      }
-
-      return { antenna, createdAdmin };
+    const antenna = await this.prisma.antenna.create({
+      data: {
+        associationId,
+        code,
+        name: data.name,
+        addressLine1: data.addressLine1,
+        addressLine2: data.addressLine2,
+        postalCode: data.postalCode,
+        city: data.city,
+        country: data.country,
+        phone: data.phone,
+        email: data.email,
+        isActive: data.isActive ?? true,
+        defaultCurrency: data.defaultCurrency,
+        createdByUserId: actorId,
+      },
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour les Super Admins
     await this.notifications.notifySuperAdminsWithPush(
       associationId,
-      `Une nouvelle antenne "${created.antenna.name}" a été créée.`,
+      `Une nouvelle antenne "${antenna.name}" a été créée.`,
       NotificationType.SYSTEM_ALERT,
       '🏢 Nouvelle antenne',
     );
 
-    if (created.createdAdmin?.sendInvite !== false) {
-      await this.mailService.sendAntennaAdminInvitation({
-        to: created.createdAdmin.email,
-        firstName: created.createdAdmin.firstName,
-        lastName: created.createdAdmin.lastName,
-        antennaName: created.createdAdmin.antennaName,
-        temporaryPassword: created.createdAdmin.temporaryPassword,
-        associationTitle: created.createdAdmin.associationTitle,
-      });
-    }
-
-    return created.antenna;
+    return antenna;
   }
 
   async updateAntenna(id: string, data: Partial<CreateAntennaDto>, associationId: string) {
     return this.prisma.antenna.update({
-      where: { id, associationId }, // 🔥 FILTRÉ
+      where: { id, associationId },
       data: {
         ...(data.code !== undefined ? { code: data.code } : {}),
         ...(data.name !== undefined ? { name: data.name } : {}),
@@ -281,7 +229,7 @@ export class SuperAdminService {
   }
 
   async deleteAntenna(id: string, associationId: string) {
-    return this.prisma.antenna.delete({ where: { id, associationId } }); // 🔥 FILTRÉ
+    return this.prisma.antenna.delete({ where: { id, associationId } });
   }
 
   /* ── USERS ── */
@@ -290,7 +238,7 @@ export class SuperAdminService {
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.UserWhereInput = {
-      associationId, // 🔥 FILTRÉ
+      associationId,
       role,
       ...(status
         ? { status: status as UserStatus }
@@ -331,7 +279,7 @@ export class SuperAdminService {
 
   async approveUser(userId: string, adminId: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId, associationId }, // 🔥 FILTRÉ
+      where: { id: userId, associationId },
       data: {
         status: UserStatus.ACTIVE,
         approvedByUserId: adminId,
@@ -339,7 +287,6 @@ export class SuperAdminService {
       },
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour l'utilisateur
     await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
@@ -355,7 +302,7 @@ export class SuperAdminService {
 
   async rejectUser(userId: string, adminId: string, reason: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId, associationId }, // 🔥 FILTRÉ
+      where: { id: userId, associationId },
       data: {
         status: UserStatus.REJECTED,
         rejectedByUserId: adminId,
@@ -364,7 +311,6 @@ export class SuperAdminService {
       },
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
     await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
@@ -380,7 +326,7 @@ export class SuperAdminService {
 
   async updateUser(userId: string, data: any, associationId: string) {
     return this.prisma.user.update({
-      where: { id: userId, associationId }, // 🔥 FILTRÉ
+      where: { id: userId, associationId },
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -392,7 +338,6 @@ export class SuperAdminService {
         country: data.country,
         addressLine1: data.addressLine1,
         addressLine2: data.addressLine2,
-        // 🔥 AJOUTS CHIRURGICAUX DES NOUVEAUX CHAMPS
         postalCode: data.postalCode,
         function: data.function,
         professionalStatus: data.professionalStatus,
@@ -404,7 +349,7 @@ export class SuperAdminService {
 
   async suspendUser(userId: string, actorId: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId, associationId }, // 🔥 FILTRÉ
+      where: { id: userId, associationId },
       data: {
         status: UserStatus.SUSPENDED,
         suspendedByUserId: actorId,
@@ -412,7 +357,6 @@ export class SuperAdminService {
       },
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
     await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
@@ -428,7 +372,7 @@ export class SuperAdminService {
 
   async activateUser(userId: string, actorId: string, associationId: string) {
     const user = await this.prisma.user.update({
-      where: { id: userId, associationId }, // 🔥 FILTRÉ
+      where: { id: userId, associationId },
       data: {
         status: UserStatus.ACTIVE,
         approvedByUserId: actorId,
@@ -438,7 +382,6 @@ export class SuperAdminService {
       },
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
     await this.notifications.createForUserWithPush({
       associationId,
       userId: user.id,
@@ -454,7 +397,7 @@ export class SuperAdminService {
 
   async deleteUser(userId: string, actorId: string, associationId: string) {
     return this.prisma.user.update({
-      where: { id: userId, associationId }, // 🔥 FILTRÉ
+      where: { id: userId, associationId },
       data: {
         status: UserStatus.DELETED,
         deletedAt: new Date(),
@@ -463,23 +406,34 @@ export class SuperAdminService {
     });
   }
 
+  /* ── ANTENNA ADMIN (CRÉATION AVEC VÉRIFICATION DE DEVISE) ── */
+
   async createAntennaAdmin(data: CreateAntennaAdminDto, actorId: string, associationId: string) {
-    const antenna = await this.prisma.antenna.findFirst({
-      where: { id: data.antennaId, associationId }, // 🔥 FILTRÉ
+    const antennas = await this.prisma.antenna.findMany({
+      where: { id: { in: data.antennaIds }, associationId },
     });
 
-    if (!antenna) throw new NotFoundException('Antenne introuvable.');
+    if (antennas.length === 0 || antennas.length !== data.antennaIds.length) {
+      throw new NotFoundException('Une ou plusieurs antennes sélectionnées sont introuvables.');
+    }
+
+    // ⚡ VÉRIFICATION STRICTE : UN ADMIN = UNE SEULE DEVISE
+    const currencies = new Set(antennas.map(a => a.defaultCurrency));
+    if (currencies.size > 1) {
+      throw new BadRequestException("Impossible d'assigner des antennes utilisant des devises différentes à un même administrateur.");
+    }
 
     const result = await this.createAntennaAdminRecord(
       this.prisma,
       {
         associationId,
-        antennaId: antenna.id,
+        antennaIds: data.antennaIds,
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email,
         phone: data.phone,
-        associationTitle: data.associationTitle,
+        associationTitle: data.associationTitle || data.function,
+        professionalStatus: data.professionalStatus,
         addressLine1: data.addressLine1,
         addressLine2: data.addressLine2,
         postalCode: data.postalCode,
@@ -491,15 +445,16 @@ export class SuperAdminService {
       actorId,
     );
 
-    // 🔥 AJOUT CHIRURGICAL : Upgrade Push
+    const antennaNames = antennas.map(a => a.name).join(', ');
+
     await this.notifications.createForUserWithPush({
       associationId,
       userId: result.user.id,
-      message: `Bienvenue ! Vous avez été nommé administrateur pour l'antenne "${antenna.name}".`,
+      message: `Bienvenue ! Vous avez été nommé administrateur pour : ${antennaNames}.`,
       type: NotificationType.SYSTEM_ALERT,
       title: 'Promotion Admin',
       pushTitle: '👑 Promotion Admin',
-      pushBody: `Vous êtes maintenant administrateur de l'antenne ${antenna.name}.`,
+      pushBody: `Vous êtes maintenant administrateur.`,
     });
 
     if (data.sendInvite !== false) {
@@ -507,9 +462,9 @@ export class SuperAdminService {
         to: result.user.email,
         firstName: result.user.firstName,
         lastName: result.user.lastName,
-        antennaName: antenna.name,
+        antennaName: antennaNames,
         temporaryPassword: result.temporaryPassword,
-        associationTitle: data.associationTitle,
+        associationTitle: data.associationTitle || data.function,
       });
     }
 
@@ -519,21 +474,63 @@ export class SuperAdminService {
     });
   }
 
-  async updateAntennaAdmin(userId: string, data: any, actorId: string, associationId: string) {
+  async updateAntennaAdmin(userId: string, data: Partial<CreateAntennaAdminDto>, actorId: string, associationId: string) {
+    const admin = await this.prisma.user.findFirst({
+      where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN },
+    });
+
+    if (!admin) throw new NotFoundException('Administrateur introuvable.');
+
+    // S'il y a une mise à jour des antennes assignées
+    if (data.antennaIds && data.antennaIds.length > 0) {
+      const antennas = await this.prisma.antenna.findMany({
+        where: { id: { in: data.antennaIds }, associationId },
+      });
+
+      if (antennas.length !== data.antennaIds.length) {
+        throw new NotFoundException('Une ou plusieurs antennes sélectionnées sont introuvables.');
+      }
+
+      const currencies = new Set(antennas.map(a => a.defaultCurrency));
+      if (currencies.size > 1) {
+        throw new BadRequestException("Impossible d'assigner des antennes utilisant des devises différentes à un même administrateur.");
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        // Désactiver les anciennes assignations
+        await tx.antennaAdminAssignment.updateMany({
+          where: { adminUserId: userId, associationId },
+          data: { isActive: false, revokedAt: new Date(), revokedByUserId: actorId },
+        });
+
+        // Créer les nouvelles assignations
+        const newAssignments = data.antennaIds!.map(id => ({
+          associationId,
+          antennaId: id,
+          adminUserId: userId,
+          assignedByUserId: actorId,
+          isPrimaryManager: true,
+          isActive: true,
+        }));
+
+        await tx.antennaAdminAssignment.createMany({ data: newAssignments });
+      });
+    }
+
     return this.prisma.user.update({
-      where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN }, // 🔥 FILTRÉ
+      where: { id: userId },
       data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        phone: data.phone,
-        city: data.city,
-        country: data.country,
-        postalCode: data.postalCode,
-        originSubPrefecture: data.originSubPrefecture,
-        addressLine1: data.addressLine1,
-        addressLine2: data.addressLine2,
-        // 🔥 AJOUT CHIRURGICAL : On enregistre enfin le poste occupé !
-        function: data.function || data.associationTitle,
+        ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+        ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+        ...(data.phone !== undefined ? { phone: data.phone } : {}),
+        ...(data.city !== undefined ? { city: data.city } : {}),
+        ...(data.country !== undefined ? { country: data.country } : {}),
+        ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
+        ...(data.originSubPrefecture !== undefined ? { originSubPrefecture: data.originSubPrefecture } : {}),
+        ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
+        ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
+        ...(data.function !== undefined || data.associationTitle !== undefined ? { function: data.function || data.associationTitle } : {}),
+        ...(data.professionalStatus !== undefined ? { professionalStatus: data.professionalStatus } : {}),
       },
     });
   }
@@ -596,7 +593,7 @@ export class SuperAdminService {
   async listProjects(associationId: string, page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
     const where: Prisma.ProjectWhereInput = { 
-      associationId, // 🔥 FILTRÉ
+      associationId,
       ...(q ? { title: { contains: q, mode: 'insensitive' } } : {})
     };
 
@@ -624,19 +621,18 @@ export class SuperAdminService {
   }
 
   async updateProject(id: string, data: any, associationId: string) {
-    // 🔥 CORRECTION CHIRURGICALE : Sécurisation blindée du statut entrant (Blind-Proof)
     let safeStatus = data.status;
     if (safeStatus === 'DRAFT') safeStatus = ProjectStatus.PROPOSED;
     if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
     if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
 
     return this.prisma.project.update({
-      where: { id, associationId }, // 🔥 FILTRÉ
+      where: { id, associationId },
       data: {
         title: data.title,
         summary: data.summary,
         description: data.description,
-        status: safeStatus, // 🔥 Utilisation de la version sécurisée
+        status: safeStatus,
         budgetAmount: data.budgetAmount,
         amountSpent: data.amountSpent,
         startDate: data.startDate ? new Date(data.startDate) : undefined,
@@ -646,7 +642,7 @@ export class SuperAdminService {
   }
 
   async deleteProject(id: string, associationId: string) {
-    return this.prisma.project.delete({ where: { id, associationId } }); // 🔥 FILTRÉ
+    return this.prisma.project.delete({ where: { id, associationId } });
   }
 
   /* ── DOCUMENTS ── */
@@ -672,7 +668,7 @@ export class SuperAdminService {
   async listDocuments(associationId: string, page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
     const where: Prisma.DocumentWhereInput = {
-      associationId, // 🔥 FILTRÉ
+      associationId,
       ...(q ? { title: { contains: q, mode: 'insensitive' } } : {})
     };
 
@@ -750,7 +746,7 @@ export class SuperAdminService {
         coverImageFileId: data.coverImageFileId || data.coverFileAssetId || null,
         associationId,
         createdByUserId: adminId,
-        scope: 'GLOBAL', // SuperAdmin publie pour tout le monde par défaut
+        scope: 'GLOBAL',
         ...(data.status === PostStatus.PUBLISHED ? { publishedAt: new Date(), publishedByUserId: adminId } : {}),
         attachments: data.imageIds?.length > 0 ? {
           create: data.imageIds.slice(0, 3).map((fileId: string) => ({ fileId }))
@@ -794,7 +790,7 @@ export class SuperAdminService {
   async listAllContributions(associationId: string, page: number, pageSize: number, status?: string) {
     const skip = (page - 1) * pageSize;
     const where: Prisma.ContributionWhereInput = {
-      associationId, // 🔥 FILTRÉ
+      associationId,
       ...(status ? { status: status as any } : {})
     };
     const [items, total] = await Promise.all([
@@ -837,7 +833,6 @@ export class SuperAdminService {
         emailVerifiedAt: now,
         firstName: payload.firstName,
         lastName: payload.lastName,
-        // 🔥 AJOUTS CHIRURGICAUX : On s'assure que les données ne sont plus perdues à la création
         phone: payload.phone,
         city: payload.city,
         country: payload.country,
@@ -845,23 +840,24 @@ export class SuperAdminService {
         addressLine1: payload.addressLine1,
         addressLine2: payload.addressLine2,
         originSubPrefecture: payload.originSubPrefecture,
-        function: payload.associationTitle, 
+        function: payload.associationTitle,
+        professionalStatus: payload.professionalStatus,
         createdByUserId: actorId,
         approvedByUserId: actorId,
         approvedAt: now,
       },
     });
 
-    await prisma.antennaAdminAssignment.create({
-      data: {
-        associationId: payload.associationId,
-        antennaId: payload.antennaId,
-        adminUserId: user.id,
-        assignedByUserId: actorId,
-        isPrimaryManager: true,
-        isActive: true,
-      },
-    });
+    const assignments = payload.antennaIds.map(id => ({
+      associationId: payload.associationId,
+      antennaId: id,
+      adminUserId: user.id,
+      assignedByUserId: actorId,
+      isPrimaryManager: true,
+      isActive: true,
+    }));
+
+    await prisma.antennaAdminAssignment.createMany({ data: assignments });
 
     return { user, temporaryPassword };
   }

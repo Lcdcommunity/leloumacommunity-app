@@ -1,7 +1,7 @@
 // web/components/super-admin/AntennaForm.tsx
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { type FormEvent, useState } from 'react';
 
 export interface AntennaFormValues {
   name: string;
@@ -14,41 +14,8 @@ export interface AntennaFormValues {
   email?: string;
   isActive: boolean;
   defaultCurrency?: string;
-  admin: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone?: string;
-    associationTitle?: string;
-    addressLine1?: string;
-    addressLine2?: string;
-    postalCode?: string;
-    city?: string;
-    country?: string;
-    originSubPrefecture?: string;
-    sendInvite: boolean;
-  };
 }
 
-const ASSOCIATION_TITLES = [
-  'Président',
-  'Vice-président',
-  'Secrétaire général',
-  'Secrétaire adjoint',
-  "Secrétaire à l'information",
-  "Secrétaire à l'organisation",
-  'Trésorier',
-  'Trésorier adjoint',
-  'Responsable jeunesse',
-  'Responsable des femmes',
-  'Coordinateur',
-  'Conseiller',
-  'Chargé de mission',
-  'Commissaire aux comptes',
-  'Autre',
-];
-
-// 🔥 NOUVEAU : Liste stricte des pays avec leur devise associée pour l'automatisation
 const COUNTRIES = [
   { name: 'Guinée', code: 'GN', currency: 'GNF' },
   { name: 'Sénégal', code: 'SN', currency: 'XOF' },
@@ -67,7 +34,7 @@ const COUNTRIES = [
   { name: 'Italie', code: 'IT', currency: 'EUR' },
   { name: 'États-Unis', code: 'US', currency: 'USD' },
   { name: 'Canada', code: 'CA', currency: 'USD' },
-  { name: 'Royaume-Uni', code: 'GB', currency: 'EUR' }, // Si GBP n'est pas dans la liste, on fallback sur EUR/USD selon le besoin
+  { name: 'Royaume-Uni', code: 'GB', currency: 'EUR' },
   { name: 'Autre (Non listé)', code: 'OTHER', currency: 'EUR' }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -89,7 +56,7 @@ function Field({
   readOnly?: boolean;
 }) {
   return (
-    <div style={{ flex: 1, minWidth: 220 }}>
+    <div style={{ flex: 1, minWidth: 'min(100%, 220px)' }}>
       <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
         {label}
         {required && !readOnly && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
@@ -114,8 +81,10 @@ function Field({
           fontWeight: 600,
           color: readOnly ? '#6B7280' : '#111827',
           outline: 'none',
-          cursor: readOnly ? 'default' : 'text',
+          transition: 'border-color .2s, box-shadow .2s',
         }}
+        onFocus={(e) => { if (!readOnly) { e.target.style.borderColor = 'rgba(37,99,235,.45)'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,.09)'; } }}
+        onBlur={(e) => { if (!readOnly) { e.target.style.borderColor = 'rgba(37,99,235,.18)'; e.target.style.boxShadow = 'none'; } }}
       />
     </div>
   );
@@ -127,14 +96,12 @@ export function AntennaForm({
   onSubmit,
   busy = false,
   readOnly = false,
-  isEditMode = false,
 }: {
   initialValues?: Partial<AntennaFormValues>;
   submitLabel?: string;
   onSubmit: (values: AntennaFormValues) => Promise<void>;
   busy?: boolean;
   readOnly?: boolean;
-  isEditMode?: boolean;
 }) {
   const [values, setValues] = useState<AntennaFormValues>({
     name: initialValues?.name ?? '',
@@ -147,20 +114,6 @@ export function AntennaForm({
     email: initialValues?.email ?? '',
     isActive: initialValues?.isActive ?? true,
     defaultCurrency: initialValues?.defaultCurrency ?? 'EUR',
-    admin: {
-      firstName: initialValues?.admin?.firstName ?? '',
-      lastName: initialValues?.admin?.lastName ?? '',
-      email: initialValues?.admin?.email ?? '',
-      phone: initialValues?.admin?.phone ?? '',
-      associationTitle: initialValues?.admin?.associationTitle ?? '',
-      addressLine1: initialValues?.admin?.addressLine1 ?? '',
-      addressLine2: initialValues?.admin?.addressLine2 ?? '',
-      postalCode: initialValues?.admin?.postalCode ?? '',
-      city: initialValues?.admin?.city ?? '',
-      country: initialValues?.admin?.country ?? '',
-      originSubPrefecture: initialValues?.admin?.originSubPrefecture ?? '',
-      sendInvite: initialValues?.admin?.sendInvite ?? true,
-    },
   });
 
   async function handleSubmit(e: FormEvent) {
@@ -184,12 +137,13 @@ export function AntennaForm({
     color: readOnly ? '#6B7280' : '#111827',
     outline: 'none',
     cursor: readOnly ? 'default' : 'pointer',
+    transition: 'border-color .2s, box-shadow .2s',
   };
 
   return (
     <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div style={{ padding: '1rem 1.1rem', borderRadius: 16, border: '1px solid rgba(37,99,235,.12)', background: 'rgba(239,246,255,.35)' }}>
-        <div style={{ fontSize: '.86rem', fontWeight: 900, color: '#1F2937', marginBottom: '1rem' }}>Informations de l’antenne</div>
+      <div style={{ padding: 'clamp(1rem, 3vw, 1.5rem)', borderRadius: 16, border: '1px solid rgba(37,99,235,.12)', background: 'rgba(239,246,255,.35)' }}>
+        <div style={{ fontSize: '.86rem', fontWeight: 900, color: '#1F2937', marginBottom: '1rem' }}>Informations de l&apos;antenne</div>
 
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
           <Field readOnly={readOnly} label="Nom de l'antenne" value={values.name} onChange={(v) => setValues((prev) => ({ ...prev, name: v }))} required placeholder="Ex: Antenne Paris Nord" />
@@ -198,7 +152,7 @@ export function AntennaForm({
 
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
           <Field readOnly={readOnly} label="Email de l'antenne" type="email" value={values.email ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, email: v }))} placeholder="antenne@email.com" />
-          <Field readOnly={readOnly} label="Adresse de l'antenne" value={values.addressLine1 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, addressLine1: v }))} placeholder="Rue, avenue, quartier..." />
+          <Field readOnly={readOnly} label="Adresse (Siège)" value={values.addressLine1 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, addressLine1: v }))} placeholder="Rue, avenue, quartier..." />
         </div>
 
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
@@ -208,9 +162,8 @@ export function AntennaForm({
 
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
           <Field readOnly={readOnly} label="Ville" value={values.city ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, city: v }))} placeholder="Ex: Conakry, Paris..." />
-          
-          {/* 🔥 NOUVEAU : Pays en select qui pilote automatiquement la devise */}
-          <div style={{ flex: 1, minWidth: 220 }}>
+
+          <div style={{ flex: 1, minWidth: 'min(100%, 220px)' }}>
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
               Pays de l&apos;antenne
               {!readOnly && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
@@ -222,15 +175,16 @@ export function AntennaForm({
               onChange={(e) => {
                 const selectedCountryName = e.target.value;
                 const countryData = COUNTRIES.find(c => c.name === selectedCountryName);
-                
+
                 setValues((prev) => ({ 
                   ...prev, 
                   country: selectedCountryName,
-                  // ⚡ Automatisation : la devise s'ajuste instantanément
                   defaultCurrency: countryData ? countryData.currency : prev.defaultCurrency
                 }));
               }}
               style={selectStyle}
+              onFocus={(e) => { if (!readOnly) { e.target.style.borderColor = 'rgba(37,99,235,.45)'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,.09)'; } }}
+              onBlur={(e) => { if (!readOnly) { e.target.style.borderColor = 'rgba(37,99,235,.18)'; e.target.style.boxShadow = 'none'; } }}
             >
               <option value="">Sélectionnez un pays</option>
               {COUNTRIES.map(c => <option key={`ant-${c.code}`} value={c.name}>{c.name}</option>)}
@@ -239,7 +193,7 @@ export function AntennaForm({
         </div>
 
         <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ flex: 1, minWidth: 'min(100%, 220px)' }}>
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
               Devise de l&apos;antenne
               {!readOnly && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
@@ -249,111 +203,19 @@ export function AntennaForm({
               value={values.defaultCurrency ?? 'EUR'}
               onChange={(e) => setValues((prev) => ({ ...prev, defaultCurrency: e.target.value }))}
               style={selectStyle}
+              onFocus={(e) => { if (!readOnly) { e.target.style.borderColor = 'rgba(37,99,235,.45)'; e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,.09)'; } }}
+              onBlur={(e) => { if (!readOnly) { e.target.style.borderColor = 'rgba(37,99,235,.18)'; e.target.style.boxShadow = 'none'; } }}
             >
               <option value="GNF">GNF (Franc Guinéen)</option>
               <option value="XOF">XOF (Franc CFA)</option>
               <option value="USD">DOLLAR (USD)</option>
               <option value="EUR">EURO (EUR)</option>
             </select>
-            <p style={{ fontSize: '0.65rem', color: '#6B7280', marginTop: '0.3rem', fontStyle: 'italic' }}>*Définie automatiquement selon le pays choisi.</p>
+            <p style={{ fontSize: '0.65rem', color: '#6B7280', marginTop: '0.3rem', fontStyle: 'italic' }}>*Ajustée automatiquement selon le pays.</p>
           </div>
-          <div style={{ flex: 1, minWidth: 220 }}></div>
+          <div style={{ flex: 1, minWidth: 'min(100%, 220px)' }} />
         </div>
       </div>
-
-      {!isEditMode && (
-        <div style={{ padding: '1rem 1.1rem', borderRadius: 16, border: '1px solid rgba(220,38,38,.12)', background: 'rgba(254,242,242,.4)' }}>
-          <div style={{ fontSize: '.86rem', fontWeight: 900, color: '#1F2937', marginBottom: '1rem' }}>Admin principal de l’antenne</div>
-
-          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-            <Field readOnly={readOnly} label="Prénom" value={values.admin.firstName} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, firstName: v } }))} required placeholder="Ex: Jean" />
-            <Field readOnly={readOnly} label="Nom" value={values.admin.lastName} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, lastName: v } }))} required placeholder="Ex: Dupont" />
-          </div>
-
-          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-            <Field readOnly={readOnly} label="Adresse email" type="email" value={values.admin.email} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, email: v } }))} required placeholder="admin@email.com" />
-            <Field readOnly={readOnly} label="Téléphone" value={values.admin.phone ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, phone: v } }))} placeholder="+33 ..." />
-          </div>
-
-          <div style={{ marginTop: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
-              Fonction dans l&apos;association
-            </label>
-            <select
-              disabled={readOnly}
-              value={values.admin.associationTitle ?? ''}
-              onChange={(e) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, associationTitle: e.target.value } }))}
-              style={selectStyle}
-            >
-              <option value="">Sélectionnez une fonction</option>
-              {ASSOCIATION_TITLES.map((title) => (
-                <option key={title} value={title}>
-                  {title}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-            <Field readOnly={readOnly} label="Adresse complète" value={values.admin.addressLine1 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, addressLine1: v } }))} placeholder="Rue, avenue..." />
-            <Field readOnly={readOnly} label="Complément d'adresse" value={values.admin.addressLine2 ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, addressLine2: v } }))} placeholder="Appartement, quartier..." />
-          </div>
-
-          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-            <Field readOnly={readOnly} label="Code postal" value={values.admin.postalCode ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, postalCode: v } }))} placeholder="75000" />
-            <Field readOnly={readOnly} label="Ville" value={values.admin.city ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, city: v } }))} placeholder="Paris" />
-          </div>
-
-          <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-            {/* 🔥 NOUVEAU : Pays de l'admin en Select également */}
-            <div style={{ flex: 1, minWidth: 220 }}>
-              <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
-                Pays de résidence
-              </label>
-              <select
-                disabled={readOnly}
-                value={values.admin.country ?? ''}
-                onChange={(e) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, country: e.target.value } }))}
-                style={selectStyle}
-              >
-                <option value="">Sélectionnez un pays</option>
-                {COUNTRIES.map(c => <option key={`adm-${c.code}`} value={c.name}>{c.name}</option>)}
-              </select>
-            </div>
-            
-            <Field readOnly={readOnly} label="Ville d'origine" value={values.admin.originSubPrefecture ?? ''} onChange={(v) => setValues((prev) => ({ ...prev, admin: { ...prev.admin, originSubPrefecture: v } }))} placeholder="Labé, Dakar, Kindia..." />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.1rem', background: 'rgba(255,255,255,.7)', border: '1px solid rgba(37,99,235,.12)', borderRadius: '12px', marginTop: '1rem', opacity: readOnly ? 0.6 : 1 }}>
-            <div>
-              <div style={{ fontSize: '.84rem', fontWeight: 800, color: '#111827', marginBottom: '.15rem' }}>Envoyer l’email d’invitation</div>
-              <div style={{ fontSize: '.72rem', fontWeight: 600, color: '#6B7280', lineHeight: 1.4 }}>
-                L’admin recevra un mot de passe provisoire.
-              </div>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              disabled={readOnly}
-              aria-checked={values.admin.sendInvite}
-              onClick={() => setValues((prev) => ({ ...prev, admin: { ...prev.admin, sendInvite: !prev.admin.sendInvite } }))}
-              style={{
-                width: 44,
-                height: 24,
-                borderRadius: 99,
-                border: 'none',
-                cursor: readOnly ? 'default' : 'pointer',
-                background: values.admin.sendInvite ? 'linear-gradient(135deg,#1D4ED8,#3B82F6)' : '#D1D5DB',
-                position: 'relative',
-                transition: 'background .25s',
-                flexShrink: 0,
-              }}
-            >
-              <span style={{ position: 'absolute', top: 3, left: values.admin.sendInvite ? 23 : 3, width: 18, height: 18, borderRadius: '50%', background: 'white', transition: 'left .22s cubic-bezier(.22,1,.36,1)', boxShadow: '0 1px 4px rgba(0,0,0,.18)' }} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {!readOnly && (
         <div style={{ paddingTop: '1rem', borderTop: '1px solid rgba(37,99,235,.1)', marginTop: '.5rem', display: 'flex', justifyContent: 'flex-end' }}>
@@ -361,7 +223,7 @@ export function AntennaForm({
             type="submit"
             disabled={busy}
             style={{
-              height: 44,
+              height: 46,
               padding: '0 1.5rem',
               borderRadius: 12,
               background: 'linear-gradient(135deg,#1D4ED8,#2563EB)',
@@ -376,9 +238,12 @@ export function AntennaForm({
               gap: '.5rem',
               boxShadow: '0 4px 14px rgba(37,99,235,.32)',
               opacity: busy ? 0.6 : 1,
+              transition: 'all .2s'
             }}
           >
-            {busy ? 'Mise à jour...' : submitLabel}
+            {busy ? (
+              <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Création...</>
+            ) : submitLabel}
           </button>
         </div>
       )}

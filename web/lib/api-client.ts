@@ -1,4 +1,4 @@
-// web/lib/api-client.ts
+/////// web/lib/api-client.ts
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
@@ -141,6 +141,7 @@ export interface Sponsor {
   isActive: boolean;
   logoFile?: { url: string } | null;
 }
+
 export interface PushSubscriptionPayload {
   endpoint: string;
   expirationTime?: number | null;
@@ -353,7 +354,8 @@ export const api = {
       method: 'DELETE',
       body: { endpoint },
     }),
-// ==========================================
+
+  // ==========================================
   // COMMUNICATION & DIFFUSION
   // ==========================================
   sendCustomCommunication: (body: {
@@ -367,6 +369,7 @@ export const api = {
       method: 'POST',
       body,
     }),
+
   // ==========================================
   // TARIFICATION & SAAS 
   // ==========================================
@@ -440,7 +443,7 @@ export const api = {
       lastUpdatedAt?: string | null;
     }>('/member/association-balance'),
 
-  // ==========================================
+ // ==========================================
   // ASSOCIATION & ANTENNES
   // ==========================================
   getAssociation: () => http<Association>('/associations/current'),
@@ -454,13 +457,19 @@ export const api = {
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
       }${typeof params?.isActive === 'boolean' ? `&isActive=${String(params.isActive)}` : ''}`
     ),
+
   getAntenna: (id: string) => http<Antenna>(`/super-admin/antennas/${id}`),
 
   createAntenna: (body: {
-    code: string;
+    code?: string;
     name: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    postalCode?: string;
     city?: string;
     country?: string;
+    phone?: string;
+    email?: string;
     isActive?: boolean;
     defaultCurrency?: string | null;
   }) =>
@@ -479,11 +488,19 @@ export const api = {
     ),
 
   createAntennaAdmin: (body: {
-    antennaId: string;
+    antennaIds: string[];
     firstName: string;
     lastName: string;
     email: string;
     phone?: string;
+    professionalStatus?: string;
+    associationTitle?: string;
+    addressLine1?: string;
+    addressLine2?: string;
+    postalCode?: string;
+    city?: string;
+    country?: string;
+    originSubPrefecture?: string;
     sendInvite?: boolean;
   }) =>
     http<UserSummary, typeof body>('/super-admin/admins', { method: 'POST', body }),
@@ -625,6 +642,7 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
+
   validateContributionAntenna: (id: string, payload?: { note?: string }) =>
     http(`/admin/contributions/${id}/validate`, { method: 'PATCH', body: payload ?? {} }),
 
@@ -656,7 +674,8 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
     ), 
-    runContributionProjection: (body: {
+
+  runContributionProjection: (body: {
     expectedMembersPaying: number;
     averageContribution: number;
     currency?: string;
@@ -872,7 +891,7 @@ export const api = {
       `/admin/events?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.type ? `&type=${encodeURIComponent(params.type)}` : ''}${
-        params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''
+        params?.antennaId ? `&encodeURIComponent(params.antennaId)}` : ''
       }`
     ),
 

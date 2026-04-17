@@ -3,15 +3,16 @@
 
 import { type FormEvent, useEffect, useState } from 'react';
 import type { Antenna } from '../../types/antenna';
-import { superAdminApi } from '../../lib/super-admin-api';
+import { api } from '../../lib/api-client';
 
 export type AdminFormValues = {
-  antennaId: string;
+  antennaIds: string[];
   firstName: string;
   lastName: string;
   email: string;
   phone?: string;
   associationTitle?: string;
+  professionalStatus?: string;
   addressLine1?: string;
   addressLine2?: string;
   postalCode?: string;
@@ -37,32 +38,24 @@ interface FieldProps {
 }
 
 const ASSOCIATION_TITLES = [
-  'Président',
-  'Vice-président',
-  'Secrétaire général',
-  'Secrétaire adjoint',
-  "Secrétaire à l'information",
-  "Secrétaire à l'organisation",
-  'Trésorier',
-  'Trésorier adjoint',
-  'Responsable jeunesse',
-  'Responsable des femmes',
-  'Coordinateur',
-  'Conseiller',
-  'Chargé de mission',
-  'Commissaire aux comptes',
-  'Autre',
+  'Président', 'Vice-président', 'Secrétaire général', 'Secrétaire adjoint',
+  "Secrétaire à l'information", "Secrétaire à l'organisation", 'Trésorier',
+  'Trésorier adjoint', 'Responsable jeunesse', 'Responsable des femmes',
+  'Coordinateur', 'Conseiller', 'Chargé de mission', 'Commissaire aux comptes', 'Autre',
 ];
 
-function Field({
-  label,
-  type = 'text',
-  value,
-  onChange,
-  placeholder,
-  required = false,
-  hint,
-}: FieldProps) {
+const PROFESSIONAL_STATUSES = [
+  'Employé(e)', 'Indépendant(e)', 'Ouvrier(ère)', 'Cadre',
+  'Étudiant(e)', 'Retraité(e)', 'Sans emploi', 'Autre',
+];
+
+const COUNTRIES = [
+  'Guinée', 'Sénégal', 'Côte d\'Ivoire', 'Mali', 'Burkina Faso', 'Togo',
+  'Bénin', 'Niger', 'France', 'Belgique', 'Suisse', 'Allemagne', 'Espagne',
+  'Italie', 'États-Unis', 'Canada', 'Royaume-Uni', 'Autre (Non listé)'
+].sort();
+
+function Field({ label, type = 'text', value, onChange, placeholder, required = false, hint }: FieldProps) {
   const [focused, setFocused] = useState(false);
 
   return (
@@ -78,19 +71,12 @@ function Field({
         placeholder={placeholder}
         required={required}
         style={{
-          width: '100%',
-          height: 42,
-          borderRadius: 11,
-          boxSizing: 'border-box',
+          width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box',
           border: `1.5px solid ${focused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
           background: focused ? 'white' : 'rgba(255,255,255,.88)',
-          padding: '0 .95rem',
-          fontFamily: "'DM Sans',sans-serif",
-          fontSize: '.86rem',
-          fontWeight: 600,
-          color: '#111827',
-          outline: 'none',
-          transition: 'border-color .2s, box-shadow .2s',
+          padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif",
+          fontSize: '.86rem', fontWeight: 600, color: '#111827',
+          outline: 'none', transition: 'border-color .2s, box-shadow .2s',
           boxShadow: focused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
         }}
         onFocus={() => setFocused(true)}
@@ -106,16 +92,18 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
   const [loadingAntennas, setLoadingAntennas] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Focus states for selects to match red theme
-  const [antennaFocused, setAntennaFocused] = useState(false);
   const [roleFocused, setRoleFocused] = useState(false);
+  const [statusFocused, setStatusFocused] = useState(false);
+  const [countryFocused, setCountryFocused] = useState(false);
 
-  const [antennaId, setAntennaId] = useState('');
+  // States
+  const [antennaIds, setAntennaIds] = useState<string[]>([]);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [associationTitle, setAssociationTitle] = useState('');
+  const [professionalStatus, setProfessionalStatus] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [addressLine2, setAddressLine2] = useState('');
   const [postalCode, setPostalCode] = useState('');
@@ -124,52 +112,50 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
   const [sendInvite, setSendInvite] = useState(true);
 
+  // Computed currency constraint
+  const selectedCurrency = antennaIds.length > 0 
+    ? antennas.find(a => a.id === antennaIds[0])?.defaultCurrency 
+    : null;
+
   useEffect(() => {
     let cancelled = false;
-
     async function loadAntennas() {
       setLoadingAntennas(true);
       setLoadError(null);
-
       try {
-        const res = await superAdminApi.listAntennas({ pageSize: 100, isActive: true });
+        const res = await api.listAntennas({ pageSize: 100, isActive: true });
         if (cancelled) return;
         setAntennas(res.items);
-        setAntennaId(res.items[0]?.id ?? '');
-      } catch (err) {
-        console.error(err);
-        if (!cancelled) {
-          setLoadError("Impossible de charger la liste des antennes.");
-          setAntennas([]);
-          setAntennaId('');
-        }
+      } catch {
+        if (!cancelled) setLoadError("Impossible de charger la liste des antennes.");
       } finally {
         if (!cancelled) setLoadingAntennas(false);
       }
     }
-
     void loadAntennas();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
+
+  const handleToggleAntenna = (id: string, currency?: string | null) => {
+    if (selectedCurrency && currency !== selectedCurrency && !antennaIds.includes(id)) {
+      return; // Bloqué par la devise
+    }
+    setAntennaIds(prev => 
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-
-    if (!antennaId) {
-      alert("Veuillez sélectionner une antenne.");
+    if (antennaIds.length === 0) {
+      alert("Veuillez sélectionner au moins une antenne.");
       return;
     }
-
     await onSubmit({
-      antennaId,
-      firstName,
-      lastName,
-      email,
-      phone: phone || undefined,
+      antennaIds,
+      firstName, lastName, email, phone: phone || undefined,
       associationTitle: associationTitle || undefined,
+      professionalStatus: professionalStatus || undefined,
       addressLine1: addressLine1 || undefined,
       addressLine2: addressLine2 || undefined,
       postalCode: postalCode || undefined,
@@ -183,50 +169,59 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
   return (
     <>
       <style>{`
-        .sauf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
-        @media (max-width: 600px) { .sauf-grid { grid-template-columns: 1fr; } }
+        .sauf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem; }
+        .sauf-antennas { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .75rem; margin-top: .5rem; }
+        .sauf-card { display: flex; align-items: center; gap: .75rem; padding: .8rem 1rem; border-radius: 12px; border: 2px solid; cursor: pointer; transition: all .2s; }
+        .sauf-card.active { border-color: rgba(220,38,38,.6); background: rgba(254,242,242,.6); box-shadow: 0 4px 12px rgba(220,38,38,.08); }
+        .sauf-card.idle { border-color: rgba(229,231,235,1); background: white; }
+        .sauf-card.disabled { border-color: rgba(229,231,235,.5); background: rgba(243,244,246,.5); opacity: 0.5; cursor: not-allowed; }
+        .sauf-card:hover:not(.disabled):not(.active) { border-color: rgba(220,38,38,.3); transform: translateY(-1px); }
+        .sauf-chk { width: 18px; height: 18px; border-radius: 6px; border: 2px solid; display: flex; align-items: center; justify-content: center; transition: all .2s; flex-shrink: 0; }
+        .active .sauf-chk { background: #DC2626; border-color: #DC2626; color: white; }
+        .idle .sauf-chk { border-color: #D1D5DB; }
+        @media (max-width: 600px) { .sauf-grid { grid-template-columns: 1fr; } .sauf-antennas { grid-template-columns: 1fr; } }
       `}</style>
 
-      <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        
-        <div className="sauf-grid">
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
-              Antenne assign&eacute;e <span style={{ color: '#DC2626' }}>*</span>
-            </label>
-            <div style={{ position: 'relative' }}>
-              <select
-                value={antennaId}
-                onChange={(e) => setAntennaId(e.target.value)}
-                onFocus={() => setAntennaFocused(true)}
-                onBlur={() => setAntennaFocused(false)}
-                required
-                disabled={loadingAntennas || busy}
-                style={{
-                  width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box',
-                  border: `1.5px solid ${antennaFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
-                  background: antennaFocused ? 'white' : 'rgba(255,255,255,.88)',
-                  padding: '0 2rem 0 .95rem', fontFamily: "'DM Sans',sans-serif",
-                  fontSize: '.86rem', fontWeight: 700, color: '#111827',
-                  outline: 'none', appearance: 'none', cursor: 'pointer',
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236B7280' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: 'no-repeat', backgroundPosition: 'right .8rem center',
-                  transition: 'border-color .2s, box-shadow .2s',
-                  boxShadow: antennaFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
-                }}
-              >
-                <option value="" disabled>
-                  {loadingAntennas ? 'Chargement des antennes...' : 'Sélectionnez une antenne'}
-                </option>
-                {antennas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} ({a.code})
-                  </option>
-                ))}
-              </select>
+      <form onSubmit={(e) => void handleSubmit(e)} style={{ display: 'flex', flexDirection: 'column' }}>
+
+        <div style={{ marginBottom: '2rem' }}>
+          <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
+            <span>Antennes assign&eacute;es <span style={{ color: '#DC2626' }}>*</span></span>
+            {selectedCurrency && (
+              <span style={{ background: '#FEF2F2', color: '#DC2626', padding: '2px 8px', borderRadius: 6, border: '1px solid #FECACA', fontSize: '.6rem' }}>
+                Filtre Devise: {selectedCurrency}
+              </span>
+            )}
+          </label>
+          <p style={{ fontSize: '.75rem', color: '#6B7280', marginBottom: '1rem', lineHeight: 1.4 }}>
+            Un administrateur ne peut gérer que des antennes partageant la <strong>même devise</strong> pour des raisons comptables.
+          </p>
+
+          {loadingAntennas ? (
+            <div style={{ fontSize: '.8rem', color: '#6B7280', fontWeight: 600 }}>Chargement des antennes...</div>
+          ) : loadError ? (
+            <div style={{ color: '#DC2626', fontSize: '.8rem', fontWeight: 700 }}>{loadError}</div>
+          ) : (
+            <div className="sauf-antennas">
+              {antennas.map(a => {
+                const isSelected = antennaIds.includes(a.id);
+                const isBlocked = selectedCurrency && a.defaultCurrency !== selectedCurrency && !isSelected;
+                const cardClass = isSelected ? 'active' : isBlocked ? 'disabled' : 'idle';
+
+                return (
+                  <div key={a.id} className={`sauf-card ${cardClass}`} onClick={() => handleToggleAntenna(a.id, a.defaultCurrency)}>
+                    <div className="sauf-chk">
+                      {isSelected && <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: '.84rem', fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.name}</div>
+                      <div style={{ fontSize: '.7rem', fontWeight: 600, color: isBlocked ? '#DC2626' : '#6B7280' }}>Devise : {a.defaultCurrency}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            {loadError && <p style={{ marginTop: '.45rem', fontSize: '.74rem', fontWeight: 700, color: '#B91C1C' }}>{loadError}</p>}
-          </div>
+          )}
         </div>
 
         <div className="sauf-grid">
@@ -235,36 +230,35 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
         </div>
 
         <div className="sauf-grid">
-          <Field type="email" label="Adresse Email" value={email} onChange={setEmail} placeholder="jean.dupont@email.com" required hint="Reçoit l'invitation et le mot de passe provisoire." />
+          <Field type="email" label="Adresse Email" value={email} onChange={setEmail} placeholder="jean.dupont@email.com" required hint="Reçoit l'invitation et le mot de passe." />
           <Field type="tel" label="T&eacute;l&eacute;phone" value={phone} onChange={setPhone} placeholder="+33 6 00 00 00 00" />
         </div>
 
         <div className="sauf-grid">
-          <div style={{ gridColumn: '1 / -1' }}>
-            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>
-              Poste occupé
-            </label>
+          <div style={{ width: '100%' }}>
+            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>Poste dans l&apos;asso</label>
             <select
-              value={associationTitle}
-              onChange={(e) => setAssociationTitle(e.target.value)}
-              onFocus={() => setRoleFocused(true)}
-              onBlur={() => setRoleFocused(false)}
+              value={associationTitle} onChange={(e) => setAssociationTitle(e.target.value)} onFocus={() => setRoleFocused(true)} onBlur={() => setRoleFocused(false)}
               style={{
-                width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box',
-                border: `1.5px solid ${roleFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
-                background: roleFocused ? 'white' : 'rgba(255,255,255,.88)',
-                padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif",
-                fontSize: '.86rem', fontWeight: 700, color: '#111827',
-                outline: 'none', transition: 'border-color .2s, box-shadow .2s',
-                boxShadow: roleFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
+                width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box', border: `1.5px solid ${roleFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
+                background: roleFocused ? 'white' : 'rgba(255,255,255,.88)', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 700, color: '#111827', outline: 'none', transition: 'border-color .2s, box-shadow .2s', boxShadow: roleFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
               }}
             >
               <option value="">Sélectionnez un poste</option>
-              {ASSOCIATION_TITLES.map((title) => (
-                <option key={title} value={title}>
-                  {title}
-                </option>
-              ))}
+              {ASSOCIATION_TITLES.map((title) => <option key={title} value={title}>{title}</option>)}
+            </select>
+          </div>
+          <div style={{ width: '100%' }}>
+            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>Statut Professionnel</label>
+            <select
+              value={professionalStatus} onChange={(e) => setProfessionalStatus(e.target.value)} onFocus={() => setStatusFocused(true)} onBlur={() => setStatusFocused(false)}
+              style={{
+                width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box', border: `1.5px solid ${statusFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
+                background: statusFocused ? 'white' : 'rgba(255,255,255,.88)', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 700, color: '#111827', outline: 'none', transition: 'border-color .2s, box-shadow .2s', boxShadow: statusFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
+              }}
+            >
+              <option value="">Sélectionnez un statut</option>
+              {PROFESSIONAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
           </div>
         </div>
@@ -280,7 +274,18 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
         </div>
 
         <div className="sauf-grid">
-          <Field label="Pays" value={country} onChange={setCountry} placeholder="France" />
+          <div style={{ width: '100%' }}>
+            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>Pays de résidence</label>
+            <select
+              value={country} onChange={(e) => setCountry(e.target.value)} onFocus={() => setCountryFocused(true)} onBlur={() => setCountryFocused(false)}
+              style={{
+                width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box', border: `1.5px solid ${countryFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
+                background: countryFocused ? 'white' : 'rgba(255,255,255,.88)', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 700, color: '#111827', outline: 'none', transition: 'border-color .2s, box-shadow .2s', boxShadow: countryFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
+              }}
+            >
+              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
           <Field label="Commune d'origine" value={originSubPrefecture} onChange={setOriginSubPrefecture} placeholder="Ex: Sagalé" />
         </div>
 
@@ -288,7 +293,7 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
           <div>
             <div style={{ fontSize: '.84rem', fontWeight: 800, color: '#111827', marginBottom: '.15rem' }}>Envoyer l&apos;email d&apos;invitation</div>
             <div style={{ fontSize: '.72rem', fontWeight: 600, color: '#6B7280', lineHeight: 1.4 }}>
-              L&apos;utilisateur recevra son mot de passe provisoire et devra le modifier à la première connexion.
+              L&apos;utilisateur recevra son mot de passe provisoire à modifier à la connexion.
             </div>
           </div>
           <button
@@ -307,7 +312,7 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
           </button>
         </div>
 
-        <div style={{ paddingTop: '1.25rem', borderTop: '1px solid rgba(220,38,38,.1)', marginTop: '.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+        <div style={{ paddingTop: '1.25rem', borderTop: '1px solid rgba(220,38,38,.1)', marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end' }}>
           <button
             type="submit"
             disabled={busy || loadingAntennas}
@@ -321,17 +326,9 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
             }}
           >
             {busy ? (
-              <>
-                <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'sadnpulse 1s linear infinite' }} />
-                Cr&eacute;ation&#8230;
-              </>
+              <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 1s linear infinite' }} /> Création...</>
             ) : (
-              <>
-                <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-                Cr&eacute;er le compte admin
-              </>
+              <><svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> Créer le compte admin</>
             )}
           </button>
         </div>
