@@ -25,77 +25,13 @@ if (typeof BigInt !== 'undefined' && !(BigInt.prototype as { toJSON?: () => stri
   };
 }
 
-/**
- * Nettoie et prépare les URLs d'origine
- */
-function normalizeOrigins(values: string[]): string[] {
-  return values
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map((value) => value.replace(/\/+$/, ''));
-}
-
-/**
- * Récupère les origines autorisées depuis l'environnement
- */
-function getAllowedOrigins(): string[] {
-  const fromEnv = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '';
-
-  return normalizeOrigins([
-    'http://localhost:3000',
-    'http://127.0.0.1:3000',
-    ...fromEnv.split(','),
-  ]);
-}
-
-/**
- * Logique de validation dynamique des origines
- */
-function isAllowedOrigin(origin: string | undefined, allowedOrigins: string[]): boolean {
-  if (!origin) {
-    return true; // Autorise les outils comme Postman
-  }
-
-  const cleanOrigin = origin.replace(/\/+$/, '');
-
-  if (allowedOrigins.includes(cleanOrigin)) {
-    return true;
-  }
-
-  let parsed: URL;
-  try {
-    parsed = new URL(cleanOrigin);
-  } catch {
-    return false;
-  }
-
-  const hostname = parsed.hostname.toLowerCase();
-
-  // Autorise localhost et les domaines de préproduction Vercel
-  if (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1'
-  ) {
-    return true;
-  }
-
-  if (
-    hostname === 'lcd-comminity.vercel.app' ||
-    hostname.endsWith('.vercel.app')
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 async function bootstrap() {
   // Création de l'application sans CORS par défaut pour le configurer manuellement
   const app = await NestFactory.create(AppModule, { cors: false });
 
   // Configure VAPID pour les notifications push
   const vapidEnabled = configureVapid();
-  
+
   // Injecte l'état VAPID dans le PushService
   const pushService = app.get(PushService);
   pushService.setVapidEnabled(vapidEnabled);
@@ -107,21 +43,42 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  const allowedOrigins = getAllowedOrigins();
+  // 🔥 CORRECTION CHIRURGICALE DU CORS
+  // Récupération et nettoyage des origines depuis les variables d'environnement
+  const corsOriginsStr = process.env.CORS_ORIGINS || process.env.FRONTEND_URL || '';
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...corsOriginsStr.split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean)
+  ];
 
   // Configuration CORS SaaS robuste
   app.enableCors({
     origin: (origin, callback) => {
-      if (isAllowedOrigin(origin, allowedOrigins)) {
-        callback(null, true);
-        return;
+      // Autorise les requêtes sans origine (ex: Postman, appels serveurs)
+      if (!origin) {
+        return callback(null, true);
       }
 
-      callback(new Error(`Origin non autorisée par CORS: ${origin}`), false);
+      const cleanOrigin = origin.replace(/\/+$/, '');
+
+      // Vérifie si l'origine est dans la liste exacte
+      if (allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
+      }
+
+      // Autorise dynamiquement tous les sous-domaines Vercel (pour les previews)
+      if (cleanOrigin.endsWith('.vercel.app')) {
+        return callback(null, true);
+      }
+
+      // Au lieu de throw une Error qui fait planter la requête preflight (OPTIONS), on renvoie false.
+      // Cela permet au navigateur de gérer l'erreur proprement sans crasher le backend.
+      callback(null, false);
     },
     credentials: true,
-    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id'],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    allowedHeaders: 'Content-Type, Accept, Authorization, x-tenant-id',
   });
 
   // Validation globale des DTOs
@@ -134,7 +91,7 @@ async function bootstrap() {
     }),
   );
 
-  // Indispensable pour récupérer l'IP réelle derrière un proxy (Vercel/Nginx)
+  // Indispensable pour récupérer l'IP réelle derrière un proxy (Vercel/Nginx/Render)
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   // Configuration Swagger (Documentation API)
@@ -161,7 +118,8 @@ async function bootstrap() {
     express.static(path.resolve(process.env.LOCAL_UPLOAD_DIR || './uploads')),
   );
 
-  const port = Number(process.env.PORT || 3001);
+  // Sur Render, le port par défaut est souvent 10000
+  const port = Number(process.env.PORT || 10000);
 
   await app.listen(port);
 
