@@ -156,19 +156,18 @@ export class PublicService {
   }
 
   /**
-   * Vérification du jeton d'email
+   * Vérification du jeton d'email (Tolérant aux doubles-appels)
    */
   async verifyEmailToken(rawToken: string) {
     if (!rawToken) throw new BadRequestException('Token manquant.');
 
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
 
+    // 1. On cherche le token SANS filtrer sur "consumedAt: null" pour pouvoir analyser la situation
     const authToken = await this.prisma.authToken.findFirst({
       where: {
         tokenHash,
         type: TokenType.EMAIL_VERIFICATION,
-        consumedAt: null,
-        expiresAt: { gt: new Date() },
       },
       include: {
         user: {
@@ -180,10 +179,26 @@ export class PublicService {
     });
 
     if (!authToken || !authToken.user) {
-      throw new BadRequestException('Le lien de vérification est invalide ou a expiré.');
+      throw new BadRequestException('Le lien de vérification est invalide.');
+    }
+
+    if (authToken.expiresAt < new Date()) {
+      throw new BadRequestException('Le lien de vérification a expiré.');
     }
 
     const user = authToken.user;
+
+    // 2. GESTION DU DOUBLE-APPEL (La magie opère ici ✨)
+    if (authToken.consumedAt) {
+      // Si le token est déjà consommé, on vérifie le statut de l'utilisateur.
+      // S'il n'est plus "EMAIL_UNVERIFIED", c'est que le premier appel a réussi juste avant !
+      if (user.status !== UserStatus.EMAIL_UNVERIFIED) {
+        return { emailVerified: true, alreadyVerified: true }; // On renvoie un succès silencieux
+      }
+      throw new BadRequestException('Ce lien a déjà été utilisé.');
+    }
+
+    // 3. Traitement normal (Le tout premier appel)
     const primaryAntennaId = user.memberships[0]?.antennaId;
 
     await this.prisma.$transaction([

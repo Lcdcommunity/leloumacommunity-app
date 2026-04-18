@@ -37,9 +37,9 @@ export class AuthMailerService {
     const appName = params.appName || this.config.get<string>('APP_NAME') || 'Lélouma Community';
     const mailFrom = this.getMailFrom(appName, 'Support');
 
-    const logoHtml = params.logoUrl 
-      ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${params.logoUrl}" alt="${appName}" style="max-height: 60px; border-radius: 8px;"></div>`
-      : `<h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>`;
+    const logoHtml = params.logoUrl
+      ? `<img src="${params.logoUrl}" alt="${appName}" style="max-height: 80px; width: auto; margin-bottom: 24px; border-radius: 8px;" />`
+      : `<h2 style="color: #1E3A8A; font-size: 28px; margin: 0 0 24px; font-weight: bold; letter-spacing: -0.5px;">${appName}</h2>`;
 
     try {
       await this.transporter.sendMail({
@@ -47,28 +47,65 @@ export class AuthMailerService {
         to: params.to,
         subject: `Réinitialisation de votre mot de passe - ${appName}`,
         html: `
-          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 25px;">
-              ${logoHtml}
-            </div>
-
-            <h2 style="color: #111827; font-size: 20px; font-weight: 600;">Réinitialisation de mot de passe</h2>
-            <p style="color: #374151; font-size: 16px; line-height: 1.5;">Bonjour,</p>
-            <p style="color: #374151; font-size: 16px; line-height: 1.5;">
-              Vous avez demandé à réinitialiser votre mot de passe pour votre compte <strong>${appName}</strong>. Cliquez sur le bouton ci-dessous :
-            </p>
-
-            <div style="text-align: center; margin: 35px 0;">
-              <a href="${params.resetUrl}" style="background-color: #2563EB; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
-                Réinitialiser mon mot de passe
-              </a>
-            </div>
-
-            <p style="font-size: 13px; color: #6B7280; line-height: 1.5; padding-top: 20px; border-top: 1px solid #F3F4F6;">
-              Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br/>
-              <a href="${params.resetUrl}" style="color: #3B82F6; word-break: break-all;">${params.resetUrl}</a>
-            </p>
-          </div>
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F3F4F6; color: #111827; -webkit-font-smoothing: antialiased;">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F3F4F6; padding: 40px 20px;">
+              <tr>
+                <td align="center">
+                  <table width="100%" max-width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); max-width: 600px; width: 100%;">
+                    <tr>
+                      <td align="center" style="padding: 48px 32px 16px; background: linear-gradient(to bottom, #F8FAFC, #FFFFFF);">
+                        ${logoHtml}
+                        <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">
+                          Réinitialisation de mot de passe
+                        </h1>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 16px 40px 32px;">
+                        <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: #4B5563;">Bonjour,</p>
+                        <p style="margin: 0 0 32px; font-size: 16px; line-height: 1.6; color: #4B5563;">
+                          Vous avez demandé à réinitialiser votre mot de passe pour votre compte <strong>${appName}</strong>. Cliquez sur le bouton ci-dessous pour le modifier :
+                        </p>
+                        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                          <tr>
+                            <td align="center">
+                              <a href="${params.resetUrl}" style="display: inline-block; background-color: #2563EB; color: #FFFFFF; font-size: 16px; font-weight: 600; text-decoration: none; padding: 16px 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);">
+                                Réinitialiser mon mot de passe
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 24px 40px 32px; background-color: #F8FAFC; border-top: 1px solid #E5E7EB;">
+                        <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #6B7280; text-align: center;">
+                          Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :<br/>
+                          <a href="${params.resetUrl}" style="color: #3B82F6; word-break: break-all;">${params.resetUrl}</a>
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  <table width="100%" max-width="600" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%;">
+                    <tr>
+                      <td align="center" style="padding: 24px 0;">
+                        <p style="margin: 0; font-size: 12px; color: #9CA3AF;">
+                          &copy; ${new Date().getFullYear()} ${appName}. Tous droits réservés.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
         `,
       });
     } catch (error: unknown) {
@@ -86,9 +123,9 @@ export class AuthMailerService {
     const appName = params.appName || this.config.get<string>('APP_NAME') || 'Lélouma Community';
     const mailFrom = this.getMailFrom(appName, 'Bienvenue');
 
-    const logoHtml = params.logoUrl 
-      ? `<div style="text-align: center; margin-bottom: 20px;"><img src="${params.logoUrl}" alt="${appName}" style="max-height: 60px; border-radius: 8px;"></div>`
-      : `<h1 style="color: #2563EB; margin: 0; font-size: 24px;">${appName}</h1>`;
+    const logoHtml = params.logoUrl
+      ? `<img src="${params.logoUrl}" alt="${appName}" style="max-height: 80px; width: auto; margin-bottom: 24px; border-radius: 8px;" />`
+      : `<h2 style="color: #1E3A8A; font-size: 28px; margin: 0 0 24px; font-weight: bold; letter-spacing: -0.5px;">${appName}</h2>`;
 
     try {
       await this.transporter.sendMail({
@@ -96,27 +133,67 @@ export class AuthMailerService {
         to: params.to,
         subject: `Vérifiez votre adresse email - ${appName}`,
         html: `
-          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #e5e7eb; border-radius: 16px; background-color: #ffffff;">
-            <div style="text-align: center; margin-bottom: 25px;">
-              ${logoHtml}
-            </div>
-
-            <h2 style="color: #111827; font-size: 20px; font-weight: 600;">Bienvenue chez ${appName} !</h2>
-            <p style="color: #374151; font-size: 16px; line-height: 1.5;">Bonjour,</p>
-            <p style="color: #374151; font-size: 16px; line-height: 1.5;">
-              Merci de nous avoir rejoints. Pour activer votre accès, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :
-            </p>
-
-            <div style="text-align: center; margin: 35px 0;">
-              <a href="${params.verifyUrl}" style="background-color: #15803D; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: 600; font-size: 16px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(21, 128, 61, 0.2);">
-                Vérifier mon email
-              </a>
-            </div>
-
-            <p style="font-size: 13px; color: #6B7280; line-height: 1.5; padding-top: 20px; border-top: 1px solid #F3F4F6;">
-              Une fois votre email vérifié, un administrateur devra valider votre compte pour vous donner accès à l'espace membre de l'association.
-            </p>
-          </div>
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #F3F4F6; color: #111827; -webkit-font-smoothing: antialiased;">
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F3F4F6; padding: 40px 20px;">
+              <tr>
+                <td align="center">
+                  <table width="100%" max-width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); max-width: 600px; width: 100%;">
+                    <tr>
+                      <td align="center" style="padding: 48px 32px 16px; background: linear-gradient(to bottom, #F8FAFC, #FFFFFF);">
+                        ${logoHtml}
+                        <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #111827; letter-spacing: -0.5px;">
+                          Bienvenue chez ${appName} !
+                        </h1>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 16px 40px 32px;">
+                        <p style="margin: 0 0 16px; font-size: 16px; line-height: 1.6; color: #4B5563;">Bonjour,</p>
+                        <p style="margin: 0 0 32px; font-size: 16px; line-height: 1.6; color: #4B5563;">
+                          Merci de nous avoir rejoints. Pour activer votre accès et finaliser la création de votre compte, veuillez vérifier votre adresse email en cliquant sur le bouton ci-dessous :
+                        </p>
+                        <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                          <tr>
+                            <td align="center">
+                              <a href="${params.verifyUrl}" style="display: inline-block; background-color: #059669; color: #FFFFFF; font-size: 16px; font-weight: 600; text-decoration: none; padding: 16px 32px; border-radius: 12px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);">
+                                Vérifier mon email
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 24px 40px 32px; background-color: #F8FAFC; border-top: 1px solid #E5E7EB;">
+                        <p style="margin: 0; font-size: 13px; line-height: 1.5; color: #6B7280; text-align: center;">
+                          Une fois votre email vérifié, un administrateur devra valider votre compte pour vous donner accès à l'espace membre de l'association.
+                        </p>
+                        <p style="margin: 16px 0 0; font-size: 12px; color: #9CA3AF; text-align: center;">
+                          Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                  <table width="100%" max-width="600" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; width: 100%;">
+                    <tr>
+                      <td align="center" style="padding: 24px 0;">
+                        <p style="margin: 0; font-size: 12px; color: #9CA3AF;">
+                          &copy; ${new Date().getFullYear()} ${appName}. Tous droits réservés.
+                        </p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+          </html>
         `,
       });
     } catch (error: unknown) {

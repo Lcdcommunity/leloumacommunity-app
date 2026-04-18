@@ -1,7 +1,7 @@
 // web/app/(public)/verify-email/page.tsx
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
@@ -87,6 +87,9 @@ function VerifyEmailContent({ theme }: { theme: ThemeConfig }) {
   const [success, setSuccess] = useState<boolean | null>(null);
   const [message, setMessage] = useState('');
 
+  // ⚡ VERROU ANTI-DOUBLE-APPEL
+  const hasFetched = useRef(false);
+
   const verify = useCallback(async () => {
     if (!token) {
       setSuccess(false);
@@ -124,6 +127,10 @@ function VerifyEmailContent({ theme }: { theme: ThemeConfig }) {
   }, [token]);
 
   useEffect(() => {
+    // ⚡ On bloque l'exécution si l'appel a déjà été fait
+    if (hasFetched.current) return;
+    
+    hasFetched.current = true;
     void verify();
   }, [verify]);
 
@@ -282,8 +289,7 @@ function VerifyEmailContent({ theme }: { theme: ThemeConfig }) {
                 gap: '0.4rem',
                 whiteSpace: 'nowrap',
               }}
-            >
-              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            >              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
               </svg>
               Se connecter
