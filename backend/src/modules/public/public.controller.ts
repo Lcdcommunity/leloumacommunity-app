@@ -1,5 +1,6 @@
 // backend/src/modules/public/public.controller.ts
-import { Controller, Get, Post, Body, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PublicService, SignupDto } from './public.service';
 
@@ -51,9 +52,17 @@ export class PublicController {
     }));
   }
 
+  /**
+   * Ajout du FileInterceptor pour parser le FormData (multipart/form-data)
+   * envoyé par le frontend avec l'image "avatar".
+   */
   @Post('signup')
-  async signup(@Body() dto: SignupDto) {
-    return this.publicService.signup(dto);
+  @UseInterceptors(FileInterceptor('avatar'))
+  async signup(
+    @Body() dto: SignupDto,
+    @UploadedFile() avatar?: Express.Multer.File
+  ) {
+    return this.publicService.signup(dto, avatar);
   }
 
   /**

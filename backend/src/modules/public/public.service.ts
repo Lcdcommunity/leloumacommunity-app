@@ -20,6 +20,12 @@ export interface SignupDto {
   addressLine2?: string;
   originSubPrefecture?: string; 
   placeOfBirth?: string;
+  // Ajouts pour synchroniser avec le FormData du frontend
+  birthDate?: string;
+  birthCountry?: string;
+  postalCode?: string;
+  function?: string;
+  professionalStatus?: string;
 }
 
 @Injectable()
@@ -33,7 +39,12 @@ export class PublicService {
   /**
    * Inscription d'un nouveau membre via le formulaire public
    */
-  async signup(dto: SignupDto) {
+  async signup(dto: SignupDto, avatar?: Express.Multer.File) {
+    // Sécurité anti-crash au cas où le payload est mal formaté
+    if (!dto.email) {
+      throw new BadRequestException('L\'adresse email est obligatoire.');
+    }
+
     const emailLower = dto.email.toLowerCase().trim();
 
     // 1. Vérifier si l'email existe déjà (toutes associations confondues)
@@ -61,6 +72,13 @@ export class PublicService {
     }
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
+    // TODO: Si tu disposes d'un FileService (S3/Cloudinary), uploader 'avatar' ici
+    // et récupérer l'ID du fichier pour l'affecter à 'profilePhotoFileId' ci-dessous.
+    // let profilePhotoFileId = null;
+    // if (avatar) {
+    //   profilePhotoFileId = await this.fileService.upload(avatar);
+    // }
+
     // 4. Création atomique (Utilisateur + Membership + Notification)
     const user = await this.prisma.user.create({
       data: {
@@ -73,8 +91,17 @@ export class PublicService {
         country: dto.country,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2,
+        postalCode: dto.postalCode,
         originSubPrefecture: dto.originSubPrefecture,
         placeOfBirth: dto.placeOfBirth,
+        countryOfBirth: dto.birthCountry,
+        function: dto.function,
+        professionalStatus: dto.professionalStatus,
+        // profilePhotoFileId: profilePhotoFileId,
+        
+        // Conversion de la date (qui arrive en YYYY-MM-DD depuis le front)
+        birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
+
         role: UserRole.MEMBER,
         status: UserStatus.EMAIL_UNVERIFIED, 
         associationId: antenna.associationId, 
