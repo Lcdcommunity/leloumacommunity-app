@@ -1,4 +1,4 @@
-/////////// web/app/(public)/signup/page.tsx
+//web/app/(public)/signup/page.tsx
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState, useCallback } from 'react';
@@ -307,7 +307,6 @@ export default function MemberSignupPage() {
     setSelectedPhotoFile(file);
     setPhotoPreviewUrl(URL.createObjectURL(file));
   }
-  
   function removePhoto() {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     setSelectedPhotoFile(null);
@@ -395,7 +394,6 @@ export default function MemberSignupPage() {
     setStep(s => Math.max(s - 1, 0));
   }
 
-  // ⚡ LA FONCTION CHIRURGICALE POUR TOUT ENVOYER D'UN SEUL COUP ⚡
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     const err = validateStep(3);
@@ -408,14 +406,13 @@ export default function MemberSignupPage() {
       const finalCountry = country === 'Autre (Non listé)' ? customCountry : country;
       const formattedBirthDate = convertDateToISO(birthDate);
 
-      // Création d'un FormData unique pour inclure l'image et TOUTES les données saisies
       const formData = new FormData();
       formData.append('firstName', firstName.trim());
       formData.append('lastName', lastName.trim());
       formData.append('email', email.trim());
       formData.append('password', password);
       formData.append('antennaId', antennaId);
-      
+
       if (phone) formData.append('phone', phone.trim());
       if (originSubPrefecture) formData.append('originSubPrefecture', originSubPrefecture.trim());
       if (formattedBirthDate) formData.append('birthDate', formattedBirthDate);
@@ -430,12 +427,10 @@ export default function MemberSignupPage() {
       if (profession) formData.append('professionalStatus', profession.trim());
       formData.append('termsAccepted', String(termsAccepted));
 
-      // Ajout de la photo de manière native
       if (selectedPhotoFile) {
         formData.append('avatar', selectedPhotoFile);
       }
 
-      // ⚠️ Assure-toi que la méthode api.memberSignup accepte le FormData dans ton fichier api-client.ts
       await api.memberSignup(formData);
 
       setSuccess(true);
@@ -505,41 +500,53 @@ export default function MemberSignupPage() {
         .sp-card.visible { opacity: 1; transform: translateY(0); }
 
         .sp-header { text-align: center; margin-bottom: 1.75rem; }
-        .sp-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: ${getLightColor(theme.primary, 0.1)}; border: 1px solid ${getLightColor(theme.primary, 0.2)}; border-radius: 99px; padding: 0.3rem 0.85rem; font-size: 0.72rem; font-weight: 700; color: var(--theme-blue-dark); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.9rem; }
+        .sp-badge { display: inline-flex; align-items: center; gap: 0.4rem; background: ${getLightColor(theme.primary, 0.1)}; border: 1px solid ${getLightColor(theme.primary, 0.2)}; border-radius: 99px; padding: 0.3rem 0.85rem; font-size: 0.72rem; font-weight: 700; color: #1E40AF; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.9rem; }
         .sp-badge-dot { width: 6px; height: 6px; background: var(--theme-blue); border-radius: 50%; animation: blink 2s ease-in-out infinite; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        .sp-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 4.5vw, 2.3rem); font-weight: 600; color: #1E3A8A; letter-spacing: -0.02em; line-height: 1.15; }
-        .sp-title span { background: linear-gradient(135deg, var(--theme-blue-dark), var(--theme-blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+        /* ── TITRE PRINCIPAL : slate profond, plus lisible ── */
+        .sp-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 4.5vw, 2.3rem); font-weight: 600; color: #1E293B; letter-spacing: -0.02em; line-height: 1.15; }
+        .sp-title span { background: linear-gradient(135deg, ${theme.primary}, #3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+
+        /* ── SOUS-TITRE : slate moyen ── */
         .sp-subtitle { font-size: 0.82rem; color: #64748B; margin-top: 0.45rem; line-height: 1.6; font-weight: 500; }
 
         .sp-stepper { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.75rem; }
         .sp-step-item { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; position: relative; flex: 1; }
         .sp-step-item:not(:last-child)::after { content: ''; position: absolute; top: 13px; left: calc(50% + 14px); width: calc(100% - 28px); height: 1px; background: #E2E8F0; transition: background 0.4s; }
-        .sp-step-item.done:not(:last-child)::after { background: var(--theme-green); }
+        .sp-step-item.done:not(:last-child)::after { background: ${theme.secondary}; }
         .sp-step-circle { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #CBD5E1; background: white; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; color: #94A3B8; transition: all 0.3s cubic-bezier(.22,1,.36,1); position: relative; z-index: 1; }
-        .sp-step-item.active .sp-step-circle { border-color: var(--theme-blue); background: var(--theme-blue); color: white; box-shadow: 0 0 0 4px ${getLightColor(theme.primary, 0.15)}; }
-        .sp-step-item.done .sp-step-circle { border-color: var(--theme-green); background: ${getLightColor(theme.secondary, 0.1)}; color: var(--theme-green); }
-        .sp-step-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; transition: color 0.3s; }
-        .sp-step-item.active .sp-step-label { color: var(--theme-blue-dark); }
-        .sp-step-item.done .sp-step-label { color: var(--theme-green); }
+        .sp-step-item.active .sp-step-circle { border-color: ${theme.primary}; background: ${theme.primary}; color: white; box-shadow: 0 0 0 4px ${getLightColor(theme.primary, 0.15)}; }
+        .sp-step-item.done .sp-step-circle { border-color: ${theme.secondary}; background: ${getLightColor(theme.secondary, 0.1)}; color: ${theme.secondary}; }
 
-        .sp-section-title { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--theme-green); margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-        .sp-section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, ${getLightColor(theme.secondary, 0.3)}, transparent); }
+        /* ── LABELS STEPPER : lisibles ── */
+        .sp-step-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; transition: color 0.3s; }
+        .sp-step-item.active .sp-step-label { color: #1E40AF; }
+        .sp-step-item.done .sp-step-label { color: #047857; }
+
+        /* ── TITRES DE SECTIONS : slate-600, discrets mais lisibles ── */
+        .sp-section-title { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #475569; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
+        .sp-section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, #CBD5E1, transparent); }
+
         .sp-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; }
         .sp-stack { display: flex; flex-direction: column; gap: 0.2rem; }
         .sp-field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
-        .sp-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--theme-green); }
+
+        /* ── LABELS DE CHAMPS : slate-600 ── */
+        .sp-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569; }
         .sp-label .sp-opt { font-weight: 500; color: #94A3B8; text-transform: none; letter-spacing: 0; font-size: 0.65rem; margin-left: 0.3rem; }
+
         .sp-input-wrap { position: relative; }
         .sp-input, .sp-select { width: 100%; min-height: 48px; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #FFFFFF; padding: 0 1rem; color: #111827; font-weight: 500; font-family: var(--font-main); font-size: 0.88rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
-        .sp-input:focus, .sp-select:focus { border-color: var(--theme-blue); box-shadow: 0 0 0 3px ${getLightColor(theme.primary, 0.12)}; }
+        .sp-input:focus, .sp-select:focus { border-color: ${theme.primary}; box-shadow: 0 0 0 3px ${getLightColor(theme.primary, 0.12)}; }
         .sp-input.has-icon { padding-right: 2.8rem; padding-left: ${isRTL ? '2.8rem' : '1rem'}; }
         .sp-select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: ${isRTL ? 'left 1rem center' : 'right 1rem center'}; appearance: none; }
         .sp-eye-btn { position: absolute; right: ${isRTL ? 'auto' : '0.85rem'}; left: ${isRTL ? '0.85rem' : 'auto'}; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94A3B8; cursor: pointer; padding: 4px; display: flex; align-items: center; }
         .sp-pwd-strength { display: flex; gap: 4px; margin-top: 0.4rem; align-items: center; }
         .sp-pwd-bar { flex: 1; height: 4px; border-radius: 99px; background: #E2E8F0; overflow: hidden; }
         .sp-pwd-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.4s; }
-        .sp-pwd-label { font-size: 0.65rem; font-weight: 700; margin-left: 0.4rem; min-width: 36px; }        .sp-notice { background: ${getLightColor(theme.primary, 0.1)}; border: 1px solid ${getLightColor(theme.primary, 0.2)}; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.78rem; color: var(--theme-blue-dark); font-weight: 500; line-height: 1.5; margin-bottom: 1.2rem; display: flex; gap: 0.6rem; align-items: flex-start; }
+        .sp-pwd-label { font-size: 0.65rem; font-weight: 700; margin-left: 0.4rem; min-width: 36px; }
+        .sp-notice { background: ${getLightColor(theme.primary, 0.07)}; border: 1px solid ${getLightColor(theme.primary, 0.15)}; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.78rem; color: #1E40AF; font-weight: 500; line-height: 1.5; margin-bottom: 1.2rem; display: flex; gap: 0.6rem; align-items: flex-start; }
         .sp-error { display: flex; align-items: center; gap: 0.55rem; padding: 0.8rem 1rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; color: var(--err); font-size: 0.8rem; font-weight: 600; }
         .sp-toast-ok { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 1rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
         .sp-success { text-align: center; padding: 1rem 0; }
@@ -548,27 +555,37 @@ export default function MemberSignupPage() {
         .sp-success-text { font-size: 0.85rem; color: #64748B; line-height: 1.6; font-weight: 500; }
 
         .sp-nav { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
-        .sp-btn-back { flex: 0 0 auto; min-height: 48px; padding: 0 1.25rem; background: white; border: 1.5px solid #CBD5E1; border-radius: 12px; color: #475569; font-family: var(--font-main); font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
-        .sp-btn-next, .sp-btn-submit { flex: 1; min-height: 48px; background: linear-gradient(135deg, var(--theme-blue-dark), var(--theme-blue)); border: none; border-radius: 12px; color: white; font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.45rem; box-shadow: 0 4px 14px ${getLightColor(theme.primary, 0.25)}; }
-        .sp-btn-next:disabled, .sp-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        /* ── BOUTON RETOUR : visible, sobre ── */
+        .sp-btn-back { flex: 0 0 auto; min-height: 48px; padding: 0 1.25rem; background: white; border: 1.5px solid #94A3B8; border-radius: 12px; color: #334155; font-family: var(--font-main); font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: border-color 0.2s, background 0.2s; }
+        .sp-btn-back:hover { border-color: #64748B; background: #F8FAFC; }
+
+        /* ── BOUTONS CONTINUER / CRÉER MON COMPTE : vert emeraude visible ── */
+        .sp-btn-next, .sp-btn-submit { flex: 1; min-height: 48px; background: linear-gradient(135deg, #047857, #059669); border: none; border-radius: 12px; color: white; font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.45rem; box-shadow: 0 4px 14px rgba(5,150,105,0.28); transition: opacity 0.2s, box-shadow 0.2s; }
+        .sp-btn-next:hover, .sp-btn-submit:hover { box-shadow: 0 6px 20px rgba(5,150,105,0.38); }
+        .sp-btn-next:disabled, .sp-btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
         .sp-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
         .sp-footer { margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid #E2E8F0; text-align: center; font-size: 0.8rem; color: #64748B; font-weight: 500; display: flex; flex-direction: column; gap: 0.6rem; }
-        .sp-footer a { color: var(--theme-blue); font-weight: 700; text-decoration: none; }
+        .sp-footer a { color: ${theme.primary}; font-weight: 700; text-decoration: none; }
         .sp-footer-sublink { font-size: 0.75rem; font-weight: 500; color: #94A3B8; }
 
-        .sp-photo-avatar { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 1.2rem; background: linear-gradient(135deg, var(--theme-blue-dark), var(--theme-blue)); display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 700; color: white; box-shadow: 0 6px 20px ${getLightColor(theme.primary, 0.25)}; overflow: hidden; }
+        .sp-photo-avatar { width: 100px; height: 100px; border-radius: 50%; margin: 0 auto 1.2rem; background: linear-gradient(135deg, ${theme.primary}, #3B82F6); display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 700; color: white; box-shadow: 0 6px 20px ${getLightColor(theme.primary, 0.25)}; overflow: hidden; }
         .sp-photo-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .sp-photo-box { border: 1.5px dashed #CBD5E1; border-radius: 16px; padding: 1.5rem 1rem; background: #F8FAFC; text-align: center; }
-        .sp-file-label { min-height: 46px; padding: 0 1.25rem; border-radius: 12px; border: 1.5px solid #CBD5E1; background: white; color: var(--theme-blue-dark); font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; }
+
+        /* ── BOUTON CHOISIR UNE PHOTO : visible avec bordure bleue ── */
+        .sp-file-label { min-height: 46px; padding: 0 1.25rem; border-radius: 12px; border: 1.5px solid #93C5FD; background: #EFF6FF; color: #1D4ED8; font-family: var(--font-main); font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
+        .sp-file-label:hover { background: #DBEAFE; border-color: #60A5FA; }
         .sp-file-input { display: none; }
         .sp-photo-remove-btn { min-height: 46px; padding: 0 1rem; border-radius: 12px; border: 1.5px solid rgba(220,38,38,0.2); background: rgba(254,242,242,0.6); color: #DC2626; font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; }
 
+        /* ── SELECT POSTE / RÔLE ── */
         .sp-role-select {
           width: 100%; min-height: 48px; border-radius: 12px;
           border: 1.5px solid ${getLightColor(theme.secondary, 0.3)};
-          background: linear-gradient(135deg, ${getLightColor(theme.secondary, 0.02)}, ${getLightColor(theme.secondary, 0.05)});
+          background: ${getLightColor(theme.secondary, 0.03)};
           padding: 0 2rem 0 1rem; color: #134E4A; font-weight: 600;
           font-family: var(--font-main); font-size: 0.88rem; outline: none;
           transition: border-color 0.2s, box-shadow 0.2s; cursor: pointer; appearance: none;
@@ -576,15 +593,14 @@ export default function MemberSignupPage() {
           background-repeat: no-repeat; background-position: ${isRTL ? 'left 1rem center' : 'right 1rem center'};
         }
         .sp-role-select:focus {
-          border-color: var(--theme-green);
+          border-color: ${theme.secondary};
           box-shadow: 0 0 0 3px ${getLightColor(theme.secondary, 0.15)};
         }
+
+        /* ── LABEL RÔLE : couleur solide lisible ── */
         .sp-role-label {
           font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em;
-          text-transform: uppercase;
-          background: linear-gradient(135deg, var(--theme-green), var(--theme-green-light));
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          background-clip: text;
+          text-transform: uppercase; color: #047857;
           display: flex; align-items: center; gap: 0.4rem;
         }
         
@@ -601,7 +617,7 @@ export default function MemberSignupPage() {
           flex-shrink: 0; margin-top: 0.1rem; transition: all 0.2s;
         }
         .sp-checkbox:checked {
-          background-color: var(--theme-blue); border-color: var(--theme-blue);
+          background-color: ${theme.primary}; border-color: ${theme.primary};
         }
         .sp-checkbox:checked::after {
           content: ''; width: 5px; height: 10px;
@@ -613,7 +629,7 @@ export default function MemberSignupPage() {
           font-size: 0.8rem; color: #475569; line-height: 1.5; cursor: pointer;
         }
         .sp-legal-link {
-          color: var(--theme-blue); font-weight: 700; text-decoration: underline;
+          color: ${theme.primary}; font-weight: 700; text-decoration: underline;
         }
 
         @media (max-width: 540px) {
@@ -682,7 +698,7 @@ export default function MemberSignupPage() {
                 {t('signup.successText2', 'puis attendez la validation par l\'administrateur')}<br />{t('signup.successText3', 'de votre antenne.')}
               </p>
               <div style={{ marginTop: '1.75rem' }}>
-                <Link href="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--theme-blue-dark)', fontWeight: 800, fontSize: '0.9rem', textDecoration: 'none' }}>
+                <Link href="/login" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: theme.primary, fontWeight: 800, fontSize: '0.9rem', textDecoration: 'none' }}>
                   {t('signup.login', 'Se connecter')}
                   <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -723,7 +739,9 @@ export default function MemberSignupPage() {
                     </select>
                   </div>
                 </div>
-              )}              {/* ── STEP 1 : Contact, Origine & Naissance ── */}
+              )}
+
+              {/* ── STEP 1 : Contact, Origine & Naissance ── */}
               {step === 1 && (
                 <div className="sp-panel sp-stack">
                   <p className="sp-section-title">{t('signup.communityIdentity', 'Identité communautaire')}</p>
@@ -757,7 +775,7 @@ export default function MemberSignupPage() {
                       ))}
                     </select>
                     {associationRole && associationRole !== 'Membre (simple)' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.68rem', fontWeight: 700, color: 'var(--theme-green)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.68rem', fontWeight: 700, color: '#047857' }}>
                         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
@@ -927,6 +945,7 @@ export default function MemberSignupPage() {
 
                 </div>
               )}
+
               {/* Error */}
               {error && <div className="sp-error" style={{ marginTop: '1.25rem' }}>{error}</div>}
 

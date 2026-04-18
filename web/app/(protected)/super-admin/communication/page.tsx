@@ -2,22 +2,29 @@
 'use client';
 
 import React, { type FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation'; // 🔥 AJOUT CHIRURGICAL : Pour le bouton retour
+import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
-import { useTranslation } from 'react-i18next';
+import type { UserSummary } from '../../../../types/user';
 
 export default function SuperAdminCommunicationPage() {
-  const { i18n } = useTranslation();
-  const isRTL = i18n.language === 'ar';
-  const router = useRouter(); // 🔥 AJOUT CHIRURGICAL
+  const router = useRouter();
 
+  // Données
   const [antennas, setAntennas] = useState<{id: string, name: string}[]>([]);
-  
+  const [members, setMembers] = useState<UserSummary[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
   // États du formulaire
   const [targetType, setTargetType] = useState<'ALL' | 'ANTENNA' | 'MEMBER'>('ALL');
-  const [targetId, setTargetId] = useState(''); // Contiendra l'ID de l'antenne ou du membre
   
+  // Sélections multiples
+  const [selectedAntennaIds, setSelectedAntennaIds] = useState<string[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  
+  // Filtre pour la vue "Membres"
+  const [selectedAntennaFilter, setSelectedAntennaFilter] = useState<string>('');
+
   const [channels, setChannels] = useState({
     inApp: true,
     push: false,
@@ -27,19 +34,62 @@ export default function SuperAdminCommunicationPage() {
 
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  
+
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Charger la liste des antennes au montage
   useEffect(() => {
-    // Charger la liste des antennes au montage
-    api.listAntennas().then(res => {
-      setAntennas(res.items || []);
-    }).catch(console.error);
+    api.listAntennas({ pageSize: 100, isActive: true })
+      .then(res => setAntennas(res.items || []))
+      .catch(console.error);
   }, []);
+
+  // Charger les membres quand le filtre d'antenne change (pour le mode MEMBER)
+  useEffect(() => {
+    if (targetType === 'MEMBER') {
+      setLoadingMembers(true);
+      api.listMembers({ 
+        pageSize: 500, 
+        status: 'ACTIVE',
+        ...(selectedAntennaFilter ? { antennaId: selectedAntennaFilter } : {})
+      })
+      .then(res => setMembers(res.items || []))
+      .catch(console.error)
+      .finally(() => setLoadingMembers(false));
+    }
+  }, [targetType, selectedAntennaFilter]);
 
   const toggleChannel = (key: keyof typeof channels) => {
     setChannels(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleToggleAntenna = (id: string) => {
+    setSelectedAntennaIds(prev => 
+      prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]
+    );
+  };
+
+  const handleToggleMember = (id: string) => {
+    setSelectedMemberIds(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllAntennas = () => {
+    if (selectedAntennaIds.length === antennas.length) {
+      setSelectedAntennaIds([]); // Tout décocher
+    } else {
+      setSelectedAntennaIds(antennas.map(a => a.id)); // Tout cocher
+    }
+  };
+
+  const handleSelectAllMembers = () => {
+    if (selectedMemberIds.length === members.length) {
+      setSelectedMemberIds([]); 
+    } else {
+      setSelectedMemberIds(members.map(m => m.id)); 
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -48,26 +98,34 @@ export default function SuperAdminCommunicationPage() {
     setLoading(true);
 
     try {
-      if (targetType !== 'ALL' && !targetId) {
-        throw new Error("Veuillez sélectionner une cible valide.");
+      if (targetType === 'ANTENNA' && selectedAntennaIds.length === 0) {
+        throw new Error("Veuillez sélectionner au moins une antenne.");
+      }
+      if (targetType === 'MEMBER' && selectedMemberIds.length === 0) {
+        throw new Error("Veuillez sélectionner au moins un membre.");
       }
       if (!title.trim() || !message.trim()) {
         throw new Error("Le titre et le message sont requis.");
       }
 
+      let finalTargetIds: string[] = [];
+      if (targetType === 'ANTENNA') finalTargetIds = selectedAntennaIds;
+      if (targetType === 'MEMBER') finalTargetIds = selectedMemberIds;
+
       await api.sendCustomCommunication({
         targetType,
-        targetId: targetType === 'ALL' ? undefined : targetId,
+        targetIds: targetType === 'ALL' ? undefined : finalTargetIds,
         channels,
         title: title.trim(),
         message: message.trim()
       });
 
-      setMsg({ type: 'success', text: "Message envoyé avec succès à la cible !" });
+      setMsg({ type: 'success', text: "Message diffusé avec succès !" });
       setTitle('');
       setMessage('');
-      setTargetId('');
-      
+      setSelectedAntennaIds([]);
+      setSelectedMemberIds([]);
+
       setTimeout(() => setMsg(null), 5000);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors de l'envoi.";
@@ -77,12 +135,12 @@ export default function SuperAdminCommunicationPage() {
     }
   };
 
-  // 🔥 AJOUT CHIRURGICAL : Logique de verrouillage du bouton d'envoi
   const isSendDisabled = 
     loading || 
     !title.trim() || 
     !message.trim() || 
-    (targetType !== 'ALL' && !targetId.trim()) || 
+    (targetType === 'ANTENNA' && selectedAntennaIds.length === 0) || 
+    (targetType === 'MEMBER' && selectedMemberIds.length === 0) || 
     (!channels.inApp && !channels.push && !channels.email && !channels.sms);
 
   return (
@@ -91,7 +149,6 @@ export default function SuperAdminCommunicationPage() {
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&display=swap');
         .comm-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:900px;margin:0 auto}
         
-        /* 🔥 AJOUT CHIRURGICAL : Style pour le bouton de retour */
         .comm-back-btn {
           display: inline-flex; align-items: center; gap: 0.4rem;
           font-family: 'DM Sans', sans-serif; font-size: 0.82rem; font-weight: 700;
@@ -114,9 +171,11 @@ export default function SuperAdminCommunicationPage() {
         .comm-panel-body{padding:1.5rem}
 
         .comm-field-group{margin-bottom:1.2rem}
-        .comm-label{display:block;font-size:.72rem;font-weight:900;color:#374151;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.45rem}
+        .comm-label{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;font-weight:900;color:#374151;letter-spacing:.07em;text-transform:uppercase;margin-bottom:.6rem}
+        
         .comm-input, .comm-select, .comm-textarea{width:100%;border-radius:11px;border:1.5px solid rgba(220,38,38,.18);background:rgba(255,255,255,.88);padding:0 .95rem;font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:600;color:#111827;outline:none;transition:all .2s;box-sizing:border-box}
         .comm-input, .comm-select { height: 44px; }
+        .comm-select { cursor: pointer; }
         .comm-textarea { padding: .75rem .95rem; min-height: 120px; resize: vertical; }
         .comm-input:focus, .comm-select:focus, .comm-textarea:focus{border-color:rgba(220,38,38,.45);background:white;box-shadow:0 0 0 3px rgba(220,38,38,.09)}
 
@@ -124,28 +183,37 @@ export default function SuperAdminCommunicationPage() {
         .comm-tab{flex:1;padding:.6rem 0;text-align:center;font-size:.78rem;font-weight:800;color:#6B7280;border-radius:9px;cursor:pointer;transition:all .2s;border:none;background:transparent}
         .comm-tab.active{background:white;color:#DC2626;box-shadow:0 2px 6px rgba(220,38,38,.12)}
 
+        /* SÉLECTEUR MULTIPLE MODERNE */
+        .comm-select-all { font-size: .65rem; font-weight: 800; color: #DC2626; cursor: pointer; text-transform: none; letter-spacing: 0; background: rgba(254,242,242,.6); padding: .2rem .6rem; border-radius: 6px; border: 1px solid rgba(220,38,38,.2); transition: all .2s; }
+        .comm-select-all:hover { background: rgba(220,38,38,.1); }
+        .comm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .6rem; margin-top: .8rem; max-height: 280px; overflow-y: auto; padding-right: .4rem; }
+        .comm-card { display: flex; align-items: center; gap: .7rem; padding: .6rem .8rem; border: 1.5px solid rgba(229,231,235,1); border-radius: 10px; cursor: pointer; transition: all .2s; background: white; }
+        .comm-card.active { border-color: #DC2626; background: #FEF2F2; }
+        .comm-card:hover:not(.active) { border-color: rgba(220,38,38,.3); transform: translateY(-1px); }
+        .comm-chk { width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid #D1D5DB; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all .2s; }
+        .active .comm-chk { background: #DC2626; border-color: #DC2626; color: white; }
+
         .comm-channels{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.7rem}
         .comm-channel{display:flex;align-items:center;gap:.6rem;padding:.7rem;border:1.5px solid rgba(220,38,38,.1);border-radius:10px;cursor:pointer;transition:all .2s;background:rgba(254,242,242,.3)}
         .comm-channel:hover{background:#FEF2F2;border-color:rgba(220,38,38,.2)}
         .comm-channel.active{background:#FEF2F2;border-color:#DC2626;box-shadow:0 0 0 2px rgba(220,38,38,.1)}
         .comm-channel-name{font-size:.8rem;font-weight:700;color:#1F2937}
 
-        .comm-footer{padding:1.2rem 1.5rem;border-top:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between}
+        .comm-footer{padding:1.2rem 1.5rem;border-top:1px solid rgba(220,38,38,.07);display:flex;align-items:center;justify-content:space-between; flex-wrap: wrap; gap: 1rem;}
         .comm-submit{height:44px;padding:0 1.5rem;border-radius:11px;background:linear-gradient(135deg,#991B1B,#DC2626);border:none;color:white;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.86rem;font-weight:800;display:flex;align-items:center;gap:.5rem;box-shadow:0 4px 14px rgba(220,38,38,.32);transition:all .2s}
         .comm-submit:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(220,38,38,.42)}
         .comm-submit:disabled{opacity:.6;cursor:not-allowed}
 
-        .comm-msg-success{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:800;color:#059669}
-        .comm-msg-error{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:800;color:#DC2626}
+        .comm-msg-success{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:800;color:#059669; padding: .4rem .8rem; background: #ECFDF5; border-radius: 8px; border: 1px solid #A7F3D0;}
+        .comm-msg-error{display:flex;align-items:center;gap:.45rem;font-size:.82rem;font-weight:800;color:#DC2626; padding: .4rem .8rem; background: #FEF2F2; border-radius: 8px; border: 1px solid #FECACA;}
         
         @keyframes commin{to{opacity:1;transform:translateY(0);transform:translateX(0);}}
         @keyframes commpulse{0%,100%{opacity:1}50%{opacity:.3}}
         @keyframes commspin{to{transform:rotate(360deg)}}
       `}</style>
 
-      <div className="comm-wrap" dir={isRTL ? 'rtl' : 'ltr'}>
-        
-        {/* 🔥 AJOUT CHIRURGICAL : Bouton retour */}
+      <div className="comm-wrap">
+
         <button type="button" className="comm-back-btn" onClick={() => router.back()}>
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -169,50 +237,101 @@ export default function SuperAdminCommunicationPage() {
           </div>
 
           <div className="comm-panel-body">
-            
+
             {/* CIBLE */}
             <div className="comm-field-group">
               <label className="comm-label">1. Définir la cible</label>
               <div className="comm-tabs">
-                <button type="button" className={`comm-tab ${targetType === 'ALL' ? 'active' : ''}`} onClick={() => { setTargetType('ALL'); setTargetId(''); }}>
+                <button type="button" className={`comm-tab ${targetType === 'ALL' ? 'active' : ''}`} onClick={() => setTargetType('ALL')}>
                   Toute l&apos;association
                 </button>
-                <button type="button" className={`comm-tab ${targetType === 'ANTENNA' ? 'active' : ''}`} onClick={() => { setTargetType('ANTENNA'); setTargetId(''); }}>
-                  Une antenne
+                <button type="button" className={`comm-tab ${targetType === 'ANTENNA' ? 'active' : ''}`} onClick={() => setTargetType('ANTENNA')}>
+                  Antennes
                 </button>
-                <button type="button" className={`comm-tab ${targetType === 'MEMBER' ? 'active' : ''}`} onClick={() => { setTargetType('MEMBER'); setTargetId(''); }}>
-                  Un membre
+                <button type="button" className={`comm-tab ${targetType === 'MEMBER' ? 'active' : ''}`} onClick={() => setTargetType('MEMBER')}>
+                  Membres
                 </button>
               </div>
             </div>
 
+            {/* VUE: ANTENNES */}
             {targetType === 'ANTENNA' && (
               <div className="comm-field-group" style={{ animation: 'commin 0.3s forwards' }}>
-                <label className="comm-label">Sélectionner l&apos;antenne</label>
-                <select className="comm-select" value={targetId} onChange={e => setTargetId(e.target.value)} required>
-                  <option value="">-- Choisir une antenne --</option>
-                  {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
+                <label className="comm-label">
+                  <span>Sélectionner les antennes ciblées</span>
+                  <button type="button" className="comm-select-all" onClick={handleSelectAllAntennas}>
+                    {selectedAntennaIds.length === antennas.length ? 'Tout décocher' : 'Tout cocher'}
+                  </button>
+                </label>
+                <div className="comm-grid">
+                  {antennas.map(a => (
+                    <div key={a.id} className={`comm-card ${selectedAntennaIds.includes(a.id) ? 'active' : ''}`} onClick={() => handleToggleAntenna(a.id)}>
+                      <div className="comm-chk">
+                        {selectedAntennaIds.includes(a.id) && <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                      </div>
+                      <div style={{ fontSize: '.84rem', fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {a.name}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
+            {/* VUE: MEMBRES */}
             {targetType === 'MEMBER' && (
               <div className="comm-field-group" style={{ animation: 'commin 0.3s forwards' }}>
-                <label className="comm-label">ID du Membre (Temporaire pour test)</label>
-                <input 
-                  type="text" 
-                  className="comm-input" 
-                  placeholder="Collez l'ID du membre ici..." 
-                  value={targetId} 
-                  onChange={e => setTargetId(e.target.value)} 
-                  required 
-                />
+                
+                {/* 1. Filtre par antenne */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                   <label className="comm-label" style={{ textTransform: 'none', letterSpacing: '0', color: '#6B7280' }}>1. Filtrer par antenne (Optionnel)</label>
+                   <select 
+                     className="comm-select" 
+                     value={selectedAntennaFilter} 
+                     onChange={e => setSelectedAntennaFilter(e.target.value)}
+                   >
+                     <option value="">Toutes les antennes</option>
+                     {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                   </select>
+                </div>
+
+                {/* 2. Liste des membres */}
+                <label className="comm-label">
+                  <span>2. Sélectionner les membres</span>
+                  <button type="button" className="comm-select-all" onClick={handleSelectAllMembers} disabled={loadingMembers || members.length === 0}>
+                    {selectedMemberIds.length === members.length && members.length > 0 ? 'Tout décocher' : 'Tout cocher'}
+                  </button>
+                </label>
+
+                {loadingMembers ? (
+                   <span style={{ fontSize: '.8rem', color: '#6B7280' }}>Chargement de la liste...</span>
+                ) : members.length === 0 ? (
+                   <span style={{ fontSize: '.8rem', color: '#6B7280' }}>Aucun membre trouvé pour cette sélection.</span>
+                ) : (
+                  <div className="comm-grid">
+                    {members.map(m => (
+                      <div key={m.id} className={`comm-card ${selectedMemberIds.includes(m.id) ? 'active' : ''}`} onClick={() => handleToggleMember(m.id)}>
+                        <div className="comm-chk">
+                           {selectedMemberIds.includes(m.id) && <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                        </div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '.82rem', fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {m.firstName} {m.lastName}
+                          </div>
+                          <div style={{ fontSize: '.7rem', color: '#6B7280', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {m.email}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {/* CANAUX */}
             <div className="comm-field-group" style={{ marginTop: '2rem' }}>
-              <label className="comm-label">2. Canaux de diffusion</label>
+              <label className="comm-label" style={{ marginBottom: '.8rem' }}>2. Canaux de diffusion</label>
               <div className="comm-channels">
                 <div className={`comm-channel ${channels.inApp ? 'active' : ''}`} onClick={() => toggleChannel('inApp')}>
                   <input type="checkbox" checked={channels.inApp} readOnly style={{ accentColor: '#DC2626' }}/>
@@ -235,7 +354,7 @@ export default function SuperAdminCommunicationPage() {
 
             {/* MESSAGE */}
             <div className="comm-field-group" style={{ marginTop: '2rem' }}>
-              <label className="comm-label">3. Rédiger le message</label>
+              <label className="comm-label" style={{ marginBottom: '.8rem' }}>3. Rédiger le message</label>
               <input 
                 type="text" 
                 className="comm-input" 
@@ -257,7 +376,7 @@ export default function SuperAdminCommunicationPage() {
           </div>
 
           <div className="comm-footer">
-            <div>
+            <div style={{ flex: 1 }}>
               {msg?.type === 'success' && (
                 <div className="comm-msg-success">
                   <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>

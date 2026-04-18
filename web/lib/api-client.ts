@@ -297,8 +297,7 @@ export const api = {
             });
           if (!retryRes.ok) {
             const err = await retryRes.json().catch(() => ({})) as { message?: string };
-            throw new Error(err.message ?? 'Erreur lors du téléchargement de la photo.');
-          }
+            throw new Error(err.message ?? 'Erreur lors du téléchargement de la photo.');          }
           return retryRes.json();
         } else {
           clearAuthState();
@@ -361,6 +360,7 @@ export const api = {
   sendCustomCommunication: (body: {
     targetType: 'ALL' | 'ANTENNA' | 'MEMBER';
     targetId?: string;
+    targetIds?: string[]; // 🔥 AJOUT CHIRURGICAL : Prise en charge des cibles multiples
     channels: { inApp: boolean; push: boolean; email: boolean; sms: boolean };
     title: string;
     message: string;

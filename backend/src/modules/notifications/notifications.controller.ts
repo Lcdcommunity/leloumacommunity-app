@@ -1,40 +1,32 @@
-// backend/src/modules/notifications/notifications.controller.ts
-import { Controller, Get, Param, Patch, Post, Query, UseGuards, Body } from '@nestjs/common';
+////// backend/src/modules/notifications/notifications.controller.ts
+import { Controller, Get, Param, Patch, Post, Query, UseGuards, Body, ForbiddenException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { PushService } from './push.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { NotificationsQueryDto } from './dto/notifications-query.dto';
-import { NotificationType } from '@prisma/client';
+import { NotificationType, UserRole } from '@prisma/client';
 
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(
     private readonly service: NotificationsService,
-    private readonly pushService: PushService, // 🔥 Ajouté pour le test d'envoi direct
+    private readonly pushService: PushService, 
   ) {}
 
   @Get()
   listMine(@CurrentUser() user: AuthUser, @Query() query: NotificationsQueryDto) {
-    // 🔒 Injection chirurgicale de l'associationId pour le filtrage
     return this.service.listMyNotifications(user.id, user.associationId, query);
   }
 
   @Patch(':id/read')
   markRead(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    // 🔒 Injection chirurgicale de l'associationId pour la sécurité
     return this.service.markAsRead(user.id, user.associationId, id);
   }
 
-  /**
-   * 🔥 ROUTE DE TEST : Permet de déclencher manuellement tes exemples de notifications Push.
-   * Note : En production, ces extraits de code iront dans tes services métiers 
-   * (ex: ContributionsService, MembersService, etc.).
-   */
   @Post('test-push')
   async testPushNotifications(@CurrentUser() user: AuthUser) {
-    // 1. Notification simple à un utilisateur
     await this.service.createForUserWithPush({
       associationId: user.associationId,
       userId: user.id,
@@ -42,102 +34,108 @@ export class NotificationsController {
       type: NotificationType.CONTRIBUTION_VALIDATED,
       title: 'Cotisation validée',
       pushTitle: '✅ Cotisation validée',
-      pushBody: 'Votre paiement de 50€ a été confirmé',
+      pushBody: 'Votre paiement a été confirmé',
     });
-
-    // 2. Notification push directe (sans créer de notification en base)
-    await this.pushService.sendToUser(user.id, user.associationId, {
-      title: 'Rappel',
-      body: 'Votre cotisation est en retard',
-      tag: 'reminder-cotisation',
-      requireInteraction: true,
-      actions: [
-        { action: 'pay', title: 'Payer maintenant' },
-        { action: 'dismiss', title: 'Ignorer' },
-      ],
-    });
-
-    // 3. Notification aux admins d'antenne (Commenté car nécessite un vrai antennaId)
-    /*
-    await this.service.notifyAntennaAdminsWithPush(
-      'ID_DE_L_ANTENNE_ICI',
-      user.associationId,
-      'Nouveau membre en attente de validation',
-      NotificationType.ACCOUNT_APPROVED, // Ajusté selon ton schéma Prisma
-      { memberId: user.id },
-      'Nouveau membre',
-    );
-    */
 
     return { message: 'Tests de notifications push envoyés avec succès !' };
   }
 
   /**
-   * 🔥 AJOUT CHIRURGICAL : Route pour le centre de diffusion (Super Admin / Admin Antenne)
+   * 🔥 AJOUT CHIRURGICAL : Route de diffusion gérant les sélections multiples (targetIds)
    */
   @Post('dispatch')
   async dispatchCustomCommunication(
     @CurrentUser() user: AuthUser,
     @Body() body: {
       targetType: 'ALL' | 'ANTENNA' | 'MEMBER';
-      targetId?: string;
+      targetId?: string; // Gardé pour compatibilité ascendante
+      targetIds?: string[]; // NOUVEAU: Pour la sélection de multiples membres
       channels: { inApp: boolean; push: boolean; email: boolean; sms: boolean };
       title: string;
       message: string;
     }
   ) {
     let targetUsers: { id: string }[] = [];
-
-    // Astuce chirurgicale : on récupère l'instance Prisma depuis le service existant
-    // pour éviter de modifier le constructeur du contrôleur et casser tes tests éventuels.
     const prisma = (this.service as any).prisma;
 
-    // 1. Déterminer les destinataires selon la cible choisie
-    if (body.targetType === 'ALL') {
+    // --- LOGIQUE DE SÉCURITÉ POUR L'ADMIN D'ANTENNE ---
+    let allowedAntennaIds: string[] = [];
+    if (user.role === UserRole.ANTENNA_ADMIN) {
+      const assignments = await prisma.antennaAdminAssignment.findMany({
+        where: { adminUserId: user.id, isActive: true },
+        select: { antennaId: true }
+      });
+      allowedAntennaIds = assignments.map(a => a.antennaId);
+      
+      if (allowedAntennaIds.length === 0) {
+        throw new ForbiddenException("Vous n'avez aucune antenne active assignée.");
+      }
+
+      // Si l'admin d'antenne choisit "ALL", on restreint silencieusement à SES antennes
+      if (body.targetType === 'ALL') {
+        body.targetType = 'ANTENNA';
+        body.targetId = allowedAntennaIds[0]; // On prend la première par défaut ou on gère ça plus bas
+      }
+    }
+
+    // --- RECHERCHE DES CIBLES ---
+    if (body.targetType === 'ALL' && user.role === UserRole.SUPER_ADMIN) {
+      // Super Admin: Toute l'asso
       targetUsers = await prisma.user.findMany({
         where: { associationId: user.associationId, status: 'ACTIVE' },
         select: { id: true }
       });
-    } else if (body.targetType === 'ANTENNA' && body.targetId) {
+    } 
+    else if (body.targetType === 'ANTENNA') {
+      // Filtrage par Antenne
+      const searchAntennaIds = user.role === UserRole.ANTENNA_ADMIN 
+        ? allowedAntennaIds // Si admin antenne, il cible forcément ses propres antennes
+        : [body.targetId]; // Si super admin, l'antenne qu'il a choisie
+
       targetUsers = await prisma.user.findMany({
         where: { 
           associationId: user.associationId, 
           status: 'ACTIVE',
-          memberships: { some: { antennaId: body.targetId } }
+          memberships: { some: { antennaId: { in: searchAntennaIds as string[] } } }
         },
         select: { id: true }
       });
-    } else if (body.targetType === 'MEMBER' && body.targetId) {
-      targetUsers = [{ id: body.targetId }];
+    } 
+    else if (body.targetType === 'MEMBER') {
+      // Filtrage par Membres Spécifiques (Tableau de IDs)
+      const idsToSearch = body.targetIds && body.targetIds.length > 0 
+        ? body.targetIds 
+        : (body.targetId ? [body.targetId] : []);
+
+      targetUsers = await prisma.user.findMany({
+        where: { 
+          id: { in: idsToSearch },
+          associationId: user.associationId,
+          // Si c'est un Admin d'Antenne, on vérifie que ces membres sont bien dans son/ses antennes
+          ...(user.role === UserRole.ANTENNA_ADMIN ? {
+            memberships: { some: { antennaId: { in: allowedAntennaIds } } }
+          } : {})
+        },
+        select: { id: true }
+      });
     }
 
     if (targetUsers.length === 0) {
-      return { message: "Aucun membre trouvé pour cette cible." };
+      return { message: "Aucun membre valide trouvé pour cette cible (ou droits insuffisants)." };
     }
 
-    // 2. Propulser les messages en parallèle (Fire & Forget sécurisé)
+    // --- ENVOI DES NOTIFICATIONS ---
     const promises = targetUsers.map(async (targetUser) => {
-      // In-App (Base de données) + Push
       if (body.channels.inApp || body.channels.push) {
         await this.service.createForUserWithPush({
           associationId: user.associationId,
           userId: targetUser.id,
-          type: NotificationType.SYSTEM_ALERT, // Type générique pour les annonces globales
+          type: NotificationType.SYSTEM_ALERT, 
           title: body.title,
           message: body.message,
           pushTitle: body.channels.push ? body.title : undefined,
           pushBody: body.channels.push ? body.message : undefined,
         }).catch((e: any) => console.error(`Erreur Push pour ${targetUser.id}`, e));
-      }
-
-      // Email (À brancher avec ton MailService)
-      if (body.channels.email) {
-        // await this.mailService.sendCustomEmail(targetUser.email, body.title, body.message);
-      }
-
-      // SMS (À brancher avec ton fournisseur SMS)
-      if (body.channels.sms) {
-        // await ce service...
       }
     });
 
