@@ -41,6 +41,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { AssociationsModule } from './modules/associations/associations.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { UsersModule } from './modules/users/users.module';
+import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ AJOUT CHIRURGICAL
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { UsersModule } from './modules/users/users.module';
     AssociationsModule,
     AdminModule,
     UsersModule,
+    ElectionsModule, // ⚡ AJOUT CHIRURGICAL
   ],
   controllers: [], 
   providers: [

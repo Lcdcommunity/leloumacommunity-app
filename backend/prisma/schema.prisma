@@ -1,4 +1,4 @@
-/////// prisma/schema.prisma
+///////////// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -347,6 +347,14 @@ enum DashboardTarget {
   SUPER_ADMINS
 }
 
+// ⚡ AJOUT CHIRURGICAL : Statuts d'élection
+enum ElectionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  ARCHIVED
+}
+
 /// =========================
 /// CORE STRUCTURE
 /// =========================
@@ -414,6 +422,9 @@ model Association {
   videoPosts                       VideoPost[]
   carouselImages                   CarouselImage[]
   pricings                         Pricing[] 
+  
+  // ⚡ AJOUT CHIRURGICAL
+  elections                        Election[]
 
   @@index([isActive])
   @@map("associations")
@@ -480,7 +491,7 @@ model Antenna {
 
 model User {
   id                             String       @id @default(cuid())
-  associationId                  String?      
+  associationId                  String?    
   email                          String       @unique
   emailVerifiedAt                DateTime?
   passwordHash                   String
@@ -618,6 +629,10 @@ model User {
 
   videoPostsCreated              VideoPost[]     @relation("VideoCreatedBy")
   carouselImagesCreated          CarouselImage[] @relation("CarouselCreatedBy")
+
+  // ⚡ AJOUT CHIRURGICAL
+  electionCandidates             ElectionCandidate[]
+  electionVotes                  ElectionVote[]
 
   @@index([associationId, role, status])
   @@index([associationId, lastName, firstName])
@@ -1526,18 +1541,18 @@ model Notification {
 }
 
 model NotificationRecipient {
-  id             String                     @id @default(cuid())
-  notificationId String
-  userId         String
-  channel        NotificationChannel        @default(IN_APP)
-  deliveryStatus NotificationDeliveryStatus @default(PENDING)
-  sentAt         DateTime?
-  failedAt       DateTime?
-  failureReason  String?
-  readAt         DateTime?
+  id               String                     @id @default(cuid())
+  notificationId   String
+  userId           String
+  channel          NotificationChannel        @default(IN_APP)
+  deliveryStatus   NotificationDeliveryStatus @default(PENDING)
+  sentAt           DateTime?
+  failedAt         DateTime?
+  failureReason    String?
+  readAt           DateTime?
 
-  notification   Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
-  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification     Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([notificationId, userId, channel])
   @@index([userId, channel, deliveryStatus, readAt])
@@ -1682,7 +1697,7 @@ model AuditLog {
   action        AuditAction 
   entity        String   
   entityId      String?
-  details       Json     
+  details       Json      
   ipAddress     String?
   userAgent     String?
   createdAt     DateTime     @default(now())
@@ -1767,6 +1782,72 @@ model Pricing {
   @@unique([associationId, currency])
   @@index([associationId])
   @@map("pricings")
+}
+
+/// =========================
+/// ÉLECTIONS (AJOUT CHIRURGICAL)
+/// =========================
+
+model Election {
+  id            String             @id @default(cuid())
+  associationId String
+  title         String             
+  description   String?            @db.Text
+  status        ElectionStatus     @default(DRAFT)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  
+  association   Association        @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  positions     ElectionPosition[]
+  
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@map("elections")
+}
+
+model ElectionPosition {
+  id          String              @id @default(cuid())
+  electionId  String
+  title       String              
+  order       Int                 @default(0) 
+  
+  election    Election            @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  candidates  ElectionCandidate[]
+  votes       ElectionVote[]
+
+  @@map("election_positions")
+}
+
+model ElectionCandidate {
+  id         String           @id @default(cuid())
+  positionId String
+  userId     String           
+  bio        String?          @db.Text
+  photoUrl   String?          
+
+  position   ElectionPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  user       User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  votes      ElectionVote[]
+
+  @@unique([positionId, userId]) 
+  @@map("election_candidates")
+}
+
+model ElectionVote {
+  id          String            @id @default(cuid())
+  positionId  String
+  candidateId String
+  voterUserId String
+  castAt      DateTime          @default(now())
+
+  position    ElectionPosition  @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  candidate   ElectionCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  voter       User              @relation(fields: [voterUserId], references: [id], onDelete: Restrict)
+
+  // Le verrou de sécurité absolu
+  @@unique([positionId, voterUserId]) 
+  @@map("election_votes")
 }
 //npx prisma generate
 //npx prisma db push

@@ -12,6 +12,7 @@ import type { Antenna } from '../types/antenna';
 import type { AuditItem } from '../types/audit';
 import type { Association } from '../types/association';
 import type { AntennaDashboardStats, ProjectionResult } from '../types/stats';
+import type { Election, PositionResult, ElectionPosition, ElectionCandidate } from '../types/election';
 
 import { http } from './http';
 import { getAccessToken, getRefreshToken, setTokens, clearAuthState } from './auth-store';
@@ -30,7 +31,7 @@ export interface VirtualCardData {
     firstName: string;
     lastName: string;
     function?: string | null;
-    professionalStatus?: string | null; // ⚡ AJOUT CHIRURGICAL ICI
+    professionalStatus?: string | null; 
     birthDate?: string | null;
     placeOfBirth?: string | null;
     birthCountry?: string | null;
@@ -60,7 +61,7 @@ export interface FullUserProfile extends UserSummary {
   originSubPrefecture?: string | null;
   originVillage?: string | null;
   function?: string | null;
-  professionalStatus?: string | null; // ⚡ SÉCURITÉ TYPAGE
+  professionalStatus?: string | null; 
   cardNumber?: string | null;
   isCardLocked?: boolean;
   cardExpiresAt?: string | null;
@@ -126,7 +127,6 @@ export interface EventItem {
   isOnline: boolean;
   meetingLink?: string | null;
   createdAt: string;
-  // Ajout chirurgical: Permet d'afficher les antennes ciblées (utile pour le Super-Admin)
   antennas?: Array<{ id: string; name: string; code: string }>;
   _count?: {
     attendances?: number;
@@ -217,12 +217,11 @@ export const api = {
       },
     }),
 
-  // ⚡ MODIFICATION CHIRURGICALE : Remplacement par fetch natif pour gérer le FormData
   memberSignup: async (formData: FormData): Promise<{ id: string; message: string }> => {
     const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
     const res = await fetch(`${baseUrl}/public/signup`, {
       method: 'POST',
-      body: formData, // Laisse le navigateur gérer automatiquement le Content-Type: multipart/form-data
+      body: formData, 
     });
 
     if (!res.ok) {
@@ -318,7 +317,6 @@ export const api = {
     return api.uploadAvatar(form);
   },
 
-  // Récupération des préférences utilisateur
   getMemberPreferences: () =>
     http<{
       emailNotifications: boolean;
@@ -328,7 +326,6 @@ export const api = {
       theme: string;
     }>('/member/preferences'),
 
-  // Mise à jour des préférences utilisateur
   updateMemberPreferences: async (body: {
     emailNotifications?: boolean;
     smsNotifications?: boolean;
@@ -336,18 +333,15 @@ export const api = {
     language?: 'fr' | 'en' | 'es' | 'pt' | 'ar' | 'ff' | string;
     theme?: 'light' | 'dark' | 'system' | string;
   }) => {
-    // 🌍 Mise à jour du cookie pour i18next (nécessaire pour le Middleware & SSR)
     if (body.language) {
       document.cookie = `i18next=${body.language}; path=/; max-age=31536000; SameSite=Lax`;
     }
     return http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body });
   },
 
-  // Enregistrement de l'abonnement Push (Notifications navigateur)
   subscribeToPushNotifications: (subscription: PushSubscriptionPayload) =>
     http<{ message: string }, PushSubscriptionPayload>('/member/push-subscription', { method: 'POST', body: subscription }),
 
-  // Désinscription des notifications Push
   unsubscribePushNotifications: (endpoint: string) =>
     http<{ message: string }, { endpoint: string }>('/member/push-subscription', {
       method: 'DELETE',
@@ -360,7 +354,7 @@ export const api = {
   sendCustomCommunication: (body: {
     targetType: 'ALL' | 'ANTENNA' | 'MEMBER';
     targetId?: string;
-    targetIds?: string[]; // 🔥 AJOUT CHIRURGICAL : Prise en charge des cibles multiples
+    targetIds?: string[]; 
     channels: { inApp: boolean; push: boolean; email: boolean; sms: boolean };
     title: string;
     message: string;
@@ -369,6 +363,126 @@ export const api = {
       method: 'POST',
       body,
     }),
+
+// ==========================================
+// ÉLECTIONS
+// ==========================================
+
+getActiveElection: async () => {
+  try {
+    return await http<Election | null>('/elections/active');
+  } catch (err) {
+    console.error('getActiveElection error:', err);
+    return null; // ⚡ évite le crash du frontend
+  }
+},
+
+castVote: async (body: { positionId: string; candidateId: string }) => {
+  return http<{ id: string }, typeof body>('/elections/vote', {
+    method: 'POST',
+    body,
+  });
+},
+
+getElectionLiveResults: async (electionId: string) => {
+  return http<PositionResult[]>(`/elections/${electionId}/live-results`);
+},
+
+listElectionsSuperAdmin: async () => {
+  return http<Election[]>('/super-admin/elections');
+},
+
+createElection: async (body: {
+  title: string;
+  description?: string;
+  startsAt?: string;
+  endsAt?: string;
+}) => {
+  return http<Election, typeof body>('/super-admin/elections', {
+    method: 'POST',
+    body,
+  });
+},
+
+updateElectionStatus: async (
+  id: string,
+  status: 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED'
+) => {
+  return http<Election, { status: string }>(
+    `/super-admin/elections/${id}/status`,
+    {
+      method: 'PATCH',
+      body: { status },
+    }
+  );
+},
+
+deleteElectionSuperAdmin: async (id: string) => {
+  return http<void>(`/super-admin/elections/${id}`, {
+    method: 'DELETE',
+  });
+},
+
+addElectionPosition: async (
+  electionId: string,
+  body: { title: string; order: number }
+) => {
+  return http<ElectionPosition, typeof body>(
+    `/super-admin/elections/${electionId}/positions`,
+    {
+      method: 'POST',
+      body,
+    }
+  );
+},
+
+updateElectionPosition: async (
+  positionId: string,
+  body: { title: string }
+) => {
+  return http<ElectionPosition, typeof body>(
+    `/super-admin/elections/positions/${positionId}`,
+    {
+      method: 'PATCH',
+      body,
+    }
+  );
+},
+
+deleteElectionPosition: async (positionId: string) => {
+  return http<void>(
+    `/super-admin/elections/positions/${positionId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+},
+
+addElectionCandidate: async (
+  positionId: string,
+  body: { userId: string; bio?: string }
+) => {
+  return http<ElectionCandidate, typeof body>(
+    `/super-admin/elections/positions/${positionId}/candidates`,
+    {
+      method: 'POST',
+      body,
+    }
+  );
+},
+
+deleteElectionCandidate: async (candidateId: string) => {
+  return http<void>(
+    `/super-admin/elections/candidates/${candidateId}`,
+    {
+      method: 'DELETE',
+    }
+  );
+},
+
+listElectionsAdmin: async () => {
+  return http<Election[]>('/admin/elections');
+},
 
   // ==========================================
   // TARIFICATION & SAAS 
@@ -580,9 +694,7 @@ export const api = {
     addressLine2?: string;
     postalCode?: string;
   }) =>
-    http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),
-
-  updateAntennaMember: (id: string, body: Partial<{
+    http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),  updateAntennaMember: (id: string, body: Partial<{
     firstName: string;
     lastName: string;
     phone: string;
@@ -843,7 +955,6 @@ export const api = {
   }) =>
     http<ProjectProposal, typeof body>('/member/project-proposals', { method: 'POST', body }),
 
-  // 🔥 AJOUT CHIRURGICAL : Update de la proposition
   updateProjectProposalMember: (id: string, body: Partial<{
     title: string;
     description: string;
@@ -853,7 +964,6 @@ export const api = {
   }>) =>
     http<ProjectProposal, typeof body>(`/member/project-proposals/${id}`, { method: 'PATCH', body }),
 
-  // 🔥 AJOUT CHIRURGICAL : Suppression de la proposition
   deleteProjectProposalMember: (id: string) =>
     http(`/member/project-proposals/${id}`, { method: 'DELETE' }),
 
@@ -869,7 +979,7 @@ export const api = {
       `/admin/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
-    ),
+    ),  
 
   approveProjectProposal: (id: string, body?: { reviewComment?: string }) =>
     http<ProjectProposal, { reviewComment?: string }>(`/admin/project-proposals/${id}/approve`, {

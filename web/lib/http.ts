@@ -1,4 +1,4 @@
-//web/lib/http.ts
+// web/lib/http.ts
 import { env } from './env';
 import {
   getAccessToken,
@@ -19,10 +19,6 @@ export interface RequestOptions<TBody = unknown> {
   retryOn401?: boolean;
 }
 
-/**
- * Retourne l'URL de base de l'API.
- * En production, on échoue proprement si NEXT_PUBLIC_API_URL est absente.
- */
 function getBaseUrl(): string {
   const url = env.apiUrl?.trim();
 
@@ -36,13 +32,12 @@ function getBaseUrl(): string {
 async function parseJsonSafe(res: Response): Promise<unknown> {
   const text = await res.text();
 
-  if (!text) {
-    return null;
-  }
+  if (!text) return null;
 
   try {
-    return JSON.parse(text) as unknown;
+    return JSON.parse(text);
   } catch {
+    console.error('Réponse non JSON:', text);
     return text;
   }
 }
@@ -50,9 +45,7 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
 async function refreshTokenRequest(): Promise<boolean> {
   const refreshToken = getRefreshToken();
 
-  if (!refreshToken) {
-    return false;
-  }
+  if (!refreshToken) return false;
 
   const baseUrl = getBaseUrl();
 
@@ -106,7 +99,6 @@ export async function http<TResponse, TBody = unknown>(
 
   if (useAuth) {
     const accessToken = getAccessToken();
-
     if (accessToken) {
       headers.Authorization = `Bearer ${accessToken}`;
     }
@@ -118,6 +110,7 @@ export async function http<TResponse, TBody = unknown>(
     body,
   });
 
+  // 🔁 Retry automatique si 401
   if (res.status === 401 && useAuth && retryOn401) {
     const refreshed = await refreshTokenRequest();
 
@@ -129,6 +122,7 @@ export async function http<TResponse, TBody = unknown>(
     }
   }
 
+  // ❌ Gestion erreurs
   if (!res.ok) {
     const payload = (await parseJsonSafe(res)) as ApiErrorPayload | string | null;
 
@@ -136,15 +130,19 @@ export async function http<TResponse, TBody = unknown>(
       typeof payload === 'string'
         ? payload
         : Array.isArray(payload?.message)
-          ? payload.message.join(', ')
-          : payload?.message || `Erreur HTTP ${res.status}`;
+        ? payload.message.join(', ')
+        : payload?.message || `Erreur HTTP ${res.status}`;
 
     throw new Error(message);
   }
 
+  // ✅ No content
   if (res.status === 204) {
     return undefined as TResponse;
   }
 
-  return (await res.json()) as TResponse;
+  // ✅ FIX CRITIQUE : parse sécurisé
+  const data = await parseJsonSafe(res);
+
+  return data as TResponse;
 }

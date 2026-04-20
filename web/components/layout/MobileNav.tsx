@@ -7,7 +7,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { api } from '../../lib/api-client';
 import type { UserRole } from '../../types/user';
 
-/* ─── Icône SVG universelle ─── */
 function Ico({ d, size = 20 }: { d: string | string[]; size?: number }) {
   const paths = Array.isArray(d) ? d : [d];
   return (
@@ -26,7 +25,6 @@ function Ico({ d, size = 20 }: { d: string | string[]; size?: number }) {
   );
 }
 
-/* ─── Icônes Lucide modernes ─── */
 const ICO = {
   home:        ['M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z', 'M9 22V12h6v10'],
   pin:         ['M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z', 'M12 13a3 3 0 100-6 3 3 0 000 6z'],
@@ -52,6 +50,7 @@ const ICO = {
   auditLog:    ['M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2', 'M9 5a2 2 0 012-2h2a2 2 0 012 2', 'M10 12h4', 'M10 16h2'],
   history:     ['M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8', 'M3 3v5h5', 'M12 7v5l4 2'],
   close:       ['M18 6L6 18M6 6l12 12'],
+  vote:        ['M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'], // ⚡ ICÔNE ÉLECTIONS
 };
 
 type NavItem = { href: string; label: string; ico: string | string[]; section?: string };
@@ -73,6 +72,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/contributions',   label: 'Cotisations',            ico: ICO.coin,        section: 'Gestion'   },
   { href: '/super-admin/expenses',        label: 'Dépenses',               ico: ICO.creditCard,  section: 'Gestion'   },
   { href: '/super-admin/projects',        label: 'Projets',                ico: ICO.clipboard,   section: 'Gestion'   },
+  { href: '/super-admin/elections',       label: 'Élections',              ico: ICO.vote,        section: 'Gestion'   }, // ⚡ AJOUT ÉLECTIONS
   { href: '/super-admin/events',          label: 'Événements',             ico: ICO.calendar,    section: 'Gestion'   },
   { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,        section: 'Gestion'   },
   { href: '/super-admin/documents',       label: 'Documents',              ico: ICO.fileText,    section: 'Gestion'   },
@@ -93,6 +93,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/expenses',              label: 'Dépenses',               ico: ICO.creditCard,  section: 'Finances'  },
   { href: '/admin/projections',           label: 'Projections',            ico: ICO.chartBar,    section: 'Finances'  },
   { href: '/admin/projects',              label: 'Projets',                ico: ICO.clipboard,   section: 'Contenu'   },
+  { href: '/admin/elections',             label: 'Élections',              ico: ICO.vote,        section: 'Contenu'   }, // ⚡ AJOUT ÉLECTIONS
   { href: '/admin/events',                label: 'Événements',             ico: ICO.calendar,    section: 'Contenu'   },
   { href: '/admin/documents',             label: 'Documents & photos',     ico: ICO.fileText,    section: 'Contenu'   },
   { href: '/admin/contents',              label: 'Informations',           ico: ICO.newspaper,   section: 'Contenu'   },
@@ -111,6 +112,7 @@ const memberItems: NavItem[] = [
   { href: '/member/expenses',              label: 'Dépenses',               ico: ICO.creditCard, section: 'Principal'  },
   { href: '/member/projects',              label: 'Projets',                ico: ICO.clipboard,  section: 'Communauté' },
   { href: '/member/projects/propose',      label: 'Proposer un projet',     ico: ICO.penLine,    section: 'Communauté' },
+  { href: '/member/elections',             label: 'Espace Élections',       ico: ICO.vote,       section: 'Communauté' }, // ⚡ AJOUT ÉLECTIONS
   { href: '/member/events',                label: 'Événements',             ico: ICO.calendar,   section: 'Communauté' },
   { href: '/member/documents',             label: 'Documents & photos',     ico: ICO.fileText,   section: 'Communauté' },
   { href: '/member/contents',              label: 'Informations',           ico: ICO.newspaper,  section: 'Communauté' },
@@ -157,10 +159,10 @@ type RoleColorEntry = {
 };
 
 const ROLE_COLORS: Record<string, RoleColorEntry> = {
-  SYSTEM_ADMIN:  { accent: '#8B5CF6', dim: 'rgba(139,92,246,0.15)',  pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef',   shadow: 'rgba(139,92,246,0.4)'  },
-  SUPER_ADMIN:   { accent: '#EF4444', dim: 'rgba(239,68,68,0.15)',   pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin',  shadow: 'rgba(239,68,68,0.4)'   },
+  SYSTEM_ADMIN:  { accent: '#8B5CF6', dim: 'rgba(139,92,246,0.15)',  pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef',  shadow: 'rgba(139,92,246,0.4)'  },
+  SUPER_ADMIN:   { accent: '#EF4444', dim: 'rgba(239,68,68,0.15)',   pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin', shadow: 'rgba(239,68,68,0.4)'   },
   ANTENNA_ADMIN: { accent: '#3B82F6', dim: 'rgba(59,130,246,0.15)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne',shadow: 'rgba(59,130,246,0.4)'  },
-  MEMBER:        { accent: '#10B981', dim: 'rgba(16,185,129,0.15)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre',       shadow: 'rgba(16,185,129,0.4)'  },
+  MEMBER:        { accent: '#10B981', dim: 'rgba(16,185,129,0.15)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre',      shadow: 'rgba(16,185,129,0.4)'  },
 };
 
 export function MobileNav() {
@@ -173,19 +175,16 @@ export function MobileNav() {
   const [prevPath, setPrevPath]         = useState(pathname);
   const [unreadCount, setUnreadCount]   = useState(0);
 
-  /* Fermer le drawer sur navigation */
   if (pathname !== prevPath) {
     setPrevPath(pathname);
     setOpen(false);
   }
 
-  /* Scroll lock */
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [open]);
 
-  /* Chargement du rôle / association */
   useEffect(() => {
     let mounted = true;
     void (async () => {
@@ -206,7 +205,6 @@ export function MobileNav() {
     return () => { mounted = false; };
   }, []);
 
-  /* Compteur de notifications non lues */
   useEffect(() => {
     let mounted = true;
     void (async () => {
@@ -272,9 +270,6 @@ export function MobileNav() {
           .mn-safe-area, .mn-container, .mn-overlay, .mn-drawer { display: none !important; }
         }
 
-        /* ════ SAFE AREA — pousse le contenu de la page au-dessus de la nav ════ */
-        /* Ajouter cette classe sur le wrapper de contenu principal en mobile :   */
-        /*   <main className="mn-safe-area"> ... </main>                          */
         .mn-safe-area {
           padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
         }

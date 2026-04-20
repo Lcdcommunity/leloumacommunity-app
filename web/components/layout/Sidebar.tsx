@@ -41,7 +41,8 @@ const ICO = {
   user:       'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   calendar:   'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   star:       'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
-  send:       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', // 🔥 AJOUT: Icône de communication
+  send:       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', 
+  vote:       'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', // ⚡ ICÔNE ÉLECTIONS
 };
 
 const systemAdminItems: NavItem[] = [
@@ -55,17 +56,18 @@ const systemAdminItems: NavItem[] = [
 const superAdminItems: NavItem[] = [
   { href: '/super-admin',                 label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
   { href: '/super-admin/antennas',        label: 'Antennes',               icon: <Ico d={ICO.pin} /> },
-  { href: '/super-admin/admins',         label: 'Admins antenne',        icon: <Ico d={ICO.users} /> },
+  { href: '/super-admin/admins',          label: 'Admins antenne',         icon: <Ico d={ICO.users} /> },
   { href: '/super-admin/members',         label: 'Membres',                icon: <Ico d={ICO.group} /> },
   { href: '/super-admin/approvals',       label: 'Validations comptes',    icon: <Ico d={ICO.check} /> },
   { href: '/super-admin/contributions',   label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
   { href: '/super-admin/expenses',        label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
   { href: '/super-admin/projects',        label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/super-admin/elections',       label: 'Élections',              icon: <Ico d={ICO.vote} /> }, // ⚡ AJOUT ÉLECTIONS
   { href: '/super-admin/events',          label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
   { href: '/super-admin/sponsors',        label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
   { href: '/super-admin/documents',       label: 'Documents',              icon: <Ico d={ICO.doc} /> },
   { href: '/super-admin/contents',        label: 'Informations',           icon: <Ico d={ICO.news} /> },
-  { href: '/super-admin/communication',   label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> }, // 🔥 AJOUT CHIRURGICAL
+  { href: '/super-admin/communication',   label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> },
   { href: '/super-admin/notifications',   label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
   { href: '/super-admin/audit',           label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
   { href: '/super-admin/profile',         label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
@@ -79,13 +81,14 @@ const adminItems: NavItem[] = [
   { href: '/admin/contributions',         label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
   { href: '/admin/contributions/history', label: 'Historique cotisations', icon: <Ico d={ICO.history} /> },
   { href: '/admin/expenses',              label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
+  { href: '/admin/projections',           label: 'Projections',            icon: <Ico d={ICO.chart} /> },
   { href: '/admin/projects',              label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/admin/elections',             label: 'Élections',              icon: <Ico d={ICO.vote} /> }, // ⚡ AJOUT ÉLECTIONS
   { href: '/admin/events',                label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
   { href: '/admin/documents',             label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
   { href: '/admin/contents',              label: 'Informations',           icon: <Ico d={ICO.news} /> },
   { href: '/admin/late-members',          label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
-  { href: '/admin/projections',           label: 'Projections',            icon: <Ico d={ICO.chart} /> },
-  { href: '/admin/communication',         label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> }, // 🔥 AJOUT CHIRURGICAL
+  { href: '/admin/communication',         label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> }, 
   { href: '/admin/notifications',         label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
   { href: '/admin/audit',                 label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
   { href: '/admin/profile',               label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
@@ -99,6 +102,7 @@ const memberItems: NavItem[] = [
   { href: '/member/expenses',              label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
   { href: '/member/projects',              label: 'Projets',                icon: <Ico d={ICO.clip} /> },
   { href: '/member/projects/propose',      label: 'Proposer un projet',     icon: <Ico d={ICO.edit} /> },
+  { href: '/member/elections',             label: 'Espace Élections',       icon: <Ico d={ICO.vote} /> }, // ⚡ AJOUT ÉLECTIONS
   { href: '/member/events',                label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
   { href: '/member/documents',             label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
   { href: '/member/contents',              label: 'Informations',           icon: <Ico d={ICO.news} /> },
@@ -143,7 +147,6 @@ export function Sidebar() {
           setAssociation({ name: me.association.name, logoUrl: me.association.logoUrl });
         } else if (me.role !== 'SYSTEM_ADMIN') {
           const currentAssoc = await api.getAssociation();
-          // Utilisation sécurisée : currentAssoc.logoUrl existe maintenant sur le type Association
           setAssociation({ name: currentAssoc.name, logoUrl: currentAssoc.logoUrl });
         }
       } catch { 
@@ -168,7 +171,6 @@ export function Sidebar() {
 
   const colors = ROLE_COLORS[role ?? 'MEMBER'] ?? ROLE_COLORS['MEMBER'];
 
-  // 🔥 FIX CHIRURGICAL : Redirection simple vers /logout pour que le rideau s'affiche, c'est lui qui fera le vrai "logout()"
   function handleLogout() {
     router.push('/logout');
   }
