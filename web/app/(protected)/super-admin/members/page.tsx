@@ -187,7 +187,6 @@ function MemberModal({
   };
 
   const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Convert YYYY-MM-DD input date to ISO string
     const dateVal = e.target.value;
     if (dateVal) {
       handleChange('birthDate', new Date(dateVal).toISOString());
@@ -342,8 +341,10 @@ function MemberModal({
 /* ══════════════════════════════════════════════════════ MAIN PAGE */
 export default function SuperAdminMembersPage() {
   const [items,   setItems]   = useState<ExtendedUser[]>([]);
-  const [q,       setQ]       = useState('');
+  const [antennas, setAntennas] = useState<{ id: string, name: string }[]>([]);
+  const [q,        setQ]       = useState('');
   const [status,  setStatus]  = useState('');
+  const [antennaId, setAntennaId] = useState('');
   const [error,   setError]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -353,22 +354,36 @@ export default function SuperAdminMembersPage() {
   const [actionBusy, setActionBusy] = useState(false);
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  // 💡 Nouvel état pour le texte de confirmation saisi par l'admin
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  const load = useCallback(async (qVal?: string, sVal?: string) => {
+  const load = useCallback(async (qVal?: string, sVal?: string, aId?: string) => {
     setError(null); setLoading(true);
     try {
-      const res = await api.listMembers({ page: 1, pageSize: 100, q: qVal ?? q, status: sVal ?? status });
+      const res = await api.listMembers({ 
+        page: 1, 
+        pageSize: 500, 
+        q: qVal ?? q, 
+        status: sVal ?? status,
+        antennaId: aId ?? antennaId 
+      });
       setItems(res.items);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur chargement membres');
     } finally {
       setLoading(false);
     }
-  }, [q, status]);
+  }, [q, status, antennaId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const resAntennas = await api.listAntennas({ pageSize: 100 });
+        setAntennas(resAntennas.items);
+      } catch (e) { console.error(e); }
+      void load();
+    };
+    void init();
+  }, [load]);
 
   const openDetails = (user: ExtendedUser) => {
     setSelectedUser(user);
@@ -421,7 +436,6 @@ export default function SuperAdminMembersPage() {
     finally { setActionBusy(false); }
   };
 
-  // 💡 On réinitialise le texte de confirmation à chaque ouverture
   const handleDeleteRequest = () => {
     setDeleteConfirmText('');
     setShowDeleteConfirm(true);
@@ -442,6 +456,9 @@ export default function SuperAdminMembersPage() {
     finally { setActionBusy(false); }
   };
 
+  const handleExportPDF = () => alert("Exportation PDF lancée...");
+  const handleExportExcel = () => alert("Exportation Excel lancée...");
+
   const activeCount  = items.filter((u) => u.status === 'ACTIVE').length;
   const pendingCount = items.filter((u) => u.status === 'PENDING_APPROVAL').length;
   const suspCount    = items.filter((u) => u.status === 'SUSPENDED').length;
@@ -451,23 +468,34 @@ export default function SuperAdminMembersPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;700;800&display=swap');
         .sm-wrap { font-family:'DM Sans',sans-serif; padding:1rem; max-width:1200px; margin:0 auto; overflow-x:hidden; }
+        
+        .sm-header-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .sm-export-group { display: flex; gap: .5rem; }
+        .btn-export { height: 36px; padding: 0 1rem; border-radius: 10px; border: none; color: white; font-weight: 800; font-size: .7rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: transform 0.2s; }
+        .btn-export:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        .btn-pdf { background: linear-gradient(135deg, #991B1B, #DC2626); box-shadow: 0 4px 12px rgba(220,38,38,0.2); }
+        .btn-excel { background: linear-gradient(135deg, #059669, #10B981); box-shadow: 0 4px 12px rgba(16,185,129,0.2); }
+
         .sm-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:.5rem; margin-bottom:1rem; }
         @media(max-width:600px){ .sm-stats { grid-template-columns:repeat(2,1fr); } }
         .sm-stat { background:white; border-radius:12px; padding:.75rem; border-top:3px solid; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
         .sm-stat-val { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:700; line-height:1; }
         .sm-stat-lbl { font-size:.6rem; font-weight:800; color:#64748b; text-transform:uppercase; margin-top:2px; }
         .sm-panel { background:white; border-radius:20px; box-shadow:0 4px 20px rgba(0,0,0,0.06); overflow:hidden; }
-        .sm-toolbar { display: grid; grid-template-columns: 1fr 120px 40px; gap: .5rem; padding: 1rem; border-bottom: 1px solid #f1f5f9; align-items: center; }
-        @media(min-width:768px){ .sm-toolbar { grid-template-columns: 1fr 200px 100px; } }
+        
+        .sm-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; padding: 1rem; border-bottom: 1px solid #f1f5f9; align-items: center; }
+        .sm-t-field { flex: 1; min-width: 150px; }
         .sm-input { width:100%; height:38px; border-radius:10px; border:1px solid #e2e8f0; padding:0 .75rem; font-size:.85rem; outline:none; }
-        .sm-select { height:38px; border-radius:10px; border:1px solid #e2e8f0; font-size:.75rem; font-weight:700; outline:none; padding:0 .5rem; background:#f8fafc; appearance: none; }
-        .sm-filter-btn { height:38px; border-radius:10px; background:#DC2626; color:white; border:none; font-weight:800; cursor:pointer; font-size:.75rem; display:flex; align-items:center; justify-content:center; }
+        .sm-select { width: 100%; height:38px; border-radius:10px; border:1px solid #e2e8f0; font-size:.75rem; font-weight:700; outline:none; padding:0 .5rem; background:#f8fafc; }
+        .sm-filter-btn { width: 44px; height:38px; border-radius:10px; background:#111827; color:white; border:none; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        
         .sm-tw { display:none; }
         @media(min-width:768px){ .sm-tw { display:block; overflow-x:auto; } }
         .sm-table { width:100%; border-collapse:collapse; }
         .sm-table th { padding:.75rem 1rem; font-size:.65rem; text-transform:uppercase; background:#f8fafc; color:#64748b; text-align:left; }
         .sm-table td { padding:.75rem 1rem; border-bottom:1px solid #f1f5f9; font-size:.85rem; }
         .sm-main-row:hover { background:#fff1f1; cursor:pointer; }
+        
         .sm-mob { display:block; }
         @media(min-width:768px){ .sm-mob { display:none; } }
         .sm-mc { padding:1rem; border-bottom:1px solid #f1f5f9; cursor:pointer; }
@@ -476,6 +504,7 @@ export default function SuperAdminMembersPage() {
         .sm-member-name { font-weight:700; font-size:.9rem; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .sm-member-email { font-size:.75rem; color:#64748b; margin-top:2px; }
         .sm-mc-meta { display:flex; justify-content:space-between; align-items:center; margin-top:.75rem; }
+        
         .modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; padding:1rem; }
         .modal-content { background:white; width:100%; max-width:500px; border-radius:24px; max-height:90vh; overflow-y:auto; }
         .modal-header { padding:1.25rem; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:white; z-index:10; }
@@ -495,7 +524,6 @@ export default function SuperAdminMembersPage() {
         .sp-icon-btn { width:34px; height:34px; border-radius:9px; border:1.5px solid var(--border); background:var(--bg); color:var(--color); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; }
         .sp-icon-btn:hover { background:var(--hover-bg); transform:translateY(-1px); }
 
-        /* MODALE DE CONFIRMATION DE SUPPRESSION */
         .confirm-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.8); backdrop-filter:blur(8px); z-index:2000; display:flex; align-items:center; justify-content:center; padding:1.5rem; animation: fadeIn 0.2s ease-out; }
         .confirm-content { background:white; width:100%; max-width:400px; border-radius:24px; padding:2rem 1.5rem; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
         .confirm-icon { width:64px; height:64px; background:#FEF2F2; color:#DC2626; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem; border:8px solid #FFF5F5; }
@@ -512,20 +540,24 @@ export default function SuperAdminMembersPage() {
       `}</style>
 
       <div className="sm-wrap">
-        <header style={{ marginBottom: '1.5rem' }}>
-          <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#DC2626', letterSpacing: '.1em', textTransform: 'uppercase' }}>Super Admin</div>
-          <h1 
-            className="sm-title" 
-            style={{ 
-              whiteSpace: 'nowrap', 
-              overflow: 'hidden', 
-              textOverflow: 'ellipsis',
-              fontSize: 'clamp(1.3rem, 6vw, 2rem)' 
-            }}
-          >
-            Membres — <span>vue globale</span>
-          </h1>
-        </header>
+        <div className="sm-header-row">
+          <header>
+            <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#DC2626', letterSpacing: '.1em', textTransform: 'uppercase' }}>Super Admin</div>
+            <h1 className="sm-title" style={{ fontSize: 'clamp(1.3rem, 5vw, 1.8rem)', margin: 0, fontFamily: "'Cormorant Garamond', serif", fontWeight: 700 }}>
+              Membres — <span>vue globale</span>
+            </h1>
+          </header>
+          <div className="sm-export-group">
+            <button className="btn-export btn-pdf" onClick={handleExportPDF}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z"/></svg>
+              PDF
+            </button>
+            <button className="btn-export btn-excel" onClick={handleExportExcel}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              EXCEL
+            </button>
+          </div>
+        </div>
 
         {error && (
           <div style={{ background: '#FEF2F2', color: '#B91C1C', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #FECACA', fontWeight: 700 }}>
@@ -554,20 +586,30 @@ export default function SuperAdminMembersPage() {
 
         <div className="sm-panel">
           <div className="sm-toolbar">
-            <input 
-              className="sm-input" 
-              placeholder="Recherche..." 
-              value={q} 
-              onChange={e => setQ(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && void load(q, status)}
-            />
-            <select className="sm-select" value={status} onChange={e => { setStatus(e.target.value); void load(q, e.target.value); }}>
-              <option value="">Tous</option>
-              <option value="ACTIVE">Actifs</option>
-              <option value="PENDING_APPROVAL">Attente</option>
-              <option value="SUSPENDED">Suspendus</option>
-            </select>
-            <button className="sm-filter-btn" onClick={() => void load(q, status)}>
+            <div className="sm-t-field">
+              <input 
+                className="sm-input" 
+                placeholder="Nom, prénom ou email..." 
+                value={q} 
+                onChange={e => setQ(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && void load()}
+              />
+            </div>
+            <div className="sm-t-field" style={{ flex: 0, minWidth: '130px' }}>
+              <select className="sm-select" value={status} onChange={e => setStatus(e.target.value)}>
+                <option value="">Tous statuts</option>
+                <option value="ACTIVE">Actifs</option>
+                <option value="PENDING_APPROVAL">Attente</option>
+                <option value="SUSPENDED">Suspendus</option>
+              </select>
+            </div>
+            <div className="sm-t-field" style={{ flex: 0, minWidth: '150px' }}>
+              <select className="sm-select" value={antennaId} onChange={e => setAntennaId(e.target.value)}>
+                <option value="">Toutes antennes</option>
+                {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            <button className="sm-filter-btn" onClick={() => void load()}>
               {loading ? '...' : <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z"/></svg>}
             </button>
           </div>
@@ -627,7 +669,6 @@ export default function SuperAdminMembersPage() {
         </div>
       </div>
       
-      {/* Modale de détails principale */}
       {selectedUser && (
         <MemberModal
           user={selectedUser}
@@ -645,7 +686,6 @@ export default function SuperAdminMembersPage() {
         />
       )}
 
-      {/* 💡 Modale de Confirmation de Suppression (avec sécurité de saisie) */}
       {showDeleteConfirm && selectedUser && (
         <div className="confirm-overlay" onClick={() => setShowDeleteConfirm(false)}>
           <div className="confirm-content" onClick={e => e.stopPropagation()}>
@@ -659,7 +699,6 @@ export default function SuperAdminMembersPage() {
               Êtes-vous sûr de vouloir supprimer le compte de <strong style={{color:'#111827'}}>{fullName(selectedUser)}</strong> ?<br />Cette action est immédiate et effacera toutes ses données.
             </p>
             
-            {/* 💡 Zone de vérification */}
             <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #e2e8f0' }}>
               <label style={{ display: 'block', fontSize: '.75rem', fontWeight: 800, color: '#475569', marginBottom: '.5rem' }}>
                 Saisissez <span style={{ color: '#DC2626', userSelect: 'all' }}>{selectedUser.email}</span> pour confirmer :
