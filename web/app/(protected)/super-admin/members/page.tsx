@@ -1,736 +1,760 @@
-// web/app/(protected)/super-admin/members/page.tsx
+// web/app/(protected)/super-admin/contributions/page.tsx
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
-import type { UserSummary, UserStatus, UserRole } from '../../../../types/user';
-import { fullName, formatDate } from '../../../../lib/format';
-import Image from 'next/image';
+import type { Contribution, ContributionStatus } from '../../../../types/contribution';
+import { formatCurrency, formatDate } from '../../../../lib/format';
 
-/* ══════════════════════════════════════════════════════ CONSTANTES */
-const ASSOCIATION_ROLES = [
-  'Membre (simple)',
-  "Secrétaire à l'organisation",
-  'Secrétaire Général(e)',
-  'Trésorier / Trésorière',
-  'Président(e)',
-  'Vice-président(e)',
-  'Chargé(e) de communication',
-  'Conseiller / Conseillère',
-  'Autre',
-];
+type CurrencyBucket = Record<string, number>;
 
-const PROFESSION_LIST = [
-  'Étudiant(e)',
-  'Employé(e)',
-  'Fonctionnaire',
-  'Indépendant / Entrepreneur',
-  'Profession libérale',
-  'Cadre / Dirigeant',
-  'Artisan / Commerçant',
-  'Agriculteur',
-  'Sans emploi',
-  'Retraité(e)',
-  'Autre',
-];
-
-const COMMUNES_ORIGINE = [
-  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
-  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
-];
-
-const COUNTRIES = [
-  { name: 'Guinée', code: 'GN' }, { name: 'France', code: 'FR' }, { name: 'Sénégal', code: 'SN' },
-  { name: 'Côte d\'Ivoire', code: 'CI' }, { name: 'Mali', code: 'ML' }, { name: 'Maroc', code: 'MA' },
-  { name: 'Canada', code: 'CA' }, { name: 'États-Unis', code: 'US' }, { name: 'Belgique', code: 'BE' },
-  { name: 'Suisse', code: 'CH' }, { name: 'Allemagne', code: 'DE' }, { name: 'Royaume-Uni', code: 'GB' },
-  { name: 'Espagne', code: 'ES' }, { name: 'Italie', code: 'IT' }, { name: 'Autre (Non listé)', code: 'OTHER' }
-].sort((a, b) => a.name.localeCompare(b.name));
-
-/* ══════════════════════════════════════════════════════ EXTENDED TYPE */
-type ExtendedUser = UserSummary & {
-  birthDate?: string | null;
-  placeOfBirth?: string | null;
-  countryOfBirth?: string | null;
-  originSubPrefecture?: string | null;
-  phone?: string | null;
-  city?: string | null;
-  country?: string | null;
-  postalCode?: string | null;
-  addressLine1?: string | null;
-  addressLine2?: string | null;
-  professionalStatus?: string | null;
-  profilePhotoUrl?: string | null;
-  cardNumber?: string | null;
-  function?: string | null;
+const STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  PENDING: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  VALIDATED: { label: 'Validée', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  REJECTED: { label: 'Rejetée', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  CANCELLED: { label: 'Annulée', color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+  DRAFT: { label: 'Brouillon', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  SUBMITTED: { label: 'Soumise', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
 };
 
-/* ══════════════════════════════════════════════════════ BADGES */
-const STATUS_MAP: Record<UserStatus, { label: string; color: string; bg: string; border: string }> = {
-  ACTIVE:           { label: 'Actif',             color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-  PENDING_APPROVAL: { label: 'En attente',        color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
-  EMAIL_UNVERIFIED: { label: 'Non vérifié',       color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-  SUSPENDED:         { label: 'Suspendu',          color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  REJECTED:          { label: 'Rejeté',            color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  DELETED:           { label: 'Supprimé',          color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+const METHOD_LABELS: Record<string, string> = {
+  CASH: 'Espèces',
+  BANK_TRANSFER: 'Virement',
+  MOBILE_MONEY: 'Mobile Money',
+  CARD: 'Carte',
+  OTHER: 'Autre',
 };
 
-function StatusBadge({ status }: { status: UserStatus }) {
-  const s = STATUS_MAP[status] || { label: status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontSize: '.65rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '.15rem .5rem', whiteSpace: 'nowrap' }}>
-      <span style={{ width: 4, height: 4, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-      {s.label}
-    </span>
-  );
-}
-
-const ROLE_MAP: Record<UserRole, { label: string; color: string; bg: string; border: string }> = {
-  SYSTEM_ADMIN:  { label: 'Chef',        color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
-  SUPER_ADMIN:   { label: 'S.Admin',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  ANTENNA_ADMIN: { label: 'A.Admin',     color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-  MEMBER:        { label: 'Membre',      color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
-};
-
-function RoleBadge({ role }: { role: UserRole }) {
-  const r = ROLE_MAP[role] || { label: role, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '.65rem', fontWeight: 800, color: r.color, background: r.bg, border: `1px solid ${r.border}`, borderRadius: 6, padding: '.15rem .45rem', whiteSpace: 'nowrap' }}>
-      {r.label}
-    </span>
-  );
-}
-
-function Initials({ name, url, size = 34 }: { name: string; url?: string | null; size?: number }) {
-  if (url) {
-    return (
-      <Image 
-        src={url} 
-        alt={name} 
-        width={size} 
-        height={size} 
-        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(0,0,0,0.05)' }} 
-      />
-    );
+const formatContributionType = (type?: string) => {
+  switch (type) {
+    case 'MEMBERSHIP': return 'Carte de membre';
+    case 'REGULAR': return 'Cotisation régulière';
+    case 'DONATION': return 'Don';
+    case 'LATE_FEE': return 'Retard';
+    default: return type || 'Cotisation régulière';
   }
+};
+
+function getInitials(name: string) {
   const parts = name.trim().split(' ');
-  const txt = ((parts[0]?.[0] ?? '') + (parts[parts.length-1]?.[0] ?? '')).toUpperCase();
-  return (
-    <div style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg,#991B1B,#DC2626)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontFamily: "'Cormorant Garamond',serif", fontSize: size > 40 ? '1.2rem' : '.8rem', fontWeight: 700 }}>
-      {txt}
-    </div>
-  );
+  const initials = parts.map((part) => part[0]).join('');
+  return initials.slice(0, 2).toUpperCase();
 }
 
-/* ══════════════════════════════════════════════════════ ICON BUTTONS */
-function IconBtn({
-  onClick, disabled, title, color, bg, border, hoverBg, children,
+function StatCard({
+  label,
+  value,
+  color,
+  icon,
 }: {
-  onClick: () => void;
-  disabled?: boolean;
-  title: string;
+  label: string;
+  value: string | number;
   color: string;
-  bg: string;
-  border: string;
-  hoverBg: string;
-  children: React.ReactNode;
+  icon: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      title={title}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      disabled={disabled}
-      className="sp-icon-btn"
-      style={{
-        '--color': color,
-        '--bg': bg,
-        '--border': border,
-        '--hover-bg': hoverBg,
-      } as React.CSSProperties}
-    >
-      {children}
-    </button>
-  );
-}
-
-/* ══════════════════════════════════════════════════════ SVG ICONS */
-const IconEdit = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>;
-const IconApprove = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
-const IconSuspend = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
-const IconReactivate = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
-const IconDelete = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
-const IconSave = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>;
-const IconCancel = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
-
-/* ══════════════════════════════════════════════════════ MODAL COMPONENTS */
-function MemberModal({
-  user, isEditing, editValues, setEditValues, onSave, onCancel, onEdit,
-  onToggleSuspend, onDelete, onApprove, busy, onClose
-}: {
-  user: ExtendedUser;
-  isEditing: boolean;
-  editValues: Partial<ExtendedUser>;
-  setEditValues: React.Dispatch<React.SetStateAction<Partial<ExtendedUser>>>;
-  onSave: () => void;
-  onCancel: () => void;
-  onEdit: () => void;
-  onToggleSuspend: () => void;
-  onDelete: () => void;
-  onApprove: () => void;
-  busy: boolean;
-  onClose: () => void;
-}) {
-  const handleChange = (field: keyof ExtendedUser, value: string) => {
-    setEditValues((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const dateVal = e.target.value;
-    if (dateVal) {
-      handleChange('birthDate', new Date(dateVal).toISOString());
-    } else {
-      handleChange('birthDate', '');
-    }
-  };
-
-  const canApprove = user.status === 'PENDING_APPROVAL' || user.status === 'EMAIL_UNVERIFIED';
-
-  const formattedBirthDateForInput = editValues.birthDate 
-    ? new Date(editValues.birthDate).toISOString().split('T')[0] 
-    : '';
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Initials name={fullName(user)} url={user.profilePhotoUrl} size={50} />
-            <div>
-              <h2 className="modal-title">{fullName(user)}</h2>
-              <div className="sm-member-id">ID: {user.cardNumber || user.id.slice(0,8)}</div>
-            </div>
-          </div>
-          <button className="modal-close" onClick={onClose}><IconCancel /></button>
-        </div>
-
-        <div className="modal-body">
-          <div className="modal-actions-bar">
-            {isEditing ? (
-              <div style={{ display: 'flex', gap: '.5rem', width: '100%' }}>
-                <button className="btn-save" onClick={onSave} disabled={busy}>{busy ? '...' : <><IconSave /> Enregistrer</>}</button>
-                <button className="btn-cancel" onClick={onCancel} disabled={busy}>Annuler</button>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
-                <IconBtn onClick={onEdit} title="Modifier" color="#2563EB" bg="#EFF6FF" border="#BFDBFE" hoverBg="#DBEAFE"><IconEdit /></IconBtn>
-                {canApprove && <IconBtn onClick={onApprove} title="Approuver" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5"><IconApprove /></IconBtn>}
-                <IconBtn onClick={onToggleSuspend} title={user.status === 'SUSPENDED' ? 'Réactiver' : 'Suspendre'} color="#D97706" bg="#FFFBEB" border="#FDE68A" hoverBg="#FEF3C7">{user.status === 'SUSPENDED' ? <IconReactivate /> : <IconSuspend />}</IconBtn>
-                <IconBtn onClick={onDelete} title="Supprimer" color="#DC2626" bg="#FEF2F2" border="#FECACA" hoverBg="#FEE2E2"><IconDelete /></IconBtn>
-              </div>
-            )}
-          </div>
-
-          <div className="sm-section-divider">Identité & Contact</div>
-          <div className="sm-dp-grid">
-             <div className="sm-dp-field">
-                <label>Prénom</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.firstName || ''} onChange={e => handleChange('firstName', e.target.value)} /> : <div className="sm-dp-value">{user.firstName}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Nom</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.lastName || ''} onChange={e => handleChange('lastName', e.target.value)} /> : <div className="sm-dp-value">{user.lastName}</div>}
-             </div>
-             <div className="sm-dp-field full">
-                <label>Email</label>
-                {isEditing ? <input className="sm-dp-input" type="email" value={editValues.email || ''} onChange={e => handleChange('email', e.target.value)} /> : <div className="sm-dp-value">{user.email}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Téléphone</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.phone || ''} onChange={e => handleChange('phone', e.target.value)} /> : <div className="sm-dp-value">{user.phone || '-'}</div>}
-             </div>
-          </div>
-
-          <div className="sm-section-divider">Naissance & Origine</div>
-          <div className="sm-dp-grid">
-             <div className="sm-dp-field">
-                <label>Date de naissance</label>
-                {isEditing ? <input type="date" className="sm-dp-input" value={formattedBirthDateForInput} onChange={handleDateChange} /> : <div className="sm-dp-value">{user.birthDate ? formatDate(user.birthDate) : '-'}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Lieu de naissance</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.placeOfBirth || ''} onChange={e => handleChange('placeOfBirth', e.target.value)} /> : <div className="sm-dp-value">{user.placeOfBirth || '-'}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Pays de naissance</label>
-                {isEditing ? (
-                  <select className="sm-dp-input" value={editValues.countryOfBirth || ''} onChange={e => handleChange('countryOfBirth', e.target.value)}>
-                    <option value="">Sélectionner...</option>
-                    {COUNTRIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                  </select>
-                ) : <div className="sm-dp-value">{user.countryOfBirth || '-'}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Commune d&apos;origine</label>
-                {isEditing ? (
-                  <select className="sm-dp-input" value={editValues.originSubPrefecture || ''} onChange={e => handleChange('originSubPrefecture', e.target.value)}>
-                    <option value="">Sélectionner...</option>
-                    {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                ) : <div className="sm-dp-value">{user.originSubPrefecture || '-'}</div>}
-             </div>
-          </div>
-
-          <div className="sm-section-divider">Résidence & Adresse</div>
-          <div className="sm-dp-grid">
-             <div className="sm-dp-field">
-                <label>Pays actuel</label>                {isEditing ? (
-                  <select className="sm-dp-input" value={editValues.country || ''} onChange={e => handleChange('country', e.target.value)}>
-                    <option value="">Sélectionner...</option>
-                    {COUNTRIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-                  </select>
-                ) : <div className="sm-dp-value">{user.country || '-'}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Ville actuelle</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.city || ''} onChange={e => handleChange('city', e.target.value)} /> : <div className="sm-dp-value">{user.city || '-'}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Code Postal</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.postalCode || ''} onChange={e => handleChange('postalCode', e.target.value)} /> : <div className="sm-dp-value">{user.postalCode || '-'}</div>}
-             </div>
-             <div className="sm-dp-field full">
-                <label>Adresse (Ligne 1)</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.addressLine1 || ''} onChange={e => handleChange('addressLine1', e.target.value)} /> : <div className="sm-dp-value">{user.addressLine1 || '-'}</div>}
-             </div>
-             <div className="sm-dp-field full">
-                <label>Adresse (Ligne 2)</label>
-                {isEditing ? <input className="sm-dp-input" value={editValues.addressLine2 || ''} onChange={e => handleChange('addressLine2', e.target.value)} /> : <div className="sm-dp-value">{user.addressLine2 || '-'}</div>}
-             </div>
-          </div>
-
-          <div className="sm-section-divider">Poste & Profession</div>
-          <div className="sm-dp-grid">
-             <div className="sm-dp-field">
-                <label>Poste Asso</label>
-                {isEditing ? (
-                  <select className="sm-dp-input" value={editValues.function || ''} onChange={e => handleChange('function', e.target.value)}>
-                    <option value="">Sélectionner...</option>
-                    {ASSOCIATION_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                ) : <div className="sm-dp-value" style={{color:'#DC2626', fontWeight:700}}>{user.function || 'Membre'}</div>}
-             </div>
-             <div className="sm-dp-field">
-                <label>Profession / Statut</label>
-                {isEditing ? (
-                  <select className="sm-dp-input" value={editValues.professionalStatus || ''} onChange={e => handleChange('professionalStatus', e.target.value)}>
-                    <option value="">Sélectionner...</option>
-                    {PROFESSION_LIST.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                ) : <div className="sm-dp-value">{user.professionalStatus || '-'}</div>}
-             </div>
-          </div>
-
-        </div>
+    <div className="stat-card" style={{ borderTop: `3px solid ${color}` }}>
+      <div style={{ flex: 1, textAlign: 'center' }}>
+        <div className="stat-val" style={{ color }}>{value}</div>
+        <div className="stat-lbl">{label}</div>
+      </div>
+      <div className="stat-ico" style={{ background: `${color}18`, color }}>
+        {icon}
       </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════ MAIN PAGE */
-export default function SuperAdminMembersPage() {
-  const [items,   setItems]   = useState<ExtendedUser[]>([]);
+function sumAmountsByCurrency(entries: Contribution[]): CurrencyBucket {
+  return entries.reduce<CurrencyBucket>((acc, item) => {
+    const currency = item.currency || 'EUR';
+    acc[currency] = (acc[currency] ?? 0) + Number(item.amount ?? 0);
+    return acc;
+  }, {});
+}
+
+export default function SuperAdminContributionsPage() {
+  const [items, setItems] = useState<Contribution[]>([]);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<Contribution | null>(null);
+
+  // ⚡ ÉTATS D'EXPORTATION
   const [antennas, setAntennas] = useState<{ id: string, name: string }[]>([]);
-  const [q,        setQ]       = useState('');
-  const [status,  setStatus]  = useState('');
-  const [antennaId, setAntennaId] = useState('');
-  const [error,   setError]   = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const [selectedUser, setSelectedUser] = useState<ExtendedUser | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editValues, setEditValues] = useState<Partial<ExtendedUser>>({});
+  const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
+  const [exportAntenna, setExportAntenna] = useState('');
+  const [exportStartMonth, setExportStartMonth] = useState('');
+  const [exportEndMonth, setExportEndMonth] = useState('');
+  const [pdfData, setPdfData] = useState<Contribution[] | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
-  
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  const load = useCallback(async (qVal?: string, sVal?: string, aId?: string) => {
-    setError(null); setLoading(true);
-    try {
-      const res = await api.listMembers({ 
-        page: 1, 
-        pageSize: 500, 
-        q: qVal ?? q, 
-        status: sVal ?? status,
-        antennaId: aId ?? antennaId 
-      });
-      setItems(res.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur chargement membres');
-    } finally {
-      setLoading(false);
-    }
-  }, [q, status, antennaId]);
+  const load = useCallback(
+    async (statusVal?: string) => {
+      setError(null);
+      setLoading(true);
+
+      try {
+        const res = await api.listContributions({
+          page: 1,
+          pageSize: 100,
+          status: (statusVal ?? status) || undefined,
+        });
+        setItems(res.items);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erreur lors du chargement des cotisations');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [status],
+  );
 
   useEffect(() => {
-    const init = async () => {
+    void load('');
+    // Charger les antennes pour le filtre d'exportation
+    const initAntennas = async () => {
       try {
-        const resAntennas = await api.listAntennas({ pageSize: 100 });
-        setAntennas(resAntennas.items);
+        const res = await api.listAntennas({ pageSize: 100 });
+        setAntennas(res.items);
       } catch (e) { console.error(e); }
-      void load();
     };
-    void init();
+    void initAntennas();
   }, [load]);
 
-  const openDetails = (user: ExtendedUser) => {
-    setSelectedUser(user);
-    setEditValues(user);
-    setIsEditing(false);
-    setShowDeleteConfirm(false);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!selectedUser) return;
-    setActionBusy(true);
-    try {
-      await api.updateUserSuperAdmin(selectedUser.id, editValues);
-      setIsEditing(false);
-      setSelectedUser(null);
-      await load();
-    } catch (err) { 
-      console.error(err);
-      alert('Erreur modification'); 
+  useEffect(() => {
+    if (selectedItem) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
     }
-    finally { setActionBusy(false); }
-  };
+    return () => { document.body.style.overflow = ''; };
+  }, [selectedItem]);
 
-  const handleToggleSuspend = async () => {
-    if (!selectedUser) return;
-    setActionBusy(true);
+  // ⚡ FONCTION D'EXPORTATION CHIRURGICALE
+  const executeExport = async () => {
     try {
-      if (selectedUser.status === 'SUSPENDED') await api.activateUserSuperAdmin(selectedUser.id);
-      else await api.suspendUserSuperAdmin(selectedUser.id);
-      setSelectedUser(null);
-      await load();
+      setActionBusy(true);
+      const fetchRes = await api.listContributions({
+        page: 1, 
+        pageSize: 10000, // On récupère tout pour l'export
+        antennaId: exportAntenna || undefined
+      });
+      
+      let exportData = fetchRes.items as Contribution[];
+
+      // Filtrage local supplémentaire si l'API ne le gère pas
+      if (exportAntenna) {
+        exportData = exportData.filter(c => c.antennaId === exportAntenna || c.antenna?.id === exportAntenna);
+      }
+
+      if (exportStartMonth) {
+        const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
+        exportData = exportData.filter(c => new Date(c.contributionDate || c.createdAt) >= start);
+      }
+      if (exportEndMonth) {
+        const end = new Date(`${exportEndMonth}-01T00:00:00Z`);
+        end.setMonth(end.getMonth() + 1); // Inclut tout le mois de fin
+        exportData = exportData.filter(c => new Date(c.contributionDate || c.createdAt) < end);
+      }
+
+      if (exportData.length === 0) {
+        alert("Aucune cotisation ne correspond à ces critères de filtrage.");
+        return;
+      }
+
+      if (exportModalType === 'EXCEL') {
+        let csv = "Nom;Prenom;Email;Antenne;Montant;Mois Cotise;Type;Statut\n";
+        exportData.forEach(c => {
+          const nom = c.member?.lastName || '';
+          const prenom = c.member?.firstName || '';
+          const email = c.member?.email || '';
+          const antenne = c.antenna?.name || '';
+          const montant = `${c.amount} ${c.currency || 'EUR'}`;
+          const date = formatDate(c.contributionDate || c.createdAt);
+          const type = formatContributionType((c as any).type);
+          const statut = STATUS_MAP[c.status]?.label || c.status;
+
+          csv += `"${nom}";"${prenom}";"${email}";"${antenne}";"${montant}";"${date}";"${type}";"${statut}"\n`;
+        });
+        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Export_Cotisations_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setExportModalType(null);
+      } else if (exportModalType === 'PDF') {
+        setPdfData(exportData);
+        setTimeout(() => {
+          window.print();
+          setPdfData(null);
+          setExportModalType(null);
+        }, 300);
+      }
     } catch (err) {
       console.error(err);
-      alert('Erreur statut'); 
+      alert("Erreur lors de l'exportation des données.");
+    } finally {
+      setActionBusy(false);
     }
-    finally { setActionBusy(false); }
   };
 
-  const handleApprove = async () => {
-    if (!selectedUser) return;
-    setActionBusy(true);
-    try {
-      await api.approveMemberAccount(selectedUser.id);
-      setSelectedUser(null);
-      await load();
-    } catch (err) { 
-      console.error(err);
-      alert('Erreur validation'); 
-    }
-    finally { setActionBusy(false); }
-  };
+  const displayedItems = useMemo(() => {
+    if (!status) return items;
+    return items.filter((c) => {
+      if (status === 'PENDING_VALIDATION' || status === 'PENDING') {
+        return c.status === 'PENDING_VALIDATION' || c.status === 'PENDING';
+      }
+      return c.status === status;
+    });
+  }, [items, status]);
 
-  const handleDeleteRequest = () => {
-    setDeleteConfirmText('');
-    setShowDeleteConfirm(true);
-  };
+  const total = items.length;
+  const pending = items.filter((c) => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION').length;
+  const validated = items.filter((c) => c.status === 'VALIDATED').length;
 
-  const executeDelete = async () => {
-    if (!selectedUser) return;
-    setShowDeleteConfirm(false);
-    setActionBusy(true);
-    try {
-      await api.deleteUserSuperAdmin(selectedUser.id);
-      setSelectedUser(null);
-      await load();
-    } catch (err) { 
-      console.error(err);
-      alert('Erreur suppression'); 
-    }
-    finally { setActionBusy(false); }
-  };
+  const pendingItems = useMemo(
+    () => items.filter((c) => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION'),
+    [items],
+  );
 
-  const handleExportPDF = () => alert("Exportation PDF lancée...");
-  const handleExportExcel = () => alert("Exportation Excel lancée...");
+  const _pendingByCurrency = useMemo(
+    () => sumAmountsByCurrency(pendingItems),
+    [pendingItems],
+  );
+  void _pendingByCurrency;
 
-  const activeCount  = items.filter((u) => u.status === 'ACTIVE').length;
-  const pendingCount = items.filter((u) => u.status === 'PENDING_APPROVAL').length;
-  const suspCount    = items.filter((u) => u.status === 'SUSPENDED').length;
+  const hasPending = pending > 0;
 
   return (
-    <AppShell title="Membres">
+    <AppShell title="Cotisations globales">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;700;800&display=swap');
-        .sm-wrap { font-family:'DM Sans',sans-serif; padding:1rem; max-width:1200px; margin:0 auto; overflow-x:hidden; }
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
+        
+        .sc-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1200px; margin: 0 auto; box-sizing: border-box; overflow-x: hidden; }
         
         .sm-header-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
         .sm-export-group { display: flex; gap: .5rem; }
-        .btn-export { height: 36px; padding: 0 1rem; border-radius: 10px; border: none; color: white; font-weight: 800; font-size: .7rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: transform 0.2s; }
-        .btn-export:hover { transform: translateY(-1px); filter: brightness(1.1); }
+        .btn-export { height: 38px; padding: 0 1.2rem; border-radius: 12px; border: none; color: white; font-weight: 800; font-size: .75rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn-export:hover { transform: translateY(-2px); filter: brightness(1.1); }
         .btn-pdf { background: linear-gradient(135deg, #991B1B, #DC2626); box-shadow: 0 4px 12px rgba(220,38,38,0.2); }
         .btn-excel { background: linear-gradient(135deg, #059669, #10B981); box-shadow: 0 4px 12px rgba(16,185,129,0.2); }
 
-        .sm-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:.5rem; margin-bottom:1rem; }
-        @media(max-width:600px){ .sm-stats { grid-template-columns:repeat(2,1fr); } }
-        .sm-stat { background:white; border-radius:12px; padding:.75rem; border-top:3px solid; box-shadow:0 2px 6px rgba(0,0,0,0.05); }
-        .sm-stat-val { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:700; line-height:1; }
-        .sm-stat-lbl { font-size:.6rem; font-weight:800; color:#64748b; text-transform:uppercase; margin-top:2px; }
-        .sm-panel { background:white; border-radius:20px; box-shadow:0 4px 20px rgba(0,0,0,0.06); overflow:hidden; }
-        
-        .sm-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; padding: 1rem; border-bottom: 1px solid #f1f5f9; align-items: center; }
-        .sm-t-field { flex: 1; min-width: 150px; }
-        .sm-input { width:100%; height:38px; border-radius:10px; border:1px solid #e2e8f0; padding:0 .75rem; font-size:.85rem; outline:none; }
-        .sm-select { width: 100%; height:38px; border-radius:10px; border:1px solid #e2e8f0; font-size:.75rem; font-weight:700; outline:none; padding:0 .5rem; background:#f8fafc; }
-        .sm-filter-btn { width: 44px; height:38px; border-radius:10px; background:#111827; color:white; border:none; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-        
-        .sm-tw { display:none; }
-        @media(min-width:768px){ .sm-tw { display:block; overflow-x:auto; } }
-        .sm-table { width:100%; border-collapse:collapse; }
-        .sm-table th { padding:.75rem 1rem; font-size:.65rem; text-transform:uppercase; background:#f8fafc; color:#64748b; text-align:left; }
-        .sm-table td { padding:.75rem 1rem; border-bottom:1px solid #f1f5f9; font-size:.85rem; }
-        .sm-main-row:hover { background:#fff1f1; cursor:pointer; }
-        
-        .sm-mob { display:block; }
-        @media(min-width:768px){ .sm-mob { display:none; } }
-        .sm-mc { padding:1rem; border-bottom:1px solid #f1f5f9; cursor:pointer; }
-        .sm-mc-top { display:flex; align-items:center; gap:.75rem; }
-        .sm-mc-info { flex:1; min-width:0; }
-        .sm-member-name { font-weight:700; font-size:.9rem; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .sm-member-email { font-size:.75rem; color:#64748b; margin-top:2px; }
-        .sm-mc-meta { display:flex; justify-content:space-between; align-items:center; margin-top:.75rem; }
-        
-        .modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; padding:1rem; }
-        .modal-content { background:white; width:100%; max-width:500px; border-radius:24px; max-height:90vh; overflow-y:auto; }
-        .modal-header { padding:1.25rem; border-bottom:1px solid #f1f5f9; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:white; z-index:10; }
-        .modal-title { font-family:'Cormorant Garamond',serif; font-size:1.4rem; font-weight:700; color:#111827; }
-        .modal-close { width:32px; height:32px; border-radius:50%; border:1.5px solid #e2e8f0; display:flex; align-items:center; justify-content:center; cursor:pointer; }
-        .modal-body { padding:1.25rem; }
-        .modal-actions-bar { margin-bottom:1.5rem; display:flex; gap:.5rem; }
-        .sm-section-divider { font-size:0.7rem; font-weight:800; color:#DC2626; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid #FECACA; padding-bottom:0.4rem; margin:1.5rem 0 0.75rem 0; }
-        .sm-dp-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
-        .sm-dp-field { display:flex; flex-direction:column; gap:4px; }
-        .sm-dp-field.full { grid-column: span 2; }
-        .sm-dp-field label { font-size:.65rem; font-weight:800; color:#94a3b8; text-transform:uppercase; }
-        .sm-dp-value { font-size:.9rem; font-weight:600; color:#1e293b; padding:4px 0; }
-        .sm-dp-input { height:38px; border-radius:8px; border:1px solid #e2e8f0; padding:0 .75rem; font-size:.85rem; font-weight:600; width: 100%; background: white; }
-        .btn-save { flex:1; height:40px; background:#059669; color:white; border:none; border-radius:10px; font-weight:800; display:flex; align-items:center; justify-content:center; gap:6px; cursor: pointer; }
-        .btn-cancel { height:40px; padding:0 1rem; border:1.5px solid #e2e8f0; border-radius:10px; font-weight:700; cursor: pointer; }
-        .sp-icon-btn { width:34px; height:34px; border-radius:9px; border:1.5px solid var(--border); background:var(--bg); color:var(--color); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; }
-        .sp-icon-btn:hover { background:var(--hover-bg); transform:translateY(-1px); }
+        .sc-header { opacity: 0; transform: translateY(10px); animation: scin .5s .04s cubic-bezier(.22,1,.36,1) forwards; }
+        .sc-eyebrow { font-size: .67rem; font-weight: 900; letter-spacing: .14em; text-transform: uppercase; color: #DC2626; margin-bottom: .35rem; display: flex; align-items: center; gap: .4rem; }
+        .sc-dot { width: 6px; height: 6px; background: #EF4444; border-radius: 50%; animation: scpulse 2s ease-in-out infinite; }
+        @keyframes scpulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+        .sc-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.45rem, 3vw, 1.9rem); font-weight: 700; color: #111827; letter-spacing: -.02em; line-height: 1.15; margin: 0; }
+        .sc-title span { background: linear-gradient(135deg, #991B1B, #EF4444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-        .confirm-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.8); backdrop-filter:blur(8px); z-index:2000; display:flex; align-items:center; justify-content:center; padding:1.5rem; animation: fadeIn 0.2s ease-out; }
-        .confirm-content { background:white; width:100%; max-width:400px; border-radius:24px; padding:2rem 1.5rem; text-align:center; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        .confirm-icon { width:64px; height:64px; background:#FEF2F2; color:#DC2626; border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem; border:8px solid #FFF5F5; }
-        .confirm-title { font-family:'Cormorant Garamond',serif; font-size:1.6rem; font-weight:700; color:#111827; margin-bottom:.5rem; line-height:1.2; }
-        .confirm-text { font-family:'DM Sans',sans-serif; font-size:.9rem; color:#64748b; margin-bottom:1.5rem; line-height:1.5; }
-        .confirm-actions { display:flex; gap:1rem; flex-direction:column; }
-        @media(min-width:600px){ .confirm-actions { flex-direction:row; } .confirm-actions > * { flex:1; } }
-        .btn-confirm-del { height:44px; background:#DC2626; color:white; border:none; border-radius:12px; font-size:.9rem; font-weight:800; display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
-        .btn-confirm-del:hover:not(:disabled) { background:#B91C1C; }
-        .btn-confirm-cancel { height:44px; background:#f1f5f9; color:#475569; border:none; border-radius:12px; font-size:.9rem; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s; }
-        .btn-confirm-cancel:hover { background:#e2e8f0; }
-        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-        @keyframes slideUp { from { opacity:0; transform:translateY(20px) scale(0.95); } to { opacity:1; transform:translateY(0) scale(1); } }
+        .sc-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.7rem; margin-bottom: 1.4rem; opacity: 0; transform: translateY(10px); animation: scin 0.5s 0.08s cubic-bezier(.22,1,.36,1) forwards; }
+        .stat-card { background: rgba(253,253,255,.93); border-radius: 14px; border: 1px solid rgba(220,38,38,.09); box-shadow: 0 2px 8px rgba(220,38,38,.04); padding: 0.8rem 1rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+        .stat-val { font-family: 'Cormorant Garamond',serif; font-size: 1.55rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
+        .stat-lbl { font-size: 0.64rem; font-weight: 900; color: #6B7280; text-transform: uppercase; letter-spacing: 0.07em; line-height: 1.2; }
+        .stat-ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+        @media(max-width: 600px) {
+            .sc-stats { gap: 0.4rem; }
+            .stat-card { padding: 0.6rem 0.4rem; gap: 0.25rem; flex-direction: column-reverse; justify-content: center; }
+            .stat-val { font-size: 1.3rem; margin-bottom: 0.1rem; }
+            .stat-lbl { font-size: 0.55rem; letter-spacing: 0; text-align: center; }
+            .stat-ico { width: 26px; height: 26px; margin-bottom: 0.2rem; }
+            .stat-ico svg { width: 14px; height: 14px; }
+        }
+
+        .sc-urgent { display: flex; align-items: center; gap: .75rem; padding: .85rem 1.1rem; background: linear-gradient(135deg,rgba(217,119,6,.07),rgba(245,158,11,.04)); border: 1px solid rgba(217,119,6,.2); border-radius: 13px; margin-bottom: 1.25rem; opacity: 0; transform: translateY(8px); animation: scin .5s .12s cubic-bezier(.22,1,.36,1) forwards; }
+        .sc-urgent-ico { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg,#92400E,#D97706); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 3px 8px rgba(217,119,6,.3); }
+        .sc-urgent-text { display: flex; flex-direction: column; gap: .2rem; }
+        .sc-urgent-text strong { font-size: .85rem; font-weight: 800; color: #111827; }
+        .sc-urgent-text span { font-size: .75rem; font-weight: 600; color: #6B7280; }
+
+        .sc-panel { background: rgba(253,253,255,.94); backdrop-filter: blur(14px); border-radius: 22px; border: 1px solid rgba(220,38,38,.09); box-shadow: 0 2px 18px rgba(220,38,38,.06), 0 0 0 1px rgba(255,255,255,.9) inset; overflow: hidden; opacity: 0; transform: translateY(10px); animation: scin .5s .16s cubic-bezier(.22,1,.36,1) forwards; }
+        .sc-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid rgba(220,38,38,.07); display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: nowrap; overflow: hidden; }
+        .sc-panel-titlerow { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+        .sc-panel-ico { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg,#991B1B,#DC2626); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(220,38,38,.3); }
+        
+        .sc-panel-title { font-size: clamp(0.7rem, 2.5vw, 0.75rem); font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sc-count-chip { font-size: .68rem; font-weight: 900; padding: .2rem .6rem; border-radius: 99px; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; flex-shrink: 0; }
+
+        .sc-toolbar { display: flex; flex-direction: row; gap: 0.6rem; align-items: center; flex-wrap: nowrap; padding: 0.9rem 1.4rem; border-bottom: 1px solid rgba(220,38,38,.07); }
+        .sc-field { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+        .sc-label { font-size: 0.7rem; font-weight: 900; color: #374151; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+        .sc-select { flex: 1; height: 40px; border-radius: 11px; border: 1px solid rgba(220,38,38,.18); background: rgba(255,255,255,.9); padding: 0 1.8rem 0 .85rem; font-family: 'DM Sans',sans-serif; font-size: .84rem; font-weight: 700; color: #111827; outline: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .65rem center; transition: border-color .2s,box-shadow .2s; min-width: 0; text-overflow: ellipsis; }
+        .sc-select:focus { border-color: rgba(220,38,38,.42); box-shadow: 0 0 0 3px rgba(220,38,38,.09); }
+        
+        .sc-filter-btn { height: 40px; padding: 0 1.2rem; border-radius: 11px; background: linear-gradient(135deg,#991B1B,#DC2626); border: none; color: white; cursor: pointer; font-family: 'DM Sans',sans-serif; font-size: .84rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: .45rem; box-shadow: 0 3px 10px rgba(220,38,38,.3); transition: all .18s; white-space: nowrap; flex-shrink: 0; }
+        .sc-filter-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(220,38,38,.42); }
+        .sc-filter-btn:disabled { opacity: .6; cursor: not-allowed; }
+        
+        @media(max-width: 500px) {
+            .sc-toolbar { padding: 0.7rem 0.8rem; gap: 0.4rem; }
+            .sc-field { gap: 0.35rem; }
+            .sc-label { font-size: 0.6rem; letter-spacing: 0; }
+            .sc-select { padding: 0 1.2rem 0 0.5rem; font-size: 0.75rem; background-position: right 0.4rem center; }
+            .sc-filter-btn { padding: 0 0.8rem; font-size: 0.75rem; }
+        }
+
+        .sc-status-chips { display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: clamp(0.2rem, 1.5vw, 0.6rem); padding: 0.75rem clamp(0.3rem, 2vw, 1.4rem); border-bottom: 1px solid rgba(220,38,38,.06); background: rgba(254,242,242,.18); width: 100%; overflow: hidden; }
+        .sc-chip { display: inline-flex; align-items: center; gap: 0.15rem; font-size: clamp(0.5rem, 2.5vw, 0.68rem); font-weight: 800; border-radius: 99px; padding: 0.15rem clamp(0.25rem, 1.5vw, 0.6rem); border: 1px solid; cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 1; min-width: 0; }
+        .sc-chip span:last-child { font-family: 'DM Mono', monospace; font-size: clamp(0.5rem, 2.5vw, 0.68rem); margin-left: 0.1rem; }
+
+        .sc-error { display: flex; align-items: center; gap: .65rem; padding: .9rem 1.2rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; color: #B91C1C; font-size: .82rem; font-weight: 800; margin: 1rem; }
+        .sc-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: .75rem; color: #6B7280; font-size: .84rem; font-weight: 700; }
+        .sc-ring { width: 24px; height: 24px; border: 2.5px solid rgba(220,38,38,.12); border-top-color: #DC2626; border-radius: 50%; animation: scspin .8s linear infinite; }
+        .sc-empty { display: flex; flex-direction: column; align-items: center; padding: 3.5rem 1rem; gap: .75rem; color: #9CA3AF; }
+        .sc-empty-title { font-size: .9rem; font-weight: 800; color: #374151; }
+        .sc-empty-sub { font-size: .78rem; font-weight: 600; }
+
+        @keyframes scin { to { opacity: 1; transform: translateY(0); } }
+        @keyframes scspin { to { transform: rotate(360deg); } }
+
+        /* ─── STYLES DU TABLEAU INTÉGRÉ ─── */
+        .sct-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        .sct-table thead tr { border-bottom: 1px solid rgba(220,38,38,.08); }
+        .sct-table thead th { padding: .85rem 1.1rem; text-align: left; font-size: .66rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: #6B7280; background: rgba(254,242,242,.22); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .sct-row { border-bottom: 1px solid rgba(220,38,38,.06); transition: background .15s ease; cursor: pointer; }
+        .sct-row:hover { background: rgba(220,38,38,.03); }
+        .sct-row:last-child { border-bottom: none; }
+        .sct-table td { padding: .9rem 1.1rem; font-size: .82rem; color: #374151; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+
+        .sct-member-cell { display: flex; align-items: center; gap: 0.75rem; }
+        .sct-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #DC2626, #991B1B); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900; color: white; flex-shrink: 0; }
+        .sct-member { display: flex; flex-direction: column; gap: .18rem; min-width: 0; }
+        .sct-member-name { font-size: .87rem; font-weight: 800; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sct-member-email { font-size: .72rem; color: #9CA3AF; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        
+        .sct-amount { font-family: 'DM Mono', monospace; font-size: .84rem; font-weight: 800; color: #111827; white-space: nowrap; }
+        .sct-date { white-space: nowrap; font-size: .78rem; font-weight: 600; color: #374151; }
+        .sct-status { display: inline-flex; align-items: center; gap: .32rem; padding: .25rem .62rem; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+        .sct-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+        /* ── CARTES MOBILE ── */
+        .sct-cards { display: none; }
+
+        @media (max-width: 768px) {
+          .sct-table { display: none; } 
+          
+          .sct-cards { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.8rem 1rem; }
+          .sct-card { background: white; border-radius: 16px; border: 1px solid rgba(220,38,38,.08); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.02); transition: transform 0.1s, background 0.15s; }
+          .sct-card:active { transform: scale(0.98); background: #FDF2F2; }
+          .sct-card-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+          .sct-card-member { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+          .sct-card-member .sct-avatar { width: 28px; height: 28px; font-size: 0.6rem; }
+          .sct-card-member .sct-member-name { font-size: 0.8rem; }
+          
+          .sct-card-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 0.6rem; border-top: 1px solid rgba(0,0,0,0.04); }
+          .sct-card-date { font-size: 0.7rem; color: #9CA3AF; font-weight: 600; }
+        }
+
+        /* ── STYLES D'EXPORTATION ── */
+        .export-flex-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .export-flex-item { flex: 1 1 calc(50% - 0.5rem); min-width: 140px; }
+        .export-flex-item.full { flex: 1 1 100%; }
+
+        .btn-cancel { height: 42px; padding: 0 1.2rem; border: 1.5px solid #e2e8f0; border-radius: 12px; font-weight: 700; cursor: pointer; background: white; color: #475569; transition: all 0.2s; }
+        .btn-cancel:hover { background: #F8FAFC; border-color: #CBD5E1; color: #0F172A; }
+        .btn-save { height: 42px; color: white; border: none; border-radius: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .btn-save:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.15); filter: brightness(1.1); }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        @media print {
+          body * { visibility: hidden; }
+          .printable-export-area, .printable-export-area * { visibility: visible; }
+          .printable-export-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+          .sc-wrap, .modal-overlay { display: none !important; }
+        }
+        .printable-export-area { display: none; }
+
+        /* ── MODAL (Détails et Export) ── */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn 0.25s ease-out forwards; }
+        .modal-content { background: white; width: 100%; max-width: 500px; border-radius: 24px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .modal-header { padding: 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: white; z-index: 10; }
+        .modal-title { font-family: 'Cormorant Garamond',serif; font-size: 1.6rem; font-weight: 700; color: #111827; margin: 0; letter-spacing: -0.02em; }
+        .modal-close { width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #e2e8f0; display: flex; align-items: center; justify-content: center; cursor: pointer; background: white; color: #64748b; transition: all 0.2s; }
+        .modal-close:hover { background: #f8fafc; color: #0F172A; border-color: #CBD5E1; }
+        
+        .modal-body { padding: 1.5rem; }
+
+        .sc-modal-hero { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; background: linear-gradient(to bottom, #ECFDF5, #F0FDF4); border-radius: 16px; border: 1px dashed #A7F3D0; margin-bottom: 1.5rem; }
+        .sc-modal-hero-label { font-size: 0.7rem; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.4rem; }
+        .sc-modal-hero-amount { font-family: 'DM Mono', monospace; font-size: clamp(2rem, 6vw, 2.8rem); font-weight: 800; color: #047857; line-height: 1; text-align: center; word-break: break-word; }
+
+        .sm-section-divider { font-size: 0.75rem; font-weight: 800; color: #059669; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #A7F3D0; padding-bottom: 0.5rem; margin: 0 0 1rem 0; }
+        .sm-dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 2rem; }
+        .sm-dp-field { display: flex; flex-direction: column; gap: 6px; }
+        .sm-dp-field.full { grid-column: span 2; }
+        .sm-dp-field label { font-size: .7rem; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+        .sm-dp-value { font-size: .95rem; font-weight: 600; color: #1e293b; word-break: break-word; }
+
+        .sc-modal-user { display: flex; align-items: center; gap: 0.8rem; }
+        .sc-modal-avatar { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg,#059669,#047857); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 900; color: white; flex-shrink: 0; box-shadow: 0 4px 10px rgba(5,150,105,0.2); }
       `}</style>
 
-      <div className="sm-wrap">
+      {/* ⚡ LA ZONE IMPRIMABLE CACHÉE POUR LE PDF */}
+      {pdfData && (
+        <div className="printable-export-area">
+          <h2 style={{ textAlign: 'center', marginBottom: '20px', fontFamily: "'Cormorant Garamond', serif" }}>Rapport des Cotisations</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: "'DM Sans', sans-serif" }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9' }}>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Nom & Prénom</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Email</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Antenne</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Montant</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Date / Mois</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Type</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pdfData.map(c => {
+                const nom = c.member?.lastName || '';
+                const prenom = c.member?.firstName || '';
+                const email = c.member?.email || '';
+                const antenne = c.antenna?.name || '';
+                const montant = `${c.amount} ${c.currency || 'EUR'}`;
+                const date = formatDate(c.contributionDate || c.createdAt);
+                const type = formatContributionType((c as any).type);
+                const statut = STATUS_MAP[c.status]?.label || c.status;
+                
+                return (
+                  <tr key={c.id}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold' }}>{prenom} {nom}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{email}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{antenne}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontFamily: "'DM Mono', monospace" }}>{montant}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{date}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{type}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{statut}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="sc-wrap">
         <div className="sm-header-row">
-          <header>
-            <div style={{ fontSize: '.7rem', fontWeight: 900, color: '#DC2626', letterSpacing: '.1em', textTransform: 'uppercase' }}>Super Admin</div>
-            <h1 className="sm-title" style={{ fontSize: 'clamp(1.3rem, 5vw, 1.8rem)', margin: 0, fontFamily: "'Cormorant Garamond', serif", fontWeight: 700 }}>
-              Membres — <span>vue globale</span>
-            </h1>
-          </header>
+          <div className="sc-header" style={{ marginBottom: 0 }}>
+            <div className="sc-eyebrow"><div className="sc-dot" />Super Admin</div>
+            <h1 className="sc-title">Cotisations <span>globales</span></h1>
+          </div>
+          
           <div className="sm-export-group">
-            <button className="btn-export btn-pdf" onClick={handleExportPDF}>
+            <button className="btn-export btn-pdf" onClick={() => setExportModalType('PDF')}>
               <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z"/></svg>
               PDF
             </button>
-            <button className="btn-export btn-excel" onClick={handleExportExcel}>
+            <button className="btn-export btn-excel" onClick={() => setExportModalType('EXCEL')}>
               <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
               EXCEL
             </button>
           </div>
         </div>
 
-        {error && (
-          <div style={{ background: '#FEF2F2', color: '#B91C1C', padding: '1rem', borderRadius: '12px', marginBottom: '1rem', border: '1px solid #FECACA', fontWeight: 700 }}>
-            {error}
+        <div className="sc-stats">
+          <StatCard
+            label="Total cotisations"
+            value={total}
+            color="#DC2626"
+            icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
+          />
+          <StatCard
+            label="Validées"
+            value={validated}
+            color="#059669"
+            icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          />
+          <StatCard
+            label="En attente"
+            value={pending}
+            color="#D97706"
+            icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          />
+        </div>
+
+        {hasPending && (
+          <div className="sc-urgent">
+            <div className="sc-urgent-ico">
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.2"><path strokeLinecap="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+            </div>
+            <div className="sc-urgent-text">
+              <strong>{pending} cotisation{pending > 1 ? 's' : ''} en attente de validation</strong>
+              <span>Ces cotisations n&apos;ont pas encore été validées par les administrateurs d&apos;antenne.</span>
+            </div>
           </div>
         )}
 
-        <div className="sm-stats">
-          <div className="sm-stat" style={{ borderTopColor: '#DC2626' }}>
-            <div className="sm-stat-val" style={{ color: '#DC2626' }}>{items.length}</div>
-            <div className="sm-stat-lbl">Membres</div>
+        <div className="sc-panel">
+          <div className="sc-panel-head">
+            <div className="sc-panel-titlerow">
+              <div className="sc-panel-ico">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.3"><path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+              </div>
+              <span className="sc-panel-title">Suivi des cotisations</span>
+              {displayedItems.length > 0 && <span className="sc-count-chip">{displayedItems.length}</span>}
+            </div>
           </div>
-          <div className="sm-stat" style={{ borderTopColor: '#059669' }}>
-            <div className="sm-stat-val" style={{ color: '#059669' }}>{activeCount}</div>
-            <div className="sm-stat-lbl">Actifs</div>
-          </div>
-          <div className="sm-stat" style={{ borderTopColor: '#D97706' }}>
-            <div className="sm-stat-val" style={{ color: '#D97706' }}>{pendingCount}</div>
-            <div className="sm-stat-lbl">Attente</div>
-          </div>
-          <div className="sm-stat" style={{ borderTopColor: '#7C3AED' }}>
-            <div className="sm-stat-val" style={{ color: '#7C3AED' }}>{suspCount}</div>
-            <div className="sm-stat-lbl">Suspens</div>
-          </div>
-        </div>
 
-        <div className="sm-panel">
-          <div className="sm-toolbar">
-            <div className="sm-t-field">
-              <input 
-                className="sm-input" 
-                placeholder="Nom, prénom ou email..." 
-                value={q} 
-                onChange={e => setQ(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && void load()}
-              />
-            </div>
-            <div className="sm-t-field" style={{ flex: 0, minWidth: '130px' }}>
-              <select className="sm-select" value={status} onChange={e => setStatus(e.target.value)}>
-                <option value="">Tous statuts</option>
-                <option value="ACTIVE">Actifs</option>
-                <option value="PENDING_APPROVAL">Attente</option>
-                <option value="SUSPENDED">Suspendus</option>
+          <div className="sc-toolbar">
+            <div className="sc-field">
+              <label className="sc-label">Statut</label>
+              <select className="sc-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="">Tous les statuts</option>
+                <option value="PENDING_VALIDATION">En attente</option>
+                <option value="VALIDATED">Validées</option>
+                <option value="REJECTED">Rejetées</option>
+                <option value="CANCELLED">Annulées</option>
               </select>
             </div>
-            <div className="sm-t-field" style={{ flex: 0, minWidth: '150px' }}>
-              <select className="sm-select" value={antennaId} onChange={e => setAntennaId(e.target.value)}>
-                <option value="">Toutes antennes</option>
-                {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-            <button className="sm-filter-btn" onClick={() => void load()}>
-              {loading ? '...' : <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z"/></svg>}
+
+            <button className="sc-filter-btn" disabled={loading} onClick={() => void load(status)}>
+              {loading ? (
+                <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'scspin .7s linear infinite' }} /> Chargement…</>
+              ) : (
+                <><svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></svg> Actualiser</>
+              )}
             </button>
           </div>
 
-          <div className="sm-tw">
-            <table className="sm-table">
-              <thead>
-                <tr>
-                  <th>Membre</th>
-                  <th>Rôle</th>
-                  <th>Statut</th>
-                  <th>Créé le</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map(u => (
-                  <tr key={u.id} className="sm-main-row" onClick={() => openDetails(u)}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
-                        <Initials name={fullName(u)} url={u.profilePhotoUrl} />
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{fullName(u)}</div>
-                          <div style={{ fontSize: '.7rem', color: '#64748b' }}>{u.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td><RoleBadge role={u.role} /></td>
-                    <td><StatusBadge status={u.status} /></td>
-                    <td>{formatDate(u.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {!loading && items.length > 0 && (
+            <div className="sc-status-chips">
+              {(Object.entries(STATUS_MAP) as [ContributionStatus, typeof STATUS_MAP[ContributionStatus]][]).map(([key, s]) => {
+                const count = items.filter((c) => c.status === key).length;
+                if (count === 0) return null;
+                return (
+                  <button key={key} className="sc-chip" style={{ color: s.color, background: s.bg, borderColor: s.border }} onClick={() => { setStatus(key); void load(key); }}>
+                    <span style={{ width: 4, height: 4, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    {s.label} <span>{count}</span>
+                  </button>
+                );
+              })}
+              {status && (
+                <button className="sc-chip" style={{ color: '#6B7280', background: '#F9FAFB', borderColor: '#E5E7EB' }} onClick={() => { setStatus(''); void load(''); }}>
+                  <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg> Réinitialiser
+                </button>
+              )}
+            </div>
+          )}
 
-          <div className="sm-mob">
-            {items.map(u => (
-              <div key={u.id} className="sm-mc" onClick={() => openDetails(u)}>
-                <div className="sm-mc-top">
-                  <Initials name={fullName(u)} url={u.profilePhotoUrl} />
-                  <div className="sm-mc-info">
-                    <div className="sm-member-name">{fullName(u)}</div>
-                    <div className="sm-member-email">{u.email}</div>
-                  </div>
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth="3"><path d="M9 5l7 7-7 7"/></svg>
-                </div>
-                <div className="sm-mc-meta">
-                  <div style={{ display: 'flex', gap: '.4rem' }}>
-                    <RoleBadge role={u.role} />
-                    <StatusBadge status={u.status} />
-                  </div>
-                  <div style={{ fontSize: '.7rem', color: '#94a3b8', fontWeight: 600 }}>{formatDate(u.createdAt)}</div>
-                </div>
+          {error && (
+            <div className="sc-error">
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="sc-loader"><div className="sc-ring" />Chargement…</div>
+          ) : !error && displayedItems.length === 0 ? (
+            <div className="sc-empty">
+              <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3"><path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+              <div className="sc-empty-title">Aucune cotisation trouvée pour ce statut</div>
+              <div className="sc-empty-sub">Essayez de modifier le filtre ou de réinitialiser.</div>
+            </div>
+          ) : !error ? (
+            <>
+              <table className="sct-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: '35%' }}>Membre</th>
+                    <th style={{ width: '20%' }}>Antenne</th>
+                    <th style={{ width: '15%' }}>Montant</th>
+                    <th style={{ width: '15%' }}>Date</th>
+                    <th style={{ width: '15%' }}>Statut</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedItems.map((contribution) => {
+                    const statusStyles = STATUS_MAP[contribution.status] || STATUS_MAP.PENDING;
+                    const memberName = `${contribution.member?.firstName ?? ''} ${contribution.member?.lastName ?? ''}`.trim() || '—';
+
+                    return (
+                      <tr key={contribution.id} className="sct-row" onClick={() => setSelectedItem(contribution)} title="Cliquer pour voir les détails">
+                        <td>
+                          <div className="sct-member-cell">
+                            <div className="sct-avatar">{getInitials(memberName)}</div>
+                            <div className="sct-member">
+                              <span className="sct-member-name">{memberName}</span>
+                              <span className="sct-member-email">{contribution.member?.email ?? '—'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>{contribution.antenna?.name || '-'}</td>
+                        <td className="sct-amount">{formatCurrency(contribution.amount, contribution.currency || 'EUR')}</td>
+                        <td className="sct-date">{formatDate(contribution.contributionDate || contribution.createdAt)}</td>
+                        <td>
+                          <span className="sct-status" style={{ color: statusStyles.color, background: statusStyles.bg, border: `1px solid ${statusStyles.border}` }}>
+                            <span className="sct-status-dot" style={{ background: statusStyles.color }} />
+                            {statusStyles.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              <div className="sct-cards">
+                {displayedItems.map((contribution) => {
+                  const statusStyles = STATUS_MAP[contribution.status] || STATUS_MAP.PENDING;
+                  const memberName = `${contribution.member?.firstName ?? ''} ${contribution.member?.lastName ?? ''}`.trim() || '—';
+
+                  return (
+                    <div key={contribution.id} className="sct-card" onClick={() => setSelectedItem(contribution)}>
+                      <div className="sct-card-head">
+                        <div className="sct-card-member">
+                          <div className="sct-avatar">{getInitials(memberName)}</div>
+                          <span className="sct-member-name">{memberName}</span>
+                        </div>
+                        <span className="sct-status" style={{ color: statusStyles.color, background: statusStyles.bg, border: `1px solid ${statusStyles.border}` }}>
+                          <span className="sct-status-dot" style={{ background: statusStyles.color }} />
+                          {statusStyles.label}
+                        </span>
+                      </div>
+                      <div className="sct-card-foot">
+                        <span className="sct-card-date">Le {formatDate(contribution.contributionDate || contribution.createdAt)}</span>
+                        <span style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 600 }}>Détails ➔</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            </>
+          ) : null}
         </div>
       </div>
-      
-      {selectedUser && (
-        <MemberModal
-          user={selectedUser}
-          isEditing={isEditing}
-          editValues={editValues}
-          setEditValues={setEditValues}
-          busy={actionBusy}
-          onClose={() => { setSelectedUser(null); setIsEditing(false); }}
-          onEdit={() => setIsEditing(true)}
-          onCancel={() => setIsEditing(false)}
-          onSave={handleSaveEdit}
-          onToggleSuspend={handleToggleSuspend}
-          onApprove={handleApprove}
-          onDelete={handleDeleteRequest}
-        />
-      )}
 
-      {showDeleteConfirm && selectedUser && (
-        <div className="confirm-overlay" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="confirm-content" onClick={e => e.stopPropagation()}>
-            <div className="confirm-icon">
-              <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-            <h3 className="confirm-title">Suppression définitive</h3>
-            <p className="confirm-text">
-              Êtes-vous sûr de vouloir supprimer le compte de <strong style={{color:'#111827'}}>{fullName(selectedUser)}</strong> ?<br />Cette action est immédiate et effacera toutes ses données.
-            </p>
-            
-            <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '12px', marginBottom: '1.5rem', textAlign: 'left', border: '1px solid #e2e8f0' }}>
-              <label style={{ display: 'block', fontSize: '.75rem', fontWeight: 800, color: '#475569', marginBottom: '.5rem' }}>
-                Saisissez <span style={{ color: '#DC2626', userSelect: 'all' }}>{selectedUser.email}</span> pour confirmer :
-              </label>
-              <input 
-                type="text" 
-                value={deleteConfirmText}
-                onChange={e => setDeleteConfirmText(e.target.value)}
-                style={{ width: '100%', height: '40px', borderRadius: '8px', border: '1px solid #cbd5e1', padding: '0 .75rem', fontSize: '.85rem', outline: 'none' }}
-                placeholder="Tapez l'email ici..."
-              />
-            </div>
-
-            <div className="confirm-actions">
-              <button className="btn-confirm-cancel" onClick={() => setShowDeleteConfirm(false)}>
-                Annuler
+      {/* ⚡ MODALE D'EXPORTATION SANS SURCHARGER LA PAGE */}
+      {exportModalType && (
+        <div className="modal-overlay" onClick={() => !actionBusy && setExportModalType(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: '2.5rem', maxWidth: '540px' }}>
+            <div className="modal-header" style={{ padding: 0, border: 'none', position: 'relative', marginBottom: '2rem' }}>
+              <h2 className="modal-title" style={{ fontSize: '2rem' }}>
+                Exporter en <span style={{ color: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}>{exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</span>
+              </h2>
+              <button className="modal-close" onClick={() => setExportModalType(null)} style={{ position: 'absolute', right: 0, top: 0 }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
+            </div>
+            
+            <div className="export-flex-row">
+              <div className="export-flex-item full">
+                <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.5rem', textTransform: 'uppercase' }}>Filtrer par Antenne</label>
+                <select className="sc-select" value={exportAntenna} onChange={e => setExportAntenna(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }}>
+                  <option value="">Toutes les antennes (Global)</option>
+                  {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div className="export-flex-item">
+                <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.5rem', textTransform: 'uppercase' }}>Période (Début)</label>
+                <input type="month" className="sc-select" value={exportStartMonth} onChange={e => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }} />
+              </div>
+              <div className="export-flex-item">
+                <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.5rem', textTransform: 'uppercase' }}>Période (Fin)</label>
+                <input type="month" className="sc-select" value={exportEndMonth} onChange={e => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
+              <button className="btn-cancel" style={{ flex: 1 }} onClick={() => setExportModalType(null)} disabled={actionBusy}>Annuler</button>
               <button 
-                className="btn-confirm-del" 
-                onClick={executeDelete} 
-                disabled={actionBusy || deleteConfirmText !== selectedUser.email}
-                style={{ 
-                  opacity: (actionBusy || deleteConfirmText !== selectedUser.email) ? 0.5 : 1, 
-                  cursor: (actionBusy || deleteConfirmText !== selectedUser.email) ? 'not-allowed' : 'pointer' 
-                }}
+                className="btn-save" 
+                style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }} 
+                onClick={() => void executeExport()} 
+                disabled={actionBusy}
               >
-                {actionBusy ? 'Suppression...' : 'Oui, supprimer'}
+                {actionBusy ? 'Génération...' : 'Télécharger le document'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* ── MODAL DÉTAILS DE LA COTISATION ── */}
+      {selectedItem && (
+        <div className="modal-overlay" onClick={() => setSelectedItem(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+
+            <div className="modal-header">
+              <h2 className="modal-title">Détails de la cotisation</h2>
+              <button className="modal-close" onClick={() => setSelectedItem(null)}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="sc-modal-hero">
+                <span className="sc-modal-hero-label">Montant de la cotisation</span>
+                <span className="sc-modal-hero-amount">
+                  {formatCurrency(selectedItem.amount, selectedItem.currency || 'EUR')}
+                </span>
+              </div>
+
+              <div className="sm-section-divider">Informations Membre</div>
+              <div className="sm-dp-grid" style={{ marginBottom: '1rem', gridTemplateColumns: '1fr' }}>
+                <div className="sm-dp-field full">
+                  <div className="sc-modal-user">
+                    <div className="sc-modal-avatar">
+                      {getInitials(`${selectedItem.member?.firstName ?? ''} ${selectedItem.member?.lastName ?? ''}`.trim() || '—')}
+                    </div>
+                    <div>
+                      <div className="sm-dp-value" style={{ padding: 0 }}>
+                        {`${selectedItem.member?.firstName ?? ''} ${selectedItem.member?.lastName ?? ''}`.trim() || '—'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 500 }}>
+                        {selectedItem.member?.email ?? 'N/A'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="sm-section-divider">Détails de la transaction</div>
+              <div className="sm-dp-grid">
+                <div className="sm-dp-field">
+                  <label>Type</label>
+                  <div className="sm-dp-value" style={{ fontWeight: 800 }}>{formatContributionType((selectedItem as any).type)}</div>
+                </div>
+                <div className="sm-dp-field">
+                  <label>Statut</label>
+                  <div className="sm-dp-value">
+                    <span className="sct-status" style={{ color: (STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).color, background: (STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).bg, border: `1px solid ${(STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).border}` }}>
+                      <span className="sct-status-dot" style={{ background: (STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).color }} />
+                      {(STATUS_MAP[selectedItem.status] || STATUS_MAP.PENDING).label}
+                    </span>
+                  </div>
+                </div>
+                <div className="sm-dp-field">
+                  <label>Mois / Date</label>
+                  <div className="sm-dp-value">{formatDate(selectedItem.contributionDate || selectedItem.createdAt)}</div>
+                </div>
+                <div className="sm-dp-field">
+                  <label>Antenne</label>
+                  <div className="sm-dp-value">{selectedItem.antenna?.name || '—'}</div>
+                </div>
+                <div className="sm-dp-field">
+                  <label>Méthode</label>
+                  <div className="sm-dp-value">{METHOD_LABELS[selectedItem.paymentMethod || ''] || selectedItem.paymentMethod || '—'}</div>
+                </div>
+                <div className="sm-dp-field full">
+                  <label>Référence Interne</label>
+                  <div className="sm-dp-value" style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#6B7280' }}>
+                    {selectedItem.id}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </AppShell>
   );
 }

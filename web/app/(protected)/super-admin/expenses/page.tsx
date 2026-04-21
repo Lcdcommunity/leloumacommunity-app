@@ -60,7 +60,7 @@ function SuperAdminExpenseModal({
   const s = STATUS_MAP[expense.status] || STATUS_MAP.PENDING_VALIDATION;
 
   async function handleValidate() {
-    if (!confirm('Valider cette dépense ? Elle sera définitivement débitée du solde de l\'antenne.')) return;
+    if (!window.confirm('Valider cette dépense ? Elle sera définitivement débitée du solde de l\'antenne.')) return;
     setSaving(true); setError(null);
     try {
       await api.validateExpenseSuperAdmin(expense.id);
@@ -141,13 +141,13 @@ function SuperAdminExpenseModal({
 
           {expense.status === 'PENDING_VALIDATION' && !isRejecting && (
             <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
-              <button className="sae-btn-validate" onClick={handleValidate} disabled={saving}>✔ Approuver</button>
+              <button className="sae-btn-validate" onClick={() => void handleValidate()} disabled={saving}>✔ Approuver</button>
               <button className="sae-btn-reject" onClick={() => setIsRejecting(true)} disabled={saving}>✖ Refuser</button>
             </div>
           )}
 
           {isRejecting && (
-            <form onSubmit={handleReject} style={{ marginTop: '1.5rem', background: '#FEF2F2', border: '1px solid #FECACA', padding: '1rem', borderRadius: 12 }}>
+            <form onSubmit={(e) => void handleReject(e)} style={{ marginTop: '1.5rem', background: '#FEF2F2', border: '1px solid #FECACA', padding: '1rem', borderRadius: 12 }}>
               <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 800, color: '#B91C1C', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Motif du refus *</label>
               <textarea className="sae-input" value={rejectionReason} onChange={e => setRejectionReason(e.target.value)} required style={{ minHeight: '60px', padding: '0.6rem 0.9rem', marginBottom: '0.75rem', borderColor: '#FECACA' }} placeholder="Expliquez pourquoi..." />
               <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -212,7 +212,7 @@ function EditExpenseModal({ expense, onClose, onSuccess }: { expense: Expense; o
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="sae-modal-body">
+        <form onSubmit={(e) => void handleSubmit(e)} className="sae-modal-body">
           {error && (
             <div className="sae-error">
               <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
@@ -282,12 +282,23 @@ export default function SuperAdminExpensesPage() {
   // Filtres
   const [status, setStatus] = useState(''); 
   const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [endDate, setEndDate] = useState('');
+  
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
 
-  // 🔥 ÉTAT POUR LA MODALE DE SUPPRESSION
+  // État de suppression
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // ⚡ NOUVEAUX ÉTATS POUR L'EXPORTATION
+  const [antennas, setAntennas] = useState<{ id: string, name: string }[]>([]);
+  const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
+  const [exportAntenna, setExportAntenna] = useState('');
+  const [exportStartMonth, setExportStartMonth] = useState('');
+  const [exportEndMonth, setExportEndMonth] = useState('');
+  const [pdfData, setPdfData] = useState<Expense[] | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const load = useCallback(async (st = status, start = startDate, end = endDate) => {
     setLoading(true);
@@ -301,7 +312,16 @@ export default function SuperAdminExpensesPage() {
     }
   }, [status, startDate, endDate]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { 
+    void load();
+    const initAntennas = async () => {
+      try {
+        const res = await api.listAntennas({ pageSize: 100 });
+        setAntennas(res.items);
+      } catch (e) { console.error(e); }
+    };
+    void initAntennas();
+  }, [load]);
 
   const handleDeleteRequest = (expense: Expense) => {
     setExpenseToDelete(expense);
@@ -322,6 +342,77 @@ export default function SuperAdminExpensesPage() {
     }
   };
 
+  // ⚡ FONCTION D'EXPORTATION
+  const executeExport = async () => {
+    try {
+      setActionBusy(true);
+      const fetchRes = await adminApi.listSuperAdminExpenses({
+        page: 1, 
+        pageSize: 10000,
+        antennaId: exportAntenna || undefined
+      });
+      
+      let exportData = fetchRes.items as Expense[];
+
+      if (exportAntenna) {
+        exportData = exportData.filter(e => {
+          const exp = e as Expense & { antennaId?: string; antenna?: { id: string; name: string } };
+          return exp.antennaId === exportAntenna || exp.antenna?.id === exportAntenna;
+        });
+      }
+      if (exportStartMonth) {
+        const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
+        exportData = exportData.filter(e => new Date(e.expenseDate) >= start);
+      }
+      if (exportEndMonth) {
+        const end = new Date(`${exportEndMonth}-01T00:00:00Z`);
+        end.setMonth(end.getMonth() + 1); 
+        exportData = exportData.filter(e => new Date(e.expenseDate) < end);
+      }
+
+      if (exportData.length === 0) {
+        alert("Aucune dépense ne correspond à ces critères d'exportation.");
+        return;
+      }
+
+      if (exportModalType === 'EXCEL') {
+        let csv = "Categorie;Motif;Antenne;Saisie par;Montant;Date;Methode;Statut\n";
+        exportData.forEach(e => {
+          const cat = CATEGORY_MAP[e.category] || e.category;
+          const motif = e.title || '';
+          const ant = e.antenna?.name || '';
+          const saisie = e.engagedByUser ? `${e.engagedByUser.firstName} ${e.engagedByUser.lastName}` : '';
+          const montant = `${e.amount} ${e.currency || 'EUR'}`;
+          const date = formatDate(e.expenseDate);
+          const methode = METHOD_MAP[e.paymentMethod || ''] || e.paymentMethod || '';
+          const statut = STATUS_MAP[e.status]?.label || e.status;
+
+          csv += `"${cat}";"${motif}";"${ant}";"${saisie}";"${montant}";"${date}";"${methode}";"${statut}"\n`;
+        });
+        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Export_Depenses_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setExportModalType(null);
+      } else if (exportModalType === 'PDF') {
+        setPdfData(exportData);
+        setTimeout(() => {
+          window.print();
+          setPdfData(null);
+          setExportModalType(null);
+        }, 300);
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'exportation des données.");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   const totalAmount = items.reduce((acc, curr) => acc + (curr.status === 'VALIDATED' ? Number(curr.amount) : 0), 0);
   const pendingCount = items.filter(i => i.status === 'PENDING_VALIDATION').length;
 
@@ -331,9 +422,17 @@ export default function SuperAdminExpensesPage() {
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@500;600&display=swap');
         
         .sae-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 1000px; margin: 0 auto; box-sizing: border-box; }
-        .sae-header { margin-bottom: 1.5rem; text-align: left; }
+        
+        .sae-header-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+        .sae-header { text-align: left; }
         .sae-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.8rem, 5vw, 2.4rem); font-weight: 700; color: #111827; margin: 0; line-height: 1.1; }
         .sae-title span { color: #DC2626; }
+        
+        .sae-export-group { display: flex; gap: 0.5rem; }
+        .btn-export { height: 38px; padding: 0 1.2rem; border-radius: 12px; border: none; color: white; font-weight: 800; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn-export:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .btn-pdf { background: linear-gradient(135deg, #991B1B, #DC2626); box-shadow: 0 4px 12px rgba(220,38,38,0.2); }
+        .btn-excel { background: linear-gradient(135deg, #059669, #10B981); box-shadow: 0 4px 12px rgba(16,185,129,0.2); }
         
         .sae-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; opacity: 0; transform: translateY(10px); animation: saeFade 0.5s 0.05s cubic-bezier(.22,1,.36,1) forwards; }
         .sae-stat { background: white; border-radius: 16px; border: 1px solid #E2E8F0; padding: 1.25rem 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.02); display: flex; flex-direction: column; justify-content: center; }
@@ -345,11 +444,12 @@ export default function SuperAdminExpensesPage() {
         
         .sae-toolbar { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem 1.5rem; border-bottom: 1px solid #F1F5F9; background: white; }
         
-        .sae-dates-row { display: flex; flex-direction: row; gap: 0.5rem; width: 100%; }
-        .sae-date-wrapper { flex: 1; display: flex; align-items: center; gap: 0.4rem; height: 42px; border-radius: 12px; border: 1.5px solid #E2E8F0; padding: 0 0.5rem; background: white; min-width: 0; transition: all 0.2s; }
+        /* ⚡ CORRECTION DU CHAMP DATE POUR MOBILE */
+        .sae-dates-row { display: flex; flex-direction: row; flex-wrap: wrap; gap: 0.5rem; width: 100%; }
+        .sae-date-wrapper { flex: 1 1 calc(50% - 0.25rem); min-width: 140px; display: flex; align-items: center; gap: 0.4rem; height: 42px; border-radius: 12px; border: 1.5px solid #E2E8F0; padding: 0 0.5rem; background: white; transition: all 0.2s; box-sizing: border-box; }
         .sae-date-wrapper:focus-within { border-color: #DC2626; box-shadow: 0 0 0 4px rgba(220,38,38,0.1); }
-        .sae-date-lbl { font-size: 0.65rem; font-weight: 800; color: #475569; text-transform: uppercase; white-space: nowrap; }
-        .sae-date-input { flex: 1; border: none; background: transparent; outline: none; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; color: #1E293B; min-width: 0; padding: 0; }
+        .sae-date-lbl { font-size: 0.65rem; font-weight: 800; color: #475569; text-transform: uppercase; white-space: nowrap; flex-shrink: 0; }
+        .sae-date-input { flex: 1; width: 100%; min-width: 90px; border: none; background: transparent; outline: none; font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; color: #1E293B; padding: 0; }
 
         .sae-filter-field { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }
         .sae-filter-lbl { font-size: 0.65rem; font-weight: 800; color: #475569; letter-spacing: 0.05em; text-transform: uppercase; }
@@ -432,17 +532,78 @@ export default function SuperAdminExpensesPage() {
             .sae-stat { padding: 0.5rem; flex-direction: column; justify-content: center; align-items: center; border-top: none; border-left: 0; border-bottom: 3px solid; text-align: center; border-radius: 12px; }
             .sae-stat-val { font-size: 1.1rem !important; margin-bottom: 0.2rem; }
             .sae-stat-lbl { font-size: 0.55rem !important; }
-            .sae-toolbar { padding: 1rem; }
         }
+
+        /* ⚡ CSS D'EXPORTATION ET IMPRESSION */
+        .export-flex-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .export-flex-item { flex: 1 1 calc(50% - 0.5rem); min-width: 140px; }
+        .export-flex-item.full { flex: 1 1 100%; }
+
+        @media print {
+          body * { visibility: hidden; }
+          .printable-export-area, .printable-export-area * { visibility: visible; }
+          .printable-export-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+          .sae-wrap, .sae-modal-overlay { display: none !important; }
+        }
+        .printable-export-area { display: none; }
 
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes saeFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
+      {/* ⚡ LA ZONE IMPRIMABLE CACHÉE POUR LE PDF */}
+      {pdfData && (
+        <div className="printable-export-area">
+          <h2 style={{ textAlign: 'center', marginBottom: '20px', fontFamily: "'Cormorant Garamond', serif" }}>Rapport des Dépenses</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: "'DM Sans', sans-serif" }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9' }}>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Catégorie / Motif</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Antenne</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Saisie par</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Montant</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Date</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Méthode</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pdfData.map(e => (
+                <tr key={e.id}>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>
+                    <div style={{ fontWeight: 'bold' }}>{CATEGORY_MAP[e.category] || e.category}</div>
+                    <div style={{ color: '#64748b' }}>{e.title}</div>
+                  </td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{e.antenna?.name || '—'}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{e.engagedByUser ? `${e.engagedByUser.firstName} ${e.engagedByUser.lastName}` : '—'}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontFamily: "'DM Mono', monospace", fontWeight: 'bold' }}>{formatCurrency(e.amount, e.currency || 'EUR')}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDate(e.expenseDate)}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{METHOD_MAP[e.paymentMethod || ''] || e.paymentMethod || '—'}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{STATUS_MAP[e.status]?.label || e.status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="sae-wrap">
-        <header className="sae-header">
-          <h1 className="sae-title">Contrôle des <span>Dépenses</span></h1>
-        </header>
+        <div className="sae-header-row">
+          <header className="sae-header" style={{ marginBottom: 0 }}>
+            <h1 className="sae-title">Contrôle des <span>Dépenses</span></h1>
+          </header>
+          
+          <div className="sae-export-group">
+            <button className="btn-export btn-pdf" onClick={() => setExportModalType('PDF')}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z"/></svg>
+              PDF
+            </button>
+            <button className="btn-export btn-excel" onClick={() => setExportModalType('EXCEL')}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              EXCEL
+            </button>
+          </div>
+        </div>
 
         <div className="sae-stats">
           <div className="sae-stat" style={{ borderBottomColor: '#2563EB' }}>
@@ -495,7 +656,9 @@ export default function SuperAdminExpensesPage() {
                 <label className="sae-date-lbl">Au</label>
                 <input type="date" className="sae-date-input" value={endDate} onChange={e => { const v = e.target.value; setEndDate(v); void load(status, startDate, v); }} />
               </div>
-            </div>            {(startDate || endDate || status) && (
+            </div>
+
+            {(startDate || endDate || status) && (
               <div className="sae-filter-field" style={{ flex: '0 0 auto', justifyContent: 'flex-end', width: 'auto' }}>
                 <button className="sae-btn-cancel" style={{ height: 42, width: '100%', background: '#F8FAFC' }} onClick={() => { setStatus(''); setStartDate(''); setEndDate(''); void load('', '', ''); }}>
                   Réinitialiser
@@ -503,7 +666,6 @@ export default function SuperAdminExpensesPage() {
               </div>
             )}
           </div>
-
           {loading ? (
             <div className="spinner" />
           ) : items.length === 0 ? (
@@ -583,6 +745,47 @@ export default function SuperAdminExpensesPage() {
         </div>
       </div>
 
+      {/* ⚡ MODALE D'EXPORTATION */}
+      {exportModalType && (
+        <div className="sae-modal-overlay" onClick={() => !actionBusy && setExportModalType(null)}>
+          <div className="sae-modal" onClick={e => e.stopPropagation()} style={{ padding: '2rem', maxWidth: '500px', margin: 'auto' }}>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.8rem', fontWeight: 700, color: '#111827', margin: '0 0 1.5rem 0' }}>
+              Exporter en <span style={{ color: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}>{exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</span>
+            </h2>
+            
+            <div className="export-flex-row">
+              <div className="export-flex-item full">
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Filtrer par Antenne</label>
+                <select className="sae-filter-select" value={exportAntenna} onChange={e => setExportAntenna(e.target.value)} style={{ width: '100%', height: '42px', background: '#F8FAFC' }}>
+                  <option value="">Toutes les antennes (Global)</option>
+                  {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div className="export-flex-item">
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Période (Début)</label>
+                <input type="month" className="sae-input" value={exportStartMonth} onChange={e => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '42px', background: '#F8FAFC' }} />
+              </div>
+              <div className="export-flex-item">
+                <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Période (Fin)</label>
+                <input type="month" className="sae-input" value={exportEndMonth} onChange={e => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '42px', background: '#F8FAFC' }} />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+              <button className="sae-btn-cancel" style={{ flex: 1 }} onClick={() => setExportModalType(null)} disabled={actionBusy}>Annuler</button>
+              <button 
+                className="sae-btn-submit" 
+                style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626', boxShadow: 'none' }} 
+                onClick={() => void executeExport()} 
+                disabled={actionBusy}
+              >
+                {actionBusy ? 'Génération...' : 'Télécharger'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {selectedExpense && (
         <SuperAdminExpenseModal 
           expense={selectedExpense} 
@@ -616,7 +819,7 @@ export default function SuperAdminExpensesPage() {
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
               <button className="sae-btn-cancel" onClick={() => setExpenseToDelete(null)} disabled={isDeleting} style={{ flex: 1 }}>Annuler</button>
-              <button className="sae-btn-reject" onClick={confirmDelete} disabled={isDeleting} style={{ flex: 1, border: 'none', background: '#DC2626', color: 'white' }}>
+              <button className="sae-btn-reject" onClick={() => void confirmDelete()} disabled={isDeleting} style={{ flex: 1, border: 'none', background: '#DC2626', color: 'white' }}>
                 {isDeleting ? 'Suppression...' : 'Oui, supprimer'}
               </button>
             </div>

@@ -1,4 +1,5 @@
 // web/types/antenna.ts
+//web/types/antenna.ts
 export interface Antenna {
   id: string;
   associationId: string;

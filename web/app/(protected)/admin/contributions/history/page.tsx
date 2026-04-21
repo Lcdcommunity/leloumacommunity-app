@@ -228,7 +228,7 @@ function ContributionDetailModal({
             </div>
           )}
         </div>
-
+        
         <div className="ach-modal-footer">
           {!isView && <button className="ach-btn-sec" onClick={() => onConfirm('view', '')}>Annuler</button>}
 
@@ -263,13 +263,20 @@ function ContributionDetailModal({
 
 /* ══════════════════════════════════════════════════════ MAIN PAGE */
 export default function AdminContributionsHistoryPage() {
-  // 🔥 CORRECTION ICI : Remplacement de `any` par un type explicite
   const [items, setItems] = useState<(Contribution & { submitter?: { firstName: string; lastName: string } | null })[]>([]);
   const [status, setStatus] = useState('');
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>({ mode: null, contribution: null });
+
+  // ⚡ ÉTATS D'EXPORTATION CHIRURGICALE
+  const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
+  const [exportStartMonth, setExportStartMonth] = useState('');
+  const [exportEndMonth, setExportEndMonth] = useState('');
+  const [exportStatus, setExportStatus] = useState('');
+  const [pdfData, setPdfData] = useState<Contribution[] | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -309,6 +316,71 @@ export default function AdminContributionsHistoryPage() {
     } finally { setBusyId(null); }
   }
 
+  // ⚡ FONCTION D'EXPORTATION
+  const executeExport = async () => {
+    try {
+      setActionBusy(true);
+      const fetchRes = await api.listAntennaContributions({
+        page: 1,
+        pageSize: 10000,
+        status: exportStatus || undefined
+      });
+
+      let exportData = (Array.isArray(fetchRes) ? fetchRes : (fetchRes as any).items || []) as Contribution[];
+
+      if (exportStartMonth) {
+        const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
+        exportData = exportData.filter(c => new Date(getDate(c)) >= start);
+      }
+      if (exportEndMonth) {
+        const end = new Date(`${exportEndMonth}-01T00:00:00Z`);
+        end.setMonth(end.getMonth() + 1);
+        exportData = exportData.filter(c => new Date(getDate(c)) < end);
+      }
+
+      if (exportData.length === 0) {
+        alert("Aucune cotisation ne correspond à ces critères d'exportation.");
+        return;
+      }
+
+      if (exportModalType === 'EXCEL') {
+        let csv = "Nom;Prenom;Email;Montant;Date;Type;Statut\n";
+        exportData.forEach(c => {
+          const m = getMember(c);
+          const nom = m?.lastName || '';
+          const prenom = m?.firstName || '';
+          const email = m?.email || '';
+          const montant = `${c.amount} ${c.currency || 'EUR'}`;
+          const date = formatDate(getDate(c));
+          const type = PURPOSE_MAP[c.purpose] || c.purpose;
+          const sMap: Record<string, string> = { VALIDATED: 'Validée', REJECTED: 'Rejetée', PENDING_VALIDATION: 'En attente', PENDING: 'En attente', CANCELLED: 'Annulée', SUBMITTED: 'Soumise', DRAFT: 'Brouillon' };
+          const statut = sMap[c.status] || c.status;
+
+          csv += `"${nom}";"${prenom}";"${email}";"${montant}";"${date}";"${type}";"${statut}"\n`;
+        });
+        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Export_Cotisations_Antenne_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setExportModalType(null);
+      } else if (exportModalType === 'PDF') {
+        setPdfData(exportData);
+        setTimeout(() => {
+          window.print();
+          setPdfData(null);
+          setExportModalType(null);
+        }, 300);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'exportation des données.");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   const isPendingStatus = (s: string) => s === 'PENDING' || s === 'SUBMITTED' || s === 'PENDING_VALIDATION';
   const validated = items.filter((i) => i.status === 'VALIDATED').length;
   const pending   = items.filter((i) => isPendingStatus(i.status)).length;
@@ -324,11 +396,19 @@ export default function AdminContributionsHistoryPage() {
         .ach-wrap { font-family: 'DM Sans', 'Inter', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 900px; margin: 0 auto; }
         
         /* Header & Stats */
-        .ach-header { margin-bottom: 1.5rem; }
+        .ach-header-row { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .ach-header { margin-bottom: 0; }
         .ach-eyebrow { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
         .ach-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; }
         .ach-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 6vw, 2.2rem); font-weight: 700; color: #0F172A; line-height: 1.2; letter-spacing: -0.02em; margin: 0; }
         .ach-title span { color: #2563EB; }        
+        
+        .ach-export-group { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .btn-export { height: 38px; padding: 0 1.2rem; border-radius: 10px; border: none; color: white; font-weight: 800; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn-export:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .btn-pdf { background: linear-gradient(135deg, #991B1B, #DC2626); box-shadow: 0 4px 12px rgba(220,38,38,0.2); }
+        .btn-excel { background: linear-gradient(135deg, #059669, #10B981); box-shadow: 0 4px 12px rgba(16,185,129,0.2); }
+
         .ach-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.5rem; }
         @media(max-width: 640px) { .ach-stats { grid-template-columns: repeat(2, 1fr); } }
         .ach-stat { background: white; border-radius: 14px; border: 1px solid #E2E8F0; padding: 0.9rem 1rem; border-top: 3px solid; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
@@ -367,7 +447,7 @@ export default function AdminContributionsHistoryPage() {
         .ach-card-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
         .ach-card-method { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; display: flex; align-items: center; gap: 5px; letter-spacing: 0.03em; }
 
-        /* Modale */
+        /* Modale Existant */
         .ach-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.5); backdrop-filter: blur(4px); z-index: 1000; animation: fadeIn 0.2s ease-out; display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .ach-modal { width: 100%; max-width: 480px; background: #FFFFFF; border-radius: 20px; display: flex; flex-direction: column; max-height: calc(100vh - 2rem); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1); position: relative; }
         
@@ -420,15 +500,77 @@ export default function AdminContributionsHistoryPage() {
         
         .ach-spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
         
+        /* ⚡ CSS EXPORT */
+        .export-flex-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .export-flex-item { flex: 1 1 calc(50% - 0.5rem); min-width: 140px; }
+        .export-flex-item.full { flex: 1 1 100%; }
+
+        @media print {
+          body * { visibility: hidden; }
+          .printable-export-area, .printable-export-area * { visibility: visible; }
+          .printable-export-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+          .ach-wrap, .ach-modal-overlay { display: none !important; }
+        }
+        .printable-export-area { display: none; }
+
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
+      {/* ⚡ LA ZONE IMPRIMABLE CACHÉE POUR LE PDF */}
+      {pdfData && (
+        <div className="printable-export-area">
+          <h2 style={{ textAlign: 'center', marginBottom: '20px', fontFamily: "'Cormorant Garamond', serif" }}>Rapport des Cotisations de l&apos;Antenne</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: "'DM Sans', sans-serif" }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9' }}>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Nom & Prénom</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Email</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Montant</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Date</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Type</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pdfData.map(c => {
+                const m = getMember(c);
+                const sMap: Record<string, string> = { VALIDATED: 'Validée', REJECTED: 'Rejetée', PENDING_VALIDATION: 'En attente', PENDING: 'En attente', CANCELLED: 'Annulée', SUBMITTED: 'Soumise', DRAFT: 'Brouillon' };
+                return (
+                  <tr key={c.id}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold' }}>{m?.firstName} {m?.lastName}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{m?.email}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontFamily: "'DM Mono', monospace", fontWeight: 'bold' }}>{c.amount} {c.currency || 'EUR'}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDate(getDate(c))}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{PURPOSE_MAP[c.purpose] || c.purpose}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{sMap[c.status] || c.status}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       <div className="ach-wrap">
-        <div className="ach-header">
-          <div className="ach-eyebrow"><div className="ach-dot" />Archives antenne</div>
-          <h1 className="ach-title">Historique des <span>cotisations</span></h1>
+        <div className="ach-header-row">
+          <div className="ach-header">
+            <div className="ach-eyebrow"><div className="ach-dot" />Archives antenne</div>
+            <h1 className="ach-title">Historique des <span>cotisations</span></h1>
+          </div>
+          
+          {/* ⚡ BOUTONS D'EXPORTATION DANS LE HEADER */}
+          <div className="ach-export-group">
+            <button className="btn-export btn-pdf" onClick={() => setExportModalType('PDF')}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z"/></svg>
+              PDF
+            </button>
+            <button className="btn-export btn-excel" onClick={() => setExportModalType('EXCEL')}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              EXCEL
+            </button>
+          </div>
         </div>
 
         <div className="ach-stats">
@@ -486,14 +628,12 @@ export default function AdminContributionsHistoryPage() {
                 <div className="ach-avatar">{initials}</div>
                 <div className="ach-card-content">
                   <div className="ach-card-name">{name}</div>
-                  
+
                   {c.submitter && (
                     <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 800, textTransform: 'uppercase', marginBottom: '2px' }}>
                       Payé par {c.submitter.firstName}
                     </div>
-                  )}
-
-                  <div className="ach-card-ref">{c.id.slice(0, 8)}</div>
+                  )}                  <div className="ach-card-ref">{c.id.slice(0, 8)}</div>
                   <div className="ach-card-purpose">{PURPOSE_MAP[c.purpose] || c.purpose}</div>
                 </div>
                 <div className="ach-card-right">
@@ -516,13 +656,66 @@ export default function AdminContributionsHistoryPage() {
         })}
       </div>
 
+      {/* ⚡ MODALE D'EXPORTATION */}
+      {exportModalType && (
+        <div className="ach-modal-overlay" onClick={() => !actionBusy && setExportModalType(null)}>
+          <div className="ach-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', margin: 'auto', borderRadius: '24px', overflow: 'hidden' }}>
+            <div className="ach-modal-head" style={{ borderBottom: 'none', paddingBottom: '0.5rem' }}>
+              <h2 className="ach-modal-title" style={{ fontSize: '1.8rem', color: '#111827' }}>
+                Exporter en <span style={{ color: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}>{exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</span>
+              </h2>
+              <button className="ach-modal-close" onClick={() => setExportModalType(null)} style={{ position: 'relative' }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            <div className="ach-modal-body" style={{ paddingTop: 0 }}>
+              <div className="export-flex-row">
+                <div className="export-flex-item full">
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Filtrer par Statut</label>
+                  <select className="ach-select" value={exportStatus} onChange={e => setExportStatus(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC' }}>
+                    <option value="">Tous les statuts</option>
+                    <option value="DRAFT">Brouillon</option>
+                    <option value="SUBMITTED">Soumise</option>
+                    <option value="PENDING_VALIDATION">En attente</option>
+                    <option value="VALIDATED">Validée</option>
+                    <option value="REJECTED">Rejetée</option>
+                    <option value="CANCELLED">Annulée</option>
+                  </select>
+                </div>
+                <div className="export-flex-item">
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Période (Début)</label>
+                  <input type="month" className="ach-input" value={exportStartMonth} onChange={e => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC', border: '1px solid #CBD5E1' }} />
+                </div>
+                <div className="export-flex-item">
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Période (Fin)</label>
+                  <input type="month" className="ach-input" value={exportEndMonth} onChange={e => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC', border: '1px solid #CBD5E1' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                <button className="ach-btn ach-btn-sec" style={{ flex: 1, border: '1px solid #E2E8F0', borderRadius: '12px' }} onClick={() => setExportModalType(null)} disabled={actionBusy}>Annuler</button>
+                <button 
+                  className="ach-btn" 
+                  style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626', color: 'white', border: 'none', borderRadius: '12px' }} 
+                  onClick={() => void executeExport()} 
+                  disabled={actionBusy}
+                >
+                  {actionBusy ? 'Génération...' : 'Télécharger'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ContributionDetailModal 
         state={modal} 
         onClose={() => setModal({ mode:null, contribution:null })}
         busy={busyId !== null}
         onConfirm={(mode, val) => {
           if (mode === 'view') setModal({ mode:null, contribution:null });
-          else handleAction(mode, val);
+          else void handleAction(mode, val);
         }}
       />
     </AppShell>

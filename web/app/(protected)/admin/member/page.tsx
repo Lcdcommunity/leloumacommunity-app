@@ -1,3 +1,4 @@
+// web/app/(protected)/admin/members/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -44,7 +45,6 @@ interface EditMemberData {
 
 /* ══════════════════════════════════════════════════════ FONCTIONS UTILITAIRES GLOBALES */
 
-// 🔥 La fonction manquante placée ici au niveau global, impossible de la perdre !
 function renderInfoValue(value: string | null | undefined) {
   if (!value || value.trim() === '') {
     return <span style={{ color: '#9CA3AF', fontStyle: 'italic', fontWeight: 500 }}>Non renseigné</span>;
@@ -79,6 +79,13 @@ const USER_STATUS_MAP: Record<string, { label: string; color: string; bg: string
   SUSPENDED:        { label: 'Suspendu',           color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
   REJECTED:         { label: 'Rejeté',             color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
   DELETED:          { label: 'Supprimé',           color: '#9CA3AF', bg: '#F9FAFB', border: '#E5E7EB' },
+};
+
+const ROLE_MAP: Record<string, string> = {
+  SYSTEM_ADMIN: 'Chef',
+  SUPER_ADMIN: 'S.Admin',
+  ANTENNA_ADMIN: 'A.Admin',
+  MEMBER: 'Membre',
 };
 
 function UserStatusBadge({ status }: { status: string }) {
@@ -149,6 +156,13 @@ export default function AdminMembersDirectoryPage() {
     addressLine1: '', addressLine2: '', postalCode: '', city: '', country: '', customCountry: ''
   });
 
+  // ⚡ ÉTATS D'EXPORTATION (NOUVEAU)
+  const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
+  const [exportStartMonth, setExportStartMonth] = useState('');
+  const [exportEndMonth, setExportEndMonth] = useState('');
+  const [exportStatus, setExportStatus] = useState('');
+  const [pdfData, setPdfData] = useState<ExtendedMember[] | null>(null);
+
   const loadMembers = useCallback(async (qVal?: string, sVal?: string) => {
     setError(null); 
     setLoading(true);
@@ -179,7 +193,7 @@ export default function AdminMembersDirectoryPage() {
 
   const startEditMode = () => {
     if (!selectedUser) return;
-    
+
     const isStandardBirthCountry = !selectedUser.birthCountry || COUNTRIES.includes(selectedUser.birthCountry);
     const isStandardCountry = !selectedUser.country || COUNTRIES.includes(selectedUser.country);
 
@@ -244,7 +258,7 @@ export default function AdminMembersDirectoryPage() {
       setActionLoading(null);
     }
   };
-
+  
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
@@ -310,7 +324,7 @@ export default function AdminMembersDirectoryPage() {
         addressLine2: formData.addressLine2 || undefined,
         postalCode: formData.postalCode || undefined,
       });
-      
+
       setCreatedPassword(formData.password);
       await loadMembers(); 
     } catch (err) {
@@ -349,6 +363,63 @@ export default function AdminMembersDirectoryPage() {
     setEditData({ ...editData, birthDate: formatted });
   };
 
+  // ⚡ FONCTION D'EXPORTATION (NOUVEAU)
+  const executeExport = async () => {
+    try {
+      setActionLoading('EXPORT');
+      const fetchRes = await api.listAntennaMembers({
+        page: 1,
+        pageSize: 10000,
+        status: exportStatus || undefined
+      });
+
+      let exportData = fetchRes.items as ExtendedMember[];
+
+      if (exportStartMonth) {
+        const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
+        exportData = exportData.filter(u => new Date(u.createdAt) >= start);
+      }
+      if (exportEndMonth) {
+        const end = new Date(`${exportEndMonth}-01T00:00:00Z`);
+        end.setMonth(end.getMonth() + 1);
+        exportData = exportData.filter(u => new Date(u.createdAt) < end);
+      }
+
+      if (exportData.length === 0) {
+        alert("Aucun membre ne correspond à ces critères d'exportation.");
+        return;
+      }
+
+      if (exportModalType === 'EXCEL') {
+        let csv = "Nom;Prenom;Email;Telephone;Role;Statut;Date Inscription\n";
+        exportData.forEach(u => {
+          const roleLbl = ROLE_MAP[u.role] || u.role;
+          const statLbl = USER_STATUS_MAP[u.status]?.label || u.status;
+          csv += `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${roleLbl}";"${statLbl}";"${formatDate(u.createdAt)}"\n`;
+        });
+        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Export_Membres_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        setExportModalType(null);
+      } else if (exportModalType === 'PDF') {
+        setPdfData(exportData);
+        setTimeout(() => {
+          window.print();
+          setPdfData(null);
+          setExportModalType(null);
+        }, 300);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur lors de l'exportation des données.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   /* ── Table styles ── */
   const thStyle: React.CSSProperties = { padding: '.65rem .9rem', fontSize: '.62rem', fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#374151', textAlign: 'left', background: 'rgba(248,250,252,.6)', whiteSpace: 'nowrap' };
   const tdStyle: React.CSSProperties = { padding: '.75rem .9rem', verticalAlign: 'middle', fontSize: '.8rem', color: '#111827' };
@@ -365,8 +436,16 @@ export default function AdminMembersDirectoryPage() {
         @keyframes aapulse { 0%,100%{opacity:1} 50%{opacity:.3} }
         .aa-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.45rem, 3vw, 1.85rem); font-weight: 600; color: #111827; letter-spacing: -0.02em; line-height: 1.15; }
         .aa-title span { background: linear-gradient(135deg,#1D4ED8,#3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-        .aa-add-btn { background: #059669; color: white; border: none; padding: 0.6rem 1rem; border-radius: 10px; font-weight: 700; font-size: 0.8rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(5,150,105,0.2); transition: transform 0.2s, box-shadow 0.2s; }
-        .aa-add-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(5,150,105,0.3); }
+        
+        .sm-export-group { display: flex; gap: .5rem; flex-wrap: wrap; }
+        .btn-export { height: 38px; padding: 0 1.2rem; border-radius: 10px; border: none; color: white; font-weight: 800; font-size: .75rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: transform 0.2s, box-shadow 0.2s; }
+        .btn-export:hover { transform: translateY(-2px); filter: brightness(1.1); }
+        .btn-pdf { background: linear-gradient(135deg, #991B1B, #DC2626); box-shadow: 0 4px 12px rgba(220,38,38,0.2); }
+        .btn-excel { background: linear-gradient(135deg, #059669, #10B981); box-shadow: 0 4px 12px rgba(16,185,129,0.2); }
+
+        .aa-add-btn { background: #059669; color: white; border: none; padding: 0 1.2rem; height: 38px; border-radius: 10px; font-weight: 800; font-size: 0.75rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(5,150,105,0.2); transition: transform 0.2s, box-shadow 0.2s; }
+        .aa-add-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(5,150,105,0.3); }
+        
         .aa-toolbar { display: flex; gap: clamp(0.35rem, 1.5vw, 0.65rem); align-items: center; flex-wrap: nowrap; padding: 1rem clamp(0.5rem, 2vw, 1.3rem); border-bottom: 1px solid rgba(37,99,235,.07); overflow: hidden; }
         .aa-sw { position: relative; flex: 1; min-width: 0; }
         .aa-si { position: absolute; left: clamp(0.5rem, 1.5vw, 0.8rem); top: 50%; transform: translateY(-50%); color: #9CA3AF; pointer-events: none; }
@@ -374,6 +453,7 @@ export default function AdminMembersDirectoryPage() {
         .aa-search:focus { border-color: rgba(37,99,235,.4); box-shadow: 0 0 0 3px rgba(37,99,235,.08); background: white; }
         .aa-select { flex: 0 1 auto; min-width: 0; height: 40px; border-radius: 11px; border: 1px solid rgba(37,99,235,.15); background: rgba(255,255,255,.88); padding: 0 clamp(1.2rem, 3vw, 2rem) 0 clamp(0.3rem, 1vw, 0.85rem); font-family: 'DM Sans', sans-serif; font-size: clamp(0.7rem, 2vw, 0.82rem); color: #374151; font-weight: 600; outline: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right clamp(0.25rem, 1vw, 0.65rem) center; }
         .aa-filter-btn { flex: 0 0 auto; height: 40px; padding: 0 clamp(0.6rem, 2vw, 1.4rem); border-radius: 11px; background: linear-gradient(135deg,#1D4ED8,#2563EB); border: none; color: white; cursor: pointer; font-weight: 700; font-size: clamp(0.75rem, 2vw, 0.8rem); box-shadow: 0 3px 10px rgba(37,99,235,.28); }
+        
         .aa-members-panel { background: rgba(253,253,255,.93); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(37,99,235,.09); box-shadow: 0 2px 14px rgba(37,99,235,.05); overflow: hidden; animation: aaFadeInUp 0.5s 0.1s cubic-bezier(.22,1,.36,1) both; }
         .aa-members-head { padding: 1rem 1.3rem; border-bottom: 1px solid rgba(37,99,235,.07); display: flex; align-items: center; justify-content: space-between; }
         .aa-members-title { font-size: 0.73rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #1F2937; display: flex; align-items: center; gap: 0.5rem; }
@@ -425,7 +505,7 @@ export default function AdminMembersDirectoryPage() {
         .aa-form-group { display: flex; flex-direction: column; gap: 0.35rem; }
         .aa-form-group.full { grid-column: 1 / -1; }
         .aa-form-label { font-size: 0.7rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em; }
-        .aa-form-input { height: 44px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 0.85rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; outline: none; background: #FAFAFA; transition: all 0.2s; }
+        .aa-form-input { height: 44px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 0.85rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; outline: none; background: #FAFAFA; transition: all 0.2s; width: 100%; box-sizing: border-box; }
         .aa-form-input:focus { border-color: #2563EB; background: white; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         .aa-form-input:disabled { background: #F1F5F9; color: #9CA3AF; cursor: not-allowed; }
         
@@ -452,7 +532,55 @@ export default function AdminMembersDirectoryPage() {
         @keyframes aaFadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
         @keyframes aaScaleUp { 0% { transform: scale(0.95) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes aaspin { to { transform: rotate(360deg); } }
+
+        /* ⚡ CSS D'EXPORTATION ET IMPRESSION */
+        .export-flex-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+        .export-flex-item { flex: 1 1 calc(50% - 0.5rem); min-width: 140px; }
+        .export-flex-item.full { flex: 1 1 100%; }
+
+        @media print {
+          body * { visibility: hidden; }
+          .printable-export-area, .printable-export-area * { visibility: visible; }
+          .printable-export-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+          .aa-wrap, .aa-modal-overlay { display: none !important; }
+        }
+        .printable-export-area { display: none; }
       `}</style>
+
+      {/* ⚡ LA ZONE IMPRIMABLE CACHÉE POUR LE PDF */}
+      {pdfData && (
+        <div className="printable-export-area">
+          <h2 style={{ textAlign: 'center', marginBottom: '20px', fontFamily: "'Cormorant Garamond', serif" }}>Liste des Membres</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: "'DM Sans', sans-serif" }}>
+            <thead>
+              <tr style={{ background: '#f1f5f9' }}>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Nom & Prénom</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Email</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Téléphone</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Rôle</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Statut</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Date Inscription</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pdfData.map(u => {
+                const roleLbl = ROLE_MAP[u.role] || u.role;
+                const statLbl = USER_STATUS_MAP[u.status]?.label || u.status;
+                return (
+                  <tr key={u.id}>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold' }}>{u.firstName} {u.lastName}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{u.email}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{u.phone || '-'}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{roleLbl}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{statLbl}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDate(u.createdAt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* 🔥 TOAST DE CONFIRMATION GLOBALE */}
       {saveOk && (
@@ -471,12 +599,22 @@ export default function AdminMembersDirectoryPage() {
             <div className="aa-eyebrow"><div className="aa-dot" />Admin antenne</div>
             <h1 className="aa-title">Annuaire <span>&amp; membres</span></h1>
           </div>
-          <button className="aa-add-btn" onClick={() => setIsCreateModalOpen(true)}>
-            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Nouveau membre
-          </button>
+          <div className="sm-export-group">
+            <button className="btn-export btn-pdf" onClick={() => setExportModalType('PDF')}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z"/></svg>
+              PDF
+            </button>
+            <button className="btn-export btn-excel" onClick={() => setExportModalType('EXCEL')}>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              EXCEL
+            </button>
+            <button className="aa-add-btn" onClick={() => setIsCreateModalOpen(true)}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="hide-mobile">Nouveau membre</span>
+            </button>
+          </div>
         </div>
 
         <div className="aa-members-panel">
@@ -583,6 +721,51 @@ export default function AdminMembersDirectoryPage() {
           )}
         </div>
 
+        {/* ⚡ MODALE D'EXPORTATION SANS SURCHARGER LA PAGE */}
+        {exportModalType && (
+          <div className="aa-modal-overlay" onClick={() => actionLoading !== 'EXPORT' && setExportModalType(null)}>
+            <div className="aa-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', padding: '2rem', display: 'block', overflow: 'visible' }}>
+              <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.8rem', fontWeight: 700, color: '#111827', margin: '0 0 1.5rem 0' }}>
+                Exporter en <span style={{ color: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}>{exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</span>
+              </h2>
+              
+              <div className="export-flex-row">
+                <div className="export-flex-item full">
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Filtrer par Statut</label>
+                  <select className="md-edit-select" value={exportStatus} onChange={e => setExportStatus(e.target.value)} style={{ width: '100%', height: '42px', background: '#F8FAFC' }}>
+                    <option value="">Tous les statuts</option>
+                    <option value="ACTIVE">Actifs</option>
+                    <option value="PENDING_APPROVAL">En attente d&apos;approbation</option>
+                    <option value="EMAIL_UNVERIFIED">Email non vérifié</option>
+                    <option value="SUSPENDED">Suspendus</option>
+                    <option value="REJECTED">Rejetés</option>
+                  </select>
+                </div>
+                <div className="export-flex-item">
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Inscrits depuis</label>
+                  <input type="month" className="aa-form-input" value={exportStartMonth} onChange={e => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '42px', background: '#F8FAFC' }} />
+                </div>
+                <div className="export-flex-item">
+                  <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Inscrits jusqu&apos;à</label>
+                  <input type="month" className="aa-form-input" value={exportEndMonth} onChange={e => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '42px', background: '#F8FAFC' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                <button className="aa-btn aa-btn-cancel" style={{ flex: 1, border: '1px solid #E2E8F0', background: 'transparent', color: '#64748B' }} onClick={() => setExportModalType(null)} disabled={actionLoading === 'EXPORT'}>Annuler</button>
+                <button 
+                  className="aa-btn" 
+                  style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626', color: 'white', border: 'none' }} 
+                  onClick={() => void executeExport()} 
+                  disabled={actionLoading === 'EXPORT'}
+                >
+                  {actionLoading === 'EXPORT' ? 'Génération...' : 'Télécharger'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── MODALE DE CRÉATION DE MEMBRE (AVEC TOUS LES CHAMPS) ── */}
         {isCreateModalOpen && (
           <div className="aa-modal-overlay" onClick={resetCreateForm}>
@@ -607,8 +790,8 @@ export default function AdminMembersDirectoryPage() {
                     </p>
                   </div>
                 ) : (
-                  <form id="createMemberForm" onSubmit={handleCreateSubmit}>
-                    
+                  <form id="createMemberForm" onSubmit={(e) => void handleCreateSubmit(e)}>
+
                     <div className="md-edit-section">
                       <div className="md-edit-section-title">Identité & Contact</div>
                       <div className="aa-form-grid">
@@ -706,8 +889,7 @@ export default function AdminMembersDirectoryPage() {
                           <input className="aa-form-input" value={formData.postalCode} onChange={e => setFormData({ ...formData, postalCode: e.target.value })} placeholder="Ex: 75001" />
                         </div>
                         <div className="aa-form-group">
-                          <label className="aa-form-label">Ville résidence</label>
-                          <input className="aa-form-input" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder="Ex: Paris" />
+                          <label className="aa-form-label">Ville résidence</label>                          <input className="aa-form-input" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder="Ex: Paris" />
                         </div>
                         <div className="aa-form-group full">
                           <label className="aa-form-label">Pays résidence</label>
@@ -732,7 +914,7 @@ export default function AdminMembersDirectoryPage() {
                   <>
                     <button className="aa-btn aa-btn-cancel" onClick={resetCreateForm}>Annuler</button>
                     <button form="createMemberForm" type="submit" className="aa-btn aa-btn-validate" disabled={isCreating}>
-                      {isCreating ? <div className="aa-btn-ring" /> : "Créer le compte"}
+                      {isCreating ? "Création..." : "Créer le compte"}
                     </button>
                   </>
                 )}
@@ -775,7 +957,7 @@ export default function AdminMembersDirectoryPage() {
                       <span className="aa-info-label">Téléphone</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.phone)}</span>
                     </div>
-                    
+
                     <div className="aa-info-item">
                       <span className="aa-info-label">Date de naissance</span>
                       <span className="aa-info-value">{selectedUser.birthDate ? new Date(selectedUser.birthDate).toLocaleDateString('fr-FR') : renderInfoValue(null)}</span>
@@ -788,7 +970,7 @@ export default function AdminMembersDirectoryPage() {
                       <span className="aa-info-label">Pays de naissance</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.birthCountry)}</span>
                     </div>
-                    
+
                     <div className="aa-info-item">
                       <span className="aa-info-label">Profession</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.professionalStatus)}</span>
@@ -826,7 +1008,7 @@ export default function AdminMembersDirectoryPage() {
                   </div>
                 ) : (
                   /* VUE ÉDITION INTÉGRÉE DANS LA MODALE */
-                  <form id="editMemberForm" onSubmit={handleSaveEdit} className="aa-form-grid">
+                  <form id="editMemberForm" onSubmit={(e) => void handleSaveEdit(e)} className="aa-form-grid">
                     <div className="aa-form-group">
                       <label className="aa-form-label">Prénom</label>
                       <input className="aa-form-input" value={editData.firstName} onChange={e => setEditData({ ...editData, firstName: e.target.value })} required />
@@ -922,21 +1104,20 @@ export default function AdminMembersDirectoryPage() {
                     <button className="aa-btn aa-btn-edit" onClick={startEditMode} disabled={actionLoading !== null}>
                       Modifier
                     </button>
-                    
+
                     {selectedUser.status === 'PENDING_APPROVAL' && (
-                      <button className="aa-btn aa-btn-validate" onClick={() => handleUpdateStatus('ACTIVE')} disabled={actionLoading !== null}>
+                      <button className="aa-btn aa-btn-validate" onClick={() => void handleUpdateStatus('ACTIVE')} disabled={actionLoading !== null}>
                         {actionLoading === 'ACTIVE' ? '...' : 'Valider'}
                       </button>
                     )}
 
-                    {/* Le bouton rejeter n'apparait PAS si le membre est Actif, Supprimé ou Déjà Rejeté */}
                     {selectedUser.status !== 'ACTIVE' && selectedUser.status !== 'REJECTED' && selectedUser.status !== 'DELETED' && (
-                      <button className="aa-btn aa-btn-reject" onClick={() => handleUpdateStatus('REJECTED')} disabled={actionLoading !== null}>
+                      <button className="aa-btn aa-btn-reject" onClick={() => void handleUpdateStatus('REJECTED')} disabled={actionLoading !== null}>
                         {actionLoading === 'REJECTED' ? '...' : 'Rejeter'}
                       </button>
                     )}
 
-                    <button className="aa-btn aa-btn-delete" onClick={handleDelete} disabled={actionLoading !== null || selectedUser.status === 'DELETED'}>
+                    <button className="aa-btn aa-btn-delete" onClick={() => void handleDelete()} disabled={actionLoading !== null || selectedUser.status === 'DELETED'}>
                       {actionLoading === 'DELETE' ? '...' : 'Supprimer'}
                     </button>
                   </>
