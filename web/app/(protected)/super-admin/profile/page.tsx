@@ -9,6 +9,51 @@ import type { Association } from '../../../../types/association';
 
 type FlashMessage = { text: string; ok: boolean } | null;
 
+export const ASSOCIATION_ROLES = [
+  'Membre (simple)',
+  "Secrétaire à l'organisation",
+  'Secrétaire Général(e)',
+  'Trésorier / Trésorière',
+  'Président(e)',
+  'Vice-président(e)',
+  'Chargé(e) de communication',
+  'Conseiller / Conseillère',
+  'Autre',
+];
+
+export const COMMUNES_ORIGINE = [
+  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
+];
+
+export const COUNTRIES = [
+  { name: 'Guinée', code: 'GN' },
+  { name: 'France', code: 'FR' },
+  { name: 'Sénégal', code: 'SN' },
+  { name: 'Côte d\'Ivoire', code: 'CI' },
+  { name: 'Mali', code: 'ML' },
+  { name: 'Maroc', code: 'MA' },
+  { name: 'Canada', code: 'CA' },
+  { name: 'États-Unis', code: 'US' },
+  { name: 'Belgique', code: 'BE' },
+  { name: 'Suisse', code: 'CH' },
+  { name: 'Allemagne', code: 'DE' },
+  { name: 'Royaume-Uni', code: 'GB' },
+  { name: 'Espagne', code: 'ES' },
+  { name: 'Italie', code: 'IT' },
+  { name: 'Sierra Leone', code: 'SL' },
+  { name: 'Libéria', code: 'LR' },
+  { name: 'Guinée-Bissau', code: 'GW' },
+  { name: 'Gambie', code: 'GM' },
+  { name: 'Angola', code: 'AO' },
+  { name: 'Cameroun', code: 'CM' },
+  { name: 'Niger', code: 'NE' },
+  { name: 'Afrique du Sud', code: 'ZA' },
+  { name: 'Mozambique', code: 'MZ' },
+  { name: 'Portugal', code: 'PT' },
+  { name: 'Autre', code: 'OTHER' }
+].sort((a, b) => a.name.localeCompare(b.name));
+
 const CURRENCIES = [
   { value: 'GNF', label: 'GNF — Franc guinéen' },
   { value: 'XOF', label: 'XOF — Franc CFA (UEMOA)' },
@@ -45,14 +90,20 @@ export default function SuperAdminProfilePage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  
   const [associationTitle, setAssociationTitle] = useState('');
+  const [customAssociationTitle, setCustomAssociationTitle] = useState('');
+
   const [addrNum, setAddrNum] = useState('');
   const [addrLabel, setAddrLabel] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [city, setCity] = useState('');
+  
   const [country, setCountry] = useState('');
+  const [customCountry, setCustomCountry] = useState('');
+
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  const [customOriginSubPrefecture, setCustomOriginSubPrefecture] = useState('');
 
   // — Champs association —
   const [assocName, setAssocName] = useState('');
@@ -101,16 +152,44 @@ export default function SuperAdminProfilePage() {
     setFirstName(user.firstName || '');
     setLastName(user.lastName || '');
     setPhone(user.phone || '');
-    setAssociationTitle(user.associationTitle || user.function || 'Super Administrateur');
+    
+    // Hydratation chirurgicale : Fonction
+    const uRole = user.associationTitle || user.function || 'Super Administrateur';
+    if (uRole && !ASSOCIATION_ROLES.includes(uRole)) {
+      setAssociationTitle('Autre');
+      setCustomAssociationTitle(uRole);
+    } else {
+      setAssociationTitle(uRole);
+      setCustomAssociationTitle('');
+    }
+
     const line1 = user.addressLine1 || '';
     const numMatch = line1.match(/^(\S+)\s+(.*)/);
     if (numMatch) { setAddrNum(numMatch[1]); setAddrLabel(numMatch[2]); }
     else { setAddrNum(''); setAddrLabel(line1); }
-    setAddressLine2(user.addressLine2 || '');
+    
     setPostalCode(user.postalCode || '');
     setCity(user.city || '');
-    setCountry(user.country || '');
-    setOriginSubPrefecture(user.originSubPrefecture || '');
+
+    // Hydratation chirurgicale : Pays de résidence
+    const uCountry = user.country || '';
+    if (uCountry && !COUNTRIES.find(c => c.name === uCountry)) {
+      setCountry('Autre');
+      setCustomCountry(uCountry);
+    } else {
+      setCountry(uCountry);
+      setCustomCountry('');
+    }
+
+    // Hydratation chirurgicale : Origine
+    const uOrigin = user.originSubPrefecture || '';
+    if (uOrigin && !COMMUNES_ORIGINE.includes(uOrigin)) {
+      setOriginSubPrefecture('Autre');
+      setCustomOriginSubPrefecture(uOrigin);
+    } else {
+      setOriginSubPrefecture(uOrigin);
+      setCustomOriginSubPrefecture('');
+    }
   }
 
   function populateAssocFields(assoc: Association | null) {
@@ -175,7 +254,12 @@ export default function SuperAdminProfilePage() {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
+    
     try {
+      const finalRole = associationTitle === 'Autre' ? customAssociationTitle : associationTitle;
+      const finalCountry = country === 'Autre' ? customCountry : country;
+      const finalOrigin = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
+
       const addressLine1 = [addrNum.trim(), addrLabel.trim()].filter(Boolean).join(' ') || undefined;
       const assocAddressLine1 = [assocAddrNum.trim(), assocAddrLabel.trim()].filter(Boolean).join(' ') || undefined;
 
@@ -183,13 +267,12 @@ export default function SuperAdminProfilePage() {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         phone: phone.trim() || undefined,
-        associationTitle: associationTitle.trim() || undefined,
+        associationTitle: finalRole.trim() || undefined,
         addressLine1,
-        addressLine2: addressLine2.trim() || undefined,
         postalCode: postalCode.trim() || undefined,
         city: city.trim() || undefined,
-        country: country.trim() || undefined,
-        originSubPrefecture: originSubPrefecture.trim() || undefined,
+        country: finalCountry.trim() || undefined,
+        originSubPrefecture: finalOrigin.trim() || undefined,
       };
 
       const updatedUser = await api.updateMyProfile(userPayload);
@@ -253,8 +336,7 @@ export default function SuperAdminProfilePage() {
         .saprf-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 960px; margin: 0 auto; }
 
         .saprf-header-block { margin-bottom: 1.75rem; opacity: 0; transform: translateY(12px); animation: saprfin 0.55s 0.04s cubic-bezier(.22,1,.36,1) forwards; }
-        .saprf-eyebrow { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #B91C1C; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.45rem; }
-        .saprf-eyebrow-dot { width: 6px; height: 6px; background: #DC2626; border-radius: 50%; animation: saprfpulse 2s ease-in-out infinite; }
+        .saprf-eyebrow { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #B91C1C; margin-bottom: 0.4rem; display: flex; align-items: center; gap: 0.45rem; }        .saprf-eyebrow-dot { width: 6px; height: 6px; background: #DC2626; border-radius: 50%; animation: saprfpulse 2s ease-in-out infinite; }
         @keyframes saprfpulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
         .saprf-page-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 3.5vw, 2.1rem); font-weight: 600; color: #991B1B; letter-spacing: -0.025em; line-height: 1.1; }
         .saprf-page-title span { color: #DC2626; }
@@ -434,8 +516,8 @@ export default function SuperAdminProfilePage() {
                   <label className="saprf-label">Nom</label>
                   <input className="saprf-input" value={lastName} onChange={e => setLastName(e.target.value)} disabled={!isEditing} required />
                 </div>
-              </div>
-
+              </div>              
+              
               <div className="saprf-grid-2" style={{ marginBottom: '1rem' }}>
                 <div className="saprf-field">
                   <label className="saprf-label">Email <span className="opt">Non modifiable</span></label>
@@ -449,7 +531,19 @@ export default function SuperAdminProfilePage() {
 
               <div className="saprf-field">
                 <label className="saprf-label">Fonction officielle</label>
-                <input className="saprf-input" value={associationTitle} onChange={e => setAssociationTitle(e.target.value)} disabled={!isEditing} placeholder="Ex : Président, Secrétaire Général…" />
+                {isEditing ? (
+                  <>
+                    <select className="saprf-select" value={associationTitle} onChange={e => { setAssociationTitle(e.target.value); if(e.target.value !== 'Autre') setCustomAssociationTitle(''); }}>
+                      <option value="">Sélectionnez un poste...</option>
+                      {ASSOCIATION_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    {associationTitle === 'Autre' && (
+                      <input className="saprf-input" style={{ marginTop: '0.4rem' }} value={customAssociationTitle} onChange={e => setCustomAssociationTitle(e.target.value)} placeholder="Précisez la fonction" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="saprf-input" value={associationTitle === 'Autre' ? customAssociationTitle : associationTitle} disabled placeholder="Ex : Président, Secrétaire Général…" />
+                )}
               </div>
             </div>
 
@@ -474,11 +568,6 @@ export default function SuperAdminProfilePage() {
                 </div>
               </div>
 
-              <div className="saprf-field" style={{ marginBottom: '1rem' }}>
-                <label className="saprf-label">Complément <span className="opt">Optionnel</span></label>
-                <input className="saprf-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} disabled={!isEditing} placeholder="Appartement, bâtiment…" />
-              </div>
-
               <div className="saprf-grid-2" style={{ marginBottom: '1rem' }}>
                 <div className="saprf-field">
                   <label className="saprf-label">Code postal</label>
@@ -492,7 +581,19 @@ export default function SuperAdminProfilePage() {
 
               <div className="saprf-field">
                 <label className="saprf-label">Pays</label>
-                <input className="saprf-input" value={country} onChange={e => setCountry(e.target.value)} disabled={!isEditing} placeholder="France" />
+                {isEditing ? (
+                  <>
+                    <select className="saprf-select" value={country} onChange={e => { setCountry(e.target.value); if(e.target.value !== 'Autre') setCustomCountry(''); }}>
+                      <option value="">Sélectionnez un pays...</option>
+                      {COUNTRIES.map(c => <option key={`res-${c.code}`} value={c.name}>{c.name}</option>)}
+                    </select>
+                    {country === 'Autre' && (
+                      <input className="saprf-input" style={{ marginTop: '0.4rem' }} value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder="Précisez votre pays" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="saprf-input" value={country === 'Autre' ? customCountry : country} disabled placeholder="France" />
+                )}
               </div>
             </div>
 
@@ -507,7 +608,19 @@ export default function SuperAdminProfilePage() {
               </div>
               <div className="saprf-field">
                 <label className="saprf-label">Commune d&apos;origine</label>
-                <input className="saprf-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} disabled={!isEditing} placeholder="Ex : Lélouma Centre" />
+                {isEditing ? (
+                  <>
+                    <select className="saprf-select" value={originSubPrefecture} onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}>
+                      <option value="">Sélectionnez votre commune...</option>
+                      {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {originSubPrefecture === 'Autre' && (
+                      <input className="saprf-input" style={{ marginTop: '0.4rem' }} value={customOriginSubPrefecture} onChange={e => setCustomOriginSubPrefecture(e.target.value)} placeholder="Précisez votre commune" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="saprf-input" value={originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture} disabled placeholder="Ex : Lélouma Centre" />
+                )}
               </div>
             </div>
 
@@ -603,8 +716,7 @@ export default function SuperAdminProfilePage() {
               <div className="saprf-grid-num" style={{ marginBottom: '1rem' }}>
                 <div className="saprf-field">
                   <label className="saprf-label">N°</label>
-                  <input className="saprf-input" value={assocAddrNum} onChange={e => setAssocAddrNum(e.target.value)} disabled={!isEditing} placeholder="12" />
-                </div>
+                  <input className="saprf-input" value={assocAddrNum} onChange={e => setAssocAddrNum(e.target.value)} disabled={!isEditing} placeholder="12" />                </div>
                 <div className="saprf-field">
                   <label className="saprf-label">Libellé de voie</label>
                   <input className="saprf-input" value={assocAddrLabel} onChange={e => setAssocAddrLabel(e.target.value)} disabled={!isEditing} placeholder="Rue des Acacias…" />

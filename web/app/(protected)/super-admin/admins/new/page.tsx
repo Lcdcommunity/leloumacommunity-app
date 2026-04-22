@@ -27,7 +27,6 @@ export default function NewAdminPage() {
         associationTitle: values.associationTitle,
         professionalStatus: values.professionalStatus,
         addressLine1: values.addressLine1,
-        addressLine2: values.addressLine2,
         postalCode: values.postalCode,
         city: values.city,
         country: values.country,

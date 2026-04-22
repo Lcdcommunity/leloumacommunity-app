@@ -44,7 +44,7 @@ export const PROFESSION_LIST = [
 
 export const COMMUNES_ORIGINE = [
   'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
-  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
 ];
 
 export const COUNTRIES = [
@@ -72,7 +72,7 @@ export const COUNTRIES = [
   { name: 'Afrique du Sud', code: 'ZA', dial: '+27', phoneLength: 9 },
   { name: 'Mozambique', code: 'MZ', dial: '+258', phoneLength: 9 },
   { name: 'Portugal', code: 'PT', dial: '+351', phoneLength: 9 },
-  { name: 'Autre (Non listé)', code: 'OTHER', dial: '+', phoneLength: 0 }
+  { name: 'Autre', code: 'OTHER', dial: '+', phoneLength: 0 }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 export default function MemberSignupPage() {
@@ -113,7 +113,10 @@ export default function MemberSignupPage() {
 
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  const [customOriginSubPrefecture, setCustomOriginSubPrefecture] = useState('');
+
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
 
@@ -127,9 +130,10 @@ export default function MemberSignupPage() {
 
   const [postalCode, setPostalCode] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
   const [profession, setProfession] = useState('');
+  
   const [associationRole, setAssociationRole] = useState('');
+  const [customAssociationRole, setCustomAssociationRole] = useState('');
 
   const [selectedPhotoFile, setSelectedPhotoFile] = useState<File | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
@@ -166,6 +170,7 @@ export default function MemberSignupPage() {
         if (parsed.email) setEmail(parsed.email);
         if (parsed.phone) setPhone(parsed.phone);
         if (parsed.originSubPrefecture) setOriginSubPrefecture(parsed.originSubPrefecture);
+        if (parsed.customOriginSubPrefecture) setCustomOriginSubPrefecture(parsed.customOriginSubPrefecture);
         if (parsed.birthDate) setBirthDate(parsed.birthDate);
         if (parsed.placeOfBirth) setPlaceOfBirth(parsed.placeOfBirth);
         if (parsed.birthCountry) setBirthCountry(parsed.birthCountry);
@@ -175,9 +180,9 @@ export default function MemberSignupPage() {
         if (parsed.customCountry) setCustomCountry(parsed.customCountry);
         if (parsed.postalCode) setPostalCode(parsed.postalCode);
         if (parsed.addressLine1) setAddressLine1(parsed.addressLine1);
-        if (parsed.addressLine2) setAddressLine2(parsed.addressLine2);
         if (parsed.profession) setProfession(parsed.profession);
         if (parsed.associationRole) setAssociationRole(parsed.associationRole);
+        if (parsed.customAssociationRole) setCustomAssociationRole(parsed.customAssociationRole);
         if (parsed.termsAccepted) setTermsAccepted(parsed.termsAccepted);
       } catch (e) {
         console.error("Erreur lors de la restauration du formulaire", e);
@@ -242,20 +247,20 @@ export default function MemberSignupPage() {
   useEffect(() => {
     if (!mounted) return;
     const dataToSave = {
-      step, firstName, lastName, antennaId, email, phone, originSubPrefecture,
+      step, firstName, lastName, antennaId, email, phone, originSubPrefecture, customOriginSubPrefecture,
       birthDate, placeOfBirth, birthCountry, customBirthCountry, city, country,
-      customCountry, postalCode, addressLine1, addressLine2, profession, associationRole,
+      customCountry, postalCode, addressLine1, profession, associationRole, customAssociationRole,
       termsAccepted
     };
     sessionStorage.setItem('signupFormState', JSON.stringify(dataToSave));
-  }, [mounted, step, firstName, lastName, antennaId, email, phone, originSubPrefecture, birthDate, placeOfBirth, birthCountry, customBirthCountry, city, country, customCountry, postalCode, addressLine1, addressLine2, profession, associationRole, termsAccepted]);
+  }, [mounted, step, firstName, lastName, antennaId, email, phone, originSubPrefecture, customOriginSubPrefecture, birthDate, placeOfBirth, birthCountry, customBirthCountry, city, country, customCountry, postalCode, addressLine1, profession, associationRole, customAssociationRole, termsAccepted]);
 
   useEffect(() => {
     return () => { if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); };
   }, [photoPreviewUrl]);
 
   useEffect(() => {
-    if (country && country !== 'Autre (Non listé)') {
+    if (country && country !== 'Autre') {
       const selectedCountry = COUNTRIES.find(c => c.name === country);
       if (selectedCountry) {
         setPhone(prevPhone => {
@@ -265,7 +270,7 @@ export default function MemberSignupPage() {
             const phoneParts = prevPhone.split(' ');
             if (phoneParts.length > 1) {
               phoneParts[0] = selectedCountry.dial;
-              return phoneParts.join(' ');
+              return phoneParts.join(' ');            
             }
             return prevPhone;
           }
@@ -307,6 +312,7 @@ export default function MemberSignupPage() {
     setSelectedPhotoFile(file);
     setPhotoPreviewUrl(URL.createObjectURL(file));
   }
+  
   function removePhoto() {
     if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
     setSelectedPhotoFile(null);
@@ -323,7 +329,10 @@ export default function MemberSignupPage() {
     }
     if (s === 1) {
       if (!associationRole) return t('signup.errRole', 'Le poste occupé est requis.');
+      if (associationRole === 'Autre' && !customAssociationRole.trim()) return t('signup.errRoleOther', 'Veuillez préciser le poste occupé.');
+
       if (!originSubPrefecture) return t('signup.errCommune', 'La commune d\'origine est requise.');
+      if (originSubPrefecture === 'Autre' && !customOriginSubPrefecture.trim()) return t('signup.errCommuneOther', 'Veuillez préciser la commune d\'origine.');
 
       if (!birthDate || birthDate.length < 10) return t('signup.errBirthdateReq', 'La date de naissance est requise (JJ/MM/AAAA).');
       const parts = birthDate.split('/');
@@ -346,16 +355,16 @@ export default function MemberSignupPage() {
 
       if (!placeOfBirth.trim()) return t('signup.errBirthplace', 'Le lieu de naissance est requis.');
       if (!birthCountry) return t('signup.errBirthCountry', 'Le pays de naissance est requis.');
-      if (birthCountry === 'Autre (Non listé)' && !customBirthCountry.trim()) return t('signup.errBirthCountryOther', 'Veuillez préciser votre pays de naissance.');
+      if (birthCountry === 'Autre' && !customBirthCountry.trim()) return t('signup.errBirthCountryOther', 'Veuillez préciser votre pays de naissance.');
 
       if (!country) return t('signup.errCountry', 'Le pays de résidence est requis.');
-      if (country === 'Autre (Non listé)' && !customCountry.trim()) return t('signup.errCountryOther', 'Veuillez préciser votre pays de résidence.');
+      if (country === 'Autre' && !customCountry.trim()) return t('signup.errCountryOther', 'Veuillez préciser votre pays de résidence.');
 
       if (!email.trim()) return t('signup.errEmailReq', 'L\'email est requis.');
       if (!/\S+@\S+\.\S+/.test(email)) return t('signup.errEmailFmt', 'Format d\'email invalide.');
 
       if (!phone.trim()) return t('signup.errPhoneReq', 'Le téléphone est requis.');
-      if (phone && country && country !== 'Autre (Non listé)') {
+      if (phone && country && country !== 'Autre') {
         const selectedCountry = COUNTRIES.find(c => c.name === country);
         if (selectedCountry) {
           let phoneWithoutDial = phone;
@@ -371,7 +380,7 @@ export default function MemberSignupPage() {
 
       if (!profession) return t('signup.errProfession', 'La profession / situation est requise.');
       if (!city.trim()) return t('signup.errCity', 'La ville de résidence est requise.');
-      if (!addressLine1.trim()) return t('signup.errAddress', 'L\'adresse (Ligne 1) est requise.');
+      if (!addressLine1.trim()) return t('signup.errAddress', 'L\'adresse de résidence est requise.');
     }
     if (s === 3) {
       if (!password) return t('signup.errPwdReq', 'Le mot de passe est requis.');
@@ -402,8 +411,10 @@ export default function MemberSignupPage() {
     setSubmitting(true);
 
     try {
-      const finalBirthCountry = birthCountry === 'Autre (Non listé)' ? customBirthCountry : birthCountry;
-      const finalCountry = country === 'Autre (Non listé)' ? customCountry : country;
+      const finalBirthCountry = birthCountry === 'Autre' ? customBirthCountry : birthCountry;
+      const finalCountry = country === 'Autre' ? customCountry : country;
+      const finalOrigin = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
+      const finalRole = associationRole === 'Autre' ? customAssociationRole : associationRole;
       const formattedBirthDate = convertDateToISO(birthDate);
 
       const formData = new FormData();
@@ -414,7 +425,7 @@ export default function MemberSignupPage() {
       formData.append('antennaId', antennaId);
 
       if (phone) formData.append('phone', phone.trim());
-      if (originSubPrefecture) formData.append('originSubPrefecture', originSubPrefecture.trim());
+      if (finalOrigin) formData.append('originSubPrefecture', finalOrigin.trim());
       if (formattedBirthDate) formData.append('birthDate', formattedBirthDate);
       if (placeOfBirth) formData.append('placeOfBirth', placeOfBirth.trim());
       if (finalBirthCountry) formData.append('birthCountry', finalBirthCountry.trim());
@@ -422,8 +433,7 @@ export default function MemberSignupPage() {
       if (finalCountry) formData.append('country', finalCountry.trim());
       if (postalCode) formData.append('postalCode', postalCode.trim());
       if (addressLine1) formData.append('addressLine1', addressLine1.trim());
-      if (addressLine2) formData.append('addressLine2', addressLine2.trim());
-      if (associationRole) formData.append('function', associationRole.trim());
+      if (finalRole) formData.append('function', finalRole.trim());
       if (profession) formData.append('professionalStatus', profession.trim());
       formData.append('termsAccepted', String(termsAccepted));
 
@@ -488,8 +498,7 @@ export default function MemberSignupPage() {
           display: flex; align-items: flex-start; justify-content: center;
           position: relative; overflow: hidden;
           padding: 2rem 1.25rem 3rem;
-        }
-        .sp-orb { position: fixed; border-radius: 50%; filter: blur(100px); pointer-events: none; }
+        }        .sp-orb { position: fixed; border-radius: 50%; filter: blur(100px); pointer-events: none; }
         .sp-orb-1 { width: 500px; height: 500px; background: radial-gradient(circle, ${getLightColor(theme.primary, 0.15)} 0%, transparent 70%); top: -150px; right: -100px; animation: oa 16s ease-in-out infinite alternate; }
         .sp-orb-2 { width: 360px; height: 360px; background: radial-gradient(circle, ${getLightColor(theme.secondary, 0.12)} 0%, transparent 70%); bottom: -80px; left: -80px; animation: ob 20s ease-in-out infinite alternate; }
         @keyframes oa { from{transform:translate(0,0)} to{transform:translate(-40px,40px)} }
@@ -677,8 +686,8 @@ export default function MemberSignupPage() {
                 </div>
               ))}
             </div>
-          )}
-
+          )}          
+          
           {/* ── SUCCESS ── */}
           {success ? (
             <div className="sp-success sp-panel">
@@ -748,12 +757,15 @@ export default function MemberSignupPage() {
 
                   <div className="sp-field">
                     <label className="sp-label">{t('signup.originCommune', 'Commune d\'origine')}</label>
-                    <select className="sp-select" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} required>
+                    <select className="sp-select" value={originSubPrefecture} onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }} required>
                       <option value="">{t('signup.selectCommune', 'Sélectionnez votre commune...')}</option>
                       {COMMUNES_ORIGINE.map(commune => (
                         <option key={commune} value={commune}>{commune}</option>
                       ))}
                     </select>
+                    {originSubPrefecture === 'Autre' && (
+                      <input className="sp-input" value={customOriginSubPrefecture} onChange={e => setCustomOriginSubPrefecture(e.target.value)} placeholder={t('signup.specifyCommune', 'Précisez votre commune')} required style={{ marginTop: '0.4rem' }} />
+                    )}
                   </div>
 
                   <div className="sp-field">
@@ -766,7 +778,7 @@ export default function MemberSignupPage() {
                     <select
                       className="sp-role-select"
                       value={associationRole}
-                      onChange={e => setAssociationRole(e.target.value)}
+                      onChange={e => { setAssociationRole(e.target.value); if(e.target.value !== 'Autre') setCustomAssociationRole(''); }}
                       required
                     >
                       <option value="">{t('signup.selectRole', 'Sélectionnez un poste…')}</option>
@@ -774,7 +786,10 @@ export default function MemberSignupPage() {
                         <option key={r} value={r}>{r}</option>
                       ))}
                     </select>
-                    {associationRole && associationRole !== 'Membre (simple)' && (
+                    {associationRole === 'Autre' && (
+                      <input className="sp-input" value={customAssociationRole} onChange={e => setCustomAssociationRole(e.target.value)} placeholder={t('signup.specifyRole', 'Précisez le poste occupé')} required style={{ marginTop: '0.4rem' }} />
+                    )}
+                    {associationRole && associationRole !== 'Membre (simple)' && associationRole !== 'Autre' && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.68rem', fontWeight: 700, color: '#047857' }}>
                         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -798,13 +813,13 @@ export default function MemberSignupPage() {
 
                   <div className="sp-field">
                     <label className="sp-label">{t('signup.birthCountry', 'Pays de naissance')}</label>
-                    <select className="sp-select" value={birthCountry} onChange={e => { setBirthCountry(e.target.value); if (e.target.value !== 'Autre (Non listé)') setCustomBirthCountry(''); }} required>
+                    <select className="sp-select" value={birthCountry} onChange={e => { setBirthCountry(e.target.value); if (e.target.value !== 'Autre') setCustomBirthCountry(''); }} required>
                       <option value="">{t('signup.selectCountry', 'Sélectionnez un pays...')}</option>
                       {COUNTRIES.map(c => (
                         <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
-                    {birthCountry === 'Autre (Non listé)' && (
+                    {birthCountry === 'Autre' && (
                       <input className="sp-input" value={customBirthCountry} onChange={e => setCustomBirthCountry(e.target.value)} placeholder={t('signup.specifyCountry', 'Précisez votre pays')} required style={{ marginTop: '0.4rem' }} />
                     )}
                   </div>
@@ -813,13 +828,13 @@ export default function MemberSignupPage() {
 
                   <div className="sp-field">
                     <label className="sp-label">{t('signup.residenceCountry', 'Pays de résidence')}</label>
-                    <select className="sp-select" value={country} onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre (Non listé)') setCustomCountry(''); }} required>
+                    <select className="sp-select" value={country} onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre') setCustomCountry(''); }} required>
                       <option value="">{t('signup.selectCountry', 'Sélectionnez votre pays...')}</option>
                       {COUNTRIES.map(c => (
                         <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
-                    {country === 'Autre (Non listé)' && (
+                    {country === 'Autre' && (
                       <input className="sp-input" value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder={t('signup.specifyCountry', 'Précisez votre pays')} required style={{ marginTop: '0.4rem' }} />
                     )}
                   </div>
@@ -852,6 +867,7 @@ export default function MemberSignupPage() {
                   </div>
 
                   <p className="sp-section-title">{t('signup.residenceAddress', 'Adresse de résidence')}</p>
+                  
                   <div className="sp-grid-2">
                     <div className="sp-field">
                       <label className="sp-label">{t('signup.city', 'Ville')}</label>
@@ -863,15 +879,9 @@ export default function MemberSignupPage() {
                     </div>
                   </div>
 
-                  <div className="sp-grid-2">
-                    <div className="sp-field">
-                      <label className="sp-label">{t('signup.address1', 'Adresse 1')}</label>
-                      <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue..." required />
-                    </div>
-                    <div className="sp-field">
-                      <label className="sp-label">{t('signup.address2', 'Adresse 2')} <span className="sp-opt">({t('signup.optional', 'optionnel')})</span></label>
-                      <input className="sp-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} placeholder="Apt 3B" />
-                    </div>
+                  <div className="sp-field">
+                    <label className="sp-label">{t('signup.address1', 'Adresse de résidence')}</label>
+                    <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue..." required />
                   </div>
                 </div>
               )}

@@ -14,7 +14,6 @@ export type AdminFormValues = {
   associationTitle?: string;
   professionalStatus?: string;
   addressLine1?: string;
-  addressLine2?: string;
   postalCode?: string;
   city?: string;
   country?: string;
@@ -49,10 +48,15 @@ const PROFESSIONAL_STATUSES = [
   'Étudiant(e)', 'Retraité(e)', 'Sans emploi', 'Autre',
 ];
 
+const COMMUNES_ORIGINE = [
+  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
+];
+
 const COUNTRIES = [
   'Guinée', 'Sénégal', 'Côte d\'Ivoire', 'Mali', 'Burkina Faso', 'Togo',
   'Bénin', 'Niger', 'France', 'Belgique', 'Suisse', 'Allemagne', 'Espagne',
-  'Italie', 'États-Unis', 'Canada', 'Royaume-Uni', 'Autre (Non listé)'
+  'Italie', 'États-Unis', 'Canada', 'Royaume-Uni', 'Autre'
 ].sort();
 
 function Field({ label, type = 'text', value, onChange, placeholder, required = false, hint }: FieldProps) {
@@ -92,24 +96,29 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
   const [loadingAntennas, setLoadingAntennas] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [roleFocused, setRoleFocused] = useState(false);
-  const [statusFocused, setStatusFocused] = useState(false);
-  const [countryFocused, setCountryFocused] = useState(false);
-
   // States
   const [antennaIds, setAntennaIds] = useState<string[]>([]);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  
   const [associationTitle, setAssociationTitle] = useState('');
+  const [customAssociationTitle, setCustomAssociationTitle] = useState('');
+  
   const [professionalStatus, setProfessionalStatus] = useState('');
+  const [customProfessionalStatus, setCustomProfessionalStatus] = useState('');
+  
   const [addressLine1, setAddressLine1] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
   const [postalCode, setPostalCode] = useState('');
   const [city, setCity] = useState('');
+  
   const [country, setCountry] = useState('France');
+  const [customCountry, setCustomCountry] = useState('');
+  
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  const [customOriginSubPrefecture, setCustomOriginSubPrefecture] = useState('');
+  
   const [sendInvite, setSendInvite] = useState(true);
 
   // Computed currency constraint
@@ -151,17 +160,22 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
       alert("Veuillez sélectionner au moins une antenne.");
       return;
     }
+
+    const finalTitle = associationTitle === 'Autre' ? customAssociationTitle : associationTitle;
+    const finalProfStatus = professionalStatus === 'Autre' ? customProfessionalStatus : professionalStatus;
+    const finalCountry = country === 'Autre' ? customCountry : country;
+    const finalOrigin = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
+
     await onSubmit({
       antennaIds,
       firstName, lastName, email, phone: phone || undefined,
-      associationTitle: associationTitle || undefined,
-      professionalStatus: professionalStatus || undefined,
+      associationTitle: finalTitle || undefined,
+      professionalStatus: finalProfStatus || undefined,
       addressLine1: addressLine1 || undefined,
-      addressLine2: addressLine2 || undefined,
       postalCode: postalCode || undefined,
       city: city || undefined,
-      country: country || undefined,
-      originSubPrefecture: originSubPrefecture || undefined,
+      country: finalCountry || undefined,
+      originSubPrefecture: finalOrigin || undefined,
       sendInvite,
     });
   };
@@ -179,6 +193,28 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
         .sauf-chk { width: 18px; height: 18px; border-radius: 6px; border: 2px solid; display: flex; align-items: center; justify-content: center; transition: all .2s; flex-shrink: 0; }
         .active .sauf-chk { background: #DC2626; border-color: #DC2626; color: white; }
         .idle .sauf-chk { border-color: #D1D5DB; }
+        
+        .sauf-field-elem {
+          width: 100%; height: 42px; border-radius: 11px; box-sizing: border-box;
+          border: 1.5px solid rgba(220,38,38,.18);
+          background: rgba(255,255,255,.88); padding: 0 .95rem;
+          font-family: 'DM Sans',sans-serif; font-size: .86rem; font-weight: 600;
+          color: #111827; outline: none; transition: border-color .2s, box-shadow .2s;
+        }
+        .sauf-field-elem:focus {
+          border-color: rgba(220,38,38,.45);
+          background: white;
+          box-shadow: 0 0 0 3px rgba(220,38,38,.09);
+        }
+        select.sauf-field-elem {
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23374151' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right .85rem center;
+          padding-right: 2.5rem;
+          font-weight: 700;
+        }
+
         @media (max-width: 600px) { .sauf-grid { grid-template-columns: 1fr; } .sauf-antennas { grid-template-columns: 1fr; } }
       `}</style>
 
@@ -238,34 +274,49 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
           <div style={{ width: '100%' }}>
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>Poste dans l&apos;asso</label>
             <select
-              value={associationTitle} onChange={(e) => setAssociationTitle(e.target.value)} onFocus={() => setRoleFocused(true)} onBlur={() => setRoleFocused(false)}
-              style={{
-                width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box', border: `1.5px solid ${roleFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
-                background: roleFocused ? 'white' : 'rgba(255,255,255,.88)', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 700, color: '#111827', outline: 'none', transition: 'border-color .2s, box-shadow .2s', boxShadow: roleFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
-              }}
+              value={associationTitle}
+              onChange={(e) => { setAssociationTitle(e.target.value); if(e.target.value !== 'Autre') setCustomAssociationTitle(''); }}
+              className="sauf-field-elem"
             >
               <option value="">Sélectionnez un poste</option>
               {ASSOCIATION_TITLES.map((title) => <option key={title} value={title}>{title}</option>)}
             </select>
+            {associationTitle === 'Autre' && (
+              <input
+                className="sauf-field-elem"
+                style={{ marginTop: '.45rem' }}
+                value={customAssociationTitle}
+                onChange={(e) => setCustomAssociationTitle(e.target.value)}
+                placeholder="Précisez le poste"
+                required
+              />
+            )}
           </div>
           <div style={{ width: '100%' }}>
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>Statut Professionnel</label>
             <select
-              value={professionalStatus} onChange={(e) => setProfessionalStatus(e.target.value)} onFocus={() => setStatusFocused(true)} onBlur={() => setStatusFocused(false)}
-              style={{
-                width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box', border: `1.5px solid ${statusFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
-                background: statusFocused ? 'white' : 'rgba(255,255,255,.88)', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 700, color: '#111827', outline: 'none', transition: 'border-color .2s, box-shadow .2s', boxShadow: statusFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
-              }}
+              value={professionalStatus}
+              onChange={(e) => { setProfessionalStatus(e.target.value); if(e.target.value !== 'Autre') setCustomProfessionalStatus(''); }}
+              className="sauf-field-elem"
             >
               <option value="">Sélectionnez un statut</option>
               {PROFESSIONAL_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+            {professionalStatus === 'Autre' && (
+              <input
+                className="sauf-field-elem"
+                style={{ marginTop: '.45rem' }}
+                value={customProfessionalStatus}
+                onChange={(e) => setCustomProfessionalStatus(e.target.value)}
+                placeholder="Précisez le statut"
+                required
+              />
+            )}
           </div>
         </div>
 
-        <div className="sauf-grid">
-          <Field label="Adresse 1" value={addressLine1} onChange={setAddressLine1} placeholder="Ex: 12 rue de Paris" />
-          <Field label="Compl&eacute;ment" value={addressLine2} onChange={setAddressLine2} placeholder="Bâtiment, étage..." />
+        <div className="sauf-grid" style={{ gridTemplateColumns: '1fr' }}>
+          <Field label="Adresse de résidence" value={addressLine1} onChange={setAddressLine1} placeholder="N° et nom de rue" />
         </div>
 
         <div className="sauf-grid">
@@ -277,16 +328,46 @@ export function AdminUserForm({ onSubmit, busy = false }: AdminUserFormProps) {
           <div style={{ width: '100%' }}>
             <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>Pays de résidence</label>
             <select
-              value={country} onChange={(e) => setCountry(e.target.value)} onFocus={() => setCountryFocused(true)} onBlur={() => setCountryFocused(false)}
-              style={{
-                width: '100%', height: 42, borderRadius: 11, boxSizing: 'border-box', border: `1.5px solid ${countryFocused ? 'rgba(220,38,38,.45)' : 'rgba(220,38,38,.18)'}`,
-                background: countryFocused ? 'white' : 'rgba(255,255,255,.88)', padding: '0 .95rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.86rem', fontWeight: 700, color: '#111827', outline: 'none', transition: 'border-color .2s, box-shadow .2s', boxShadow: countryFocused ? '0 0 0 3px rgba(220,38,38,.09)' : 'none',
-              }}
+              value={country}
+              onChange={(e) => { setCountry(e.target.value); if(e.target.value !== 'Autre') setCustomCountry(''); }}
+              className="sauf-field-elem"
             >
+              <option value="">Sélectionnez un pays</option>
               {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
+            {country === 'Autre' && (
+              <input
+                className="sauf-field-elem"
+                style={{ marginTop: '.45rem' }}
+                value={customCountry}
+                onChange={(e) => setCustomCountry(e.target.value)}
+                placeholder="Précisez le pays"
+                required
+              />
+            )}
           </div>
-          <Field label="Commune d'origine" value={originSubPrefecture} onChange={setOriginSubPrefecture} placeholder="Ex: Sagalé" />
+          
+          <div style={{ width: '100%' }}>
+            <label style={{ display: 'block', fontSize: '.72rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.45rem' }}>Commune d&apos;origine</label>
+            <select
+              value={originSubPrefecture}
+              onChange={(e) => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}
+              className="sauf-field-elem"
+            >
+              <option value="">Sélectionnez une commune</option>
+              {COMMUNES_ORIGINE.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {originSubPrefecture === 'Autre' && (
+              <input
+                className="sauf-field-elem"
+                style={{ marginTop: '.45rem' }}
+                value={customOriginSubPrefecture}
+                onChange={(e) => setCustomOriginSubPrefecture(e.target.value)}
+                placeholder="Précisez la commune"
+                required
+              />
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '1rem 1.1rem', background: 'rgba(254,242,242,.6)', border: '1px solid rgba(220,38,38,.15)', borderRadius: '12px', marginTop: '.5rem' }}>

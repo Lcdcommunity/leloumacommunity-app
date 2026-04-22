@@ -13,7 +13,6 @@ type ExtendedMember = UserSummary & {
   country?: string;
   postalCode?: string;
   addressLine1?: string;
-  addressLine2?: string;
   originSubPrefecture?: string;
   originVillage?: string;
   birthDate?: string | Date;
@@ -29,14 +28,15 @@ interface EditMemberData {
   phone: string;
   professionalStatus: string;
   function: string;
+  customFunction: string;
   birthDate: string;
   placeOfBirth: string;
   birthCountry: string;
   customBirthCountry: string;
   originSubPrefecture: string;
+  customOriginSubPrefecture: string;
   originVillage: string;
   addressLine1: string;
-  addressLine2: string;
   postalCode: string;
   city: string;
   country: string;
@@ -113,14 +113,14 @@ const PROFESSION_LIST = [
 
 const COMMUNES_ORIGINE = [
   'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
-  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
 ];
 
 const COUNTRIES = [
   'Guinée', 'France', 'Sénégal', "Côte d'Ivoire", 'Mali', 'Maroc', 'Canada', 
   'États-Unis', 'Belgique', 'Suisse', 'Allemagne', 'Royaume-Uni', 'Espagne', 
   'Italie', 'Sierra Leone', 'Libéria', 'Guinée-Bissau', 'Gambie', 'Angola', 
-  'Cameroun', 'Niger', 'Afrique du Sud', 'Mozambique', 'Portugal', 'Autre (Non listé)'
+  'Cameroun', 'Niger', 'Afrique du Sud', 'Mozambique', 'Portugal', 'Autre'
 ].sort();
 
 /* ══════════════════════════════════════════════════════ PAGE PRINCIPALE */
@@ -139,9 +139,9 @@ export default function AdminMembersDirectoryPage() {
   // États d'édition dans la modale
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<EditMemberData>({
-    firstName: '', lastName: '', phone: '', professionalStatus: '', function: '',
-    birthDate: '', placeOfBirth: '', birthCountry: '', customBirthCountry: '', originSubPrefecture: '',
-    originVillage: '', addressLine1: '', addressLine2: '', postalCode: '',
+    firstName: '', lastName: '', phone: '', professionalStatus: '', function: '', customFunction: '',
+    birthDate: '', placeOfBirth: '', birthCountry: '', customBirthCountry: '', originSubPrefecture: '', customOriginSubPrefecture: '',
+    originVillage: '', addressLine1: '', postalCode: '',
     city: '', country: '', customCountry: ''
   });
 
@@ -152,8 +152,8 @@ export default function AdminMembersDirectoryPage() {
   const [formData, setFormData] = useState({
     firstName: '', lastName: '', email: '', password: '', phone: '',
     birthDate: '', placeOfBirth: '', birthCountry: '', customBirthCountry: '',
-    originSubPrefecture: '', originVillage: '', professionalStatus: '', function: '',
-    addressLine1: '', addressLine2: '', postalCode: '', city: '', country: '', customCountry: ''
+    originSubPrefecture: '', customOriginSubPrefecture: '', originVillage: '', professionalStatus: '', function: '', customFunction: '',
+    addressLine1: '', postalCode: '', city: '', country: '', customCountry: ''
   });
 
   // ⚡ ÉTATS D'EXPORTATION (NOUVEAU)
@@ -196,24 +196,33 @@ export default function AdminMembersDirectoryPage() {
 
     const isStandardBirthCountry = !selectedUser.birthCountry || COUNTRIES.includes(selectedUser.birthCountry);
     const isStandardCountry = !selectedUser.country || COUNTRIES.includes(selectedUser.country);
+    const isStandardOrigin = !selectedUser.originSubPrefecture || COMMUNES_ORIGINE.includes(selectedUser.originSubPrefecture);
+    const isStandardFunction = !selectedUser.function || ASSOCIATION_ROLES.includes(selectedUser.function);
 
     setEditData({
       firstName: selectedUser.firstName || '', 
       lastName: selectedUser.lastName || '', 
       phone: selectedUser.phone || '',
       professionalStatus: selectedUser.professionalStatus || '', 
-      function: selectedUser.function || '',
+      
+      function: isStandardFunction ? (selectedUser.function || '') : 'Autre',
+      customFunction: isStandardFunction ? '' : (selectedUser.function || ''),
+
       birthDate: selectedUser.birthDate ? new Date(selectedUser.birthDate).toLocaleDateString('fr-FR') : '',
       placeOfBirth: selectedUser.placeOfBirth || '', 
-      birthCountry: isStandardBirthCountry ? (selectedUser.birthCountry || '') : 'Autre (Non listé)',
+      
+      birthCountry: isStandardBirthCountry ? (selectedUser.birthCountry || '') : 'Autre',
       customBirthCountry: isStandardBirthCountry ? '' : (selectedUser.birthCountry || ''),
-      originSubPrefecture: selectedUser.originSubPrefecture || '', 
+      
+      originSubPrefecture: isStandardOrigin ? (selectedUser.originSubPrefecture || '') : 'Autre',
+      customOriginSubPrefecture: isStandardOrigin ? '' : (selectedUser.originSubPrefecture || ''),
+      
       originVillage: selectedUser.originVillage || '',
       addressLine1: selectedUser.addressLine1 || '', 
-      addressLine2: selectedUser.addressLine2 || '',
       postalCode: selectedUser.postalCode || '', 
       city: selectedUser.city || '', 
-      country: isStandardCountry ? (selectedUser.country || '') : 'Autre (Non listé)',
+      
+      country: isStandardCountry ? (selectedUser.country || '') : 'Autre',
       customCountry: isStandardCountry ? '' : (selectedUser.country || ''),
     });
     setIsEditing(true);
@@ -258,29 +267,30 @@ export default function AdminMembersDirectoryPage() {
       setActionLoading(null);
     }
   };
-  
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
     setActionLoading('EDIT');
     setSaveOk(false);
     try {
-      const finalBirthCountry = editData.birthCountry === 'Autre (Non listé)' ? editData.customBirthCountry : editData.birthCountry;
-      const finalCountry = editData.country === 'Autre (Non listé)' ? editData.customCountry : editData.country;
+      const finalBirthCountry = editData.birthCountry === 'Autre' ? editData.customBirthCountry : editData.birthCountry;
+      const finalCountry = editData.country === 'Autre' ? editData.customCountry : editData.country;
+      const finalOrigin = editData.originSubPrefecture === 'Autre' ? editData.customOriginSubPrefecture : editData.originSubPrefecture;
+      const finalFunction = editData.function === 'Autre' ? editData.customFunction : editData.function;
 
       await api.updateAntennaMember(selectedUser.id, {
         firstName: editData.firstName.trim() || undefined, 
         lastName: editData.lastName.trim() || undefined,
         phone: editData.phone.trim() || undefined, 
         professionalStatus: editData.professionalStatus || undefined,
-        function: editData.function || undefined, 
+        function: finalFunction?.trim() || undefined, 
         birthDate: convertDateToISO(editData.birthDate) || undefined,
         placeOfBirth: editData.placeOfBirth.trim() || undefined, 
         birthCountry: finalBirthCountry?.trim() || undefined,
-        originSubPrefecture: editData.originSubPrefecture || undefined, 
+        originSubPrefecture: finalOrigin?.trim() || undefined, 
         originVillage: editData.originVillage.trim() || undefined,
         addressLine1: editData.addressLine1.trim() || undefined, 
-        addressLine2: editData.addressLine2.trim() || undefined,
         postalCode: editData.postalCode.trim() || undefined, 
         city: editData.city.trim() || undefined, 
         country: finalCountry?.trim() || undefined,
@@ -296,14 +306,16 @@ export default function AdminMembersDirectoryPage() {
     } finally {
       setActionLoading(null);
     }
-  };
+  };  
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsCreating(true);
     try {
-      const finalBirthCountry = formData.birthCountry === 'Autre (Non listé)' ? formData.customBirthCountry : formData.birthCountry;
-      const finalCountry = formData.country === 'Autre (Non listé)' ? formData.customCountry : formData.country;
+      const finalBirthCountry = formData.birthCountry === 'Autre' ? formData.customBirthCountry : formData.birthCountry;
+      const finalCountry = formData.country === 'Autre' ? formData.customCountry : formData.country;
+      const finalOrigin = formData.originSubPrefecture === 'Autre' ? formData.customOriginSubPrefecture : formData.originSubPrefecture;
+      const finalFunction = formData.function === 'Autre' ? formData.customFunction : formData.function;
 
       await api.createAntennaMember({
         firstName: formData.firstName,
@@ -313,15 +325,14 @@ export default function AdminMembersDirectoryPage() {
         phone: formData.phone || undefined,
         city: formData.city || undefined,
         country: finalCountry || undefined,
-        originSubPrefecture: formData.originSubPrefecture || undefined,
+        originSubPrefecture: finalOrigin || undefined,
         originVillage: formData.originVillage || undefined,
         professionalStatus: formData.professionalStatus || undefined,
-        function: formData.function || undefined,
+        function: finalFunction || undefined,
         birthDate: convertDateToISO(formData.birthDate) || undefined,
         placeOfBirth: formData.placeOfBirth || undefined,
         birthCountry: finalBirthCountry || undefined,
         addressLine1: formData.addressLine1 || undefined,
-        addressLine2: formData.addressLine2 || undefined,
         postalCode: formData.postalCode || undefined,
       });
 
@@ -340,8 +351,8 @@ export default function AdminMembersDirectoryPage() {
     setFormData({
       firstName: '', lastName: '', email: '', password: '', phone: '',
       birthDate: '', placeOfBirth: '', birthCountry: '', customBirthCountry: '',
-      originSubPrefecture: '', originVillage: '', professionalStatus: '', function: '',
-      addressLine1: '', addressLine2: '', postalCode: '', city: '', country: '', customCountry: ''
+      originSubPrefecture: '', customOriginSubPrefecture: '', originVillage: '', professionalStatus: '', function: '', customFunction: '',
+      addressLine1: '', postalCode: '', city: '', country: '', customCountry: ''
     });
   };
 
@@ -501,7 +512,7 @@ export default function AdminMembersDirectoryPage() {
         .md-edit-section { margin-bottom: 1.5rem; }
         .md-edit-section-title { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #9CA3AF; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
         .md-edit-section-title::after { content: ''; flex: 1; height: 1px; background: rgba(37,99,235,0.1); }
-        .aa-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .aa-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }        
         .aa-form-group { display: flex; flex-direction: column; gap: 0.35rem; }
         .aa-form-group.full { grid-column: 1 / -1; }
         .aa-form-label { font-size: 0.7rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -728,7 +739,7 @@ export default function AdminMembersDirectoryPage() {
               <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.8rem', fontWeight: 700, color: '#111827', margin: '0 0 1.5rem 0' }}>
                 Exporter en <span style={{ color: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}>{exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</span>
               </h2>
-              
+
               <div className="export-flex-row">
                 <div className="export-flex-item full">
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Filtrer par Statut</label>
@@ -829,23 +840,29 @@ export default function AdminMembersDirectoryPage() {
                           <label className="aa-form-label">Lieu naissance</label>
                           <input className="aa-form-input" value={formData.placeOfBirth} onChange={e => setFormData({ ...formData, placeOfBirth: e.target.value })} />
                         </div>
+                        
                         <div className="aa-form-group">
                           <label className="aa-form-label">Pays naissance</label>
-                          <select className="md-edit-select" value={formData.birthCountry} onChange={e => { setFormData({ ...formData, birthCountry: e.target.value }); if(e.target.value !== 'Autre (Non listé)') setFormData(f => ({...f, customBirthCountry: ''})); }}>
+                          <select className="md-edit-select" value={formData.birthCountry} onChange={e => { setFormData({ ...formData, birthCountry: e.target.value }); if(e.target.value !== 'Autre') setFormData(f => ({...f, customBirthCountry: ''})); }}>
                             <option value="">Sélectionnez...</option>
                             {COUNTRIES.map(c => <option key={`c-birth-${c}`} value={c}>{c}</option>)}
                           </select>
-                          {formData.birthCountry === 'Autre (Non listé)' && (
+                          {formData.birthCountry === 'Autre' && (
                             <input className="aa-form-input" value={formData.customBirthCountry} onChange={e => setFormData({ ...formData, customBirthCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                           )}
                         </div>
+                        
                         <div className="aa-form-group">
                           <label className="aa-form-label">Commune d&apos;origine</label>
-                          <select className="md-edit-select" value={formData.originSubPrefecture} onChange={e => setFormData({ ...formData, originSubPrefecture: e.target.value })}>
+                          <select className="md-edit-select" value={formData.originSubPrefecture} onChange={e => { setFormData({ ...formData, originSubPrefecture: e.target.value }); if(e.target.value !== 'Autre') setFormData(f => ({...f, customOriginSubPrefecture: ''})); }}>
                             <option value="">Sélectionnez...</option>
                             {COMMUNES_ORIGINE.map(c => <option key={`c-orig-${c}`} value={c}>{c}</option>)}
                           </select>
+                          {formData.originSubPrefecture === 'Autre' && (
+                            <input className="aa-form-input" value={formData.customOriginSubPrefecture} onChange={e => setFormData({ ...formData, customOriginSubPrefecture: e.target.value })} placeholder="Précisez la commune" style={{ marginTop: '0.4rem' }} />
+                          )}
                         </div>
+                        
                         <div className="aa-form-group full">
                           <label className="aa-form-label">Village d&apos;origine</label>
                           <input className="aa-form-input" value={formData.originVillage} onChange={e => setFormData({ ...formData, originVillage: e.target.value })} placeholder="Ex: Petel" />
@@ -865,10 +882,13 @@ export default function AdminMembersDirectoryPage() {
                         </div>
                         <div className="aa-form-group">
                           <label className="aa-form-label">Poste Associatif</label>
-                          <select className="md-edit-select" value={formData.function} onChange={e => setFormData({ ...formData, function: e.target.value })}>
+                          <select className="md-edit-select" value={formData.function} onChange={e => { setFormData({ ...formData, function: e.target.value }); if(e.target.value !== 'Autre') setFormData(f => ({...f, customFunction: ''})); }}>
                             <option value="">Sélectionnez...</option>
                             {ASSOCIATION_ROLES.map(r => <option key={`c-role-${r}`} value={r}>{r}</option>)}
                           </select>
+                          {formData.function === 'Autre' && (
+                            <input className="aa-form-input" value={formData.customFunction} onChange={e => setFormData({ ...formData, customFunction: e.target.value })} placeholder="Précisez le poste" style={{ marginTop: '0.4rem' }} />
+                          )}
                         </div>
                       </div>
                     </div>
@@ -877,27 +897,25 @@ export default function AdminMembersDirectoryPage() {
                       <div className="md-edit-section-title">Localisation & Résidence</div>
                       <div className="aa-form-grid">
                         <div className="aa-form-group">
-                          <label className="aa-form-label">Adresse 1</label>
+                          <label className="aa-form-label">Adresse de résidence</label>
                           <input className="aa-form-input" value={formData.addressLine1} onChange={e => setFormData({ ...formData, addressLine1: e.target.value })} placeholder="N° et nom de rue" />
                         </div>
-                        <div className="aa-form-group">
-                          <label className="aa-form-label">Adresse 2</label>
-                          <input className="aa-form-input" value={formData.addressLine2} onChange={e => setFormData({ ...formData, addressLine2: e.target.value })} placeholder="Apt, Bâtiment..." />
-                        </div>
+                        
                         <div className="aa-form-group">
                           <label className="aa-form-label">Code postal</label>
                           <input className="aa-form-input" value={formData.postalCode} onChange={e => setFormData({ ...formData, postalCode: e.target.value })} placeholder="Ex: 75001" />
                         </div>
                         <div className="aa-form-group">
-                          <label className="aa-form-label">Ville résidence</label>                          <input className="aa-form-input" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder="Ex: Paris" />
+                          <label className="aa-form-label">Ville résidence</label>
+                          <input className="aa-form-input" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} placeholder="Ex: Paris" />
                         </div>
                         <div className="aa-form-group full">
                           <label className="aa-form-label">Pays résidence</label>
-                          <select className="md-edit-select" value={formData.country} onChange={e => { setFormData({ ...formData, country: e.target.value }); if(e.target.value !== 'Autre (Non listé)') setFormData(f => ({...f, customCountry: ''})); }}>
+                          <select className="md-edit-select" value={formData.country} onChange={e => { setFormData({ ...formData, country: e.target.value }); if(e.target.value !== 'Autre') setFormData(f => ({...f, customCountry: ''})); }}>
                             <option value="">Sélectionnez...</option>
                             {COUNTRIES.map(c => <option key={`c-res-${c}`} value={c}>{c}</option>)}
                           </select>
-                          {formData.country === 'Autre (Non listé)' && (
+                          {formData.country === 'Autre' && (
                             <input className="aa-form-input" value={formData.customCountry} onChange={e => setFormData({ ...formData, customCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                           )}
                         </div>
@@ -992,13 +1010,10 @@ export default function AdminMembersDirectoryPage() {
                       <span className="aa-info-value">{renderInfoValue(selectedUser.postalCode)}</span>
                     </div>
                     <div className="aa-info-item">
-                      <span className="aa-info-label">Adresse 1</span>
+                      <span className="aa-info-label">Adresse de résidence</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.addressLine1)}</span>
                     </div>
-                    <div className="aa-info-item">
-                      <span className="aa-info-label">Adresse 2</span>
-                      <span className="aa-info-value">{renderInfoValue(selectedUser.addressLine2)}</span>
-                    </div>
+                    
                     <div className="aa-info-item" style={{ gridColumn: '1 / -1' }}>
                       <span className="aa-info-label">Ville & Pays de résidence</span>
                       <span className="aa-info-value">
@@ -1033,16 +1048,18 @@ export default function AdminMembersDirectoryPage() {
                       <label className="aa-form-label">Lieu naissance</label>
                       <input className="aa-form-input" value={editData.placeOfBirth} onChange={e => setEditData({ ...editData, placeOfBirth: e.target.value })} />
                     </div>
+                    
                     <div className="aa-form-group">
                       <label className="aa-form-label">Pays naissance</label>
-                      <select className="md-edit-select" value={editData.birthCountry} onChange={e => { setEditData({ ...editData, birthCountry: e.target.value }); if(e.target.value !== 'Autre (Non listé)') setEditData(f => ({...f, customBirthCountry: ''})); }}>
+                      <select className="md-edit-select" value={editData.birthCountry} onChange={e => { setEditData({ ...editData, birthCountry: e.target.value }); if(e.target.value !== 'Autre') setEditData(f => ({...f, customBirthCountry: ''})); }}>
                         <option value="">Sélectionnez...</option>
                         {COUNTRIES.map(c => <option key={`edit-birth-${c}`} value={c}>{c}</option>)}
                       </select>
-                      {editData.birthCountry === 'Autre (Non listé)' && (
+                      {editData.birthCountry === 'Autre' && (
                         <input className="aa-form-input" value={editData.customBirthCountry} onChange={e => setEditData({ ...editData, customBirthCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                       )}
                     </div>
+                    
                     <div className="aa-form-group">
                       <label className="aa-form-label">Profession</label>
                       <select className="md-edit-select" value={editData.professionalStatus} onChange={e => setEditData({ ...editData, professionalStatus: e.target.value })}>
@@ -1052,30 +1069,34 @@ export default function AdminMembersDirectoryPage() {
                     </div>
                     <div className="aa-form-group">
                       <label className="aa-form-label">Poste associatif</label>
-                      <select className="md-edit-select" value={editData.function} onChange={e => setEditData({ ...editData, function: e.target.value })}>
+                      <select className="md-edit-select" value={editData.function} onChange={e => { setEditData({ ...editData, function: e.target.value }); if(e.target.value !== 'Autre') setEditData(f => ({...f, customFunction: ''})); }}>
                         <option value="">Sélectionnez...</option>
                         {ASSOCIATION_ROLES.map(r => <option key={`edit-role-${r}`} value={r}>{r}</option>)}
                       </select>
+                      {editData.function === 'Autre' && (
+                        <input className="aa-form-input" value={editData.customFunction} onChange={e => setEditData({ ...editData, customFunction: e.target.value })} placeholder="Précisez le poste" style={{ marginTop: '0.4rem' }} />
+                      )}
                     </div>
                     <div className="aa-form-group">
                       <label className="aa-form-label">Commune origine</label>
-                      <select className="md-edit-select" value={editData.originSubPrefecture} onChange={e => setEditData({ ...editData, originSubPrefecture: e.target.value })}>
+                      <select className="md-edit-select" value={editData.originSubPrefecture} onChange={e => { setEditData({ ...editData, originSubPrefecture: e.target.value }); if(e.target.value !== 'Autre') setEditData(f => ({...f, customOriginSubPrefecture: ''})); }}>
                         <option value="">Sélectionnez...</option>
                         {COMMUNES_ORIGINE.map(c => <option key={`edit-orig-${c}`} value={c}>{c}</option>)}
                       </select>
+                      {editData.originSubPrefecture === 'Autre' && (
+                        <input className="aa-form-input" value={editData.customOriginSubPrefecture} onChange={e => setEditData({ ...editData, customOriginSubPrefecture: e.target.value })} placeholder="Précisez la commune" style={{ marginTop: '0.4rem' }} />
+                      )}
                     </div>
                     <div className="aa-form-group">
                       <label className="aa-form-label">Village origine</label>
                       <input className="aa-form-input" value={editData.originVillage} onChange={e => setEditData({ ...editData, originVillage: e.target.value })} />
                     </div>
+                    
                     <div className="aa-form-group">
-                      <label className="aa-form-label">Adresse 1</label>
+                      <label className="aa-form-label">Adresse de résidence</label>
                       <input className="aa-form-input" value={editData.addressLine1} onChange={e => setEditData({ ...editData, addressLine1: e.target.value })} />
                     </div>
-                    <div className="aa-form-group">
-                      <label className="aa-form-label">Adresse 2</label>
-                      <input className="aa-form-input" value={editData.addressLine2} onChange={e => setEditData({ ...editData, addressLine2: e.target.value })} />
-                    </div>
+                    
                     <div className="aa-form-group">
                       <label className="aa-form-label">Code postal</label>
                       <input className="aa-form-input" value={editData.postalCode} onChange={e => setEditData({ ...editData, postalCode: e.target.value })} />
@@ -1086,11 +1107,11 @@ export default function AdminMembersDirectoryPage() {
                     </div>
                     <div className="aa-form-group full">
                       <label className="aa-form-label">Pays résidence</label>
-                      <select className="md-edit-select" value={editData.country} onChange={e => { setEditData({ ...editData, country: e.target.value }); if(e.target.value !== 'Autre (Non listé)') setEditData(f => ({...f, customCountry: ''})); }}>
+                      <select className="md-edit-select" value={editData.country} onChange={e => { setEditData({ ...editData, country: e.target.value }); if(e.target.value !== 'Autre') setEditData(f => ({...f, customCountry: ''})); }}>
                         <option value="">Sélectionnez...</option>
                         {COUNTRIES.map(c => <option key={`edit-res-${c}`} value={c}>{c}</option>)}
                       </select>
-                      {editData.country === 'Autre (Non listé)' && (
+                      {editData.country === 'Autre' && (
                         <input className="aa-form-input" value={editData.customCountry} onChange={e => setEditData({ ...editData, customCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                       )}
                     </div>

@@ -38,7 +38,7 @@ export const PROFESSION_LIST = [
 
 export const COMMUNES_ORIGINE = [
   'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
-  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
 ];
 
 export const COUNTRIES = [
@@ -66,7 +66,7 @@ export const COUNTRIES = [
   { name: 'Afrique du Sud', code: 'ZA' },
   { name: 'Mozambique', code: 'MZ' },
   { name: 'Portugal', code: 'PT' },
-  { name: 'Autre (Non listé)', code: 'OTHER' }
+  { name: 'Autre', code: 'OTHER' }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 export default function MemberProfilePage() {
@@ -77,17 +77,27 @@ export default function MemberProfilePage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
+  
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  const [customOriginSubPrefecture, setCustomOriginSubPrefecture] = useState('');
+
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
+  
   const [birthCountry, setBirthCountry] = useState('');
+  const [customBirthCountry, setCustomBirthCountry] = useState('');
+
   const [city, setCity] = useState('');
+  
   const [country, setCountry] = useState('');
+  const [customCountry, setCustomCountry] = useState('');
+
   const [postalCode, setPostalCode] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
-  const [addressLine2, setAddressLine2] = useState('');
   const [profession, setProfession] = useState('');
+  
   const [associationRole, setAssociationRole] = useState('');
+  const [customAssociationRole, setCustomAssociationRole] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -120,17 +130,51 @@ export default function MemberProfilePage() {
     setFirstName(user.firstName || '');
     setLastName(user.lastName || '');
     setPhone(user.phone || '');
-    setOriginSubPrefecture(user.originSubPrefecture || '');
     setPlaceOfBirth(user.placeOfBirth || '');
-    setBirthCountry(user.countryOfBirth || user.birthCountry || '');
     setCity(user.city || '');
-    setCountry(user.country || '');
     setPostalCode(user.postalCode || '');
     setAddressLine1(user.addressLine1 || '');
-    setAddressLine2(user.addressLine2 || '');
-
-    setAssociationRole(user.function || '');
     setProfession(user.professionalStatus || '');
+
+    // Hydratation chirurgicale : Origine
+    const uOrigin = user.originSubPrefecture || '';
+    if (uOrigin && !COMMUNES_ORIGINE.includes(uOrigin)) {
+      setOriginSubPrefecture('Autre');
+      setCustomOriginSubPrefecture(uOrigin);
+    } else {
+      setOriginSubPrefecture(uOrigin);
+      setCustomOriginSubPrefecture('');
+    }
+
+    // Hydratation chirurgicale : Pays de naissance
+    const uBirthCountry = user.countryOfBirth || user.birthCountry || '';
+    if (uBirthCountry && !COUNTRIES.find(c => c.name === uBirthCountry)) {
+      setBirthCountry('Autre');
+      setCustomBirthCountry(uBirthCountry);
+    } else {
+      setBirthCountry(uBirthCountry);
+      setCustomBirthCountry('');
+    }
+
+    // Hydratation chirurgicale : Pays de résidence
+    const uCountry = user.country || '';
+    if (uCountry && !COUNTRIES.find(c => c.name === uCountry)) {
+      setCountry('Autre');
+      setCustomCountry(uCountry);
+    } else {
+      setCountry(uCountry);
+      setCustomCountry('');
+    }
+
+    // Hydratation chirurgicale : Rôle / Fonction
+    const uRole = user.function || '';
+    if (uRole && !ASSOCIATION_ROLES.includes(uRole)) {
+      setAssociationRole('Autre');
+      setCustomAssociationRole(uRole);
+    } else {
+      setAssociationRole(uRole);
+      setCustomAssociationRole('');
+    }
 
     if (user.birthDate) {
       const d = new Date(user.birthDate);
@@ -196,7 +240,12 @@ export default function MemberProfilePage() {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
-    
+
+    const finalOrigin = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
+    const finalBirthCountry = birthCountry === 'Autre' ? customBirthCountry : birthCountry;
+    const finalCountry = country === 'Autre' ? customCountry : country;
+    const finalRole = associationRole === 'Autre' ? customAssociationRole : associationRole;
+
     try {
       const formattedDate = convertDateToISO(birthDate);
 
@@ -204,19 +253,18 @@ export default function MemberProfilePage() {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         phone: phone.trim() || undefined,
-        originSubPrefecture: originSubPrefecture.trim() || undefined,
+        originSubPrefecture: finalOrigin.trim() || undefined,
         birthDate: formattedDate,
         placeOfBirth: placeOfBirth.trim() || undefined,
-        countryOfBirth: birthCountry.trim() || undefined,
+        countryOfBirth: finalBirthCountry.trim() || undefined,
         city: city.trim() || undefined,
-        country: country.trim() || undefined,
+        country: finalCountry.trim() || undefined,
         postalCode: postalCode.trim() || undefined,
         addressLine1: addressLine1.trim() || undefined,
-        addressLine2: addressLine2.trim() || undefined,
-        function: associationRole || undefined,
+        function: finalRole.trim() || undefined,
         professionalStatus: profession || undefined,
       };
-      
+
       Object.keys(payload).forEach(key => payload[key] === undefined && delete payload[key]);
 
       const nextUser = await api.updateMyProfile(payload);
@@ -237,6 +285,11 @@ export default function MemberProfilePage() {
     : false;
   const currentPhoto = photoPreviewUrl || me?.avatarUrl || me?.profilePhotoUrl || '';
 
+  const currentOriginForCard = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
+  const currentBirthCountryForCard = birthCountry === 'Autre' ? customBirthCountry : birthCountry;
+  const currentCountryForCard = country === 'Autre' ? customCountry : country;
+  const currentRoleForCard = associationRole === 'Autre' ? customAssociationRole : associationRole;
+
   // Suppression de professionalStatus ici pour satisfaire le type VirtualCardData de api-client.ts
   const liveCardData: VirtualCardData | null = me ? {
     cardNumber: me.virtualCard?.cardNumber || me.cardNumber || 'EN ATTENTE',
@@ -249,15 +302,15 @@ export default function MemberProfilePage() {
       lastName,
       birthDate: convertDateToISO(birthDate) || null,
       placeOfBirth: placeOfBirth || null,
-      birthCountry: birthCountry || null,
-      originSubPrefecture: originSubPrefecture || null,
-      originCommune: originSubPrefecture || null,
-      originVillage: originSubPrefecture || null,
-      country: country || null,
+      birthCountry: currentBirthCountryForCard || null,
+      originSubPrefecture: currentOriginForCard || null,
+      originCommune: currentOriginForCard || null,
+      originVillage: currentOriginForCard || null,
+      country: currentCountryForCard || null,
       city: city || null,
       postalCode: postalCode || null,
       profilePhotoUrl: currentPhoto,
-      function: associationRole || profession || null,
+      function: currentRoleForCard || profession || null,
     },
   } : null;
 
@@ -286,9 +339,7 @@ export default function MemberProfilePage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500&display=swap');
 
-        .mpr-wrap { font-family: 'DM Sans', sans-serif; padding: 1.25rem 1rem 3rem; max-width: 680px; margin: 0 auto; }
-
-        .mpr-hero {
+        .mpr-wrap { font-family: 'DM Sans', sans-serif; padding: 1.25rem 1rem 3rem; max-width: 680px; margin: 0 auto; }        .mpr-hero {
           position: relative; overflow: hidden;
           background: linear-gradient(135deg, #0f3d2e 0%, #1b5e42 55%, #c89f3d 130%);
           border-radius: 24px; padding: 2rem 1.75rem; margin-bottom: 1.25rem;
@@ -447,6 +498,9 @@ export default function MemberProfilePage() {
           font-size: 0.63rem; font-weight: 700; color: #94A3B8;
           text-transform: uppercase; letter-spacing: 0.06em;
         }
+        .mpr-label .opt {
+          font-weight: 500; text-transform: none; font-size: 0.6rem; letter-spacing: 0; margin-left: 0.25rem;
+        }
         .mpr-input, .mpr-select {
           width: 100%; height: 44px; border-radius: 12px;
           border: 1.5px solid #E2E8F0; padding: 0 0.85rem;
@@ -528,8 +582,7 @@ export default function MemberProfilePage() {
               />
               {uploadingPhoto ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" fill="none" style={{ animation: 'mpr-spin 0.8s linear infinite' }}>
-                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-                </svg>
+                  <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />                </svg>
               ) : (
                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                   <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -549,7 +602,7 @@ export default function MemberProfilePage() {
             <h2 className="mpr-hero-name">
               {firstName} <em>{lastName}</em>
             </h2>
-            
+
             <div className="mpr-hero-id">
               ID: {me?.id ? me.id.substring(0, 8) : '—'}
             </div>
@@ -658,21 +711,35 @@ export default function MemberProfilePage() {
             <div className="mpr-grid-2" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
                 <label className="mpr-label">Commune d&apos;origine</label>
-                <select className="mpr-select" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} disabled={!isEditing}>
-                  <option value="">Sélectionnez votre commune...</option>
-                  {COMMUNES_ORIGINE.map(commune => (
-                    <option key={commune} value={commune}>{commune}</option>
-                  ))}
-                </select>
+                {isEditing ? (
+                  <>
+                    <select className="mpr-select" value={originSubPrefecture} onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}>
+                      <option value="">Sélectionnez votre commune...</option>
+                      {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {originSubPrefecture === 'Autre' && (
+                      <input className="mpr-input" style={{ marginTop: '0.4rem' }} value={customOriginSubPrefecture} onChange={e => setCustomOriginSubPrefecture(e.target.value)} placeholder="Précisez votre commune" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="mpr-input" value={originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture} disabled />
+                )}
               </div>
               <div className="mpr-field">
                 <label className="mpr-label">Pays de naissance</label>
-                <select className="mpr-select" value={birthCountry} onChange={e => setBirthCountry(e.target.value)} disabled={!isEditing}>
-                  <option value="">Sélectionnez un pays...</option>
-                  {COUNTRIES.map(c => (
-                    <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
+                {isEditing ? (
+                  <>
+                    <select className="mpr-select" value={birthCountry} onChange={e => { setBirthCountry(e.target.value); if(e.target.value !== 'Autre') setCustomBirthCountry(''); }}>
+                      <option value="">Sélectionnez un pays...</option>
+                      {COUNTRIES.map(c => <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>)}
+                    </select>
+                    {birthCountry === 'Autre' && (
+                      <input className="mpr-input" style={{ marginTop: '0.4rem' }} value={customBirthCountry} onChange={e => setCustomBirthCountry(e.target.value)} placeholder="Précisez votre pays" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="mpr-input" value={birthCountry === 'Autre' ? customBirthCountry : birthCountry} disabled />
+                )}
               </div>
             </div>
           </div>
@@ -688,10 +755,19 @@ export default function MemberProfilePage() {
             <div className="mpr-grid-2" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
                 <label className="mpr-label">Poste dans l&apos;association</label>
-                <select className="mpr-select" value={associationRole} onChange={e => setAssociationRole(e.target.value)} disabled={!isEditing}>
-                  <option value="">Sélectionnez un poste…</option>
-                  {ASSOCIATION_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+                {isEditing ? (
+                  <>
+                    <select className="mpr-select" value={associationRole} onChange={e => { setAssociationRole(e.target.value); if(e.target.value !== 'Autre') setCustomAssociationRole(''); }}>
+                      <option value="">Sélectionnez un poste…</option>
+                      {ASSOCIATION_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                    {associationRole === 'Autre' && (
+                      <input className="mpr-input" style={{ marginTop: '0.4rem' }} value={customAssociationRole} onChange={e => setCustomAssociationRole(e.target.value)} placeholder="Précisez le poste" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="mpr-input" value={associationRole === 'Autre' ? customAssociationRole : associationRole} disabled />
+                )}
               </div>
               <div className="mpr-field">
                 <label className="mpr-label">Profession / Situation</label>
@@ -711,19 +787,17 @@ export default function MemberProfilePage() {
               </span>
               Adresse de résidence
             </h3>
-            <div className="mpr-grid-num">
+            
+            <div className="mpr-grid-1">
               <div className="mpr-field">
-                <label className="mpr-label">N° de rue</label>
-                <input className="mpr-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} disabled={!isEditing} placeholder="N°" />
-              </div>
-              <div className="mpr-field">
-                <label className="mpr-label">Libellé de voie</label>
-                <input className="mpr-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} disabled={!isEditing} placeholder="Rue, Avenue…" />
+                <label className="mpr-label">Adresse de résidence</label>
+                <input className="mpr-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} disabled={!isEditing} placeholder="N° et nom de rue" />
               </div>
             </div>
+            
             <div className="mpr-grid-2">
               <div className="mpr-field">
-                <label className="mpr-label">Code postal</label>
+                <label className="mpr-label">Code postal <span className="opt">(Optionnel)</span></label>
                 <input className="mpr-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} disabled={!isEditing} />
               </div>
               <div className="mpr-field">
@@ -731,15 +805,25 @@ export default function MemberProfilePage() {
                 <input className="mpr-input" value={city} onChange={e => setCity(e.target.value)} disabled={!isEditing} />
               </div>
             </div>
+            
             <div className="mpr-grid-1" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
                 <label className="mpr-label">Pays</label>
-                <select className="mpr-select" value={country} onChange={e => setCountry(e.target.value)} disabled={!isEditing}>
-                  <option value="">Sélectionnez un pays...</option>
-                  {COUNTRIES.map(c => (
-                    <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
+                {isEditing ? (
+                  <>
+                    <select className="mpr-select" value={country} onChange={e => { setCountry(e.target.value); if(e.target.value !== 'Autre') setCustomCountry(''); }}>
+                      <option value="">Sélectionnez un pays...</option>
+                      {COUNTRIES.map(c => (
+                        <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                    {country === 'Autre' && (
+                      <input className="mpr-input" style={{ marginTop: '0.4rem' }} value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder="Précisez votre pays" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="mpr-input" value={country === 'Autre' ? customCountry : country} disabled />
+                )}
               </div>
             </div>
           </div>

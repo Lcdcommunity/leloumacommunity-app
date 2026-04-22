@@ -26,6 +26,17 @@ const ASSOCIATION_TITLES = [
   'Autre',
 ];
 
+const COMMUNES_ORIGINE = [
+  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
+];
+
+const COUNTRIES = [
+  'Guinée', 'Sénégal', 'Côte d\'Ivoire', 'Mali', 'Burkina Faso', 'Togo',
+  'Bénin', 'Niger', 'France', 'Belgique', 'Suisse', 'Allemagne', 'Espagne',
+  'Italie', 'États-Unis', 'Canada', 'Royaume-Uni', 'Autre'
+].sort();
+
 export default function AdminDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
@@ -43,12 +54,17 @@ export default function AdminDetailPage() {
   const [fLastName, setFLastName] = useState('');
   const [fPhone, setFPhone] = useState('');
   const [fCity, setFCity] = useState('');
-  const [fCountry, setFCountry] = useState('');
   const [fPostalCode, setFPostalCode] = useState('');
-  const [fOriginSubPrefecture, setFOriginSubPrefecture] = useState('');
   const [fAddressLine1, setFAddressLine1] = useState('');
-  const [fAddressLine2, setFAddressLine2] = useState('');
+  
+  const [fCountry, setFCountry] = useState('');
+  const [fCustomCountry, setFCustomCountry] = useState('');
+
+  const [fOriginSubPrefecture, setFOriginSubPrefecture] = useState('');
+  const [fCustomOriginSubPrefecture, setFCustomOriginSubPrefecture] = useState('');
+
   const [fAssociationTitle, setFAssociationTitle] = useState('');
+  const [fCustomAssociationTitle, setFCustomAssociationTitle] = useState('');
 
   useEffect(() => {
     async function fetchUser() {
@@ -81,13 +97,38 @@ export default function AdminDetailPage() {
     setFLastName(found.lastName ?? '');
     setFPhone(found.phone ?? '');
     setFCity(found.city ?? '');
-    setFCountry(found.country ?? '');
     setFPostalCode(found.postalCode ?? '');
-    setFOriginSubPrefecture(found.originSubPrefecture ?? '');
     setFAddressLine1(found.addressLine1 ?? '');
-    setFAddressLine2(found.addressLine2 ?? '');
-    // SOLUTION : On écoute function OU associationTitle
-    setFAssociationTitle(found.function || found.associationTitle || '');
+
+    // Hydratation chirurgicale : Pays
+    const uCountry = found.country ?? '';
+    if (uCountry && !COUNTRIES.includes(uCountry)) {
+      setFCountry('Autre');
+      setFCustomCountry(uCountry);
+    } else {
+      setFCountry(uCountry);
+      setFCustomCountry('');
+    }
+
+    // Hydratation chirurgicale : Origine
+    const uOrigin = found.originSubPrefecture ?? '';
+    if (uOrigin && !COMMUNES_ORIGINE.includes(uOrigin)) {
+      setFOriginSubPrefecture('Autre');
+      setFCustomOriginSubPrefecture(uOrigin);
+    } else {
+      setFOriginSubPrefecture(uOrigin);
+      setFCustomOriginSubPrefecture('');
+    }
+
+    // Hydratation chirurgicale : Fonction
+    const uRole = found.function || found.associationTitle || '';
+    if (uRole && !ASSOCIATION_TITLES.includes(uRole)) {
+      setFAssociationTitle('Autre');
+      setFCustomAssociationTitle(uRole);
+    } else {
+      setFAssociationTitle(uRole);
+      setFCustomAssociationTitle('');
+    }
   }
 
   async function reloadUser() {
@@ -127,19 +168,21 @@ export default function AdminDetailPage() {
     setSaveOk(false);
 
     try {
+      const finalCountry = fCountry === 'Autre' ? fCustomCountry : fCountry;
+      const finalOrigin = fOriginSubPrefecture === 'Autre' ? fCustomOriginSubPrefecture : fOriginSubPrefecture;
+      const finalTitle = fAssociationTitle === 'Autre' ? fCustomAssociationTitle : fAssociationTitle;
+
       await superAdminApi.updateAntennaAdmin(id, {
         firstName: fFirstName.trim() || undefined,
         lastName: fLastName.trim() || undefined,
         phone: fPhone.trim() || undefined,
         city: fCity.trim() || undefined,
-        country: fCountry.trim() || undefined,
+        country: finalCountry.trim() || undefined,
         postalCode: fPostalCode.trim() || undefined,
-        originSubPrefecture: fOriginSubPrefecture.trim() || undefined,
+        originSubPrefecture: finalOrigin.trim() || undefined,
         addressLine1: fAddressLine1.trim() || undefined,
-        addressLine2: fAddressLine2.trim() || undefined,
-        // SOLUTION : On envoie la valeur dans les deux clés possibles
-        function: fAssociationTitle.trim() || undefined,
-        associationTitle: fAssociationTitle.trim() || undefined,
+        function: finalTitle.trim() || undefined,
+        associationTitle: finalTitle.trim() || undefined,
       });
 
       await reloadUser();
@@ -326,7 +369,6 @@ export default function AdminDetailPage() {
           animation: saddin .4s .02s cubic-bezier(.22,1,.36,1) forwards;
           transition: color .15s;
         }
-
         .sadd-back:hover {
           color: #991B1B;
         }
@@ -647,7 +689,6 @@ export default function AdminDetailPage() {
           margin-bottom: 1rem;
           animation: saddin .3s cubic-bezier(.22,1,.36,1);
         }
-
         .sadd-edit-panel,
         .sadd-card {
           background: rgba(255,255,255,.95);
@@ -813,6 +854,15 @@ export default function AdminDetailPage() {
           color: rgba(0,0,0,.35);
         }
 
+        .sadd-edit-select {
+          cursor: pointer;
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23B91C1C' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 1rem center;
+          padding-right: 2.5rem;
+        }
+
         .sadd-tech {
           padding: 1rem 1.4rem;
           background: rgba(254,242,242,.28);
@@ -940,7 +990,6 @@ export default function AdminDetailPage() {
           .sadd-actions-desktop {
             display: none;
           }
-
           .sadd-edit-body,
           .sadd-grid,
           .sadd-card-h,
@@ -1308,8 +1357,7 @@ export default function AdminDetailPage() {
                     />
                   </svg>
                 </div>
-                <span className="sadd-edit-title">Modifier le profil</span>
-              </div>
+                <span className="sadd-edit-title">Modifier le profil</span>              </div>
             </div>
 
             <div className="sadd-edit-body">
@@ -1352,22 +1400,12 @@ export default function AdminDetailPage() {
                 <div className="sadd-edit-section-title">Localisation &amp; Origine</div>
                 <div className="sadd-edit-grid">
                   <div className="sadd-edit-field sadd-col-span-2">
-                    <label className="sadd-edit-label">Adresse 1</label>
+                    <label className="sadd-edit-label">Adresse de résidence</label>
                     <input
                       className="sadd-edit-input"
                       value={fAddressLine1}
                       onChange={(e) => setFAddressLine1(e.target.value)}
-                      placeholder="Rue, avenue…"
-                    />
-                  </div>
-
-                  <div className="sadd-edit-field sadd-col-span-2">
-                    <label className="sadd-edit-label">Adresse 2</label>
-                    <input
-                      className="sadd-edit-input"
-                      value={fAddressLine2}
-                      onChange={(e) => setFAddressLine2(e.target.value)}
-                      placeholder="Appartement, étage…"
+                      placeholder="N° et nom de rue…"
                     />
                   </div>
 
@@ -1393,31 +1431,65 @@ export default function AdminDetailPage() {
 
                   <div className="sadd-edit-field">
                     <label className="sadd-edit-label">Pays</label>
-                    <input
-                      className="sadd-edit-input"
+                    <select
+                      className="sadd-edit-select"
                       value={fCountry}
-                      onChange={(e) => setFCountry(e.target.value)}
-                      placeholder="France"
-                    />
+                      onChange={(e) => {
+                        setFCountry(e.target.value);
+                        if (e.target.value !== 'Autre') setFCustomCountry('');
+                      }}
+                    >
+                      <option value="">Sélectionnez un pays…</option>
+                      {COUNTRIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    {fCountry === 'Autre' && (
+                      <input
+                        className="sadd-edit-input"
+                        style={{ marginTop: '.45rem' }}
+                        value={fCustomCountry}
+                        onChange={(e) => setFCustomCountry(e.target.value)}
+                        placeholder="Précisez le pays"
+                      />
+                    )}
                   </div>
 
                   <div className="sadd-edit-field">
                     <label className="sadd-edit-label">Commune d&apos;origine</label>
-                    <input
-                      className="sadd-edit-input"
+                    <select
+                      className="sadd-edit-select"
                       value={fOriginSubPrefecture}
-                      onChange={(e) => setFOriginSubPrefecture(e.target.value)}
-                      placeholder="Ex : Sagalé"
-                    />
+                      onChange={(e) => {
+                        setFOriginSubPrefecture(e.target.value);
+                        if (e.target.value !== 'Autre') setFCustomOriginSubPrefecture('');
+                      }}
+                    >
+                      <option value="">Sélectionnez une commune…</option>
+                      {COMMUNES_ORIGINE.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    {fOriginSubPrefecture === 'Autre' && (
+                      <input
+                        className="sadd-edit-input"
+                        style={{ marginTop: '.45rem' }}
+                        value={fCustomOriginSubPrefecture}
+                        onChange={(e) => setFCustomOriginSubPrefecture(e.target.value)}
+                        placeholder="Précisez la commune"
+                      />
+                    )}
                   </div>
 
-                  {/* NOUVEAU CHAMP : Poste occupé */}
                   <div className="sadd-edit-field sadd-col-span-2">
                     <label className="sadd-edit-label">Poste occupé</label>
                     <select
                       className="sadd-edit-select"
                       value={fAssociationTitle}
-                      onChange={(e) => setFAssociationTitle(e.target.value)}
+                      onChange={(e) => {
+                        setFAssociationTitle(e.target.value);
+                        if (e.target.value !== 'Autre') setFCustomAssociationTitle('');
+                      }}
                     >
                       <option value="">Sélectionnez un poste…</option>
                       {ASSOCIATION_TITLES.map((title) => (
@@ -1426,6 +1498,15 @@ export default function AdminDetailPage() {
                         </option>
                       ))}
                     </select>
+                    {fAssociationTitle === 'Autre' && (
+                      <input
+                        className="sadd-edit-input"
+                        style={{ marginTop: '.45rem' }}
+                        value={fCustomAssociationTitle}
+                        onChange={(e) => setFCustomAssociationTitle(e.target.value)}
+                        placeholder="Précisez le poste"
+                      />
+                    )}
                   </div>
 
                 </div>
@@ -1586,11 +1667,9 @@ export default function AdminDetailPage() {
 
           <div className="sadd-grid">
             <div className="sadd-field sadd-col-span-2">
-              <span className="sadd-field-label">Adresse</span>
+              <span className="sadd-field-label">Adresse de résidence</span>
               <span className={`sadd-field-value${user.addressLine1 ? '' : ' empty'}`}>
-                {user.addressLine1
-                  ? `${user.addressLine1}${user.addressLine2 ? `, ${user.addressLine2}` : ''}`
-                  : '—'}
+                {user.addressLine1 || '—'}
               </span>
             </div>
 

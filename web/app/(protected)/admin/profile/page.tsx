@@ -6,6 +6,51 @@ import Image from 'next/image';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type FullUserProfile } from '../../../../lib/api-client';
 
+export const ASSOCIATION_ROLES = [
+  'Membre (simple)',
+  "Secrétaire à l'organisation",
+  'Secrétaire Général(e)',
+  'Trésorier / Trésorière',
+  'Président(e)',
+  'Vice-président(e)',
+  'Chargé(e) de communication',
+  'Conseiller / Conseillère',
+  'Autre',
+];
+
+export const COMMUNES_ORIGINE = [
+  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
+];
+
+export const COUNTRIES = [
+  { name: 'Guinée', code: 'GN', dial: '+224', phoneLength: 9 },
+  { name: 'France', code: 'FR', dial: '+33', phoneLength: 9 },
+  { name: 'Sénégal', code: 'SN', dial: '+221', phoneLength: 9 },
+  { name: 'Côte d\'Ivoire', code: 'CI', dial: '+225', phoneLength: 10 },
+  { name: 'Mali', code: 'ML', dial: '+223', phoneLength: 8 },
+  { name: 'Maroc', code: 'MA', dial: '+212', phoneLength: 9 },
+  { name: 'Canada', code: 'CA', dial: '+1', phoneLength: 10 },
+  { name: 'États-Unis', code: 'US', dial: '+1', phoneLength: 10 },
+  { name: 'Belgique', code: 'BE', dial: '+32', phoneLength: 9 },
+  { name: 'Suisse', code: 'CH', dial: '+41', phoneLength: 9 },
+  { name: 'Allemagne', code: 'DE', dial: '+49', phoneLength: 10 },
+  { name: 'Royaume-Uni', code: 'GB', dial: '+44', phoneLength: 10 },
+  { name: 'Espagne', code: 'ES', dial: '+34', phoneLength: 9 },
+  { name: 'Italie', code: 'IT', dial: '+39', phoneLength: 10 },
+  { name: 'Sierra Leone', code: 'SL', dial: '+232', phoneLength: 8 },
+  { name: 'Libéria', code: 'LR', dial: '+231', phoneLength: 8 },
+  { name: 'Guinée-Bissau', code: 'GW', dial: '+245', phoneLength: 9 },
+  { name: 'Gambie', code: 'GM', dial: '+220', phoneLength: 7 },
+  { name: 'Angola', code: 'AO', dial: '+244', phoneLength: 9 },
+  { name: 'Cameroun', code: 'CM', dial: '+237', phoneLength: 9 },
+  { name: 'Niger', code: 'NE', dial: '+227', phoneLength: 8 },
+  { name: 'Afrique du Sud', code: 'ZA', dial: '+27', phoneLength: 9 },
+  { name: 'Mozambique', code: 'MZ', dial: '+258', phoneLength: 9 },
+  { name: 'Portugal', code: 'PT', dial: '+351', phoneLength: 9 },
+  { name: 'Autre', code: 'OTHER', dial: '+', phoneLength: 0 }
+].sort((a, b) => a.name.localeCompare(b.name));
+
 type ExtendedAdminProfile = FullUserProfile & {
   associationTitle?: string | null;
   avatarUrl?: string | null;
@@ -35,13 +80,19 @@ export default function AdminProfilePage() {
   const [firstName, setFirstName]         = useState('');
   const [lastName, setLastName]           = useState('');
   const [phone, setPhone]                 = useState('');
+  
   const [associationTitle, setAssociationTitle] = useState('');
+  const [customAssociationTitle, setCustomAssociationTitle] = useState('');
+
   const [addressLine1, setAddressLine1]   = useState('');
-  const [addressLine2, setAddressLine2]   = useState('');
   const [postalCode, setPostalCode]       = useState('');
   const [city, setCity]                   = useState('');
+  
   const [country, setCountry]             = useState('');
+  const [customCountry, setCustomCountry] = useState('');
+
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
+  const [customOriginSubPrefecture, setCustomOriginSubPrefecture] = useState('');
 
   const [antennaName, setAntennaName]       = useState('');
   const [antennaCode, setAntennaCode]       = useState('');
@@ -70,12 +121,39 @@ export default function AdminProfilePage() {
     setLastName(user.lastName || '');
     setPhone(user.phone || '');
     setAddressLine1(user.addressLine1 || '');
-    setAddressLine2(user.addressLine2 || '');
     setPostalCode(user.postalCode || '');
     setCity(user.city || '');
-    setCountry(user.country || '');
-    setOriginSubPrefecture(user.originSubPrefecture || '');
-    setAssociationTitle(user.associationTitle || user.function || '');
+
+    // Hydratation chirurgicale du Pays
+    const uCountry = user.country || '';
+    if (uCountry && !COUNTRIES.find(c => c.name === uCountry)) {
+      setCountry('Autre');
+      setCustomCountry(uCountry);
+    } else {
+      setCountry(uCountry);
+      setCustomCountry('');
+    }
+
+    // Hydratation chirurgicale de l'Origine
+    const uOrigin = user.originSubPrefecture || '';
+    if (uOrigin && !COMMUNES_ORIGINE.includes(uOrigin)) {
+      setOriginSubPrefecture('Autre');
+      setCustomOriginSubPrefecture(uOrigin);
+    } else {
+      setOriginSubPrefecture(uOrigin);
+      setCustomOriginSubPrefecture('');
+    }
+
+    // Hydratation chirurgicale du Poste
+    const uRole = user.associationTitle || user.function || '';
+    if (uRole && !ASSOCIATION_ROLES.includes(uRole)) {
+      setAssociationTitle('Autre');
+      setCustomAssociationTitle(uRole);
+    } else {
+      setAssociationTitle(uRole);
+      setCustomAssociationTitle('');
+    }
+
     const ant = user.adminAssignments?.[0]?.antenna ?? user.antenna;
     if (ant) {
       setAntennaName(ant.name || '');
@@ -135,18 +213,24 @@ export default function AdminProfilePage() {
     e.preventDefault();
     setSaving(true);
     setMessage(null);
+
+    const finalCountry = country === 'Autre' ? customCountry : country;
+    const finalOrigin = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
+    const finalRole = associationTitle === 'Autre' ? customAssociationTitle : associationTitle;
+
     try {
       const payload: Record<string, string | undefined> = {
         firstName:           firstName.trim()           || undefined,
         lastName:            lastName.trim()            || undefined,
         phone:               phone.trim()               || undefined,
         addressLine1:        addressLine1.trim()        || undefined,
-        addressLine2:        addressLine2.trim()        || undefined,
         postalCode:          postalCode.trim()          || undefined,
         city:                city.trim()                || undefined,
-        country:             country.trim()             || undefined,
-        originSubPrefecture: originSubPrefecture.trim() || undefined,
+        country:             finalCountry.trim()        || undefined,
+        originSubPrefecture: finalOrigin.trim()         || undefined,
+        function:            finalRole.trim()           || undefined,
       };
+      
       const updated = await api.updateMyProfile(payload) as ExtendedAdminProfile;
       setMe(updated);
       populateFields(updated);
@@ -287,8 +371,7 @@ export default function AdminProfilePage() {
           background: #EFF6FF; color: #1D4ED8;
           padding: 0.28rem 0.7rem; border-radius: 99px;
           border: 1px solid #BFDBFE; letter-spacing: 0.05em; text-transform: uppercase;
-        }
-        .aprf-role-dot { width: 5px; height: 5px; background: #3B82F6; border-radius: 50%; }
+        }        .aprf-role-dot { width: 5px; height: 5px; background: #3B82F6; border-radius: 50%; }
         .aprf-antenna-tag {
           display: inline-flex; align-items: center; gap: 0.35rem;
           font-size: 0.63rem; font-weight: 700;
@@ -378,6 +461,10 @@ export default function AdminProfilePage() {
           outline: none;
           transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
           box-sizing: border-box;
+        }
+        select.aprf-input {
+          appearance: auto;
+          cursor: pointer;
         }
         .aprf-input.mono {
           font-family: 'DM Mono', monospace; font-size: 0.875rem;
@@ -536,8 +623,7 @@ export default function AdminProfilePage() {
             </h2>
             <div className="aprf-hero-meta">
               <span className="aprf-role-tag">
-                <span className="aprf-role-dot" />
-                Administrateur
+                <span className="aprf-role-dot" />                Administrateur
               </span>
               <span className="aprf-antenna-tag">
                 <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -593,11 +679,20 @@ export default function AdminProfilePage() {
                   <input className="aprf-input" value={phone} onChange={e => setPhone(e.target.value)} disabled={!isEditing} placeholder="+33 6 …" />
                 </div>
                 <div className="aprf-field">
-                  <label className="aprf-label">
-                    Poste occupé
-                    <span className="opt">Admin</span>
-                  </label>
-                  <input className="aprf-input aprf-input-readonly" value={associationTitle || 'Non défini'} disabled />
+                  <label className="aprf-label">Poste occupé</label>
+                  {isEditing ? (
+                    <>
+                      <select className="aprf-input" value={associationTitle} onChange={e => { setAssociationTitle(e.target.value); if (e.target.value !== 'Autre') setCustomAssociationTitle(''); }}>
+                        <option value="">Sélectionnez un poste...</option>
+                        {ASSOCIATION_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
+                      {associationTitle === 'Autre' && (
+                        <input className="aprf-input" style={{ marginTop: '0.4rem' }} value={customAssociationTitle} onChange={e => setCustomAssociationTitle(e.target.value)} placeholder="Précisez le poste" required />
+                      )}
+                    </>
+                  ) : (
+                    <input className="aprf-input aprf-input-readonly" value={(associationTitle === 'Autre' ? customAssociationTitle : associationTitle) || 'Non défini'} disabled />
+                  )}
                 </div>
               </div>
 
@@ -623,25 +718,16 @@ export default function AdminProfilePage() {
                 <div className="aprf-section-divider" />
               </div>
 
-              {/* Row 1: Adresse 1 + Adresse 2 */}
-              <div className="aprf-grid-2" style={{ marginBottom: '1rem' }}>
-                <div className="aprf-field">
-                  <label className="aprf-label">Adresse ligne 1</label>
-                  <input className="aprf-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} disabled={!isEditing} placeholder="N° et nom de rue" />
-                </div>
-                <div className="aprf-field">
-                  <label className="aprf-label">
-                    Adresse ligne 2
-                    <span className="opt">Optionnel</span>
-                  </label>
-                  <input className="aprf-input" value={addressLine2} onChange={e => setAddressLine2(e.target.value)} disabled={!isEditing} placeholder="Appartement, bâtiment…" />
-                </div>
+              {/* Row 1: Adresse 1 (Pleine largeur car Adresse 2 retirée) */}
+              <div className="aprf-field" style={{ marginBottom: '1rem' }}>
+                <label className="aprf-label">Adresse de résidence</label>
+                <input className="aprf-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} disabled={!isEditing} placeholder="N° et nom de rue" />
               </div>
 
               {/* Row 2: Code postal + Ville + Pays */}
               <div className="aprf-grid-3">
                 <div className="aprf-field">
-                  <label className="aprf-label">Code Postal</label>
+                  <label className="aprf-label">Code Postal <span className="opt">Optionnel</span></label>
                   <input className="aprf-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} disabled={!isEditing} placeholder="75001" />
                 </div>
                 <div className="aprf-field">
@@ -650,7 +736,19 @@ export default function AdminProfilePage() {
                 </div>
                 <div className="aprf-field">
                   <label className="aprf-label">Pays</label>
-                  <input className="aprf-input" value={country} onChange={e => setCountry(e.target.value)} disabled={!isEditing} placeholder="France" />
+                  {isEditing ? (
+                    <>
+                      <select className="aprf-input" value={country} onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre') setCustomCountry(''); }}>
+                        <option value="">Sélectionnez un pays...</option>
+                        {COUNTRIES.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+                      </select>
+                      {country === 'Autre' && (
+                        <input className="aprf-input" style={{ marginTop: '0.4rem' }} value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder="Précisez votre pays" required />
+                      )}
+                    </>
+                  ) : (
+                    <input className="aprf-input" value={country === 'Autre' ? customCountry : country} disabled />
+                  )}
                 </div>
               </div>
             </div>
@@ -668,7 +766,19 @@ export default function AdminProfilePage() {
               </div>
               <div className="aprf-field">
                 <label className="aprf-label">Commune d&apos;origine</label>
-                <input className="aprf-input" value={originSubPrefecture} onChange={e => setOriginSubPrefecture(e.target.value)} disabled={!isEditing} placeholder="Ex : Lélouma Centre" />
+                {isEditing ? (
+                  <>
+                    <select className="aprf-input" value={originSubPrefecture} onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}>
+                      <option value="">Sélectionnez votre commune...</option>
+                      {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    {originSubPrefecture === 'Autre' && (
+                      <input className="aprf-input" style={{ marginTop: '0.4rem' }} value={customOriginSubPrefecture} onChange={e => setCustomOriginSubPrefecture(e.target.value)} placeholder="Précisez votre commune" required />
+                    )}
+                  </>
+                ) : (
+                  <input className="aprf-input" value={originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture} disabled />
+                )}
               </div>
             </div>
 

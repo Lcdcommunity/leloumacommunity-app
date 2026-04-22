@@ -24,14 +24,14 @@ const PROFESSION_LIST = [
 
 const COMMUNES_ORIGINE = [
   'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
-  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan'
+  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
 ];
 
 const COUNTRY_NAMES = [
   'Guinée', 'France', 'Sénégal', "Côte d'Ivoire", 'Mali', 'Maroc', 'Canada', 
   'États-Unis', 'Belgique', 'Suisse', 'Allemagne', 'Royaume-Uni', 'Espagne', 
   'Italie', 'Sierra Leone', 'Libéria', 'Guinée-Bissau', 'Gambie', 'Angola', 
-  'Cameroun', 'Niger', 'Afrique du Sud', 'Mozambique', 'Portugal', 'Autre (Non listé)'
+  'Cameroun', 'Niger', 'Afrique du Sud', 'Mozambique', 'Portugal', 'Autre'
 ].sort();
 
 const USER_STATUS_MAP: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -68,7 +68,6 @@ type ExtendedMember = UserSummary & {
   country?: string;
   postalCode?: string;
   addressLine1?: string;
-  addressLine2?: string;
   originSubPrefecture?: string;
   originVillage?: string;
   birthDate?: string | Date;
@@ -81,7 +80,7 @@ type ExtendedMember = UserSummary & {
 export default function AdminMemberDetailPage() {
   const { id } = useParams() as { id: string };
   const router = useRouter();
-  
+
   const [user, setUser] = useState<ExtendedMember | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -99,27 +98,28 @@ export default function AdminMemberDetailPage() {
   const [fPhone, setFPhone] = useState('');
   const [fProfession, setFProfession] = useState('');
   const [fAssociationRole, setFAssociationRole] = useState('');
+  const [fCustomFunction, setFCustomFunction] = useState('');
   const [fBirthDate, setFBirthDate] = useState('');
   const [fPlaceOfBirth, setFPlaceOfBirth] = useState('');
   const [fBirthCountry, setFBirthCountry] = useState('');
   const [fCustomBirthCountry, setFCustomBirthCountry] = useState('');
   const [fOriginSubPrefecture, setFOriginSubPrefecture] = useState('');
+  const [fCustomOriginSubPrefecture, setFCustomOriginSubPrefecture] = useState('');
   const [fOriginVillage, setFOriginVillage] = useState('');
   const [fCity, setFCity] = useState('');
   const [fCountry, setFCountry] = useState('');
   const [fCustomCountry, setFCustomCountry] = useState('');
   const [fPostalCode, setFPostalCode] = useState('');
   const [fAddressLine1, setFAddressLine1] = useState('');
-  const [fAddressLine2, setFAddressLine2] = useState('');
 
   useEffect(() => {
     async function fetchUser() {
       try {
         const res = await api.listAntennaMembers({ page: 1, pageSize: 500 });
         const found = res.items.find((u) => u.id === id);
-        
+
         if (!found) throw new Error('Membre introuvable dans votre antenne.');
-        
+
         const extendedFound = found as ExtendedMember;
         setUser(extendedFound);
 
@@ -131,27 +131,54 @@ export default function AdminMemberDetailPage() {
           }
         }
 
-        const isStandardBirthCountry = !extendedFound.birthCountry || COUNTRY_NAMES.includes(extendedFound.birthCountry);
-        const isStandardCountry = !extendedFound.country || COUNTRY_NAMES.includes(extendedFound.country);
-
+        // Hydratation chirurgicale
         setFFirstName(extendedFound.firstName ?? '');
         setFLastName(extendedFound.lastName ?? '');
         setFPhone(extendedFound.phone ?? '');
         setFProfession(extendedFound.professionalStatus ?? '');
-        setFAssociationRole(extendedFound.function ?? '');
         setFBirthDate(initialBirthDate);
         setFPlaceOfBirth(extendedFound.placeOfBirth ?? '');
-        setFBirthCountry(isStandardBirthCountry ? (extendedFound.birthCountry ?? '') : 'Autre (Non listé)');
-        setFCustomBirthCountry(isStandardBirthCountry ? '' : (extendedFound.birthCountry ?? ''));
-        setFOriginSubPrefecture(extendedFound.originSubPrefecture ?? '');
         setFOriginVillage(extendedFound.originVillage ?? '');
         setFCity(extendedFound.city ?? '');
-        setFCountry(isStandardCountry ? (extendedFound.country ?? '') : 'Autre (Non listé)');
-        setFCustomCountry(isStandardCountry ? '' : (extendedFound.country ?? ''));
         setFPostalCode(extendedFound.postalCode ?? '');
         setFAddressLine1(extendedFound.addressLine1 ?? '');
-        setFAddressLine2(extendedFound.addressLine2 ?? '');
-        
+
+        const uRole = extendedFound.function ?? '';
+        if (uRole && !ASSOCIATION_ROLES.includes(uRole)) {
+          setFAssociationRole('Autre');
+          setFCustomFunction(uRole);
+        } else {
+          setFAssociationRole(uRole);
+          setFCustomFunction('');
+        }
+
+        const uBirthCountry = extendedFound.birthCountry ?? '';
+        if (uBirthCountry && !COUNTRY_NAMES.includes(uBirthCountry)) {
+          setFBirthCountry('Autre');
+          setFCustomBirthCountry(uBirthCountry);
+        } else {
+          setFBirthCountry(uBirthCountry);
+          setFCustomBirthCountry('');
+        }
+
+        const uOrigin = extendedFound.originSubPrefecture ?? '';
+        if (uOrigin && !COMMUNES_ORIGINE.includes(uOrigin)) {
+          setFOriginSubPrefecture('Autre');
+          setFCustomOriginSubPrefecture(uOrigin);
+        } else {
+          setFOriginSubPrefecture(uOrigin);
+          setFCustomOriginSubPrefecture('');
+        }
+
+        const uCountry = extendedFound.country ?? '';
+        if (uCountry && !COUNTRY_NAMES.includes(uCountry)) {
+          setFCountry('Autre');
+          setFCustomCountry(uCountry);
+        } else {
+          setFCountry(uCountry);
+          setFCustomCountry('');
+        }
+
       } catch (err) {
         setError(err instanceof Error ? err.message : "Impossible de charger les détails.");
       } finally {
@@ -184,7 +211,7 @@ export default function AdminMemberDetailPage() {
       else if (action === 'ACTIVATE') await api.activateUser(id);
       else if (action === 'APPROVE') await api.approveMemberAccountAntenna(id);
       else if (action === 'REJECT') await api.rejectMemberAccountAntenna(id);
-      
+
       const res = await api.listAntennaMembers({ page: 1, pageSize: 500 });
       const updated = res.items.find((u) => u.id === id);
       if (updated) setUser(updated as ExtendedMember);
@@ -197,11 +224,11 @@ export default function AdminMemberDetailPage() {
 
   async function handleDelete() {
     if (!user || busy) return;
-    
+
     const confirmEmail = window.prompt(
       `ATTENTION : Vous êtes sur le point de supprimer définitivement le compte de ${fullName(user)}.\n\nPour confirmer, veuillez saisir son adresse email exacte (${user.email}) :`
     );
-    
+
     if (confirmEmail !== user.email) {
       if (confirmEmail !== null) alert("L'adresse email saisie est incorrecte. La suppression a été annulée.");
       return;
@@ -222,10 +249,12 @@ export default function AdminMemberDetailPage() {
     setSaving(true); 
     setSaveError(null); 
     setSaveOk(false);
-    
+
     try {
-      const finalBirthCountry = fBirthCountry === 'Autre (Non listé)' ? fCustomBirthCountry : fBirthCountry;
-      const finalCountry = fCountry === 'Autre (Non listé)' ? fCustomCountry : fCountry;
+      const finalBirthCountry = fBirthCountry === 'Autre' ? fCustomBirthCountry : fBirthCountry;
+      const finalCountry = fCountry === 'Autre' ? fCustomCountry : fCountry;
+      const finalFunction = fAssociationRole === 'Autre' ? fCustomFunction : fAssociationRole;
+      const finalOrigin = fOriginSubPrefecture === 'Autre' ? fCustomOriginSubPrefecture : fOriginSubPrefecture;
 
       // 🔥 Le vrai appel API au backend !
       await api.updateAntennaMember(id, {
@@ -233,7 +262,7 @@ export default function AdminMemberDetailPage() {
         lastName: fLastName.trim() || undefined,
         phone: fPhone.trim() || undefined,
         professionalStatus: fProfession || undefined,
-        function: fAssociationRole || undefined,
+        function: finalFunction.trim() || undefined,
         birthDate: convertDateToISO(fBirthDate) || undefined,
         placeOfBirth: fPlaceOfBirth.trim() || undefined,
         birthCountry: finalBirthCountry.trim() || undefined,
@@ -241,11 +270,10 @@ export default function AdminMemberDetailPage() {
         country: finalCountry.trim() || undefined,
         postalCode: fPostalCode.trim() || undefined,
         addressLine1: fAddressLine1.trim() || undefined,
-        addressLine2: fAddressLine2.trim() || undefined,
-        originSubPrefecture: fOriginSubPrefecture || undefined,
+        originSubPrefecture: finalOrigin.trim() || undefined,
         originVillage: fOriginVillage.trim() || undefined,
       });
-      
+
       setIsEditing(false);
       setSaveOk(true);
       setTimeout(() => setSaveOk(false), 4000);
@@ -315,9 +343,7 @@ export default function AdminMemberDetailPage() {
         .md-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1.25rem, 3vw, 2rem); max-width: 1000px; margin: 0 auto; }
 
         .md-back { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.78rem; font-weight: 700; color: #2563EB; text-decoration: none; margin-bottom: 1.25rem; opacity: 0; transform: translateY(8px); animation: fadein 0.4s 0.02s cubic-bezier(.22,1,.36,1) forwards; transition: color 0.15s; }
-        .md-back:hover { color: #1D4ED8; }
-
-        .md-eyebrow { font-size: 0.67rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; opacity: 0; transform: translateY(8px); animation: fadein 0.45s 0.05s cubic-bezier(.22,1,.36,1) forwards; }
+        .md-back:hover { color: #1D4ED8; }        .md-eyebrow { font-size: 0.67rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; opacity: 0; transform: translateY(8px); animation: fadein 0.45s 0.05s cubic-bezier(.22,1,.36,1) forwards; }
         .md-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; animation: pulse 2s ease-in-out infinite; }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
 
@@ -484,7 +510,7 @@ export default function AdminMemberDetailPage() {
                 <span className="btn-text">Annuler</span>
               </button>
             )}
-            
+
             {user.status === 'PENDING_APPROVAL' && (
               <>
                 <button className="md-btn-approve" disabled={busy} onClick={() => handleToggleStatus('APPROVE')} title="Valider">
@@ -549,7 +575,7 @@ export default function AdminMemberDetailPage() {
                   <div className="md-edit-field">
                     <label className="md-edit-label">Nom</label>
                     <input className="md-edit-input" value={fLastName} onChange={e => setFLastName(e.target.value)} placeholder="Nom" />
-                  </div>
+                                    </div>
                   <div className="md-edit-field">
                     <label className="md-edit-label">Email (Non modifiable)</label>
                     <input className="md-edit-input" value={user.email} disabled />
@@ -574,20 +600,23 @@ export default function AdminMemberDetailPage() {
                   </div>
                   <div className="md-edit-field">
                     <label className="md-edit-label">Pays de naissance</label>
-                    <select className="md-edit-select" value={fBirthCountry} onChange={e => { setFBirthCountry(e.target.value); if(e.target.value !== 'Autre (Non listé)') setFCustomBirthCountry(''); }}>
+                    <select className="md-edit-select" value={fBirthCountry} onChange={e => { setFBirthCountry(e.target.value); if(e.target.value !== 'Autre') setFCustomBirthCountry(''); }}>
                       <option value="">Sélectionner...</option>
                       {COUNTRY_NAMES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    {fBirthCountry === 'Autre (Non listé)' && (
+                    {fBirthCountry === 'Autre' && (
                       <input className="md-edit-input" value={fCustomBirthCountry} onChange={e => setFCustomBirthCountry(e.target.value)} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                     )}
                   </div>
                   <div className="md-edit-field">
                     <label className="md-edit-label">Commune d&apos;origine</label>
-                    <select className="md-edit-select" value={fOriginSubPrefecture} onChange={e => setFOriginSubPrefecture(e.target.value)}>
+                    <select className="md-edit-select" value={fOriginSubPrefecture} onChange={e => { setFOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setFCustomOriginSubPrefecture(''); }}>
                       <option value="">Sélectionner...</option>
                       {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
+                    {fOriginSubPrefecture === 'Autre' && (
+                      <input className="md-edit-input" value={fCustomOriginSubPrefecture} onChange={e => setFCustomOriginSubPrefecture(e.target.value)} placeholder="Précisez la commune" style={{ marginTop: '0.4rem' }} />
+                    )}
                   </div>
                   <div className="md-edit-field">
                     <label className="md-edit-label">Village d&apos;origine</label>
@@ -608,10 +637,13 @@ export default function AdminMemberDetailPage() {
                   </div>
                   <div className="md-edit-field">
                     <label className="md-edit-label">Poste Associatif</label>
-                    <select className="md-edit-select" value={fAssociationRole} onChange={e => setFAssociationRole(e.target.value)}>
+                    <select className="md-edit-select" value={fAssociationRole} onChange={e => { setFAssociationRole(e.target.value); if(e.target.value !== 'Autre') setFCustomFunction(''); }}>
                       <option value="">Sélectionner...</option>
                       {ASSOCIATION_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
+                    {fAssociationRole === 'Autre' && (
+                      <input className="md-edit-input" value={fCustomFunction} onChange={e => setFCustomFunction(e.target.value)} placeholder="Précisez le poste" style={{ marginTop: '0.4rem' }} />
+                    )}
                   </div>
                 </div>
               </div>
@@ -620,12 +652,8 @@ export default function AdminMemberDetailPage() {
                 <div className="md-edit-section-title">Localisation & Résidence</div>
                 <div className="md-edit-grid">
                   <div className="md-edit-field">
-                    <label className="md-edit-label">Adresse 1</label>
+                    <label className="md-edit-label">Adresse de résidence</label>
                     <input className="md-edit-input" value={fAddressLine1} onChange={e => setFAddressLine1(e.target.value)} placeholder="N° et nom de rue" />
-                  </div>
-                  <div className="md-edit-field">
-                    <label className="md-edit-label">Adresse 2</label>
-                    <input className="md-edit-input" value={fAddressLine2} onChange={e => setFAddressLine2(e.target.value)} placeholder="Apt, Bâtiment..." />
                   </div>
                   <div className="md-edit-field">
                     <label className="md-edit-label">Code postal</label>
@@ -637,11 +665,11 @@ export default function AdminMemberDetailPage() {
                   </div>
                   <div className="md-edit-field" style={{ gridColumn: '1 / -1' }}>
                     <label className="md-edit-label">Pays de résidence</label>
-                    <select className="md-edit-select" value={fCountry} onChange={e => { setFCountry(e.target.value); if(e.target.value !== 'Autre (Non listé)') setFCustomCountry(''); }}>
+                    <select className="md-edit-select" value={fCountry} onChange={e => { setFCountry(e.target.value); if(e.target.value !== 'Autre') setFCustomCountry(''); }}>
                       <option value="">Sélectionner...</option>
                       {COUNTRY_NAMES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
-                    {fCountry === 'Autre (Non listé)' && (
+                    {fCountry === 'Autre' && (
                       <input className="md-edit-input" value={fCustomCountry} onChange={e => setFCustomCountry(e.target.value)} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                     )}
                   </div>
@@ -715,8 +743,7 @@ export default function AdminMemberDetailPage() {
           <div className="md-card-h">
             <div className="md-card-ico" style={{ background: '#F3E8FF', color: '#7C3AED' }}>
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />              </svg>
             </div>
             <span className="md-card-title">Naissance & Profession</span>
           </div>
@@ -757,12 +784,8 @@ export default function AdminMemberDetailPage() {
           </div>
           <div className="md-grid md-grid-3">
             <div className="md-field">
-              <span className="md-field-label">Adresse 1</span>
+              <span className="md-field-label">Adresse de résidence</span>
               <span className="md-field-value">{renderInfoValue(user.addressLine1)}</span>
-            </div>
-            <div className="md-field">
-              <span className="md-field-label">Adresse 2</span>
-              <span className="md-field-value">{renderInfoValue(user.addressLine2)}</span>
             </div>
             <div className="md-field">
               <span className="md-field-label">Code postal</span>
