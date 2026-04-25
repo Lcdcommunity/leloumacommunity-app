@@ -10,10 +10,8 @@ export const metadata: Metadata = {
   title: 'Lelouma Community',
   description: 'Plateforme de gestion d’association communautaire - Multi-tenant',
   manifest: '/manifest.json',
-  icons: {
-    // La ligne "icon" a été retirée car Next.js va détecter automatiquement le fichier icon.jpg dans le dossier app/
-    apple: '/icon-192x192.png',
-  },
+  // La référence manuelle à 'apple: /icon-192x192.png' a été retirée pour éviter l'erreur 404.
+  // Next.js génère automatiquement les métadonnées grâce à web/app/icon.jpg
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -33,14 +31,12 @@ export const viewport: Viewport = {
   ],
 };
 
-// ✅ AJOUT DE 'async' ICI
 export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   // 🌍 Récupération de la langue depuis les cookies côté serveur
-  // ✅ AJOUT DE 'await' ICI car cookies() est asynchrone en Next.js 15
   const cookieStore = await cookies();
   const lang = cookieStore.get('i18next')?.value || 'fr';
 

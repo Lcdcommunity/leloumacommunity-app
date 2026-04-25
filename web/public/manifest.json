@@ -1,6 +1,7 @@
 {
   "name": "Lelouma Community",
   "short_name": "LCD",
+  "description": "Plateforme de gestion d’association communautaire",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -9,12 +10,14 @@
     {
       "src": "/assets/images/logolcd.jpg",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/jpeg",
+      "purpose": "any"
     },
     {
       "src": "/assets/images/logolcd.jpg",
-      "sizes": "512x512",
-      "type": "image/jpeg"
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "maskable"
     }
   ]
 }
