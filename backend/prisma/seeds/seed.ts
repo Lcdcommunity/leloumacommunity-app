@@ -7,21 +7,25 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Début du seeding de production...');
 
-  // 1. Création de l'Association principale
+  // 1. Création de l'Association principale avec son DOMAINE
+  // C'est ici qu'on fait le lien entre le site web et l'association en base de données
   const association = await prisma.association.upsert({
     where: { code: 'LCD26DONIKO' },
     update: {
       name: 'Lelouma Community',
+      domainName: 'www.leloumacommunity.com', // ⚡ CHAMP CORRIGÉ ICI
+      isActive: true,
     },
     create: {
       code: 'LCD26DONIKO',
       name: 'Lelouma Community',
+      domainName: 'www.leloumacommunity.com', // ⚡ CHAMP CORRIGÉ ICI
+      isActive: true,
     },
   });
-  console.log('🏢 Association principale configurée.');
+  console.log('🏢 Association principale configurée avec le domaine.');
 
   // 2. Hachage du mot de passe
-  // Utilisation du mot de passe souhaité : Lcd123456!
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
   // 3. CRÉATION DU GRAND CHEF (SYSTEM_ADMIN)
@@ -80,7 +84,7 @@ async function main() {
       addressLine1: '21 rue du petit champ',
       postalCode: '77700',
       city: 'Chessy',
-      emailVerifiedAt: new Date(), // Marqué comme vérifié pour accès immédiat
+      emailVerifiedAt: new Date(),
     },
     create: {
       email: 'istevediallo@gmail.com',
@@ -110,5 +114,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-// Commande pour exécuter : npx prisma db seed
   //npx prisma db seed
