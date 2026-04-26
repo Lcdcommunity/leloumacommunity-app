@@ -7,9 +7,10 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Début du seeding...');
 
-  // 1. Création de l'Association principale
+  // 1. Création ou mise à jour de l'Association
+  // IMPORTANT : Vérifie que 'LCD26DONIKO' est bien le code existant dans Neon
   const association = await prisma.association.upsert({
-    where: { code: 'LCD26DONIKO' },
+    where: { code: 'LCD26DONIKO' }, 
     update: {
       name: 'Lelouma Community',
       domainName: 'leloumacommunity.com', 
@@ -26,7 +27,7 @@ async function main() {
 
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
-  // 2. Création du SYSTEM_ADMIN (Lui peut se connecter de n'importe où)
+  // 2. Création du SYSTEM_ADMIN
   await prisma.user.upsert({
     where: { email: 'thiernodoniko21@outlook.fr' },
     update: {
@@ -44,7 +45,7 @@ async function main() {
     },
   });
 
-  // 3. Création du SUPER_ADMIN (L'utilisateur thiernodoniko@gmail.com)
+  // 3. Création du SUPER_ADMIN lié à l'association du client
   await prisma.user.upsert({
     where: { email: 'thiernodoniko@gmail.com' },
     update: {

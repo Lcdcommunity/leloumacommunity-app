@@ -125,24 +125,23 @@ export class AuthService {
       );
     }
 
-    // 🔒 PILIER 3 : BARRIÈRE ANTI TENANT-SPOOFING (VERSION UNIVERSELLE)
+    // 🔒 PILIER 3 : BARRIÈRE ANTI TENANT-SPOOFING (VERSION SOUPLE)
     if (user.role !== 'SYSTEM_ADMIN' && meta?.tenantDomain && user.associationId) {
+      // On nettoie le domaine (enlève www. et met en minuscule)
       const requestDomain = meta.tenantDomain.split(':')[0].toLowerCase().replace(/^www\./, '');
+      
+      const userAssociation = await this.prisma.association.findUnique({
+        where: { id: user.associationId },
+        select: { domainName: true }
+      });
 
-      // On autorise localhost et 127.0.0.1 sans vérification de domaine en base
+      const dbDomain = userAssociation?.domainName?.toLowerCase().replace(/^www\./, '');
+
+      // On laisse passer si c'est localhost ou si les domaines correspondent (sans www)
       const isLocal = requestDomain === 'localhost' || requestDomain === '127.0.0.1';
 
-      if (!isLocal) {
-        const userAssociation = await this.prisma.association.findUnique({
-          where: { id: user.associationId },
-          select: { domainName: true }
-        });
-
-        const dbDomain = userAssociation?.domainName?.toLowerCase().replace(/^www\./, '');
-
-        if (dbDomain && dbDomain !== requestDomain) {
-          throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
-        }
+      if (!isLocal && dbDomain && dbDomain !== requestDomain) {
+        throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
       }
     }
 
@@ -286,7 +285,7 @@ export class AuthService {
     await this.notifications.createForUser({
       associationId: record.associationId,
       userId: record.userId,
-      message: 'Votre mot de passe a été modifié avec succès. Si vous n\'êtes pas à l\'origine de cette action, contactez le support.',
+      message: 'Votre mot de passe a été modifié avec succès.',
       type: NotificationType.SYSTEM_ALERT,
       title: 'Sécurité : Mot de passe modifié',
     });
