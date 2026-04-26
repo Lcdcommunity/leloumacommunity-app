@@ -29,14 +29,23 @@ export class AuthService {
     private readonly notifications: NotificationsService, 
   ) {}
 
+  /**
+   * Hachage SHA256 pour les tokens de réinitialisation
+   */
   private sha256(input: string): string {
     return createHash('sha256').update(input).digest('hex');
   }
 
+  /**
+   * Nettoie les URLs pour éviter les problèmes de slash final
+   */
   private normalizeUrl(url: string): string {
-    return url.replace(/\/+$/, '');
+    return url.replace(/\/+$/, '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
   }
 
+  /**
+   * Récupère l'URL de base du frontend depuis la config
+   */
   private getFrontendBaseUrl(): string {
     const raw =
       this.config.get<string>('FRONTEND_URL') ||
@@ -45,7 +54,7 @@ export class AuthService {
       process.env.APP_URL;
 
     if (raw && raw.trim().length > 0) {
-      return this.normalizeUrl(raw.trim());
+      return raw.trim().replace(/\/+$/, '');
     }
 
     if (process.env.NODE_ENV !== 'production') {
@@ -57,6 +66,9 @@ export class AuthService {
     );
   }
 
+  /**
+   * Récupère les infos de l'utilisateur connecté
+   */
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -91,13 +103,15 @@ export class AuthService {
       associationId: user.associationId,
       associationName: user.association?.name,
       associationLogo: user.association?.logoFile?.url ?? null,
-      permissions: [],
       avatarUrl: photoUrl,
       profilePhotoUrl: photoUrl,
       antenna: primaryAntenna,
     };
   }
 
+  /**
+   * Logique de connexion principale
+   */
   async login(
     dto: LoginDto,
     meta?: { userAgent?: string; ipAddress?: string; tenantDomain?: string },
@@ -125,22 +139,23 @@ export class AuthService {
       );
     }
 
-    // 🔒 PILIER 3 : BARRIÈRE ANTI TENANT-SPOOFING (VERSION SOUPLE)
+    // 🔒 PILIER 3 : BARRIÈRE ANTI-SPOOFING (VERSION MODERNE & SOUPLE)
     if (user.role !== 'SYSTEM_ADMIN' && meta?.tenantDomain && user.associationId) {
-      // On nettoie le domaine (enlève www. et met en minuscule)
-      const requestDomain = meta.tenantDomain.split(':')[0].toLowerCase().replace(/^www\./, '');
+      const requestDomain = this.normalizeUrl(meta.tenantDomain.split(':')[0]);
       
       const userAssociation = await this.prisma.association.findUnique({
         where: { id: user.associationId },
         select: { domainName: true }
       });
 
-      const dbDomain = userAssociation?.domainName?.toLowerCase().replace(/^www\./, '');
+      const dbDomain = userAssociation?.domainName ? this.normalizeUrl(userAssociation.domainName) : null;
 
-      // On laisse passer si c'est localhost ou si les domaines correspondent (sans www)
+      // Autorisation si localhost ou si les domaines normalisés correspondent
       const isLocal = requestDomain === 'localhost' || requestDomain === '127.0.0.1';
-
+      
       if (!isLocal && dbDomain && dbDomain !== requestDomain) {
+        // Log de debug interne (visible uniquement dans Render logs)
+        console.warn(`[Auth] Blocage domaine : Base=${dbDomain} | Reçu=${requestDomain}`);
         throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
       }
     }
@@ -209,8 +224,7 @@ export class AuthService {
 
     const generic = {
       success: true,
-      message:
-        'Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.',
+      message: 'Si un compte existe, un email a été envoyé.',
     };
 
     if (!user || user.status === 'REJECTED' || user.status === 'DELETED') {
@@ -219,15 +233,14 @@ export class AuthService {
 
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.sha256(rawToken);
-    const ttlMinutes = Number(
-      this.config.get('auth.passwordResetTokenTtlMinutes') ?? 30,
-    );
+    const ttlMinutes = 30;
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
     await this.prisma.passwordResetToken.updateMany({
       where: { userId: user.id, usedAt: null },
       data: { usedAt: new Date() },
     });
+
     await this.prisma.passwordResetToken.create({
       data: {
         associationId: user.associationId,
@@ -252,15 +265,12 @@ export class AuthService {
 
   async resetPassword(dto: ResetPasswordDto) {
     const tokenHash = this.sha256(dto.token);
-
     const record = await this.prisma.passwordResetToken.findUnique({
       where: { tokenHash },
     });
 
     if (!record || record.usedAt || record.expiresAt <= new Date()) {
-      throw new BadRequestException(
-        'Token de réinitialisation invalide ou expiré',
-      );
+      throw new BadRequestException('Token invalide ou expiré');
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 12);
@@ -285,9 +295,9 @@ export class AuthService {
     await this.notifications.createForUser({
       associationId: record.associationId,
       userId: record.userId,
-      message: 'Votre mot de passe a été modifié avec succès.',
+      message: 'Mot de passe modifié avec succès.',
       type: NotificationType.SYSTEM_ALERT,
-      title: 'Sécurité : Mot de passe modifié',
+      title: 'Sécurité',
     });
 
     return { success: true };
