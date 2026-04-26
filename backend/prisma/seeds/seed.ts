@@ -13,13 +13,13 @@ async function main() {
     where: { code: 'LCD26DONIKO' }, 
     update: {
       name: 'Lelouma Community',
-      domainName: 'leloumacommunity.com', 
+      domainName: 'www.leloumacommunity.com', 
       isActive: true,
     },
     create: {
       code: 'LCD26DONIKO',
       name: 'Lelouma Community',
-      domainName: 'leloumacommunity.com', 
+      domainName: 'www.leloumacommunity.com', 
       isActive: true,
     },
   });
