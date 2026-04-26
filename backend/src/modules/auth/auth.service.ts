@@ -1,4 +1,4 @@
-/////// backend/src/modules/auth/auth.service.ts
+// backend/src/modules/auth/auth.service.ts
 import {
   BadRequestException,
   Injectable,
@@ -100,7 +100,7 @@ export class AuthService {
 
   async login(
     dto: LoginDto,
-    meta?: { userAgent?: string; ipAddress?: string; tenantDomain?: string }, // 👈 Ajout du paramètre
+    meta?: { userAgent?: string; ipAddress?: string; tenantDomain?: string },
   ) {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase().trim() },
@@ -125,20 +125,24 @@ export class AuthService {
       );
     }
 
-    // 🔒 PILIER 3 : BARRIÈRE ANTI TENANT-SPOOFING
+    // 🔒 PILIER 3 : BARRIÈRE ANTI TENANT-SPOOFING (VERSION UNIVERSELLE)
     if (user.role !== 'SYSTEM_ADMIN' && meta?.tenantDomain && user.associationId) {
-      const requestDomain = meta.tenantDomain.split(':')[0]; // On retire le port s'il y en a un (ex: localhost:3000)
-      
-      const userAssociation = await this.prisma.association.findUnique({
-        where: { id: user.associationId },
-        select: { domainName: true }
-      });
+      const requestDomain = meta.tenantDomain.split(':')[0].toLowerCase().replace(/^www\./, '');
 
-      // Si l'utilisateur appartient à une association qui possède un domaine, 
-      // il DOIT se connecter via ce domaine exact.
-      if (userAssociation?.domainName && userAssociation.domainName !== requestDomain) {
-        // On renvoie un message générique pour ne pas donner d'infos aux attaquants
-        throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
+      // On autorise localhost et 127.0.0.1 sans vérification de domaine en base
+      const isLocal = requestDomain === 'localhost' || requestDomain === '127.0.0.1';
+
+      if (!isLocal) {
+        const userAssociation = await this.prisma.association.findUnique({
+          where: { id: user.associationId },
+          select: { domainName: true }
+        });
+
+        const dbDomain = userAssociation?.domainName?.toLowerCase().replace(/^www\./, '');
+
+        if (dbDomain && dbDomain !== requestDomain) {
+          throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
+        }
       }
     }
 
@@ -147,7 +151,7 @@ export class AuthService {
         id: user.id,
         associationId: user.associationId,
         role: user.role,
-        status: user.status, // 👈 Ajouté pour corriger la stratégie JWT
+        status: user.status,
         email: user.email,
       },
       meta,
@@ -225,7 +229,6 @@ export class AuthService {
       where: { userId: user.id, usedAt: null },
       data: { usedAt: new Date() },
     });
-
     await this.prisma.passwordResetToken.create({
       data: {
         associationId: user.associationId,
