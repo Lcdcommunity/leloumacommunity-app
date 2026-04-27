@@ -36,7 +36,7 @@ export class UpdateAssociationDto {
   @IsString()
   @MaxLength(150)
   websiteUrl?: string; 
-  
+
   @IsOptional()
   @IsString()
   @MaxLength(150)

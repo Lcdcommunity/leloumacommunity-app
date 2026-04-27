@@ -12,12 +12,15 @@ export class PublicThemeController {
       throw new NotFoundException("Veuillez fournir un domaine ou un code d'association.");
     }
 
+    // 🔥 FIX BACKEND : Nettoyage du domaine pour ignorer le "www."
+    const cleanDomain = domain ? domain.toLowerCase().replace(/^www\./, '').trim() : undefined;
+
     // On cherche l'association par son domaine (ex: ajvk.lcd.com) ou son code (ASCOK)
     const association = await this.prisma.association.findFirst({
       where: {
         isActive: true,
         OR: [
-          domain ? { domainName: domain } : undefined,
+          cleanDomain ? { domainName: cleanDomain } : undefined,
           code ? { code: code } : undefined,
         ].filter(Boolean) as any,
       },

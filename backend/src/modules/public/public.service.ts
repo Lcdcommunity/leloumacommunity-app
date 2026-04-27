@@ -98,7 +98,7 @@ export class PublicService {
         function: dto.function,
         professionalStatus: dto.professionalStatus,
         // profilePhotoFileId: profilePhotoFileId,
-        
+
         // Conversion de la date (qui arrive en YYYY-MM-DD depuis le front)
         birthDate: dto.birthDate ? new Date(dto.birthDate) : null,
 

@@ -160,7 +160,13 @@ export const api = {
   // ==========================================
   getPublicTheme: (domain?: string, code?: string) => {
     const params = new URLSearchParams();
-    if (domain) params.append('domain', domain);
+    
+    // 🔥 FIX FRONTEND : Nettoyage du domaine pour retirer "www."
+    if (domain) {
+      const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+      params.append('domain', cleanDomain);
+    }
+    
     if (code) params.append('code', code);
 
     return http<{
@@ -257,8 +263,7 @@ export const api = {
   updateMemberProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
 
-  updateMyPassword: (password: string) =>
-    http<{ message: string }, { password: string }>('/users/me/password', { method: 'PATCH', body: { password } }),
+  updateMyPassword: (password: string) =>    http<{ message: string }, { password: string }>('/users/me/password', { method: 'PATCH', body: { password } }),
 
   uploadAvatar: async (formData: FormData): Promise<{
     message: string;
@@ -591,7 +596,6 @@ listElectionsAdmin: async () => {
 
   updateAntenna: (id: string, body: Partial<Antenna> & { defaultCurrency?: string | null }) =>
     http<Antenna, typeof body>(`/super-admin/antennas/${id}`, { method: 'PATCH', body }),
-
   deleteAntenna: (id: string) => http(`/super-admin/antennas/${id}`, { method: 'DELETE' }),
 
   listAntennaAdmins: (params?: { page?: number; pageSize?: number; antennaId?: string; q?: string }) =>
@@ -858,7 +862,6 @@ listElectionsAdmin: async () => {
 
   validateExpenseSuperAdmin: (id: string) =>
     http<{ message: string; expense: Expense }>(`/super-admin/expenses/${id}/validate`, { method: 'PATCH' }),
-
   rejectExpenseSuperAdmin: (id: string, body?: { rejectionReason?: string }) =>
     http<{ message: string; expense: Expense }, typeof body>(`/super-admin/expenses/${id}/reject`, { method: 'PATCH', body: body ?? {} }),
 
@@ -1072,9 +1075,7 @@ listElectionsAdmin: async () => {
     http<DocumentItem, Partial<DocumentItem>>(`/admin/documents/${id}`, { method: 'PATCH', body }),
 
   deleteAntennaDocument: (id: string) =>
-    http(`/admin/documents/${id}`, { method: 'DELETE' }),
-
-  listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
+    http(`/admin/documents/${id}`, { method: 'DELETE' }),  listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
     http<ApiListResponse<DocumentItem>>(
       `/member/documents?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
