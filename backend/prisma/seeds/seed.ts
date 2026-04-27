@@ -8,29 +8,28 @@ async function main() {
   console.log('🌱 Début du seeding pour le compte client...');
 
   // 1. Création ou mise à jour de l'Association du client
-  // Le domainName est configuré sans "www." pour correspondre au déploiement actuel
+  // Ajout du "www." pour correspondre à l'URL de ton navigateur
   const association = await prisma.association.upsert({
     where: { code: 'LCD26DONIKO' }, 
     update: {
       name: 'Lelouma Community',
-      domainName: 'leloumacommunity.com', 
+      domainName: 'www.leloumacommunity.com', 
       isActive: true,
     },
     create: {
       code: 'LCD26DONIKO',
       name: 'Lelouma Community',
-      domainName: 'leloumacommunity.com', 
+      domainName: 'www.leloumacommunity.com', 
       isActive: true,
     },
   });
-  console.log('🏢 Association "Lelouma Community" configurée.');
+  console.log('🏢 Association "Lelouma Community" configurée avec le domaine www.');
 
-  // Hachage du mot de passe sécurisé pour les comptes créés
+  // Hachage du mot de passe sécurisé
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
   // 2. Création du compte SUPER_ADMIN du client
-  // Ce compte est rattaché à l'association créée ci-dessus
-  console.log('👤 Création du compte Super Admin client...');
+  console.log('👤 Mise à jour du compte Super Admin...');
   await prisma.user.upsert({
     where: { email: 'thiernodoniko@gmail.com' },
     update: {
@@ -50,7 +49,7 @@ async function main() {
     },
   });
 
-  console.log('🎉 Seeding terminé avec succès ! L\'espace client est prêt.');
+  console.log('🎉 Seeding terminé ! Essaye de te connecter sur www.leloumacommunity.com');
 }
 
 main()
