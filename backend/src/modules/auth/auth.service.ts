@@ -30,21 +30,28 @@ export class AuthService {
   ) {}
 
   /**
-   * Hachage SHA256 pour les tokens de réinitialisation
+   * Hachage SHA256 pour les tokens de sécurité
    */
   private sha256(input: string): string {
     return createHash('sha256').update(input).digest('hex');
   }
 
   /**
-   * Nettoie les URLs pour éviter les problèmes de slash final
+   * Nettoyeur de domaine "Intelligent"
+   * Supprime le protocole, les "www." et les slashes pour une comparaison fiable
    */
   private normalizeUrl(url: string): string {
-    return url.replace(/\/+$/, '').toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '');
+    if (!url) return '';
+    return url
+      .toLowerCase()
+      .trim()
+      .replace(/^https?:\/\//, '') // Supprime http:// ou https://
+      .replace(/^www\./, '')       // Supprime www.
+      .replace(/\/+$/, '');        // Supprime le slash final
   }
 
   /**
-   * Récupère l'URL de base du frontend depuis la config
+   * Récupère l'URL de base du frontend avec fallback sécurisé
    */
   private getFrontendBaseUrl(): string {
     const raw =
@@ -67,7 +74,7 @@ export class AuthService {
   }
 
   /**
-   * Récupère les infos de l'utilisateur connecté
+   * Récupère le profil complet de l'utilisateur actuel
    */
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -110,7 +117,7 @@ export class AuthService {
   }
 
   /**
-   * Logique de connexion principale
+   * Connexion sécurisée avec barrière anti-spoofing intelligente
    */
   async login(
     dto: LoginDto,
@@ -120,10 +127,12 @@ export class AuthService {
       where: { email: dto.email.toLowerCase().trim() },
     });
 
+    // 1. Vérification existence utilisateur
     if (!user) {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
+    // 2. Vérification mot de passe
     const isPasswordValid = await bcrypt.compare(
       dto.password,
       user.passwordHash,
@@ -133,33 +142,38 @@ export class AuthService {
       throw new UnauthorizedException('Identifiants invalides');
     }
 
+    // 3. Vérification statut du compte
     if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException(
         "Votre compte n'est pas actif ou en attente de validation.",
       );
     }
 
-    // 🔒 PILIER 3 : BARRIÈRE ANTI-SPOOFING (VERSION MODERNE & SOUPLE)
+    // 4. 🔒 PILIER 3 : VÉRIFICATION DE DOMAINE (MULTI-TENANT)
     if (user.role !== 'SYSTEM_ADMIN' && meta?.tenantDomain && user.associationId) {
+      // Normalisation du domaine reçu (ex: "www.leloumacommunity.com:3000" -> "leloumacommunity.com")
       const requestDomain = this.normalizeUrl(meta.tenantDomain.split(':')[0]);
-      
+
       const userAssociation = await this.prisma.association.findUnique({
         where: { id: user.associationId },
         select: { domainName: true }
       });
 
-      const dbDomain = userAssociation?.domainName ? this.normalizeUrl(userAssociation.domainName) : null;
+      if (userAssociation?.domainName) {
+        const dbDomain = this.normalizeUrl(userAssociation.domainName);
+        
+        // Autorisation si on est en local ou si les domaines normalisés correspondent
+        const isLocal = requestDomain === 'localhost' || requestDomain === '127.0.0.1';
 
-      // Autorisation si localhost ou si les domaines normalisés correspondent
-      const isLocal = requestDomain === 'localhost' || requestDomain === '127.0.0.1';
-      
-      if (!isLocal && dbDomain && dbDomain !== requestDomain) {
-        // Log de debug interne (visible uniquement dans Render logs)
-        console.warn(`[Auth] Blocage domaine : Base=${dbDomain} | Reçu=${requestDomain}`);
-        throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
+        if (!isLocal && dbDomain !== requestDomain) {
+          // Log de sécurité utile dans la console de Render
+          console.warn(`[Auth-Blocked] Tentative de connexion hors domaine. Attendu: ${dbDomain}, Reçu: ${requestDomain}`);
+          throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
+        }
       }
     }
 
+    // 5. Génération des tokens
     const tokens = await this.tokens.issueLoginTokens(
       {
         id: user.id,
@@ -224,7 +238,7 @@ export class AuthService {
 
     const generic = {
       success: true,
-      message: 'Si un compte existe, un email a été envoyé.',
+      message: 'Si un compte existe avec cet email, un lien a été envoyé.',
     };
 
     if (!user || user.status === 'REJECTED' || user.status === 'DELETED') {
@@ -233,7 +247,7 @@ export class AuthService {
 
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = this.sha256(rawToken);
-    const ttlMinutes = 30;
+    const ttlMinutes = Number(this.config.get('auth.passwordResetTokenTtlMinutes') ?? 30);
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
     await this.prisma.passwordResetToken.updateMany({
@@ -270,7 +284,7 @@ export class AuthService {
     });
 
     if (!record || record.usedAt || record.expiresAt <= new Date()) {
-      throw new BadRequestException('Token invalide ou expiré');
+      throw new BadRequestException('Token de réinitialisation invalide ou expiré');
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, 12);
@@ -295,9 +309,9 @@ export class AuthService {
     await this.notifications.createForUser({
       associationId: record.associationId,
       userId: record.userId,
-      message: 'Mot de passe modifié avec succès.',
+      message: 'Votre mot de passe a été modifié avec succès.',
       type: NotificationType.SYSTEM_ALERT,
-      title: 'Sécurité',
+      title: 'Sécurité : Mot de passe modifié',
     });
 
     return { success: true };
