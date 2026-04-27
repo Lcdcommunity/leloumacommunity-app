@@ -5,47 +5,32 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Début du seeding...');
+  console.log('🌱 Début du seeding pour le compte client...');
 
-  // 1. Création ou mise à jour de l'Association
-  // IMPORTANT : Vérifie que 'LCD26DONIKO' est bien le code existant dans Neon
+  // 1. Création ou mise à jour de l'Association du client
+  // Le domainName est configuré sans "www." pour correspondre au déploiement actuel
   const association = await prisma.association.upsert({
     where: { code: 'LCD26DONIKO' }, 
     update: {
       name: 'Lelouma Community',
-      domainName: 'www.leloumacommunity.com', 
+      domainName: 'leloumacommunity.com', 
       isActive: true,
     },
     create: {
       code: 'LCD26DONIKO',
       name: 'Lelouma Community',
-      domainName: 'www.leloumacommunity.com', 
+      domainName: 'leloumacommunity.com', 
       isActive: true,
     },
   });
-  console.log('🏢 Association configurée.');
+  console.log('🏢 Association "Lelouma Community" configurée.');
 
+  // Hachage du mot de passe sécurisé pour les comptes créés
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
-  // 2. Création du SYSTEM_ADMIN
-  await prisma.user.upsert({
-    where: { email: 'thiernodoniko21@outlook.fr' },
-    update: {
-      role: UserRole.SYSTEM_ADMIN,
-      passwordHash: hashedPwd,
-      status: UserStatus.ACTIVE,
-    },
-    create: {
-      email: 'thiernodoniko21@outlook.fr',
-      passwordHash: hashedPwd,
-      firstName: 'Doniko',
-      lastName: 'DIALLO',
-      role: UserRole.SYSTEM_ADMIN,
-      status: UserStatus.ACTIVE,
-    },
-  });
-
-  // 3. Création du SUPER_ADMIN lié à l'association du client
+  // 2. Création du compte SUPER_ADMIN du client
+  // Ce compte est rattaché à l'association créée ci-dessus
+  console.log('👤 Création du compte Super Admin client...');
   await prisma.user.upsert({
     where: { email: 'thiernodoniko@gmail.com' },
     update: {
@@ -65,12 +50,12 @@ async function main() {
     },
   });
 
-  console.log('🎉 Seeding terminé !');
+  console.log('🎉 Seeding terminé avec succès ! L\'espace client est prêt.');
 }
 
 main()
   .catch((e) => {
-    console.error(e);
+    console.error('❌ Erreur lors du seeding :', e);
     process.exit(1);
   })
   .finally(async () => {
