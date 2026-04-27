@@ -29,6 +29,22 @@ function getBaseUrl(): string {
   return url.replace(/\/+$/, '');
 }
 
+// 🔥 NOUVEAU : Fonction utilitaire pour déterminer le locataire (tenant)
+function getTenantDomain(): string {
+  const FALLBACK_DOMAIN = 'leloumacommunity.com'; // Ton domaine de prod officiel
+  
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    // Si on est sur l'URL temporaire Vercel ou en local, on simule le domaine de prod
+    if (host.includes('vercel.app') || host.includes('localhost')) {
+      return FALLBACK_DOMAIN;
+    }
+    // Sinon, on renvoie le domaine actuel nettoyé
+    return host.replace(/^www\./, '');
+  }
+  return FALLBACK_DOMAIN;
+}
+
 async function parseJsonSafe(res: Response): Promise<unknown> {
   const text = await res.text();
 
@@ -48,11 +64,13 @@ async function refreshTokenRequest(): Promise<boolean> {
   if (!refreshToken) return false;
 
   const baseUrl = getBaseUrl();
+  const tenantDomain = getTenantDomain();
 
   const res = await fetch(`${baseUrl}/auth/refresh`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'x-tenant-domain': tenantDomain, // 🔥 Sécurité : on l'injecte aussi lors du refresh
     },
     body: JSON.stringify({ refreshToken }),
   });
@@ -81,10 +99,12 @@ export async function http<TResponse, TBody = unknown>(
   const useAuth = options?.auth ?? true;
   const retryOn401 = options?.retryOn401 ?? true;
   const baseUrl = getBaseUrl();
+  const tenantDomain = getTenantDomain(); // 🔥 Récupération du domaine calculé
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
   const headers: Record<string, string> = {
+    'x-tenant-domain': tenantDomain, // 🔥 Injection systématique du header
     ...(options?.headers ?? {}),
   };
 
