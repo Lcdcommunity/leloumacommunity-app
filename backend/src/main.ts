@@ -3,11 +3,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import express from 'express'; 
+import express from 'express';
 import { json, urlencoded } from 'express';
-import cookieParser from 'cookie-parser'; 
+import cookieParser from 'cookie-parser';
 import * as path from 'path';
-import * as fs from 'fs'; // ⚡ AJOUT : Nécessaire pour créer le dossier
+import * as fs from 'fs';
 import { AppModule } from './app.module';
 
 // VAPID (push notifications)
@@ -29,26 +29,26 @@ if (typeof BigInt !== 'undefined' && !(BigInt.prototype as any).toJSON) {
   };
 }
 
-// Instance express pour Vercel Serverless
+// Instance express pour le handler Vercel
 const server = express();
 
 export async function createServer() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { cors: false });
 
-  // VAPID
+  // Configuration VAPID
   const vapidEnabled = configureVapid();
   const pushService = app.get(PushService);
   pushService.setVapidEnabled(vapidEnabled);
 
-  // Prefix API
+  // Prefix global de l'API
   app.setGlobalPrefix('api');
 
-  // Middlewares
+  // Middlewares de base
   app.use(cookieParser());
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  // 🔥 INTERCEPTEUR CHIRURGICAL POUR TON DEV VERCEL 🔥
+  // 🔥 INTERCEPTEUR MULTI-TENANT (Spécial Vercel Dev)
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const requestOrigin = req.headers.origin || req.headers.host || '';
     if (requestOrigin.includes('vercel.app')) {
@@ -57,13 +57,12 @@ export async function createServer() {
     next();
   });
 
-  // 🔥 FIX CORS EXTRÊME POUR VERCEL SERVERLESS
+  // 🔥 CONFIGURATION CORS EXTRÊME (Serverless Ready)
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin || origin.includes('vercel.app') || origin.includes('localhost') || origin.includes('leloumacommunity.com')) {
         callback(null, true);
       } else {
-        console.error('❌ CORS BLOCKED:', origin);
         callback(null, false);
       }
     },
@@ -80,7 +79,7 @@ export async function createServer() {
     optionsSuccessStatus: 204,
   });
 
-  // 🔥 FORCE PREFLIGHT HANDLING (ANTI BUG VERCEL)
+  // 🔥 GESTION MANUELLE DU PREFLIGHT (Indispensable sur Vercel)
   server.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
     res.header('Access-Control-Allow-Credentials', 'true');
@@ -89,9 +88,7 @@ export async function createServer() {
     res.sendStatus(204);
   });
 
-  // ─────────────────────────────────────────────────────────────
-  // VALIDATION
-  // ─────────────────────────────────────────────────────────────
+  // Validation globale
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -101,54 +98,37 @@ export async function createServer() {
     }),
   );
 
-  // Proxy (Vercel / Nginx)
+  // Trust Proxy pour Render/Vercel
   server.set('trust proxy', 1);
 
-  // ─────────────────────────────────────────────────────────────
-  // SWAGGER
-  // ─────────────────────────────────────────────────────────────
+  // Configuration Swagger
   const swaggerEnabled = (process.env.SWAGGER_ENABLED || 'true') === 'true';
-
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
-      .setTitle('Association Community API')
-      .setDescription('API multi-tenant')
+      .setTitle('Lelouma Community API')
+      .setDescription('API Multi-tenant pour la gestion associative')
       .setVersion('1.0.0')
       .addBearerAuth()
       .build();
-
     const document = SwaggerModule.createDocument(app, config);
-
-    SwaggerModule.setup(
-      process.env.SWAGGER_PATH || 'docs',
-      app,
-      document,
-      {
-        swaggerOptions: { persistAuthorization: true },
-      },
-    );
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: { persistAuthorization: true },
+    });
   }
 
   // ─────────────────────────────────────────────────────────────
-  // STATIC FILES (FIX SERVERLESS VERCEL - ENOENT)
+  // GESTION DES FICHIERS STATIQUES (SÉCURITÉ VERCEL)
   // ─────────────────────────────────────────────────────────────
-  // ⚡ Vercel est en lecture seule sauf le dossier /tmp
   const isVercel = process.env.VERCEL === '1';
-  let defaultUploadDir = './uploads';
-  
-  if (isVercel) {
-    defaultUploadDir = '/tmp/uploads';
-  }
+  const uploadPath = isVercel ? '/tmp/uploads' : './uploads';
+  const uploadDir = path.resolve(uploadPath);
 
-  const uploadDir = path.resolve(process.env.LOCAL_UPLOAD_DIR || defaultUploadDir);
-
-  // Création du dossier dynamiquement pour éviter le crash 500
   if (!fs.existsSync(uploadDir)) {
     try {
       fs.mkdirSync(uploadDir, { recursive: true });
-      console.log(`📁 Dossier statique créé avec succès : ${uploadDir}`);
-    } catch (error) {
-      console.error(`❌ Impossible de créer le dossier statique ${uploadDir} :`, error);
+      console.log('📁 Dossier statique initialisé :', uploadDir);
+    } catch (err) {
+      console.error('⚠️ Erreur de création du dossier statique :', err);
     }
   }
 
@@ -158,7 +138,7 @@ export async function createServer() {
   return server;
 }
 
-// Handler principal exigé par Vercel pour le Serverless
+// Handler pour Vercel Serverless
 export default async (req: any, res: any) => {
   const instance = await createServer();
   return instance(req, res);

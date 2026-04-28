@@ -6,7 +6,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join, isAbsolute } from 'path';
-import * as fs from 'fs'; // ⚡ AJOUT : Pour éviter le crash Serverless
+import * as fs from 'fs';
 
 // Config & Guards
 import authConfig from './config/auth.config';
@@ -16,7 +16,7 @@ import swaggerConfig from './config/swagger.config';
 import { validateEnv } from './config/validate-env';
 import { ThrottlerBehindProxyGuard } from './common/guards/throttler-behind-proxy.guard';
 
-// Core & Shared Modules
+// Core Modules
 import { PrismaModule } from './prisma/prisma.module';
 
 // Feature Modules
@@ -51,32 +51,35 @@ import { ElectionsModule } from './modules/elections/elections.module';
       validate: validateEnv,
       load: [authConfig, rateLimitConfig, storageConfig, swaggerConfig],
     }),
+    
+    // ⚡ CONFIGURATION STATIQUE SÉCURISÉE POUR VERCEL
     ServeStaticModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        // ⚡ FIX SERVERLESS : Protection Vercel
         const isVercel = process.env.VERCEL === '1';
         const defaultDir = isVercel ? '/tmp/uploads' : './uploads';
         
         const configuredUploadDir = config.get<string>('storage.local.uploadDir') || defaultDir;
         const rootPath = isAbsolute(configuredUploadDir) ? configuredUploadDir : join(process.cwd(), configuredUploadDir);
         
-        // Sécurité anti-crash
+        // Création préventive pour éviter le crash de ServeStatic
         if (!fs.existsSync(rootPath)) {
           try {
             fs.mkdirSync(rootPath, { recursive: true });
           } catch (e) {
-             console.error(`❌ ServeStaticModule n'a pas pu créer : ${rootPath}`);
+            console.error(`❌ ServeStaticModule : impossible de créer ${rootPath}`);
           }
         }
 
         return [{ rootPath, serveRoot: '/static' }];
       },
     }),
+
     ThrottlerModule.forRoot([{
       ttl: Number(process.env.THROTTLE_TTL ?? 60) * 1000,
       limit: Number(process.env.THROTTLE_LIMIT ?? 120),
     }]),
+    
     ScheduleModule.forRoot(),
     PrismaModule,
 
