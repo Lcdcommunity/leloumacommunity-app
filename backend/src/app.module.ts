@@ -6,6 +6,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join, isAbsolute } from 'path';
+import * as fs from 'fs'; // ⚡ AJOUT : Pour éviter le crash Serverless
 
 // Config & Guards
 import authConfig from './config/auth.config';
@@ -41,7 +42,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { AssociationsModule } from './modules/associations/associations.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { UsersModule } from './modules/users/users.module';
-import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ AJOUT CHIRURGICAL
+import { ElectionsModule } from './modules/elections/elections.module';
 
 @Module({
   imports: [
@@ -53,8 +54,22 @@ import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ A
     ServeStaticModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const configuredUploadDir = config.get<string>('storage.local.uploadDir') || './uploads';
+        // ⚡ FIX SERVERLESS : Protection Vercel
+        const isVercel = process.env.VERCEL === '1';
+        const defaultDir = isVercel ? '/tmp/uploads' : './uploads';
+        
+        const configuredUploadDir = config.get<string>('storage.local.uploadDir') || defaultDir;
         const rootPath = isAbsolute(configuredUploadDir) ? configuredUploadDir : join(process.cwd(), configuredUploadDir);
+        
+        // Sécurité anti-crash
+        if (!fs.existsSync(rootPath)) {
+          try {
+            fs.mkdirSync(rootPath, { recursive: true });
+          } catch (e) {
+             console.error(`❌ ServeStaticModule n'a pas pu créer : ${rootPath}`);
+          }
+        }
+
         return [{ rootPath, serveRoot: '/static' }];
       },
     }),
@@ -88,7 +103,7 @@ import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ A
     AssociationsModule,
     AdminModule,
     UsersModule,
-    ElectionsModule, // ⚡ AJOUT CHIRURGICAL
+    ElectionsModule,
   ],
   controllers: [], 
   providers: [
