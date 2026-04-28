@@ -1,13 +1,11 @@
 // backend/src/main.ts
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { ExpressAdapter } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import express from 'express';
 import { json, urlencoded } from 'express';
-import cookieParser from 'cookie-parser';
 import * as path from 'path';
-import * as fs from 'fs';
+import * as express from 'express';
+import cookieParser = require('cookie-parser');
 import { AppModule } from './app.module';
 
 // VAPID (push notifications)
@@ -29,26 +27,75 @@ if (typeof BigInt !== 'undefined' && !(BigInt.prototype as any).toJSON) {
   };
 }
 
-// Instance express pour le handler Vercel
-const server = express();
+// ─────────────────────────────────────────────────────────────
+// UTILS CORS
+// ─────────────────────────────────────────────────────────────
+function normalizeOrigins(values: string[]): string[] {
+  return values
+    .map((v) => v.trim())
+    .filter(Boolean)
+    .map((v) => v.replace(/\/+$/, ''));
+}
 
-export async function createServer() {
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { cors: false });
+function getAllowedOrigins(): string[] {
+  const raw =
+    process.env.CORS_ORIGINS ||
+    process.env.FRONTEND_URL ||
+    ';';
 
-  // Configuration VAPID
+  return normalizeOrigins([
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    ...raw.split(','),
+  ]);
+}
+
+function isAllowedOrigin(origin: string | undefined, allowed: string[]): boolean {
+  if (!origin) return true;
+
+  const clean = origin.replace(/\/+$/, '');
+
+  if (allowed.includes(clean)) return true;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(clean);
+  } catch {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+
+  if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
+  if (hostname.endsWith('.vercel.app')) return true;
+
+  // 🔥 domaine prod
+  if (hostname.endsWith('leloumacommunity.com')) return true;
+
+  return false;
+}
+
+// ─────────────────────────────────────────────────────────────
+// BOOTSTRAP
+// ─────────────────────────────────────────────────────────────
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, { cors: false });
+
+  // VAPID
   const vapidEnabled = configureVapid();
   const pushService = app.get(PushService);
   pushService.setVapidEnabled(vapidEnabled);
 
-  // Prefix global de l'API
+  // Prefix API
   app.setGlobalPrefix('api');
 
-  // Middlewares de base
+  // Middlewares
   app.use(cookieParser());
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  // 🔥 INTERCEPTEUR MULTI-TENANT (Spécial Vercel Dev)
+  // 🔥 INTERCEPTEUR CHIRURGICAL POUR TON DEV VERCEL 🔥
+  // Bypass l'erreur 404 du Multi-Tenant sans impacter la prod client
   app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
     const requestOrigin = req.headers.origin || req.headers.host || '';
     if (requestOrigin.includes('vercel.app')) {
@@ -57,12 +104,20 @@ export async function createServer() {
     next();
   });
 
-  // 🔥 CONFIGURATION CORS EXTRÊME (Serverless Ready)
+  const allowedOrigins = getAllowedOrigins();
+  console.log('🌍 CORS ORIGINS:', allowedOrigins);
+
+  // ─────────────────────────────────────────────────────────────
+  // ✅ CORS CONFIG FINAL
+  // ─────────────────────────────────────────────────────────────
   app.enableCors({
     origin: (origin, callback) => {
-      if (!origin || origin.includes('vercel.app') || origin.includes('localhost') || origin.includes('leloumacommunity.com')) {
+      const ok = isAllowedOrigin(origin, allowedOrigins);
+
+      if (ok) {
         callback(null, true);
       } else {
+        console.error('❌ CORS BLOCKED:', origin);
         callback(null, false);
       }
     },
@@ -79,16 +134,22 @@ export async function createServer() {
     optionsSuccessStatus: 204,
   });
 
-  // 🔥 GESTION MANUELLE DU PREFLIGHT (Indispensable sur Vercel)
+  // ─────────────────────────────────────────────────────────────
+  // ✅ FORCE PREFLIGHT HANDLING
+  // ─────────────────────────────────────────────────────────────
+  const server = app.getHttpAdapter().getInstance();
+
   server.options('*', (req, res) => {
-    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS,PATCH');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization, x-tenant-id, x-tenant-domain');
+    res.header(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Accept, Authorization, x-tenant-id, x-tenant-domain',
+    );
     res.sendStatus(204);
   });
 
-  // Validation globale
+  // ─────────────────────────────────────────────────────────────
+  // VALIDATION
+  // ─────────────────────────────────────────────────────────────
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -98,48 +159,51 @@ export async function createServer() {
     }),
   );
 
-  // Trust Proxy pour Render/Vercel
+  // Proxy (Render / Vercel / Nginx)
   server.set('trust proxy', 1);
 
-  // Configuration Swagger
+  // ─────────────────────────────────────────────────────────────
+  // SWAGGER
+  // ─────────────────────────────────────────────────────────────
   const swaggerEnabled = (process.env.SWAGGER_ENABLED || 'true') === 'true';
+
   if (swaggerEnabled) {
     const config = new DocumentBuilder()
-      .setTitle('Lelouma Community API')
-      .setDescription('API Multi-tenant pour la gestion associative')
+      .setTitle('Association Community API')
+      .setDescription('API multi-tenant')
       .setVersion('1.0.0')
       .addBearerAuth()
       .build();
+
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document, {
-      swaggerOptions: { persistAuthorization: true },
-    });
+
+    SwaggerModule.setup(
+      process.env.SWAGGER_PATH || 'docs',
+      app,
+      document,
+      {
+        swaggerOptions: { persistAuthorization: true },
+      },
+    );
   }
 
   // ─────────────────────────────────────────────────────────────
-  // GESTION DES FICHIERS STATIQUES (SÉCURITÉ VERCEL)
+  // STATIC FILES
   // ─────────────────────────────────────────────────────────────
-  const isVercel = process.env.VERCEL === '1';
-  const uploadPath = isVercel ? '/tmp/uploads' : './uploads';
-  const uploadDir = path.resolve(uploadPath);
+  server.use(
+    '/static',
+    express.static(
+      path.resolve(process.env.LOCAL_UPLOAD_DIR || './uploads'),
+    ),
+  );
 
-  if (!fs.existsSync(uploadDir)) {
-    try {
-      fs.mkdirSync(uploadDir, { recursive: true });
-      console.log('📁 Dossier statique initialisé :', uploadDir);
-    } catch (err) {
-      console.error('⚠️ Erreur de création du dossier statique :', err);
-    }
-  }
+  // ─────────────────────────────────────────────────────────────
+  // START SERVER
+  // ─────────────────────────────────────────────────────────────
+  const port = Number(process.env.PORT || 3001);
+  await app.listen(port);
 
-  server.use('/static', express.static(uploadDir));
-
-  await app.init();
-  return server;
+  console.log(`🚀 API READY → http://localhost:${port}/api`);
 }
 
-// Handler pour Vercel Serverless
-export default async (req: any, res: any) => {
-  const instance = await createServer();
-  return instance(req, res);
-};
+void bootstrap();
