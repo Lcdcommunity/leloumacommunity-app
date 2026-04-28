@@ -10,7 +10,13 @@ export function middleware(request: NextRequest) {
   const locale = request.cookies.get('i18next')?.value || 'fr';
 
   // 🌍 Récupération du domaine (Tenant) pour le Multi-Tenancy visuel
-  const hostname = request.headers.get('host') || '';
+  let hostname = request.headers.get('host') || '';
+
+  // 🔥 MAPPING CHIRURGICAL POUR TON VERCEL PERSO (Bypass Auth-Blocked)
+  // On masque l'identité de ton Vercel de dev pour qu'il se fasse passer pour le client
+  if (hostname === 'lcd-comminity.vercel.app' || hostname.includes('vercel.app')) {
+    hostname = 'leloumacommunity.com';
+  }
 
   // 1. Identification des zones
   const isSystemAdminRoute = pathname.startsWith('/system-admin');
@@ -67,9 +73,14 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // 5. Injection des headers pour les Server Components (Domaine ciblé)
+  // 5. Injection des headers pour les Server Components et le Proxy
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-tenant-domain', hostname);
+  
+  // 🔥 Force l'Origin pour le proxy afin de satisfaire le backend Render
+  if (hostname === 'leloumacommunity.com') {
+    requestHeaders.set('origin', 'https://leloumacommunity.com');
+  }
 
   const response = NextResponse.next({
     request: {
@@ -92,6 +103,7 @@ export const config = {
     '/admin/:path*',
     '/member/:path*',
     '/login',
-    '/'
+    '/',
+    '/api/:path*' // 🔥 CRUCIAL : Permet au middleware de modifier les headers du proxy API
   ],
 };
