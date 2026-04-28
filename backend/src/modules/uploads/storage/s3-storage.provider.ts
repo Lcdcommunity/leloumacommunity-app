@@ -1,4 +1,4 @@
-//src/modules/uploads/storage/s3-storage.provider.ts
+// backend/src/modules/uploads/storage/s3-storage.provider.ts
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';

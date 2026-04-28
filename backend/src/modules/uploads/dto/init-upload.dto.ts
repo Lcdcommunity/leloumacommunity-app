@@ -1,4 +1,4 @@
-//src/modules/uploads/dto/init-upload.dto.ts
+// backend/src/modules/uploads/dto/init-upload.dto.ts
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class InitUploadDto {

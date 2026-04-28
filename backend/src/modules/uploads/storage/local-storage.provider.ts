@@ -1,4 +1,4 @@
-//src/modules/uploads/storage/local-storage.provider.ts
+// backend/src/modules/uploads/storage/local-storage.provider.ts
 import { Injectable } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import { join, extname, isAbsolute } from 'path';
@@ -47,9 +47,15 @@ export class LocalStorageProvider implements StorageProvider {
     mimeType?: string;
     folder?: string;
   }): Promise<StoredFileResult> {
-    const uploadDir = this.getUploadDir();
-    const publicBaseUrl = this.getPublicBaseUrl();
+    // ⚡ FIX SERVERLESS : Redirection vers /tmp si exécuté sur Vercel (Lecture seule partout ailleurs)
+    const isVercel = process.env.VERCEL === '1';
+    let uploadDir = this.getUploadDir();
+    
+    if (isVercel && !uploadDir.startsWith('/tmp')) {
+      uploadDir = join('/tmp', 'uploads');
+    }
 
+    const publicBaseUrl = this.getPublicBaseUrl();
     const folder = params.folder?.replace(/^\/+|\/+$/g, '') || 'misc';
     const year = String(new Date().getFullYear());
     const ext = extname(params.fileName) || '';

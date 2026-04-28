@@ -1,4 +1,4 @@
-//backend/src/modules/uploads/cloudinary.service.ts
+// backend/src/modules/uploads/cloudinary.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { v2 as cloudinary, UploadApiResponse, UploadApiErrorResponse } from 'cloudinary';
 import * as streamifier from 'streamifier';
@@ -34,7 +34,7 @@ export class CloudinaryService {
 
       const uploadStream = cloudinary.uploader.upload_stream(
         { 
-          folder: 'lelouma_community',
+          folder: 'leloumacommunity', // Standardisation du nom de dossier sans underscore pour compatibilité optimale
           resource_type: 'auto'
         },
         (error: UploadApiErrorResponse, result: UploadApiResponse) => {

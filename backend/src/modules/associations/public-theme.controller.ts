@@ -1,4 +1,4 @@
-/////// backend/src/modules/associations/public-theme.controller.ts
+// backend/src/modules/associations/public-theme.controller.ts
 import { Controller, Get, Query, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 

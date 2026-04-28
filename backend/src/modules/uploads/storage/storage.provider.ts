@@ -1,4 +1,4 @@
-//src/modules/uploads/storage/storage.provider.ts
+// backend/src/modules/uploads/storage/storage.provider.ts
 export type StoredFileResult = {
   storageKey: string;
   url: string;
