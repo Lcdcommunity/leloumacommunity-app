@@ -1,5 +1,6 @@
 // backend/src/modules/sponsors/dto/sponsor.dto.ts
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsUrl, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsUrl, IsEmail, IsEnum } from 'class-validator';
+import { SponsorTier } from '@prisma/client';
 
 export class CreateSponsorDto {
   @IsString()
@@ -17,6 +18,16 @@ export class CreateSponsorDto {
   @IsString()
   @IsOptional()
   logoFileId?: string;
+
+  // ⚡ AJOUT CHIRURGICAL
+  @IsString()
+  @IsOptional()
+  logoUrl?: string;
+
+  // ⚡ AJOUT CHIRURGICAL
+  @IsEnum(SponsorTier)
+  @IsOptional()
+  tier?: SponsorTier;
 
   @IsBoolean()
   @IsOptional()
@@ -39,6 +50,16 @@ export class UpdateSponsorDto {
   @IsString()
   @IsOptional()
   logoFileId?: string;
+
+  // ⚡ AJOUT CHIRURGICAL
+  @IsString()
+  @IsOptional()
+  logoUrl?: string;
+
+  // ⚡ AJOUT CHIRURGICAL
+  @IsEnum(SponsorTier)
+  @IsOptional()
+  tier?: SponsorTier;
 
   @IsBoolean()
   @IsOptional()

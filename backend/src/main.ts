@@ -41,7 +41,7 @@ function getAllowedOrigins(): string[] {
   const raw =
     process.env.CORS_ORIGINS ||
     process.env.FRONTEND_URL ||
-    ';';
+    '';
 
   return normalizeOrigins([
     'http://localhost:3000',
@@ -94,21 +94,11 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ extended: true, limit: '10mb' }));
 
-  // 🔥 INTERCEPTEUR CHIRURGICAL POUR TON DEV VERCEL 🔥
-  // Bypass l'erreur 404 du Multi-Tenant sans impacter la prod client
-  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const requestOrigin = req.headers.origin || req.headers.host || '';
-    if (requestOrigin.includes('vercel.app')) {
-      req.headers['x-tenant-domain'] = 'www.leloumacommunity.com';
-    }
-    next();
-  });
-
   const allowedOrigins = getAllowedOrigins();
   console.log('🌍 CORS ORIGINS:', allowedOrigins);
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ CORS CONFIG FINAL
+  // ✅ CORS CONFIG FINAL (FIX COMPLET)
   // ─────────────────────────────────────────────────────────────
   app.enableCors({
     origin: (origin, callback) => {
@@ -128,14 +118,14 @@ async function bootstrap() {
       'Accept',
       'Authorization',
       'x-tenant-id',
-      'x-tenant-domain', 
+      'x-tenant-domain', // ✅ FIX CRITIQUE
     ],
     exposedHeaders: ['set-cookie'],
     optionsSuccessStatus: 204,
   });
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ FORCE PREFLIGHT HANDLING
+  // ✅ FORCE PREFLIGHT HANDLING (ANTI BUG NAVIGATEUR)
   // ─────────────────────────────────────────────────────────────
   const server = app.getHttpAdapter().getInstance();
 

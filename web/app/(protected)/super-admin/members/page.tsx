@@ -266,7 +266,7 @@ function MemberModal({
                 <label>Lieu de naissance</label>
                 {isEditing ? <input className="sm-dp-input" value={editValues.placeOfBirth || ''} onChange={e => handleChange('placeOfBirth', e.target.value)} /> : <div className="sm-dp-value">{user.placeOfBirth || '-'}</div>}
              </div>
-             
+
              <div className="sm-dp-field">
                 <label>Pays de naissance</label>
                 {isEditing ? (
@@ -281,15 +281,14 @@ function MemberModal({
                   </>
                 ) : <div className="sm-dp-value">{user.countryOfBirth || '-'}</div>}
              </div>
-             
+
              <div className="sm-dp-field">
                 <label>Commune d&apos;origine</label>
                 {isEditing ? (
                   <>
                     <select className="sm-dp-input" value={editValues.originSubPrefecture || ''} onChange={e => { handleChange('originSubPrefecture', e.target.value); if(e.target.value !== 'Autre') handleChange('customOriginSubPrefecture', ''); }}>
                       <option value="">Sélectionner...</option>
-                      {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}                  
-                    </select>
+                      {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}                                      </select>
                     {editValues.originSubPrefecture === 'Autre' && (
                       <input className="sm-dp-input" style={{ marginTop: '0.4rem' }} value={editValues.customOriginSubPrefecture || ''} onChange={e => handleChange('customOriginSubPrefecture', e.target.value)} placeholder="Précisez la commune" />
                     )}
@@ -327,7 +326,7 @@ function MemberModal({
                 {isEditing ? <input className="sm-dp-input" value={editValues.addressLine1 || ''} onChange={e => handleChange('addressLine1', e.target.value)} /> : <div className="sm-dp-value">{user.addressLine1 || '-'}</div>}
              </div>
           </div>
-          
+
           <div className="sm-section-divider">Poste & Profession</div>
           <div className="sm-dp-grid">
              <div className="sm-dp-field">
@@ -415,6 +414,18 @@ export default function SuperAdminMembersPage() {
     void init();
   }, [load]);
 
+  // ⚡ CORRECTION : Écoute de l'événement d'impression système
+  // Cela empêche React de nettoyer le DOM avant que le PDF ne soit généré
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      setPdfData(null);
+      setExportModalType(prev => prev === 'PDF' ? null : prev);
+    };
+
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => window.removeEventListener('afterprint', handleAfterPrint);
+  }, []);
+
   const openDetails = (user: ExtendedUser) => {
     setSelectedUser(user);
 
@@ -460,7 +471,7 @@ export default function SuperAdminMembersPage() {
       delete payloadToSave.customOriginSubPrefecture;
       delete payloadToSave.customCountry;
       delete payloadToSave.customFunction;
-      
+
       // Sécurité : suppression de l'adresse 2 pour éviter les envois accidentels
       payloadToSave.addressLine2 = undefined;
 
@@ -534,7 +545,7 @@ export default function SuperAdminMembersPage() {
         pageSize: 10000,
         antennaId: exportAntenna || undefined
       });
-      
+
       let exportData = fetchRes.items as ExtendedUser[];
 
       // Filtrage par date de création (adhésion)
@@ -567,11 +578,10 @@ export default function SuperAdminMembersPage() {
         setExportModalType(null);
       } else if (exportModalType === 'PDF') {
         setPdfData(exportData);
+        // ⚡ CORRECTION : Délai plus long pour les gros tableaux, et le nettoyage se fait au "afterprint" 
         setTimeout(() => {
           window.print();
-          setPdfData(null);
-          setExportModalType(null);
-        }, 300); // Petit délai pour permettre au tableau caché d'être rendu
+        }, 800);
       }
 
     } catch (err) {
@@ -623,8 +633,7 @@ export default function SuperAdminMembersPage() {
         @media(min-width:768px){ .sm-mob { display:none; } }
         .sm-mc { padding:1rem; border-bottom:1px solid #f1f5f9; cursor:pointer; }
         .sm-mc-top { display:flex; align-items:center; gap:.75rem; }
-        .sm-mc-info { flex:1; min-width:0; }
-        .sm-member-name { font-weight:700; font-size:.9rem; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sm-mc-info { flex:1; min-width:0; }        .sm-member-name { font-weight:700; font-size:.9rem; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .sm-member-email { font-size:.75rem; color:#64748b; margin-top:2px; }
         .sm-mc-meta { display:flex; justify-content:space-between; align-items:center; margin-top:.75rem; }
         
@@ -752,7 +761,7 @@ export default function SuperAdminMembersPage() {
             <div className="sm-stat-lbl">Suspens</div>
           </div>
         </div>
-        
+
         <div className="sm-panel">
           <div className="sm-toolbar">
             <div className="sm-t-field">
@@ -875,8 +884,8 @@ export default function SuperAdminMembersPage() {
             </div>
           </div>
         </div>
-      )}
-
+      )}      
+      
       {selectedUser && (
         <MemberModal
           user={selectedUser}

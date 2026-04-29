@@ -1,5 +1,4 @@
 // web/app/(protected)/super-admin/elections/page.tsx
-// web/app/(protected)/super-admin/elections/page.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -15,7 +14,7 @@ export default function SuperAdminElectionsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedElectionId, setSelectedElectionId] = useState<string | null>(null);
   const [selectedElectionTitle, setSelectedElectionTitle] = useState<string>('');
-  
+
   const [showModal, setShowModal] = useState(false);
   const [busy, setBusy] = useState(false);
   const [formData, setFormData] = useState({ title: '', description: '', startsAt: '', endsAt: '' });
@@ -274,8 +273,7 @@ export default function SuperAdminElectionsPage() {
           font-size: 0.875rem; font-weight: 600; color: var(--ink-2);
           animation: toastIn 0.35s cubic-bezier(0.16,1,0.3,1) forwards;
           max-width: 360px;
-        }
-        .el-toast-icon {
+        }        .el-toast-icon {
           width: 32px; height: 32px; border-radius: 50%;
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0;
@@ -545,9 +543,7 @@ export default function SuperAdminElectionsPage() {
           font-family: 'DM Sans', sans-serif; font-size: 0.875rem; font-weight: 700;
           cursor: pointer; transition: all 0.18s;
         }
-        .btn-cancel:hover { background: var(--surface); border-color: #CBD5E1; color: var(--ink); }
-
-        .btn-submit {
+        .btn-cancel:hover { background: var(--surface); border-color: #CBD5E1; color: var(--ink); }        .btn-submit {
           flex: 1.5; padding: 0.875rem;
           background: var(--ink); border: none;
           border-radius: var(--r-btn); color: var(--white);
@@ -580,14 +576,22 @@ export default function SuperAdminElectionsPage() {
         .btn-add-pos:hover:not(:disabled) { background: var(--blue); }
         .btn-add-pos:disabled { opacity: 0.4; cursor: not-allowed; }
 
+        /* ⚡ CORRECTION: On enlève overflow: hidden; pour laisser le dropdown s'afficher et on gère le z-index dynamique */
         .pos-block {
           background: var(--white); border: 1.5px solid var(--border);
-          border-radius: 16px; overflow: hidden; margin-bottom: 1rem;
+          border-radius: 16px; margin-bottom: 1rem;
+          position: relative; z-index: 1;
+          transition: z-index 0s; 
         }
+        .pos-block:focus-within {
+          z-index: 50; /* Permet au menu déroulant de toujours passer au-dessus des autres cartes */
+        }
+        
         .pos-header {
           display: flex; justify-content: space-between; align-items: center;
           padding: 1rem 1.25rem;
           background: var(--surface); border-bottom: 1px solid var(--border);
+          border-radius: 14.5px 14.5px 0 0; /* ⚡ CORRECTION: Pour compenser la suppression du hidden, on arrondit directement le header */
           gap: 0.75rem;
         }
         .pos-title { font-size: 0.9375rem; font-weight: 800; color: var(--ink-2); }
@@ -658,12 +662,15 @@ export default function SuperAdminElectionsPage() {
           background: var(--surface); border: 1.5px dashed #CBD5E1;
           border-radius: 12px; padding: 1.25rem; position: relative;
         }
+        
+        /* ⚡ CORRECTION: Ajout d'un max-height et overflow-y pour rendre le dropdown scrollable s'il est long */
         .search-dropdown {
           position: absolute; top: 100%; left: 0; right: 0;
           background: var(--white); border: 1.5px solid var(--border);
           border-radius: 12px; box-shadow: var(--shadow-lg);
-          overflow: hidden; z-index: 50; margin-top: 0.375rem;
+          max-height: 220px; overflow-y: auto; z-index: 50; margin-top: 0.375rem;
         }
+        
         .search-item {
           padding: 0.75rem 1rem; cursor: pointer;
           font-size: 0.85rem; font-weight: 600; color: var(--ink-3);
@@ -806,7 +813,6 @@ export default function SuperAdminElectionsPage() {
                   </div>
                   <h2 className="el-card-title">{election.title}</h2>
                   <p className="el-card-desc">{election.description || 'Aucune description fournie.'}</p>
-
                   {(election.startsAt || election.endsAt) && (
                     <div className="el-dates">
                       {election.startsAt && (
@@ -1021,8 +1027,7 @@ export default function SuperAdminElectionsPage() {
                         <button className="btn-cancel-edit" onClick={() => setEditingPositionId(null)}>Annuler</button>
                       </div>
                     ) : (
-                      <>
-                        <span className="pos-title">{pos.title}</span>
+                      <>                        <span className="pos-title">{pos.title}</span>
                         <div className="pos-header-actions">
                           {manageElection.status === 'DRAFT' && (
                             <>

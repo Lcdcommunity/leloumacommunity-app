@@ -1,4 +1,4 @@
-///////////// prisma/schema.prisma
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -347,12 +347,19 @@ enum DashboardTarget {
   SUPER_ADMINS
 }
 
-// ⚡ AJOUT CHIRURGICAL : Statuts d'élection
 enum ElectionStatus {
   DRAFT
   OPEN
   CLOSED
   ARCHIVED
+}
+
+// ⚡ AJOUT CHIRURGICAL : Niveaux de sponsoring
+enum SponsorTier {
+  PLATINUM
+  GOLD
+  SILVER
+  STANDARD
 }
 
 /// =========================
@@ -422,8 +429,6 @@ model Association {
   videoPosts                       VideoPost[]
   carouselImages                   CarouselImage[]
   pricings                         Pricing[] 
-  
-  // ⚡ AJOUT CHIRURGICAL
   elections                        Election[]
 
   @@index([isActive])
@@ -630,7 +635,6 @@ model User {
   videoPostsCreated              VideoPost[]     @relation("VideoCreatedBy")
   carouselImagesCreated          CarouselImage[] @relation("CarouselCreatedBy")
 
-  // ⚡ AJOUT CHIRURGICAL
   electionCandidates             ElectionCandidate[]
   electionVotes                  ElectionVote[]
 
@@ -1072,17 +1076,17 @@ model ProjectProposalComment {
 }
 
 model Project {
-  id                   String        @id @default(cuid())
-  associationId        String
-  antennaId            String?
+  id                 String        @id @default(cuid())
+  associationId      String
+  antennaId          String?
 
-  title                String
-  slug                 String?
-  summary              String?
-  description          String
-  status               ProjectStatus @default(APPROVED)
+  title              String
+  slug               String?
+  summary            String?
+  description        String
+  status             ProjectStatus @default(APPROVED)
 
-  promoterName         String?
+  promoterName       String?
 
   specificObjectives   Json?
   targetBeneficiaries  String?
@@ -1296,6 +1300,11 @@ model Sponsor {
   name          String
   websiteUrl    String?
   contactEmail  String?
+  
+  // ⚡ AJOUT CHIRURGICAL : Nouveaux champs pour correspondre à ton design
+  logoUrl       String?
+  tier          SponsorTier  @default(STANDARD)
+  
   logoFileId    String?
   isActive      Boolean      @default(true)
 
@@ -1527,7 +1536,6 @@ model Notification {
   createdByUserId String?
   createdAt       DateTime                @default(now()) 
   
-  // ⚡ CORRECTION : Ajout du "?" après Association
   association     Association?            @relation(fields: [associationId], references: [id], onDelete: Cascade)
   
   antenna         Antenna?                @relation(fields: [antennaId], references: [id], onDelete: SetNull)
@@ -1787,7 +1795,7 @@ model Pricing {
 }
 
 /// =========================
-/// ÉLECTIONS (AJOUT CHIRURGICAL)
+/// ÉLECTIONS
 /// =========================
 
 model Election {
@@ -1837,11 +1845,11 @@ model ElectionCandidate {
 }
 
 model ElectionVote {
-  id          String            @id @default(cuid())
+  id          String           @id @default(cuid())
   positionId  String
   candidateId String
   voterUserId String
-  castAt      DateTime          @default(now())
+  castAt      DateTime         @default(now())
 
   position    ElectionPosition  @relation(fields: [positionId], references: [id], onDelete: Cascade)
   candidate   ElectionCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)

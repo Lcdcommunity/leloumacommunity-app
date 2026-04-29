@@ -50,6 +50,8 @@ export class SponsorsService {
         websiteUrl: dto.websiteUrl,
         contactEmail: dto.contactEmail,
         logoFileId: dto.logoFileId,
+        logoUrl: dto.logoUrl, // ⚡ AJOUT
+        tier: dto.tier,       // ⚡ AJOUT
         isActive: dto.isActive ?? true,
       },
     });
@@ -73,6 +75,8 @@ export class SponsorsService {
         ...(dto.websiteUrl !== undefined && { websiteUrl: dto.websiteUrl }),
         ...(dto.contactEmail !== undefined && { contactEmail: dto.contactEmail }),
         ...(dto.logoFileId !== undefined && { logoFileId: dto.logoFileId }),
+        ...(dto.logoUrl !== undefined && { logoUrl: dto.logoUrl }), // ⚡ AJOUT
+        ...(dto.tier !== undefined && { tier: dto.tier }),          // ⚡ AJOUT
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
     });

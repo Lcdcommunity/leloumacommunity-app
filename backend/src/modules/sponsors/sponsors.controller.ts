@@ -14,8 +14,9 @@ import { CurrentUser, AuthUser } from '../../common/decorators/current-user.deco
 export class SponsorsController {
   constructor(private readonly sponsorsService: SponsorsService) {}
 
+  // ⚡ CORRECTION : Ouverture de la lecture à tous les rôles pour la consultation
   @Get()
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.MEMBER, UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   listSponsors(
     @CurrentUser() user: AuthUser,
     @Query('page') page?: string,
@@ -29,7 +30,7 @@ export class SponsorsController {
   }
 
   @Post()
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   createSponsor(
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateSponsorDto
@@ -38,7 +39,7 @@ export class SponsorsController {
   }
 
   @Patch(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   updateSponsor(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
@@ -48,7 +49,7 @@ export class SponsorsController {
   }
 
   @Delete(':id')
-  @Roles(UserRole.SUPER_ADMIN)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   deleteSponsor(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string

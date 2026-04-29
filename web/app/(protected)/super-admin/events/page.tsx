@@ -1,4 +1,4 @@
-//web/app/(protected)/super-admin/events/page.tsx
+// web/app/(protected)/super-admin/events/page.tsx
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -36,25 +36,27 @@ function formatDateTime(dateString: string) {
 // ----------------------------------------------------------------------
 // MODAL : GESTION DE L'ÉVÉNEMENT (CRÉATION / MODIFICATION)
 // ----------------------------------------------------------------------
-function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; onClose: () => void; onSuccess: () => void }) {
-  const [isEditing, setIsEditing] = useState(!event); 
+function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: EventItem | null; onClose: () => void; onSuccess: () => void }) {
+  const [isEditing, setIsEditing] = useState(!selectedEvent); 
 
-  const [title, setTitle] = useState(event?.title || '');
-  const [description, setDescription] = useState(event?.description || '');
-  const [type, setType] = useState(event?.type || 'GENERAL_ASSEMBLY');
-  const [status, setStatus] = useState(event?.status || 'DRAFT');
-  const [startsAt, setStartsAt] = useState(event ? new Date(event.startsAt).toISOString().slice(0, 16) : '');
-  const [locationText, setLocationText] = useState(event?.locationText || '');
-  const [isOnline, setIsOnline] = useState(event?.isOnline || false);
-  const [meetingLink, setMeetingLink] = useState(event?.meetingLink || '');
+  const [title, setTitle] = useState(selectedEvent?.title || '');
+  const [description, setDescription] = useState(selectedEvent?.description || '');
+  const [type, setType] = useState(selectedEvent?.type || 'GENERAL_ASSEMBLY');
+  const [status, setStatus] = useState(selectedEvent?.status || 'DRAFT');
+  const [startsAt, setStartsAt] = useState(selectedEvent ? new Date(selectedEvent.startsAt).toISOString().slice(0, 16) : '');
+  const [locationText, setLocationText] = useState(selectedEvent?.locationText || '');
+  const [isOnline, setIsOnline] = useState(selectedEvent?.isOnline || false);
+  const [meetingLink, setMeetingLink] = useState(selectedEvent?.meetingLink || '');
 
   const [availableAntennas, setAvailableAntennas] = useState<Antenna[]>([]);
-  const [selectedAntennaIds, setSelectedAntennaIds] = useState<string[]>(event?.antennas?.map(a => a.id) || []);
+  const [selectedAntennaIds, setSelectedAntennaIds] = useState<string[]>(selectedEvent?.antennas?.map(a => a.id) || []);
 
   const [inviteAll, setInviteAll] = useState(true);
   const [availableMembers, setAvailableMembers] = useState<MemberItem[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -80,7 +82,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
     async function fetchMembers() {
       setLoadingMembers(true);
       try {
-        const promises = selectedAntennaIds.map(id => api.listMembers({ antennaId: id, pageSize: 200 }));
+        const promises = selectedAntennaIds.map(id => api.listMembers({ antennaId: id, pageSize: 500 }));
         const results = await Promise.all(promises);
         const allMembers = results.flatMap(res => res.items);
         setAvailableMembers(allMembers as unknown as MemberItem[]);
@@ -96,33 +98,47 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
     setSelectedMemberIds(prev => prev.includes(id) ? prev.filter(mId => mId !== id) : [...prev, id]);
   };
 
+  const filteredMembers = availableMembers.filter(m => 
+    `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(memberSearchQuery.toLowerCase())
+  );
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); 
     setSaving(true);
     try {
       const payload = { 
-        title, description, type, status, startsAt: new Date(startsAt).toISOString(), locationText, isOnline, meetingLink,
+        title, 
+        description: description.trim() || undefined, 
+        type, 
+        status, 
+        startsAt: new Date(startsAt).toISOString(), 
+        locationText: (!isOnline && locationText.trim()) ? locationText.trim() : undefined, 
+        isOnline, 
+        meetingLink: (isOnline && meetingLink.trim()) ? meetingLink.trim() : undefined,
         antennaIds: selectedAntennaIds,
         inviteAll,
         memberIds: inviteAll ? [] : selectedMemberIds
       };
 
-      if (event) {
-        await api.updateEvent(event.id, payload);
+      if (selectedEvent) {
+        await api.updateEvent(selectedEvent.id, payload);
       } else {
         await api.createEvent(payload);
       }
 
       onSuccess();
-    } catch (err) { 
-      console.error(err); alert('Erreur lors de la sauvegarde'); setSaving(false); 
+    } catch (err: unknown) { 
+      console.error(err); 
+      const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue';
+      alert(`Erreur lors de la sauvegarde : ${errorMessage}`); 
+      setSaving(false); 
     }
   }
 
   async function executeDelete() {
-    if (!event) return;
+    if (!selectedEvent) return;
     setDeleting(true); setShowDeleteConfirm(false);
-    try { await api.deleteEvent(event.id); onSuccess(); } catch (err) { console.error(err); alert('Erreur'); setDeleting(false); }
+    try { await api.deleteEvent(selectedEvent.id); onSuccess(); } catch (err) { console.error(err); alert('Erreur'); setDeleting(false); }
   }
 
   return (
@@ -137,8 +153,8 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
               <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', margin: '0 0 0.5rem' }}>Supprimer l&apos;événement ?</h3>
               <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: '0 0 1.5rem', lineHeight: 1.5 }}>Cette action est globale et définitive. L&apos;événement sera effacé de l&apos;agenda de tous les membres.</p>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: '1px solid #D1D5DB', background: 'white', fontWeight: 700, color: '#4B5563', cursor: 'pointer', transition: 'background 0.15s' }} onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
-                <button style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: 'none', background: '#DC2626', fontWeight: 800, color: 'white', cursor: 'pointer', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }} onClick={executeDelete}>Supprimer</button>
+                <button type="button" style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: '1px solid #D1D5DB', background: 'white', fontWeight: 700, color: '#4B5563', cursor: 'pointer', transition: 'background 0.15s' }} onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
+                <button type="button" style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: 'none', background: '#DC2626', fontWeight: 800, color: 'white', cursor: 'pointer', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }} onClick={executeDelete}>Supprimer</button>
               </div>
             </div>
           </div>
@@ -146,59 +162,59 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 
         <div className="aev-modal-head">
           <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>
-            {event ? (isEditing ? "Modifier l'événement" : "Détails (Super-Admin)") : "Nouvel événement global"}
+            {selectedEvent ? (isEditing ? "Modifier l'événement" : "Détails (Super-Admin)") : "Nouvel événement global"}
           </h2>
           <button className="aev-modal-close" onClick={onClose} disabled={saving || deleting}>
             <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
-        {!isEditing && event ? (
+        {!isEditing && selectedEvent ? (
           <div className="aev-modal-body">
              <div style={{ marginBottom: '1.5rem' }}>
-              <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#111827', margin: '0 0 0.5rem 0', lineHeight: 1.2 }}>{event.title}</h3>
+              <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#111827', margin: '0 0 0.5rem 0', lineHeight: 1.2 }}>{selectedEvent.title}</h3>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span className="aev-status" style={{ background: STATUS_MAP[event.status].bg, color: STATUS_MAP[event.status].color }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: STATUS_MAP[event.status].color }}/> {STATUS_MAP[event.status].label}
+                <span className="aev-status" style={{ background: STATUS_MAP[selectedEvent.status].bg, color: STATUS_MAP[selectedEvent.status].color }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: STATUS_MAP[selectedEvent.status].color }}/> {STATUS_MAP[selectedEvent.status].label}
                 </span>
                 <span className="aev-status" style={{ background: '#F3F4F6', color: '#4B5563', border: '1px solid #E5E7EB' }}>
-                  🌍 {event.antennas?.length || 0} antenne(s) ciblée(s)
+                  🌍 {selectedEvent.antennas?.length || 0} antenne(s) ciblée(s)
                 </span>
               </div>
             </div>
 
             <div className="aev-info-box">
               <span className="aev-info-lbl">Description</span>
-              <span className="aev-info-val">{event.description || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucune description</span>}</span>
+              <span className="aev-info-val">{selectedEvent.description || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucune description</span>}</span>
             </div>
 
             <div className="aev-grid-2">
               <div className="aev-info-box">
                 <span className="aev-info-lbl">Date et Heure</span>
-                <span className="aev-info-val">{formatDateTime(event.startsAt)}</span>
+                <span className="aev-info-val">{formatDateTime(selectedEvent.startsAt)}</span>
               </div>
               <div className="aev-info-box">
                 <span className="aev-info-lbl">Type</span>
-                <span className="aev-info-val">{TYPE_MAP[event.type]}</span>
+                <span className="aev-info-val">{TYPE_MAP[selectedEvent.type]}</span>
               </div>
             </div>
 
             <div className="aev-info-box">
-              <span className="aev-info-lbl">{event.isOnline ? 'Lien de la visioconférence' : 'Lieu physique'}</span>
+              <span className="aev-info-lbl">{selectedEvent.isOnline ? 'Lien de la visioconférence' : 'Lieu physique'}</span>
               <span className="aev-info-val">
-                {event.isOnline ? (
-                  <a href={event.meetingLink || '#'} target="_blank" rel="noreferrer" style={{ color: '#2563EB', textDecoration: 'underline' }}>{event.meetingLink || 'Lien à définir'}</a>
+                {selectedEvent.isOnline ? (
+                  <a href={selectedEvent.meetingLink || '#'} target="_blank" rel="noreferrer" style={{ color: '#2563EB', textDecoration: 'underline' }}>{selectedEvent.meetingLink || 'Lien à définir'}</a>
                 ) : (
-                  event.locationText || 'Lieu à définir'
+                  selectedEvent.locationText || 'Lieu à définir'
                 )}
               </span>
             </div>
 
-            {event.antennas && event.antennas.length > 0 && (
+            {selectedEvent.antennas && selectedEvent.antennas.length > 0 && (
               <div className="aev-info-box">
                 <span className="aev-info-lbl">Antennes concernées</span>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
-                  {event.antennas.map(a => (
+                  {selectedEvent.antennas.map(a => (
                     <span key={a.id} style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.5rem', background: 'white', border: '1px solid #D1D5DB', borderRadius: 6, color: '#374151' }}>
                       {a.name}
                     </span>
@@ -246,9 +262,26 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
                   {!inviteAll && (
                     <div style={{ marginTop: '0.8rem', borderTop: '1px dashed #BFDBFE', paddingTop: '0.8rem' }}>
                       <label style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: '#1D4ED8', display: 'block', marginBottom: '0.5rem' }}>Sélectionnez les participants</label>
+                      
+                      <input 
+                        type="text" 
+                        placeholder="Rechercher par nom, prénom ou email..." 
+                        className="aev-input" 
+                        style={{ height: '36px', marginBottom: '0.5rem', fontSize: '0.8rem' }}
+                        value={memberSearchQuery}
+                        onChange={e => setMemberSearchQuery(e.target.value)}
+                        disabled={loadingMembers || availableMembers.length === 0}
+                      />
+
                       <div style={{ maxHeight: 150, overflowY: 'auto', background: 'white', border: '1px solid #D1D5DB', borderRadius: 8, padding: '0.5rem' }}>
-                        {loadingMembers ? <div style={{ fontSize: '0.8rem', color: '#6B7280', textAlign: 'center' }}>Chargement...</div> : availableMembers.length === 0 ? <div style={{ fontSize: '0.8rem', color: '#9CA3AF', textAlign: 'center' }}>Aucun membre trouvé.</div> : (
-                          availableMembers.map(m => (
+                        {loadingMembers ? (
+                           <div style={{ fontSize: '0.8rem', color: '#6B7280', textAlign: 'center' }}>Chargement...</div> 
+                        ) : availableMembers.length === 0 ? (
+                           <div style={{ fontSize: '0.8rem', color: '#9CA3AF', textAlign: 'center' }}>Aucun membre dans les antennes sélectionnées.</div> 
+                        ) : filteredMembers.length === 0 ? (
+                           <div style={{ fontSize: '0.8rem', color: '#9CA3AF', textAlign: 'center' }}>Aucun résultat pour cette recherche.</div>
+                        ) : (
+                          filteredMembers.map(m => (
                             <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem', borderBottom: '1px solid #F3F4F6', cursor: 'pointer' }}>
                               <input type="checkbox" checked={selectedMemberIds.includes(m.id)} onChange={() => toggleMember(m.id)} style={{ accentColor: '#1D4ED8' }} />
                               <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>{m.firstName} {m.lastName}</span>
@@ -257,6 +290,9 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
                           ))
                         )}
                       </div>
+                      <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: '0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                        {selectedMemberIds.length} sélectionné(s)
+                      </div>
                     </div>
                   )}
                 </div>
@@ -264,7 +300,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
             </div>
 
             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
-              <button type="button" className="aev-btn-cancel" onClick={() => event ? setIsEditing(false) : onClose()} disabled={saving}>Annuler</button>
+              <button type="button" className="aev-btn-cancel" onClick={() => selectedEvent ? setIsEditing(false) : onClose()} disabled={saving}>Annuler</button>
               <button type="submit" className="aev-btn-submit" disabled={saving || selectedAntennaIds.length === 0}>{saving ? 'Sauvegarde...' : 'Enregistrer'}</button>
             </div>
           </form>
@@ -277,7 +313,7 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 // ----------------------------------------------------------------------
 // MODAL : GESTION DES PRÉSENCES (FILTRE OUI / NON)
 // ----------------------------------------------------------------------
-function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => void }) {
+function AttendanceModal({ selectedEvent, onClose }: { selectedEvent: EventItem; onClose: () => void }) {
   const [filter, setFilter] = useState<'ALL' | 'ATTENDING' | 'ABSENT'>('ALL');
   const [attendances, setAttendances] = useState<AttendanceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -288,10 +324,11 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
   }, []);
 
   useEffect(() => {
+    if (!selectedEvent) return;
     async function loadAttendances() {
       setLoading(true);
       try {
-        const res = await api.listEventAttendances(event.id, { 
+        const res = await api.listEventAttendances(selectedEvent.id, { 
           status: filter === 'ALL' ? undefined : filter,
           pageSize: 100 
         });
@@ -299,13 +336,13 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
       } catch (err) { console.error(err); } finally { setLoading(false); }
     }
     void loadAttendances();
-  }, [event.id, filter]);
+  }, [selectedEvent?.id, filter, selectedEvent]);
 
   return (
     <div className="aev-modal-overlay" onClick={onClose}>
       <div className="aev-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
         <div className="aev-modal-head">
-          <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>Présences : {event.title}</h2>
+          <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>Présences : {selectedEvent?.title}</h2>
           <button className="aev-modal-close" onClick={onClose}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
 
@@ -513,7 +550,7 @@ export default function SuperAdminEventsPage() {
                   const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
                   return (
                     <div key={e.id} className="aev-card">
-                      
+
                       {/* Colonne 1 : Événement */}
                       <div className="aev-card-content">
                         <div className="aev-card-title">{e.title}</div>
@@ -554,8 +591,8 @@ export default function SuperAdminEventsPage() {
           </div>
         </div>
 
-        {eventModal.isOpen && <EventModal event={eventModal.event} onClose={() => setEventModal({ isOpen: false })} onSuccess={() => { setEventModal({ isOpen: false }); void load(); }} />}
-        {attendanceModal.isOpen && attendanceModal.event && <AttendanceModal event={attendanceModal.event} onClose={() => setAttendanceModal({ isOpen: false })} />}
+        {eventModal.isOpen && <EventModal selectedEvent={eventModal.event} onClose={() => setEventModal({ isOpen: false })} onSuccess={() => { setEventModal({ isOpen: false }); void load(); }} />}
+        {attendanceModal.isOpen && attendanceModal.event && <AttendanceModal selectedEvent={attendanceModal.event} onClose={() => setAttendanceModal({ isOpen: false })} />}
       </div>
     </AppShell>
   );
