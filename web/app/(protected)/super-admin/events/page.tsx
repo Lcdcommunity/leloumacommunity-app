@@ -20,12 +20,18 @@ interface MemberItem {
   email: string;
 }
 
-const TYPE_MAP: Record<string, string> = { GENERAL_ASSEMBLY: 'A.G.', ANTENNA_MEETING: 'Réunion', FUNDRAISER: 'Levée de fonds', OTHER: 'Autre' };
-const STATUS_MAP: Record<string, { label: string, color: string, bg: string }> = {
-  DRAFT: { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6' },
-  PUBLISHED: { label: 'Publié', color: '#2563EB', bg: '#EFF6FF' },
-  COMPLETED: { label: 'Terminé', color: '#059669', bg: '#ECFDF5' },
-  CANCELLED: { label: 'Annulé', color: '#DC2626', bg: '#FEF2F2' },
+const TYPE_MAP: Record<string, string> = { 
+  GENERAL_ASSEMBLY: 'A.G.', 
+  ANTENNA_MEETING: 'Réunion', 
+  FUNDRAISER: 'Levée de fonds', 
+  OTHER: 'Autre' 
+};
+
+const STATUS_MAP: Record<string, { label: string, color: string, bg: string, border: string }> = {
+  DRAFT: { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+  PUBLISHED: { label: 'Publié', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+  COMPLETED: { label: 'Terminé', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  CANCELLED: { label: 'Annulé', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
 };
 
 function formatDateTime(dateString: string) {
@@ -39,9 +45,22 @@ function formatDateTime(dateString: string) {
 function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: EventItem | null; onClose: () => void; onSuccess: () => void }) {
   const [isEditing, setIsEditing] = useState(!selectedEvent); 
 
-  const [title, setTitle] = useState(selectedEvent?.title || '');
+  const initialType = selectedEvent?.type || 'GENERAL_ASSEMBLY';
+  let initialTitle = selectedEvent?.title || '';
+  let initialCustomType = '';
+
+  if (initialType === 'OTHER') {
+    const match = initialTitle.match(/^\[(.*?)\]\s*(.*)$/);
+    if (match) {
+      initialCustomType = match[1];
+      initialTitle = match[2];
+    }
+  }
+
+  const [title, setTitle] = useState(initialTitle);
+  const [customType, setCustomType] = useState(initialCustomType); 
   const [description, setDescription] = useState(selectedEvent?.description || '');
-  const [type, setType] = useState(selectedEvent?.type || 'GENERAL_ASSEMBLY');
+  const [type, setType] = useState(initialType);
   const [status, setStatus] = useState(selectedEvent?.status || 'DRAFT');
   const [startsAt, setStartsAt] = useState(selectedEvent ? new Date(selectedEvent.startsAt).toISOString().slice(0, 16) : '');
   const [locationText, setLocationText] = useState(selectedEvent?.locationText || '');
@@ -78,17 +97,29 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
   }, [isEditing]);
 
   useEffect(() => {
-    if (inviteAll || selectedAntennaIds.length === 0) return;
+    let isMounted = true;
+
+    if (inviteAll || selectedAntennaIds.length === 0) {
+      setAvailableMembers([]);
+      return;
+    }
+
     async function fetchMembers() {
       setLoadingMembers(true);
       try {
-        const promises = selectedAntennaIds.map(id => api.listMembers({ antennaId: id, pageSize: 500 }));
-        const results = await Promise.all(promises);
-        const allMembers = results.flatMap(res => res.items);
+        const res = await api.listMembers({ page: 1, pageSize: 1000, status: 'ACTIVE' });
+        if (!isMounted) return;
+        const allMembers = res.items || [];
         setAvailableMembers(allMembers as unknown as MemberItem[]);
-      } catch (err) { console.error(err); } finally { setLoadingMembers(false); }
+      } catch (err) { 
+        console.error("Erreur de récupération des membres:", err); 
+      } finally { 
+        if (isMounted) setLoadingMembers(false); 
+      }
     }
     void fetchMembers();
+
+    return () => { isMounted = false; };
   }, [selectedAntennaIds, inviteAll]);
 
   const toggleAntenna = (id: string) => {
@@ -106,8 +137,12 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
     e.preventDefault(); 
     setSaving(true);
     try {
+      const finalTitle = (type === 'OTHER' && customType.trim()) 
+        ? `[${customType.trim()}] ${title}` 
+        : title;
+
       const payload = { 
-        title, 
+        title: finalTitle, 
         description: description.trim() || undefined, 
         type, 
         status, 
@@ -141,156 +176,215 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
     try { await api.deleteEvent(selectedEvent.id); onSuccess(); } catch (err) { console.error(err); alert('Erreur'); setDeleting(false); }
   }
 
+  const sEventStatus = selectedEvent ? (STATUS_MAP[selectedEvent.status] || STATUS_MAP.DRAFT) : null;
+  const displayTitle = selectedEvent ? selectedEvent.title.replace(/^\[.*?\]\s*/, '') : '';
+  const displayType = selectedEvent ? (selectedEvent.type === 'OTHER' && selectedEvent.title.match(/^\[(.*?)\]/) ? selectedEvent.title.match(/^\[(.*?)\]/)?.[1] : TYPE_MAP[selectedEvent.type]) : '';
+
   return (
-    <div className="aev-modal-overlay" onClick={onClose}>
-      <div className="aev-modal" style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+    <div className="lux-modal-overlay" onClick={onClose}>
+      <div className="lux-modal" onClick={e => e.stopPropagation()}>
+        
+        {/* CONFIRMATION DE SUPPRESSION (Superposée) */}
         {showDeleteConfirm && (
-          <div style={{ position: 'absolute', inset: 0, zIndex: 50, background: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
-            <div style={{ background: 'white', padding: '2rem', borderRadius: 20, boxShadow: '0 20px 40px rgba(0,0,0,0.15)', border: '1px solid #FECACA', textAlign: 'center', maxWidth: 340, animation: 'aescale 0.2s cubic-bezier(.22,1,.36,1)' }}>
-              <div style={{ width: 50, height: 50, borderRadius: '50%', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
-                <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+          <div className="lux-confirm-overlay">
+            <div className="lux-confirm-box">
+              <div className="lux-confirm-icon">
+                <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
               </div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, color: '#111827', margin: '0 0 0.5rem' }}>Supprimer l&apos;événement ?</h3>
-              <p style={{ fontSize: '0.85rem', color: '#6B7280', margin: '0 0 1.5rem', lineHeight: 1.5 }}>Cette action est globale et définitive. L&apos;événement sera effacé de l&apos;agenda de tous les membres.</p>
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
-                <button type="button" style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: '1px solid #D1D5DB', background: 'white', fontWeight: 700, color: '#4B5563', cursor: 'pointer', transition: 'background 0.15s' }} onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
-                <button type="button" style={{ flex: 1, padding: '0.75rem', borderRadius: 12, border: 'none', background: '#DC2626', fontWeight: 800, color: 'white', cursor: 'pointer', boxShadow: '0 4px 12px rgba(220,38,38,0.25)' }} onClick={executeDelete}>Supprimer</button>
+              <h3>Supprimer l&apos;événement ?</h3>
+              <p>Cette action est définitive. L&apos;événement sera effacé de l&apos;agenda de tous les membres.</p>
+              <div className="lux-confirm-actions">
+                <button type="button" className="lux-btn-outline" onClick={() => setShowDeleteConfirm(false)}>Annuler</button>
+                <button type="button" className="lux-btn-danger" onClick={executeDelete}>Supprimer</button>
               </div>
             </div>
           </div>
         )}
 
-        <div className="aev-modal-head">
-          <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>
-            {selectedEvent ? (isEditing ? "Modifier l'événement" : "Détails (Super-Admin)") : "Nouvel événement global"}
+        {/* HEADER MODALE */}
+        <div className="lux-modal-header">
+          <h2 className="lux-modal-title">
+            {selectedEvent ? (isEditing ? "Modifier l'événement" : "Détails de l'événement") : "Nouvel événement"}
           </h2>
-          <button className="aev-modal-close" onClick={onClose} disabled={saving || deleting}>
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          <button className="lux-modal-close" onClick={onClose} disabled={saving || deleting}>
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
           </button>
         </div>
 
-        {!isEditing && selectedEvent ? (
-          <div className="aev-modal-body">
-             <div style={{ marginBottom: '1.5rem' }}>
-              <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.6rem', fontWeight: 700, color: '#111827', margin: '0 0 0.5rem 0', lineHeight: 1.2 }}>{selectedEvent.title}</h3>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <span className="aev-status" style={{ background: STATUS_MAP[selectedEvent.status].bg, color: STATUS_MAP[selectedEvent.status].color }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: STATUS_MAP[selectedEvent.status].color }}/> {STATUS_MAP[selectedEvent.status].label}
+        {/* CONTENU EN LECTURE SEULE */}
+        {!isEditing && selectedEvent && sEventStatus ? (
+          <div className="lux-modal-body lux-read-only">
+            
+            <div className="lux-ro-hero">
+              <h3 className="lux-ro-title">{displayTitle}</h3>
+              <div className="lux-ro-badges">
+                <span className="lux-badge" style={{ background: sEventStatus.bg, color: sEventStatus.color, borderColor: sEventStatus.border }}>
+                  <span className="lux-dot" style={{ background: sEventStatus.color }} /> {sEventStatus.label}
                 </span>
-                <span className="aev-status" style={{ background: '#F3F4F6', color: '#4B5563', border: '1px solid #E5E7EB' }}>
+                <span className="lux-badge neutral">
                   🌍 {selectedEvent.antennas?.length || 0} antenne(s) ciblée(s)
                 </span>
               </div>
             </div>
 
-            <div className="aev-info-box">
-              <span className="aev-info-lbl">Description</span>
-              <span className="aev-info-val">{selectedEvent.description || <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Aucune description</span>}</span>
-            </div>
-
-            <div className="aev-grid-2">
-              <div className="aev-info-box">
-                <span className="aev-info-lbl">Date et Heure</span>
-                <span className="aev-info-val">{formatDateTime(selectedEvent.startsAt)}</span>
+            <div className="lux-ro-grid">
+              <div className="lux-ro-item full">
+                <label>Description</label>
+                <p>{selectedEvent.description || <span className="lux-muted">Aucune description fournie.</span>}</p>
               </div>
-              <div className="aev-info-box">
-                <span className="aev-info-lbl">Type</span>
-                <span className="aev-info-val">{TYPE_MAP[selectedEvent.type]}</span>
-              </div>
-            </div>
 
-            <div className="aev-info-box">
-              <span className="aev-info-lbl">{selectedEvent.isOnline ? 'Lien de la visioconférence' : 'Lieu physique'}</span>
-              <span className="aev-info-val">
+              <div className="lux-ro-item">
+                <label>Date et Heure</label>
+                <p className="lux-strong">{formatDateTime(selectedEvent.startsAt)}</p>
+              </div>
+
+              <div className="lux-ro-item">
+                <label>Type d&apos;événement</label>
+                <p className="lux-strong">{displayType}</p>
+              </div>
+
+              <div className="lux-ro-item full">
+                <label>{selectedEvent.isOnline ? 'Lien de visioconférence' : 'Lieu physique'}</label>
                 {selectedEvent.isOnline ? (
-                  <a href={selectedEvent.meetingLink || '#'} target="_blank" rel="noreferrer" style={{ color: '#2563EB', textDecoration: 'underline' }}>{selectedEvent.meetingLink || 'Lien à définir'}</a>
+                  <p><a href={selectedEvent.meetingLink || '#'} target="_blank" rel="noreferrer" className="lux-link">{selectedEvent.meetingLink || 'Lien non défini'}</a></p>
                 ) : (
-                  selectedEvent.locationText || 'Lieu à définir'
+                  <p className="lux-strong">{selectedEvent.locationText || 'Lieu non défini'}</p>
                 )}
-              </span>
+              </div>
+
+              {selectedEvent.antennas && selectedEvent.antennas.length > 0 && (
+                <div className="lux-ro-item full">
+                  <label>Antennes concernées</label>
+                  <div className="lux-tag-list">
+                    {selectedEvent.antennas.map(a => (
+                      <span key={a.id} className="lux-tag">{a.name}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {selectedEvent.antennas && selectedEvent.antennas.length > 0 && (
-              <div className="aev-info-box">
-                <span className="aev-info-lbl">Antennes concernées</span>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.4rem' }}>
-                  {selectedEvent.antennas.map(a => (
-                    <span key={a.id} style={{ fontSize: '0.75rem', fontWeight: 700, padding: '0.2rem 0.5rem', background: 'white', border: '1px solid #D1D5DB', borderRadius: 6, color: '#374151' }}>
-                      {a.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', gap: '0.75rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
-              <button type="button" className="aev-btn-del" onClick={() => setShowDeleteConfirm(true)} disabled={deleting}>Supprimer</button>
-              <button type="button" className="aev-btn-submit" onClick={() => setIsEditing(true)}>Modifier</button>
+            <div className="lux-modal-footer">
+              <button type="button" className="lux-btn-danger-outline" onClick={() => setShowDeleteConfirm(true)} disabled={deleting}>
+                Supprimer
+              </button>
+              <button type="button" className="lux-btn-primary" onClick={() => setIsEditing(true)}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                Modifier
+              </button>
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="aev-modal-body">
-            <div className="aev-field" style={{ marginBottom: '1rem' }}><label>Titre <span>*</span></label><input className="aev-input" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ex: Assemblée Générale" /></div>
-            <div className="aev-field" style={{ marginBottom: '1rem' }}><label>Description</label><textarea className="aev-input" style={{ minHeight: '80px', padding: '0.8rem 1rem', resize: 'vertical' }} value={description} onChange={e => setDescription(e.target.value)} /></div>
-
-            <div className="aev-grid-2">
-              <div className="aev-field"><label>Type</label><select className="aev-select" value={type} onChange={e => setType(e.target.value)}>{Object.entries(TYPE_MAP).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-              <div className="aev-field"><label>Statut</label><select className="aev-select" value={status} onChange={e => setStatus(e.target.value)}>{Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
-              <div className="aev-field" style={{ gridColumn: '1 / -1' }}><label>Date et heure <span>*</span></label><input type="datetime-local" className="aev-input" value={startsAt} onChange={e => setStartsAt(e.target.value)} required /></div>
+          
+          /* CONTENU EN ÉDITION / CRÉATION */
+          <form onSubmit={handleSubmit} className="lux-modal-body">
+            
+            <div className="lux-field">
+              <label>Titre de l&apos;événement <span>*</span></label>
+              <input className="lux-input" value={title} onChange={e => setTitle(e.target.value)} required placeholder="Ex: Assemblée Générale" />
+            </div>
+            
+            <div className="lux-field">
+              <label>Description</label>
+              <textarea className="lux-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder="Détails de l'événement..." />
             </div>
 
-            <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid #E2E8F0' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.8rem' }}><input type="checkbox" checked={isOnline} onChange={e => setIsOnline(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#1D4ED8' }} id="cb-online" /><label htmlFor="cb-online" style={{ fontWeight: 700, color: '#374151', cursor: 'pointer', textTransform: 'none', fontSize: '0.9rem' }}>Événement en ligne (Visio)</label></div>
-              {isOnline ? (<div className="aev-field"><label>Lien de la réunion</label><input type="url" className="aev-input" value={meetingLink} onChange={e => setMeetingLink(e.target.value)} placeholder="https://meet..." /></div>) : (<div className="aev-field"><label>Lieu physique</label><input className="aev-input" value={locationText} onChange={e => setLocationText(e.target.value)} placeholder="Adresse complète..." /></div>)}
+            <div className="lux-grid-2">
+              <div className="lux-field">
+                <label>Type</label>
+                <select className="lux-select" value={type} onChange={e => { setType(e.target.value); if (e.target.value !== 'OTHER') setCustomType(''); }}>
+                  {Object.entries(TYPE_MAP).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              
+              <div className="lux-field">
+                <label>Statut</label>
+                <select className="lux-select" value={status} onChange={e => setStatus(e.target.value)}>
+                  {Object.entries(STATUS_MAP).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+              </div>
+
+              {type === 'OTHER' && (
+                <div className="lux-field" style={{ gridColumn: '1 / -1' }}>
+                  <label>Précisez le type d&apos;événement <span>*</span></label>
+                  <input className="lux-input" value={customType} onChange={e => setCustomType(e.target.value)} required placeholder="Ex: Tournoi de foot, Dîner de gala..." />
+                </div>
+              )}
+
+              <div className="lux-field" style={{ gridColumn: '1 / -1' }}>
+                <label>Date et heure <span>*</span></label>
+                <input type="datetime-local" className="lux-input" value={startsAt} onChange={e => setStartsAt(e.target.value)} required />
+              </div>
             </div>
 
-            <div style={{ marginTop: '1rem' }}>
-              <label style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#1D4ED8', display: 'block', marginBottom: '0.5rem' }}>Antennes ciblées <span>*</span></label>
-              <div className="aev-antennas-grid">
+            <div className="lux-highlight-box">
+              <div className="lux-checkbox-group">
+                <input type="checkbox" checked={isOnline} onChange={e => setIsOnline(e.target.checked)} id="cb-online" />
+                <label htmlFor="cb-online">Événement en ligne (Visio)</label>
+              </div>
+              {isOnline ? (
+                <div className="lux-field" style={{ marginTop: '1rem' }}>
+                  <label>Lien de la réunion</label>
+                  <input type="url" className="lux-input" value={meetingLink} onChange={e => setMeetingLink(e.target.value)} placeholder="https://meet..." />
+                </div>
+              ) : (
+                <div className="lux-field" style={{ marginTop: '1rem' }}>
+                  <label>Lieu physique</label>
+                  <input className="lux-input" value={locationText} onChange={e => setLocationText(e.target.value)} placeholder="Adresse complète..." />
+                </div>
+              )}
+            </div>
+
+            <div className="lux-field">
+              <label>Antennes ciblées <span>*</span></label>
+              <div className="lux-antennas-grid">
                 {availableAntennas.map(a => (
-                  <label key={a.id} className={`aev-antenna-cb ${selectedAntennaIds.includes(a.id) ? 'active' : ''}`}><input type="checkbox" checked={selectedAntennaIds.includes(a.id)} onChange={() => toggleAntenna(a.id)} /><span>{a.name}</span></label>
+                  <label key={a.id} className={`lux-antenna-cb ${selectedAntennaIds.includes(a.id) ? 'active' : ''}`}>
+                    <input type="checkbox" checked={selectedAntennaIds.includes(a.id)} onChange={() => toggleAntenna(a.id)} />
+                    <span>{a.name}</span>
+                  </label>
                 ))}
               </div>
 
               {selectedAntennaIds.length > 0 && (
-                <div style={{ marginTop: '1rem', background: '#EFF6FF', padding: '1rem', borderRadius: 12, border: '1px solid #BFDBFE' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                    <input type="checkbox" id="cb-inviteall" checked={inviteAll} onChange={e => setInviteAll(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#1D4ED8' }} />
-                    <label htmlFor="cb-inviteall" style={{ fontWeight: 700, color: '#1E3A8A', cursor: 'pointer', fontSize: '0.85rem' }}>Inviter TOUS les membres de ces antennes</label>
+                <div className="lux-highlight-box blue" style={{ marginTop: '1rem' }}>
+                  <div className="lux-checkbox-group">
+                    <input type="checkbox" id="cb-inviteall" checked={inviteAll} onChange={e => setInviteAll(e.target.checked)} />
+                    <label htmlFor="cb-inviteall">Inviter TOUS les membres de ces antennes</label>
                   </div>
 
                   {!inviteAll && (
-                    <div style={{ marginTop: '0.8rem', borderTop: '1px dashed #BFDBFE', paddingTop: '0.8rem' }}>
-                      <label style={{ fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', color: '#1D4ED8', display: 'block', marginBottom: '0.5rem' }}>Sélectionnez les participants</label>
-                      
+                    <div className="lux-invite-specific">
+                      <label>Sélectionnez les participants</label>
+                      <span className="lux-hint">* Seuls les membres avec un compte actif s&apos;affichent ici.</span>
+
                       <input 
                         type="text" 
                         placeholder="Rechercher par nom, prénom ou email..." 
-                        className="aev-input" 
-                        style={{ height: '36px', marginBottom: '0.5rem', fontSize: '0.8rem' }}
+                        className="lux-input search" 
                         value={memberSearchQuery}
                         onChange={e => setMemberSearchQuery(e.target.value)}
                         disabled={loadingMembers || availableMembers.length === 0}
                       />
 
-                      <div style={{ maxHeight: 150, overflowY: 'auto', background: 'white', border: '1px solid #D1D5DB', borderRadius: 8, padding: '0.5rem' }}>
+                      <div className="lux-members-list">
                         {loadingMembers ? (
-                           <div style={{ fontSize: '0.8rem', color: '#6B7280', textAlign: 'center' }}>Chargement...</div> 
+                           <div className="lux-empty-state">Chargement...</div> 
                         ) : availableMembers.length === 0 ? (
-                           <div style={{ fontSize: '0.8rem', color: '#9CA3AF', textAlign: 'center' }}>Aucun membre dans les antennes sélectionnées.</div> 
+                           <div className="lux-empty-state">Aucun membre actif trouvé.</div> 
                         ) : filteredMembers.length === 0 ? (
-                           <div style={{ fontSize: '0.8rem', color: '#9CA3AF', textAlign: 'center' }}>Aucun résultat pour cette recherche.</div>
+                           <div className="lux-empty-state">Aucun résultat pour cette recherche.</div>
                         ) : (
                           filteredMembers.map(m => (
-                            <label key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem', borderBottom: '1px solid #F3F4F6', cursor: 'pointer' }}>
-                              <input type="checkbox" checked={selectedMemberIds.includes(m.id)} onChange={() => toggleMember(m.id)} style={{ accentColor: '#1D4ED8' }} />
-                              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>{m.firstName} {m.lastName}</span>
-                              <span style={{ fontSize: '0.75rem', color: '#9CA3AF' }}>({m.email})</span>
+                            <label key={m.id} className="lux-member-item">
+                              <input type="checkbox" checked={selectedMemberIds.includes(m.id)} onChange={() => toggleMember(m.id)} />
+                              <span className="name">{m.firstName} {m.lastName}</span>
+                              <span className="email">({m.email})</span>
                             </label>
                           ))
                         )}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: '0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                      <div className="lux-selection-count">
                         {selectedMemberIds.length} sélectionné(s)
                       </div>
                     </div>
@@ -299,9 +393,9 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
               )}
             </div>
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
-              <button type="button" className="aev-btn-cancel" onClick={() => selectedEvent ? setIsEditing(false) : onClose()} disabled={saving}>Annuler</button>
-              <button type="submit" className="aev-btn-submit" disabled={saving || selectedAntennaIds.length === 0}>{saving ? 'Sauvegarde...' : 'Enregistrer'}</button>
+            <div className="lux-modal-footer">
+              <button type="button" className="lux-btn-outline" onClick={() => selectedEvent ? setIsEditing(false) : onClose()} disabled={saving}>Annuler</button>
+              <button type="submit" className="lux-btn-primary" disabled={saving || selectedAntennaIds.length === 0}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
             </div>
           </form>
         )}
@@ -311,7 +405,7 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
 }
 
 // ----------------------------------------------------------------------
-// MODAL : GESTION DES PRÉSENCES (FILTRE OUI / NON)
+// MODAL : GESTION DES PRÉSENCES (Reste inchangé mais stylisé luxueux)
 // ----------------------------------------------------------------------
 function AttendanceModal({ selectedEvent, onClose }: { selectedEvent: EventItem; onClose: () => void }) {
   const [filter, setFilter] = useState<'ALL' | 'ATTENDING' | 'ABSENT'>('ALL');
@@ -339,35 +433,35 @@ function AttendanceModal({ selectedEvent, onClose }: { selectedEvent: EventItem;
   }, [selectedEvent?.id, filter, selectedEvent]);
 
   return (
-    <div className="aev-modal-overlay" onClick={onClose}>
-      <div className="aev-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
-        <div className="aev-modal-head">
-          <h2 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase' }}>Présences : {selectedEvent?.title}</h2>
-          <button className="aev-modal-close" onClick={onClose}><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    <div className="lux-modal-overlay" onClick={onClose}>
+      <div className="lux-modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+        <div className="lux-modal-header">
+          <h2 className="lux-modal-title">Présences : {selectedEvent?.title.replace(/^\[.*?\]\s*/, '')}</h2>
+          <button className="lux-modal-close" onClick={onClose}><svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
 
-        <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
-          <div className="aev-tabs">
-            <button className={`aev-tab ${filter === 'ALL' ? 'active' : ''}`} onClick={() => setFilter('ALL')}>Toutes les réponses</button>
-            <button className={`aev-tab ${filter === 'ATTENDING' ? 'active' : ''}`} onClick={() => setFilter('ATTENDING')} style={filter === 'ATTENDING' ? { color: '#059669', borderColor: '#059669', background: '#ECFDF5' } : {}}>✅ Présents</button>
-            <button className={`aev-tab ${filter === 'ABSENT' ? 'active' : ''}`} onClick={() => setFilter('ABSENT')} style={filter === 'ABSENT' ? { color: '#DC2626', borderColor: '#DC2626', background: '#FEF2F2' } : {}}>❌ Absents</button>
+        <div className="lux-tabs-container">
+          <div className="lux-tabs">
+            <button className={`lux-tab ${filter === 'ALL' ? 'active' : ''}`} onClick={() => setFilter('ALL')}>Toutes</button>
+            <button className={`lux-tab ${filter === 'ATTENDING' ? 'active attending' : ''}`} onClick={() => setFilter('ATTENDING')}>✅ Présents</button>
+            <button className={`lux-tab ${filter === 'ABSENT' ? 'active absent' : ''}`} onClick={() => setFilter('ABSENT')}>❌ Absents</button>
           </div>
         </div>
 
-        <div className="aev-modal-body" style={{ background: '#F9FAFB' }}>
-          {loading ? ( <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280', fontWeight: 600 }}>Chargement...</div> ) : attendances.length === 0 ? ( <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', background: 'white', borderRadius: 12, border: '1px dashed #D1D5DB' }}>Aucun membre n&apos;a répondu.</div> ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div className="lux-modal-body" style={{ background: '#F8FAFC', padding: '1.5rem' }}>
+          {loading ? ( <div className="lux-empty-state">Chargement...</div> ) : attendances.length === 0 ? ( <div className="lux-empty-state" style={{ background: 'white' }}>Aucun membre n&apos;a répondu.</div> ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {attendances.map(att => (
-                <div key={att.id} style={{ background: 'white', padding: '1rem', borderRadius: 12, border: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>
-                    <div style={{ fontWeight: 800, color: '#111827', fontSize: '0.95rem' }}>{att.user.firstName} {att.user.lastName}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 2 }}>{att.user.email} {att.user.phone ? `• ${att.user.phone}` : ''}</div>
+                <div key={att.id} className="lux-attendance-card">
+                  <div className="info">
+                    <div className="name">{att.user.firstName} {att.user.lastName}</div>
+                    <div className="meta">{att.user.email} {att.user.phone ? `• ${att.user.phone}` : ''}</div>
                   </div>
-                  <div>
+                  <div className="status">
                     {att.status === 'ATTENDING' ? (
-                      <span style={{ display: 'inline-block', padding: '0.3rem 0.8rem', background: '#D1FAE5', color: '#065F46', borderRadius: 99, fontSize: '0.75rem', fontWeight: 800 }}>Participent</span>
+                      <span className="lux-badge" style={{ background: '#ECFDF5', color: '#059669', borderColor: '#A7F3D0' }}>Présent</span>
                     ) : (
-                      <span style={{ display: 'inline-block', padding: '0.3rem 0.8rem', background: '#FEE2E2', color: '#991B1B', borderRadius: 99, fontSize: '0.75rem', fontWeight: 800 }}>Absents</span>
+                      <span className="lux-badge" style={{ background: '#FEF2F2', color: '#DC2626', borderColor: '#FECACA' }}>Absent</span>
                     )}
                   </div>
                 </div>
@@ -380,6 +474,9 @@ function AttendanceModal({ selectedEvent, onClose }: { selectedEvent: EventItem;
   );
 }
 
+// ----------------------------------------------------------------------
+// PAGE PRINCIPALE
+// ----------------------------------------------------------------------
 export default function SuperAdminEventsPage() {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -397,89 +494,176 @@ export default function SuperAdminEventsPage() {
     <AppShell title="Événements Globaux">
       <div style={{ width: '100%', overflowX: 'hidden' }}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@500;600;700;800&display=swap');
+          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
           
-          .aev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); width: 100%; max-width: 1000px; margin: 0 auto; box-sizing: border-box; overflow-x: hidden; }
-          .aev-header { margin-bottom: 1.5rem; }
-          .aev-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: #111827; margin: 0; }
-          .aev-title span { color: #1D4ED8; }
-          
-          .aev-panel { background: white; border-radius: 20px; border: 1px solid #BFDBFE; box-shadow: 0 4px 20px rgba(37,99,235,0.05); width: 100%; overflow: hidden; box-sizing: border-box; }
-          .aev-panel-head { padding: 1rem 1.4rem; border-bottom: 1px solid #DBEAFE; display: flex; justify-content: space-between; align-items: center; background: #EFF6FF; }
-          .aev-new-btn { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: transform 0.15s; }
+          .aev-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); width: 100%; max-width: 1100px; margin: 0 auto; box-sizing: border-box; }
+          .aev-header { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; }
+          .aev-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 4vw, 2.5rem); font-weight: 700; color: #111827; margin: 0; line-height: 1.1; }
+          .aev-title span { color: #2563EB; }
+          .aev-subtitle { font-size: 0.9rem; color: #6B7280; font-weight: 500; margin-top: 0.5rem; }
+
+          .lux-btn-new { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0.75rem 1.4rem; border-radius: 12px; font-weight: 800; font-size: 0.9rem; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; box-shadow: 0 4px 12px rgba(37,99,235,0.25); transition: all 0.2s; white-space: nowrap; }
+          .lux-btn-new:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(37,99,235,0.35); }
+
+          .aev-panel { background: white; border-radius: 20px; border: 1px solid #E5E7EB; box-shadow: 0 4px 20px rgba(0,0,0,0.03); width: 100%; overflow: hidden; }
           
           .aev-table-container { width: 100%; overflow: hidden; }
           .aev-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-          
-          .aev-table th { padding: 0.85rem 1.4rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-          .aev-row { border-top: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
+          .aev-table th { padding: 1rem 1.5rem; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #6B7280; text-align: left; border-bottom: 1px solid #E5E7EB; background: #F8FAFC; }
+          .aev-row { border-bottom: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
           .aev-row:hover { background: #F8FAFC; }
-          .aev-table td { padding: 1rem 1.4rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
-          .aev-status { padding: 0.2rem 0.6rem; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.3rem; border: 1px solid rgba(0,0,0,0.05); white-space: nowrap; }
+          .aev-table td { padding: 1.25rem 1.5rem; font-size: 0.85rem; font-weight: 600; color: #111827; vertical-align: middle; }
           
-          .aev-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; white-space: nowrap; }
-          .aev-action-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
-          .aev-action-btn.primary { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+          .lux-status-badge { padding: 0.25rem 0.6rem; border-radius: 99px; font-size: 0.65rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid; white-space: nowrap; text-transform: uppercase; letter-spacing: 0.05em; }
           
-          .aev-tabs { display: flex; gap: 0.5rem; background: #E2E8F0; padding: 0.25rem; border-radius: 10px; }
-          .aev-tab { flex: 1; text-align: center; padding: 0.5rem; border-radius: 8px; font-size: 0.75rem; font-weight: 800; color: #6B7280; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.15s; }
-          .aev-tab.active { background: white; color: #111827; border-color: #D1D5DB; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+          .lux-action-btn { background: white; border: 1px solid #D1D5DB; color: #374151; padding: 0.45rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; justify-content: center; gap: 0.3rem; white-space: nowrap; }
+          .lux-action-btn:hover { background: #F3F4F6; border-color: #9CA3AF; }
+          .lux-action-btn.primary { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
+          .lux-action-btn.primary:hover { background: #DBEAFE; }
 
-          .aev-modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(15,23,42,0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
-          .aev-modal { background: white; width: 100%; max-width: 500px; border-radius: 20px; overflow: hidden; display: flex; flex-direction: column; max-height: 90vh; box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
-          .aev-modal-head { padding: 1.25rem 1.5rem; background: #EFF6FF; border-bottom: 1px solid #BFDBFE; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-          .aev-modal-close { background: white; border: 1px solid #BFDBFE; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #1D4ED8; flex-shrink: 0; }
+          /* ========================================================= */
+          /* NOUVEAU DESIGN LUXUEUX MODALE                             */
+          /* ========================================================= */
+          .lux-modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(15,23,42,0.6); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; padding: 1rem; animation: luxFadeIn 0.25s ease-out; }
+          .lux-modal { background: white; width: 100%; max-width: 580px; border-radius: 24px; display: flex; flex-direction: column; max-height: 90vh; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: luxSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1); overflow: hidden; position: relative; }
           
-          .aev-modal-body { padding: 1.5rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+          .lux-modal-header { padding: 1.5rem 1.75rem; border-bottom: 1px solid #E5E7EB; display: flex; justify-content: space-between; align-items: center; background: white; z-index: 10; }
+          .lux-modal-title { font-size: 0.85rem; font-weight: 800; color: #1D4ED8; text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }
+          .lux-modal-close { background: #F3F4F6; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #6B7280; transition: all 0.2s; }
+          .lux-modal-close:hover { background: #E5E7EB; color: #111827; transform: rotate(90deg); }
           
-          .aev-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-          .aev-field { display: flex; flex-direction: column; gap: 0.35rem; }
-          .aev-field label { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; color: #1D4ED8; }
-          .aev-input, .aev-select { width: 100%; box-sizing: border-box; height: 42px; border-radius: 10px; border: 1px solid #D1D5DB; padding: 0 1rem; font-family: 'DM Sans'; font-size: 0.88rem; font-weight: 600; outline: none; }
-          .aev-input:focus, .aev-select:focus { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+          .lux-modal-body { padding: 1.75rem; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 1.25rem; }
           
-          .aev-btn-submit { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; }
-          .aev-btn-cancel { background: white; border: 1px solid #D1D5DB; color: #4B5563; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+          /* LECTURE SEULE */
+          .lux-read-only .lux-ro-hero { margin-bottom: 1.5rem; text-align: center; }
+          .lux-read-only .lux-ro-title { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: #111827; margin: 0 0 1rem 0; line-height: 1.1; }
+          .lux-read-only .lux-ro-badges { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+          .lux-badge { padding: 0.3rem 0.8rem; border-radius: 99px; font-size: 0.7rem; font-weight: 800; display: inline-flex; align-items: center; gap: 0.35rem; border: 1px solid; text-transform: uppercase; letter-spacing: 0.05em; }
+          .lux-badge.neutral { background: #F8FAFC; color: #475569; border-color: #E2E8F0; }
+          .lux-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+          .lux-ro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; background: #F8FAFC; padding: 1.5rem; border-radius: 16px; border: 1px solid #E2E8F0; }
+          .lux-ro-item { display: flex; flex-direction: column; gap: 0.4rem; }
+          .lux-ro-item.full { grid-column: 1 / -1; }
+          .lux-ro-item label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #64748B; }
+          .lux-ro-item p { margin: 0; font-size: 0.9rem; color: #334155; line-height: 1.5; }
+          .lux-ro-item p.lux-strong { font-weight: 700; color: #0F172A; }
+          .lux-muted { color: #94A3B8; font-style: italic; }
+          .lux-link { color: #2563EB; font-weight: 600; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+          .lux-link:hover { border-color: #2563EB; }
           
-          .aev-antennas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5rem; max-height: 180px; overflow-y: auto; padding: 0.5rem; background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 12px; }
-          .aev-antenna-cb { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.6rem; border: 1px solid transparent; border-radius: 8px; cursor: pointer; background: white; }
-          .aev-antenna-cb.active { border-color: #60A5FA; background: #EFF6FF; }
+          .lux-tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+          .lux-tag { font-size: 0.75rem; font-weight: 700; padding: 0.3rem 0.7rem; background: white; border: 1px solid #CBD5E1; border-radius: 8px; color: #334155; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+
+          /* FORMULAIRE */
+          .lux-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+          .lux-field { display: flex; flex-direction: column; gap: 0.4rem; }
+          .lux-field label { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #1E293B; }
+          .lux-field label span { color: #DC2626; }
+          .lux-input, .lux-select, .lux-textarea { width: 100%; box-sizing: border-box; border-radius: 12px; border: 1px solid #D1D5DB; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.9rem; font-weight: 500; outline: none; background: #F9FAFB; transition: all 0.2s; }
+          .lux-input, .lux-select { height: 46px; }
+          .lux-textarea { padding: 1rem; min-height: 90px; resize: vertical; }
+          .lux-input:focus, .lux-select:focus, .lux-textarea:focus { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); background: white; }
+          .lux-input.search { height: 40px; margin-bottom: 0.75rem; font-size: 0.85rem; }
+
+          .lux-highlight-box { background: #F8FAFC; padding: 1.25rem; border-radius: 16px; border: 1px solid #E2E8F0; }
+          .lux-highlight-box.blue { background: #EFF6FF; border-color: #BFDBFE; }
           
-          /* LAYOUT CARTES MOBILE */
+          .lux-checkbox-group { display: flex; alignItems: center; gap: 0.6rem; }
+          .lux-checkbox-group input[type="checkbox"] { width: 18px; height: 18px; accent-color: #2563EB; cursor: pointer; }
+          .lux-checkbox-group label { font-size: 0.9rem; font-weight: 700; color: #1E293B; cursor: pointer; text-transform: none; letter-spacing: normal; margin: 0; }
+
+          .lux-antennas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.5rem; max-height: 180px; overflow-y: auto; padding: 0.5rem; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; }
+          .lux-antenna-cb { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; border: 1px solid transparent; border-radius: 8px; cursor: pointer; background: white; transition: all 0.15s; }
+          .lux-antenna-cb input { accent-color: #2563EB; }
+          .lux-antenna-cb span { font-size: 0.85rem; font-weight: 600; color: #475569; }
+          .lux-antenna-cb.active { border-color: #93C5FD; background: #EFF6FF; }
+          .lux-antenna-cb.active span { color: #1D4ED8; }
+
+          .lux-invite-specific { margin-top: 1rem; border-top: 1px dashed #BFDBFE; padding-top: 1rem; }
+          .lux-hint { font-size: 0.75rem; color: #64748B; display: block; margin-bottom: 0.75rem; font-style: italic; }
+          
+          .lux-members-list { max-height: 180px; overflow-y: auto; background: white; border: 1px solid #D1D5DB; border-radius: 12px; padding: 0.5rem; }
+          .lux-member-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: background 0.15s; border-radius: 6px; }
+          .lux-member-item:hover { background: #F8FAFC; }
+          .lux-member-item:last-child { border-bottom: none; }
+          .lux-member-item input { accent-color: #2563EB; }
+          .lux-member-item .name { font-size: 0.85rem; font-weight: 700; color: #1E293B; }
+          .lux-member-item .email { font-size: 0.75rem; color: #94A3B8; }
+          
+          .lux-selection-count { font-size: 0.75rem; color: #64748B; margin-top: 0.5rem; text-align: right; font-weight: 700; }
+          .lux-empty-state { font-size: 0.85rem; color: #94A3B8; text-align: center; padding: 1.5rem; font-weight: 500; }
+
+          /* FOOTER & BOUTONS */
+          .lux-modal-footer { padding: 1.25rem 1.75rem; border-top: 1px solid #E5E7EB; background: #F8FAFC; display: flex; justify-content: space-between; align-items: center; gap: 1rem; z-index: 10; }
+          .lux-btn-primary { background: linear-gradient(135deg, #2563EB, #1D4ED8); color: white; border: none; padding: 0 1.5rem; height: 44px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 12px rgba(37,99,235,0.2); transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
+          .lux-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37,99,235,0.3); }
+          .lux-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+          
+          .lux-btn-outline { background: white; border: 1px solid #D1D5DB; color: #475569; padding: 0 1.5rem; height: 44px; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; }
+          .lux-btn-outline:hover:not(:disabled) { background: #F1F5F9; color: #0F172A; }
+          
+          .lux-btn-danger-outline { background: white; border: 1px solid #FECACA; color: #DC2626; padding: 0 1.2rem; height: 44px; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+          .lux-btn-danger-outline:hover:not(:disabled) { background: #FEF2F2; }
+
+          .lux-btn-danger { background: #DC2626; color: white; border: none; padding: 0 1.5rem; height: 44px; border-radius: 12px; font-weight: 800; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 12px rgba(220,38,38,0.2); transition: all 0.2s; }
+          .lux-btn-danger:hover:not(:disabled) { background: #B91C1C; transform: translateY(-1px); }
+
+          /* CONFIRMATION OVERLAY */
+          .lux-confirm-overlay { position: absolute; inset: 0; z-index: 100; background: rgba(255,255,255,0.9); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 1.5rem; animation: luxFadeIn 0.2s ease-out; }
+          .lux-confirm-box { background: white; padding: 2.5rem 2rem; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); border: 1px solid #FECACA; text-align: center; max-width: 380px; animation: luxZoomIn 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+          .lux-confirm-icon { width: 64px; height: 64px; border-radius: 50%; background: #FEF2F2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem; }
+          .lux-confirm-box h3 { font-size: 1.25rem; font-weight: 800; color: #111827; margin: 0 0 0.75rem; }
+          .lux-confirm-box p { font-size: 0.9rem; color: #64748B; margin: 0 0 1.75rem; line-height: 1.5; }
+          .lux-confirm-actions { display: flex; gap: 0.75rem; }
+          .lux-confirm-actions > * { flex: 1; }
+
+          /* ATTENDANCE MODAL TABS */
+          .lux-tabs-container { padding: 1rem 1.75rem; border-bottom: 1px solid #E2E8F0; background: #F8FAFC; }
+          .lux-tabs { display: flex; gap: 0.5rem; background: #E2E8F0; padding: 0.25rem; border-radius: 12px; }
+          .lux-tab { flex: 1; text-align: center; padding: 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 800; color: #64748B; border: 1px solid transparent; background: transparent; cursor: pointer; transition: all 0.2s; }
+          .lux-tab.active { background: white; color: #0F172A; border-color: #CBD5E1; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+          .lux-tab.active.attending { color: #059669; border-color: #A7F3D0; background: #ECFDF5; }
+          .lux-tab.active.absent { color: #DC2626; border-color: #FECACA; background: #FEF2F2; }
+
+          .lux-attendance-card { background: white; padding: 1.25rem; border-radius: 16px; border: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+          .lux-attendance-card .name { font-weight: 800; color: #111827; font-size: 0.95rem; margin-bottom: 0.25rem; }
+          .lux-attendance-card .meta { font-size: 0.8rem; color: #64748B; font-weight: 500; }
+
+          /* ANIMATIONS */
+          @keyframes luxFadeIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes luxSlideUp { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+          @keyframes luxZoomIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+
+          /* RESPONSIVE */
           .aev-cards { display: none; }
-
           @media (max-width: 768px) { 
-            .aev-grid-2 { grid-template-columns: 1fr; } 
-            
-            /* Cacher le tableau classique */
+            .lux-grid-2 { grid-template-columns: 1fr; } 
+            .lux-ro-grid { grid-template-columns: 1fr; }
             .aev-table-container { display: none !important; } 
-            
-            /* Afficher les cartes */
             .aev-cards { display: flex; flex-direction: column; width: 100%; }
-            .aev-card { 
-              display: flex; justify-content: space-between; align-items: center; 
-              padding: 1rem; border-bottom: 1px solid #F3F4F6; gap: 0.5rem;
-            }
+            .aev-card { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem; border-bottom: 1px solid #F1F5F9; gap: 1rem; background: white; }
             .aev-card:last-child { border-bottom: none; }
-            
-            /* Colonne 1 : Événement */
-            .aev-card-content { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 0; }
-            .aev-card-title { font-weight: 800; font-size: 0.9rem; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
-            .aev-card-meta { font-size: 0.72rem; color: #6B7280; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-            
-            /* Colonne 2 : Actions/Présences */
-            .aev-card-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end; flex-shrink: 0; }
+            .aev-card-content { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; min-width: 0; }
+            .aev-card-title { font-weight: 800; font-size: 1rem; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+            .aev-card-meta { font-size: 0.8rem; color: #64748B; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .aev-card-actions { display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end; flex-shrink: 0; }
           }
         `}</style>
 
         <div className="aev-wrap">
-          <div className="aev-header"><h1 className="aev-title">Gestion Globale des <span>Événements</span></h1></div>
-          <div className="aev-panel">
-            <div className="aev-panel-head">
-              <span style={{ fontWeight: 800, color: '#1D4ED8', textTransform: 'uppercase', fontSize: '0.8rem' }}>Agenda du réseau</span>
-              <button className="aev-new-btn" onClick={() => setEventModal({ isOpen: true })}>+ Nouvel événement</button>
+          <div className="aev-header">
+            <div>
+              <h1 className="aev-title">Gestion Globale des <span>Événements</span></h1>
+              <p className="aev-subtitle">Créez et administrez l&apos;agenda complet de votre association et de vos antennes.</p>
             </div>
-
+            <button className="lux-btn-new" onClick={() => setEventModal({ isOpen: true })}>
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+              Nouvel événement
+            </button>
+          </div>
+          
+          <div className="aev-panel">
             {/* VUE DESKTOP (Tableau classique) */}
             <div className="aev-table-container">
               <table className="aev-table">
@@ -494,39 +678,43 @@ export default function SuperAdminEventsPage() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: '#6B7280' }}>Chargement des événements...</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '4rem', color: '#94A3B8', fontWeight: 600 }}>Chargement des événements...</td></tr>
                   ) : items.length === 0 ? (
-                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem', color: '#9CA3AF' }}>Aucun événement n&apos;a été créé pour le moment.</td></tr>
+                    <tr><td colSpan={5} style={{ textAlign: 'center', padding: '4rem', color: '#94A3B8', fontWeight: 600 }}>Aucun événement n&apos;a été créé pour le moment.</td></tr>
                   ) : (
                     items.map(e => {
                       const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
                       const antenneCount = e.antennas?.length || 0;
+                      
+                      const displayTitle = e.title.replace(/^\[.*?\]\s*/, '');
 
                       return (
-                        <tr key={e.id} className="aev-row">
+                        <tr key={e.id} className="aev-row" onClick={() => setEventModal({ isOpen: true, event: e })}>
                           <td>
-                            <div style={{ fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.title}</div>
-                            <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: 2, fontWeight: 700 }}>{TYPE_MAP[e.type]}</div>
+                            <div style={{ fontWeight: 800, color: '#111827', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontSize: '0.95rem' }}>{displayTitle}</div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: 4, fontWeight: 700 }}>
+                              {e.type === 'OTHER' && e.title.match(/^\[(.*?)\]/) ? e.title.match(/^\[(.*?)\]/)?.[1] : TYPE_MAP[e.type]}
+                            </div>
                           </td>
-                          <td style={{ color: '#4B5563', fontSize: '0.8rem' }}>{formatDateTime(e.startsAt)}</td>
+                          <td style={{ color: '#475569', fontSize: '0.85rem' }}>{formatDateTime(e.startsAt)}</td>
                           <td>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#F3F4F6', color: '#4B5563', padding: '0.2rem 0.5rem', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 800, background: '#F1F5F9', color: '#475569', padding: '0.3rem 0.6rem', borderRadius: 8, whiteSpace: 'nowrap' }}>
                               {antenneCount} antenne(s)
                             </span>
                           </td>
                           <td>
-                            <span className="aev-status" style={{ background: s.bg, color: s.color }}>
-                              <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }}/> {s.label}
+                            <span className="lux-status-badge" style={{ background: s.bg, color: s.color, borderColor: s.border }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.color }}/> {s.label}
                             </span>
                           </td>
-                          <td className="aev-actions-td" style={{ textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right' }}>
                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                               {e.type === 'ANTENNA_MEETING' && (
-                                <button className="aev-action-btn primary" onClick={(ev) => { ev.stopPropagation(); setAttendanceModal({ isOpen: true, event: e }); }}>
+                                <button className="lux-action-btn primary" onClick={(ev) => { ev.stopPropagation(); setAttendanceModal({ isOpen: true, event: e }); }}>
                                   Présences
                                 </button>
                               )}
-                              <button className="aev-action-btn" onClick={(ev) => { ev.stopPropagation(); setEventModal({ isOpen: true, event: e }); }}>
+                              <button className="lux-action-btn" onClick={(ev) => { ev.stopPropagation(); setEventModal({ isOpen: true, event: e }); }}>
                                 Détails
                               </button>
                             </div>
@@ -542,22 +730,25 @@ export default function SuperAdminEventsPage() {
             {/* VUE MOBILE (Cartes 2 colonnes) */}
             <div className="aev-cards">
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#6B7280', fontSize: '0.85rem' }}>Chargement...</div>
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#94A3B8', fontSize: '0.9rem', fontWeight: 600 }}>Chargement...</div>
               ) : items.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.85rem' }}>Aucun événement.</div>
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#94A3B8', fontSize: '0.9rem', fontWeight: 600 }}>Aucun événement.</div>
               ) : (
                 items.map(e => {
                   const s = STATUS_MAP[e.status] || STATUS_MAP.DRAFT;
+                  const displayTitle = e.title.replace(/^\[.*?\]\s*/, '');
+                  const displayType = e.type === 'OTHER' && e.title.match(/^\[(.*?)\]/) ? e.title.match(/^\[(.*?)\]/)?.[1] : TYPE_MAP[e.type];
+
                   return (
-                    <div key={e.id} className="aev-card">
+                    <div key={e.id} className="aev-card" onClick={() => setEventModal({ isOpen: true, event: e })}>
 
                       {/* Colonne 1 : Événement */}
                       <div className="aev-card-content">
-                        <div className="aev-card-title">{e.title}</div>
-                        <div className="aev-card-meta">{TYPE_MAP[e.type]} • {formatDateTime(e.startsAt)}</div>
-                        <div>
-                          <span className="aev-status" style={{ background: s.bg, color: s.color, padding: '0.15rem 0.4rem', fontSize: '0.65rem' }}>
-                            <span style={{ width: 4, height: 4, borderRadius: '50%', background: s.color }}/> {s.label}
+                        <div className="aev-card-title">{displayTitle}</div>
+                        <div className="aev-card-meta">{displayType} • {formatDateTime(e.startsAt)}</div>
+                        <div style={{ marginTop: '0.2rem' }}>
+                          <span className="lux-status-badge" style={{ background: s.bg, color: s.color, borderColor: s.border, padding: '0.2rem 0.5rem', fontSize: '0.6rem' }}>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }}/> {s.label}
                           </span>
                         </div>
                       </div>
@@ -566,17 +757,17 @@ export default function SuperAdminEventsPage() {
                       <div className="aev-card-actions">
                         {e.type === 'ANTENNA_MEETING' && (
                           <button 
-                            className="aev-action-btn primary" 
-                            style={{ fontSize: '0.7rem', padding: '0.35rem 0.7rem', width: '100%' }} 
-                            onClick={() => setAttendanceModal({ isOpen: true, event: e })}
+                            className="lux-action-btn primary" 
+                            style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', width: '100%' }} 
+                            onClick={(ev) => { ev.stopPropagation(); setAttendanceModal({ isOpen: true, event: e }); }}
                           >
                             Présences
                           </button>
                         )}
                         <button 
-                          className="aev-action-btn" 
-                          style={{ fontSize: '0.7rem', padding: '0.35rem 0.7rem', width: '100%' }} 
-                          onClick={() => setEventModal({ isOpen: true, event: e })}
+                          className="lux-action-btn" 
+                          style={{ fontSize: '0.75rem', padding: '0.4rem 0.8rem', width: '100%' }} 
+                          onClick={(ev) => { ev.stopPropagation(); setEventModal({ isOpen: true, event: e }); }}
                         >
                           Détails
                         </button>

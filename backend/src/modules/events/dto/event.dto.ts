@@ -43,11 +43,21 @@ export class CreateEventDto {
   @IsOptional()
   coverImageId?: string;
 
-  // 👇 AJOUT CHIRURGICAL : Support de la sélection multiple (Super-Admin)
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   antennaIds?: string[];
+
+  // ⚡ AJOUT CHIRURGICAL : Autoriser l'invitation globale
+  @IsBoolean()
+  @IsOptional()
+  inviteAll?: boolean;
+
+  // ⚡ AJOUT CHIRURGICAL : Autoriser la liste des membres spécifiques
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  memberIds?: string[];
 }
 
 export class UpdateEventDto extends CreateEventDto {}

@@ -996,7 +996,7 @@ listElectionsAdmin: async () => {
       body: body ?? {},
     }),
 
-  // ==========================================
+// ==========================================
   // ÉVÉNEMENTS 
   // ==========================================
   listEvents: (params?: { page?: number; pageSize?: number; status?: string; type?: string; antennaId?: string }) =>
@@ -1004,7 +1004,7 @@ listElectionsAdmin: async () => {
       `/admin/events?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.type ? `&type=${encodeURIComponent(params.type)}` : ''}${
-        params?.antennaId ? `&encodeURIComponent(params.antennaId)}` : ''
+        params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''
       }`
     ),
 

@@ -3,13 +3,13 @@ import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/commo
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEventDto, UpdateEventDto, RegisterAttendanceDto } from './dto/event.dto';
 import { EventStatus, UserRole, Prisma, EventType, AttendanceStatus, NotificationType } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service'; // 🔥 AJOUT CHIRURGICAL
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly notifications: NotificationsService, // 🔥 AJOUT CHIRURGICAL
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ==========================================
@@ -31,16 +31,12 @@ export class EventsService {
       ...(type ? { type: type as EventType } : {})
     };
 
-    // Restrictions selon le rôle (Adapté pour la relation Many-to-Many 'antennas')
     if (role === UserRole.MEMBER) {
       where.status = EventStatus.PUBLISHED; 
 
-      // Un membre ne voit l'événement que s'il est global (aucune antenne)
-      // OU s'il cible son antenne
-      // OU s'il a été explicitement invité (via EventAttendance)
       const memberOrCondition: Prisma.EventWhereInput[] = [
-        { antennas: { none: {} } }, // Événement global
-        { attendees: { some: { userId: user.id } } } // Invité spécifiquement
+        { antennas: { none: {} } },
+        { attendees: { some: { userId: user.id } } }
       ];
 
       if (antennaId) {
@@ -74,7 +70,6 @@ export class EventsService {
           antennas: { select: { id: true, name: true, code: true } },
           coverImage: { select: { url: true } },
           _count: { select: { attendees: true } },
-          // 👇 AJOUT CHIRURGICAL : On inclut le statut du membre courant
           attendees: { 
             where: { userId: userId }, 
             select: { status: true } 
@@ -135,10 +130,7 @@ export class EventsService {
       connectAntennas = [{ id: user.memberships[0].antennaId }];
     }
 
-    // Gestion des invitations spécifiques (Membres sélectionnés manuellement)
-    // @ts-expect-error : Le DTO strict ne connaît pas encore "inviteAll"
     const inviteAll = dto.inviteAll !== false; 
-    // @ts-expect-error
     const specificMemberIds: string[] = dto.memberIds || [];
 
     let attendeesCreation = {};
@@ -166,7 +158,6 @@ export class EventsService {
       }
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Notifier si publié dès la création
     if (event.status === EventStatus.PUBLISHED) {
       await this.notifyEventPublished(
         associationId, 
@@ -221,16 +212,13 @@ export class EventsService {
       targetAntennaIds = dto.antennaIds;
     }
 
-    // Gestion de la modification des invitations spécifiques
-    // @ts-expect-error
     const inviteAll = dto.inviteAll !== false;
-    // @ts-expect-error
     const specificMemberIds: string[] = dto.memberIds || [];
 
     if (inviteAll === false && specificMemberIds.length > 0) {
       updateData.attendees = {
-        deleteMany: {}, // Efface tout
-        create: specificMemberIds.map((mId: string) => ({ userId: mId, status: AttendanceStatus.INVITED })) // Recrée
+        deleteMany: {}, 
+        create: specificMemberIds.map((mId: string) => ({ userId: mId, status: AttendanceStatus.INVITED })) 
       };
     } else if (inviteAll === true) {
       updateData.attendees = {
@@ -243,7 +231,6 @@ export class EventsService {
       data: updateData
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Notifier si l'événement passe de DRAFT à PUBLISHED
     if (event.status !== EventStatus.PUBLISHED && updatedEvent.status === EventStatus.PUBLISHED) {
       await this.notifyEventPublished(
         associationId, 
@@ -316,11 +303,9 @@ export class EventsService {
   ) {
     const targetUserIds = new Set<string>();
 
-    // 1. Si on a sélectionné des membres spécifiques
     if (!inviteAll && specificMemberIds.length > 0) {
       specificMemberIds.forEach(id => targetUserIds.add(id));
     } 
-    // 2. Si ça cible des antennes spécifiques
     else if (antennaIds && antennaIds.length > 0) {
       const members = await this.prisma.membership.findMany({
         where: { antennaId: { in: antennaIds }, status: 'APPROVED' },
@@ -328,7 +313,6 @@ export class EventsService {
       });
       members.forEach(m => targetUserIds.add(m.userId));
     } 
-    // 3. Sinon c'est un événement global pour toute l'association
     else {
       const users = await this.prisma.user.findMany({
         where: { associationId, status: 'ACTIVE' },
@@ -337,7 +321,6 @@ export class EventsService {
       users.forEach(u => targetUserIds.add(u.id));
     }
 
-    // Propulser toutes les notifications en parallèle (Fire & Forget sécurisé)
     const notifyPromises = Array.from(targetUserIds).map(userId => 
       this.notifications.createForUserWithPush({
         associationId,
