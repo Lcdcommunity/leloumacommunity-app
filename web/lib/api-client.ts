@@ -175,7 +175,7 @@ export const api = {
       logoUrl: string | null;
       themeColors: { primary: string; secondary: string };
       fontFamily: string;
-    }>(`/public/theme?${params.toString()}`);
+    }>(`/public/theme?${params.toString()}`, { auth: false });
   },
 
   // ==========================================
@@ -240,15 +240,16 @@ export const api = {
 
   verifyEmailToken: (body: { token: string }) =>
     http<{ emailVerified: boolean }, typeof body>('/public/verify-email-token', {
-      method: 'POST',
-      body,
-    }),
+  method: 'POST',
+  body,
+  auth: false,
+  }),
 
   listPublicAntennasForSignup: () =>
-    http<Array<{ id: string; code: string; name: string; city?: string; country?: string }>>('/public/antennas'),
+    http<Array<{ id: string; code: string; name: string; city?: string; country?: string }>>('/public/antennas', { auth: false }),
 
   verifyPublicCard: (token: string) =>
-    http<VirtualCardData>(`/public/cards/${token}`),
+    http<VirtualCardData>(`/public/cards/${token}`, { auth: false }),
 
   // ==========================================
   // ME / PROFIL GÉNÉRAL
