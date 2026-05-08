@@ -41,8 +41,11 @@ const ICO = {
   user:       'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   calendar:   'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
   star:       'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.382-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z',
-  send:       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', 
-  vote:       'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', // ⚡ ICÔNE ÉLECTIONS
+  send:       'M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+  vote:       'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+  // 🔥 NOUVEAUX ICÔNES
+  lightbulb:  'M9 21h6M12 3a6 6 0 016 6c0 2.22-1.2 4.16-3 5.2V17a1 1 0 01-1 1H10a1 1 0 01-1-1v-2.8C7.2 13.16 6 11.22 6 9a6 6 0 016-6z',
+  trendingUp: 'M23 6l-9.5 9.5-5-5L1 18M17 6h6v6',
 };
 
 const systemAdminItems: NavItem[] = [
@@ -62,7 +65,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/contributions',   label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
   { href: '/super-admin/expenses',        label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
   { href: '/super-admin/projects',        label: 'Projets',                icon: <Ico d={ICO.clip} /> },
-  { href: '/super-admin/elections',       label: 'Élections',              icon: <Ico d={ICO.vote} /> }, // ⚡ AJOUT ÉLECTIONS
+  { href: '/super-admin/elections',       label: 'Élections',              icon: <Ico d={ICO.vote} /> },
   { href: '/super-admin/events',          label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
   { href: '/super-admin/sponsors',        label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
   { href: '/super-admin/documents',       label: 'Documents',              icon: <Ico d={ICO.doc} /> },
@@ -75,41 +78,45 @@ const superAdminItems: NavItem[] = [
 ];
 
 const adminItems: NavItem[] = [
-  { href: '/admin',                       label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
-  { href: '/admin/approvals',             label: 'Validations comptes',    icon: <Ico d={ICO.check} /> },
-  { href: '/admin/members',               label: 'Membres',                icon: <Ico d={ICO.group} /> },
-  { href: '/admin/contributions',         label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
-  { href: '/admin/contributions/history', label: 'Historique cotisations', icon: <Ico d={ICO.history} /> },
-  { href: '/admin/expenses',              label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
-  { href: '/admin/projections',           label: 'Projections',            icon: <Ico d={ICO.chart} /> },
-  { href: '/admin/projects',              label: 'Projets',                icon: <Ico d={ICO.clip} /> },
-  { href: '/admin/elections',             label: 'Élections',              icon: <Ico d={ICO.vote} /> }, // ⚡ AJOUT ÉLECTIONS
-  { href: '/admin/events',                label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
-  { href: '/admin/documents',             label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
-  { href: '/admin/contents',              label: 'Informations',           icon: <Ico d={ICO.news} /> },
-  { href: '/admin/late-members',          label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
-  { href: '/admin/communication',         label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> }, 
-  { href: '/admin/notifications',         label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
-  { href: '/admin/audit',                 label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
-  { href: '/admin/profile',               label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
-  { href: '/admin/settings',              label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },
+  { href: '/admin',                           label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
+  { href: '/admin/approvals',                 label: 'Validations comptes',    icon: <Ico d={ICO.check} /> },
+  { href: '/admin/members',                   label: 'Membres',                icon: <Ico d={ICO.group} /> },
+  { href: '/admin/contributions',             label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
+  { href: '/admin/contributions/history',     label: 'Historique cotisations', icon: <Ico d={ICO.history} /> },
+  { href: '/admin/expenses',                  label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
+  { href: '/admin/projections',               label: 'Projections',            icon: <Ico d={ICO.chart} /> },
+  { href: '/admin/projects',                  label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  // 🔥 NOUVEAU : Propositions de projets reçues des membres
+  { href: '/admin/project-proposals',         label: 'Propositions membres',   icon: <Ico d={ICO.lightbulb} /> },
+  { href: '/admin/elections',                 label: 'Élections',              icon: <Ico d={ICO.vote} /> },
+  { href: '/admin/events',                    label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
+  { href: '/admin/documents',                 label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
+  { href: '/admin/contents',                  label: 'Informations',           icon: <Ico d={ICO.news} /> },
+  { href: '/admin/late-members',              label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
+  { href: '/admin/communication',             label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> },
+  { href: '/admin/notifications',             label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
+  { href: '/admin/audit',                     label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
+  { href: '/admin/profile',                   label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
+  { href: '/admin/settings',                  label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },
 ];
 
 const memberItems: NavItem[] = [
-  { href: '/member',                       label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
-  { href: '/member/contributions/new',     label: 'Faire un dépôt',         icon: <Ico d={ICO.plus} /> },
-  { href: '/member/contributions/history', label: 'Mes cotisations',        icon: <Ico d={ICO.coin} /> },
-  { href: '/member/expenses',              label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
-  { href: '/member/projects',              label: 'Projets',                icon: <Ico d={ICO.clip} /> },
-  { href: '/member/projects/propose',      label: 'Proposer un projet',     icon: <Ico d={ICO.edit} /> },
-  { href: '/member/elections',             label: 'Espace Élections',       icon: <Ico d={ICO.vote} /> }, // ⚡ AJOUT ÉLECTIONS
-  { href: '/member/events',                label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
-  { href: '/member/documents',             label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
-  { href: '/member/contents',              label: 'Informations',           icon: <Ico d={ICO.news} /> },
-  { href: '/member/late-members',          label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
-  { href: '/member/notifications',         label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
-  { href: '/member/profile',               label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
-  { href: '/member/settings',              label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },
+  { href: '/member',                           label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
+  { href: '/member/contributions/new',         label: 'Faire un dépôt',         icon: <Ico d={ICO.plus} /> },
+  { href: '/member/contributions/history',     label: 'Mes cotisations',        icon: <Ico d={ICO.coin} /> },
+  { href: '/member/expenses',                  label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
+  { href: '/member/projects',                  label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/member/projects/propose',          label: 'Proposer un projet',     icon: <Ico d={ICO.edit} /> },
+  // 🔥 NOUVEAU : Simulation financière (ProjectionForm identique à l'admin)
+  { href: '/member/projects/projection',       label: 'Simulation financière',  icon: <Ico d={ICO.trendingUp} /> },
+  { href: '/member/elections',                 label: 'Espace Élections',       icon: <Ico d={ICO.vote} /> },
+  { href: '/member/events',                    label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
+  { href: '/member/documents',                 label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
+  { href: '/member/contents',                  label: 'Informations',           icon: <Ico d={ICO.news} /> },
+  { href: '/member/late-members',              label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
+  { href: '/member/notifications',             label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
+  { href: '/member/profile',                   label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
+  { href: '/member/settings',                  label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },
 ];
 
 const BOTTOM_SLUGS = ['settings', 'profile'];
@@ -122,10 +129,10 @@ const ROLE_COLORS: Record<string, {
   label: string;
   hoverBg: string;
 }> = {
-  SYSTEM_ADMIN: { accent: '#7C3AED', dim: 'rgba(124,58,237,0.08)', pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef', hoverBg: 'rgba(124,58,237,0.05)' },
-  SUPER_ADMIN:  { accent: '#DC2626', dim: 'rgba(220,38,38,0.08)',  pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin', hoverBg: 'rgba(220,38,38,0.05)' },
-  ANTENNA_ADMIN:{ accent: '#2563EB', dim: 'rgba(37,99,235,0.10)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne', hoverBg: 'rgba(37,99,235,0.05)' },
-  MEMBER:        { accent: '#059669', dim: 'rgba(5,150,105,0.10)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre', hoverBg: 'rgba(5,150,105,0.05)' },
+  SYSTEM_ADMIN:  { accent: '#7C3AED', dim: 'rgba(124,58,237,0.08)',  pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef',    hoverBg: 'rgba(124,58,237,0.05)' },
+  SUPER_ADMIN:   { accent: '#DC2626', dim: 'rgba(220,38,38,0.08)',   pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin',   hoverBg: 'rgba(220,38,38,0.05)'  },
+  ANTENNA_ADMIN: { accent: '#2563EB', dim: 'rgba(37,99,235,0.10)',   pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne', hoverBg: 'rgba(37,99,235,0.05)'  },
+  MEMBER:        { accent: '#059669', dim: 'rgba(5,150,105,0.10)',   pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre',        hoverBg: 'rgba(5,150,105,0.05)'  },
 };
 
 export function Sidebar() {
@@ -149,8 +156,8 @@ export function Sidebar() {
           const currentAssoc = await api.getAssociation();
           setAssociation({ name: currentAssoc.name, logoUrl: currentAssoc.logoUrl });
         }
-      } catch { 
-        if (mounted) setRole(null); 
+      } catch {
+        if (mounted) setRole(null);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -159,7 +166,7 @@ export function Sidebar() {
   }, []);
 
   const allItems = useMemo(() => {
-    if (role === 'SYSTEM_ADMIN')   return systemAdminItems;
+    if (role === 'SYSTEM_ADMIN')  return systemAdminItems;
     if (role === 'SUPER_ADMIN')   return superAdminItems;
     if (role === 'ANTENNA_ADMIN') return adminItems;
     if (role === 'MEMBER')        return memberItems;
@@ -259,7 +266,7 @@ export function Sidebar() {
           color: var(--sb-accent);
           font-weight: 700;
         }
-        .sb-ico { 
+        .sb-ico {
           flex-shrink: 0; opacity: 0.7; transition: transform 0.2s;
           display: flex; align-items: center; justify-content: center;
         }
@@ -302,7 +309,7 @@ export function Sidebar() {
                 className="sb-logo-img"
               />
             ) : (
-              <div 
+              <div
                 className="sb-logo-fallback"
                 style={{ background: `linear-gradient(135deg, ${colors.accent}, #1e293b)` }}
               >
@@ -348,16 +355,17 @@ export function Sidebar() {
             ))}
           </div>
         )}
+
         <div className="sb-footer">
           <button className="sb-logout" onClick={handleLogout}>
             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
             </svg>
             Déconnexion
           </button>
         </div>
-      </aside> 
+      </aside>
     </>
   );
 }

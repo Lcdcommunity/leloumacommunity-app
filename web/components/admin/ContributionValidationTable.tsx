@@ -7,6 +7,48 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { formatCurrency, formatDate } from '../../lib/format';
 
+// ── Helper: Mois concerné ────────────────────────────────────────────────────
+const MONTHS_FR = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
+
+type ExtendedContribution = Omit<Contribution, 'status'> & {
+  status: string;
+  memberName?: string;
+  monthReference?: number | null;
+  yearReference?: number | null;
+};
+
+function formatMonthRef(c: ExtendedContribution): string | null {
+  const m = c.monthReference;
+  const y = c.yearReference;
+  if (!m || !y) return null;
+  return `${MONTHS_FR[(m - 1) % 12]} ${y}`;
+}
+
+function MonthCell({ contribution }: { contribution: ExtendedContribution }) {
+  const label = formatMonthRef(contribution);
+  if (!label) return <span style={{ color: '#CBD5E1', fontSize: '0.72rem' }}>—</span>;
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '0.28rem',
+      background: '#EFF6FF', color: '#1D4ED8',
+      fontSize: '0.7rem', fontWeight: 800,
+      padding: '0.2rem 0.55rem', borderRadius: 99,
+      border: '1px solid #BFDBFE', whiteSpace: 'nowrap',
+    }}>
+      <svg width="9" height="9" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+        <rect x="3" y="4" width="18" height="18" rx="2" />
+        <path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
+      </svg>
+      {label}
+    </span>
+  );
+}
+
+// ── Existing helpers (unchanged) ─────────────────────────────────────────────
+
 function getStatusLabel(status: string) {
   if (status === 'VALIDATED') return 'Validée';
   if (status === 'PENDING_VALIDATION' || status === 'PENDING') return 'En attente';
@@ -25,13 +67,9 @@ function getMethodLabel(method: string) {
   if (method === 'CASH') return 'Espèces';
   if (method === 'BANK_TRANSFER') return 'Virement';
   if (method === 'MOBILE_MONEY') return 'Mobile Money';
+  if (method === 'CARD') return 'Carte';
   return method;
 }
-
-type ExtendedContribution = Omit<Contribution, 'status'> & {
-  status: string;
-  memberName?: string; 
-};
 
 export function ContributionValidationTable({
   items,
@@ -39,17 +77,17 @@ export function ContributionValidationTable({
   onValidate,
   onReject,
   onEdit,
-  isHistoryView = false, // 👇 NOUVELLE OPTION POUR LA PAGE HISTORIQUE
+  isHistoryView = false,
 }: {
   items: ExtendedContribution[];
   busyId?: string | null;
   onValidate: (id: string) => Promise<void>;
   onReject: (id: string) => Promise<void>;
   onEdit: (id: string, currentAmount: number) => Promise<void>;
-  isHistoryView?: boolean; // 👇 TYPAGE DE L'OPTION
+  isHistoryView?: boolean;
 }) {
   return (
-    <Table columns={['Membre', 'Montant', 'Méthode', 'Statut', 'Date dépôt', 'Actions']}>
+    <Table columns={['Membre', 'Montant', 'Méthode', 'Mois concerné', 'Statut', 'Date dépôt', 'Actions']}>
       {items.map((c) => {
         const isPending = c.status === 'PENDING_VALIDATION' || c.status === 'PENDING';
 
@@ -57,20 +95,17 @@ export function ContributionValidationTable({
           <tr key={c.id}>
             <td className="font-medium text-gray-900">{c.memberName || 'Inconnu'}</td>
             <td>{formatCurrency(c.amount, c.currency)}</td>
-            {/* 👇 CORRECTION 1 : 'method' remplacé par 'paymentMethod' */}
             <td>{getMethodLabel(c.paymentMethod || '') || '—'}</td>
+            <td><MonthCell contribution={c} /></td>
             <td>
               <Badge tone={getStatusTone(c.status)}>
                 {getStatusLabel(c.status)}
               </Badge>
             </td>
-            {/* 👇 CORRECTION 2 : 'depositedAt' remplacé par 'contributionDate' */}
             <td>{formatDate(c.contributionDate || c.createdAt)}</td>
             <td>
-              {/* 👇 CONDITION D'AFFICHAGE ADAPTÉE */}
               {isHistoryView ? (
                 <div className="row-actions flex gap-2">
-                  {/* Icône moderne "Modifier" toujours visible dans l'historique */}
                   <button
                     type="button"
                     disabled={busyId === c.id}

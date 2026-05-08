@@ -1,4 +1,4 @@
-// backend/src/modules/member/dto/create-project-proposal.dto.ts
+///////// backend/src/modules/member/dto/create-project-proposal.dto.ts
 import {
   IsNumber,
   IsOptional,
@@ -9,6 +9,12 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { CurrencyCode } from '@prisma/client';
+
+// 🔥 AJOUT : Le membre peut sauvegarder en brouillon (DRAFT) ou soumettre (SUBMITTED)
+export enum ProposalInitialStatus {
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
+}
 
 export class CreateProjectProposalDto {
   @IsString()
@@ -32,4 +38,9 @@ export class CreateProjectProposalDto {
   @IsOptional()
   @IsString()
   attachmentFileAssetId?: string | null;
+
+  // 🔥 NOUVEAU : Statut initial — DRAFT (brouillon) ou SUBMITTED (soumis à l'admin)
+  @IsOptional()
+  @IsEnum(ProposalInitialStatus)
+  status?: ProposalInitialStatus;
 }

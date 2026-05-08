@@ -27,6 +27,34 @@ const METHOD_LABELS: Record<string, string> = {
   OTHER: 'Autre',
 };
 
+type ContributionWithMonthRef = Contribution & {
+  monthRef?: string | null;
+  month?: string | null;
+  contributionMonth?: string | null;
+  targetMonth?: string | null;
+  type?: string | null;
+};
+
+const formatMonthRef = (c: ContributionWithMonthRef) => {
+  const raw =
+    c?.monthRef ||
+    c?.month ||
+    c?.contributionMonth ||
+    c?.targetMonth;
+
+  if (!raw || typeof raw !== 'string') return null;
+
+  const [year, month] = raw.split('-');
+  if (!year || !month) return raw;
+
+  const months = [
+    'Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin',
+    'Juil', 'Août', 'Sept', 'Oct', 'Nov', 'Déc',
+  ];
+
+  return `${months[Number(month) - 1] || month} ${year}`;
+};
+
 const formatContributionType = (type?: string) => {
   switch (type) {
     case 'MEMBERSHIP': return 'Carte de membre';
@@ -82,8 +110,7 @@ export default function SuperAdminContributionsPage() {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Contribution | null>(null);
 
-  // ⚡ ÉTATS D'EXPORTATION
-  const [antennas, setAntennas] = useState<{ id: string, name: string }[]>([]);
+  const [antennas, setAntennas] = useState<{ id: string; name: string }[]>([]);
   const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
   const [exportAntenna, setExportAntenna] = useState('');
   const [exportStartMonth, setExportStartMonth] = useState('');
@@ -114,7 +141,6 @@ export default function SuperAdminContributionsPage() {
 
   useEffect(() => {
     void load('');
-    // Charger les antennes pour le filtre d'exportation
     const initAntennas = async () => {
       try {
         const res = await api.listAntennas({ pageSize: 100 });
@@ -133,58 +159,70 @@ export default function SuperAdminContributionsPage() {
     return () => { document.body.style.overflow = ''; };
   }, [selectedItem]);
 
-  // ⚡ FONCTION D'EXPORTATION CHIRURGICALE
   const executeExport = async () => {
     try {
       setActionBusy(true);
       const fetchRes = await api.listContributions({
-        page: 1, 
-        pageSize: 10000, // On récupère tout pour l'export
-        antennaId: exportAntenna || undefined
+        page: 1,
+        pageSize: 10000,
+        antennaId: exportAntenna || undefined,
       });
-      
+
       let exportData = fetchRes.items as Contribution[];
 
-      // Filtrage local supplémentaire si l'API ne le gère pas
       if (exportAntenna) {
-        exportData = exportData.filter(c => c.antennaId === exportAntenna || c.antenna?.id === exportAntenna);
+        exportData = exportData.filter(
+          (c) =>
+            c.antennaId === exportAntenna ||
+            c.antenna?.id === exportAntenna,
+        );
       }
 
       if (exportStartMonth) {
         const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
-        exportData = exportData.filter(c => new Date(c.contributionDate || c.createdAt) >= start);
+        exportData = exportData.filter(
+          (c) => new Date(c.contributionDate || c.createdAt) >= start,
+        );
       }
       if (exportEndMonth) {
         const end = new Date(`${exportEndMonth}-01T00:00:00Z`);
-        end.setMonth(end.getMonth() + 1); // Inclut tout le mois de fin
-        exportData = exportData.filter(c => new Date(c.contributionDate || c.createdAt) < end);
+        end.setMonth(end.getMonth() + 1);
+        exportData = exportData.filter(
+          (c) => new Date(c.contributionDate || c.createdAt) < end,
+        );
       }
 
       if (exportData.length === 0) {
-        alert("Aucune cotisation ne correspond à ces critères de filtrage.");
+        alert('Aucune cotisation ne correspond à ces critères de filtrage.');
         return;
       }
 
       if (exportModalType === 'EXCEL') {
-        let csv = "Nom;Prenom;Email;Antenne;Montant;Mois Cotise;Type;Statut\n";
-        exportData.forEach(c => {
+        let csv = 'Nom;Prenom;Email;Antenne;Montant;Mois Cotise;Type;Statut\n';
+
+        exportData.forEach((c: Contribution) => {
           const nom = c.member?.lastName || '';
           const prenom = c.member?.firstName || '';
           const email = c.member?.email || '';
           const antenne = c.antenna?.name || '';
           const montant = `${c.amount} ${c.currency || 'EUR'}`;
           const date = formatDate(c.contributionDate || c.createdAt);
-          const type = formatContributionType((c as any).type);
+          const typed = (c as ContributionWithMonthRef).type;
+          const type = formatContributionType(typed ? String(typed) : '');
           const statut = STATUS_MAP[c.status]?.label || c.status;
 
           csv += `"${nom}";"${prenom}";"${email}";"${antenne}";"${montant}";"${date}";"${type}";"${statut}"\n`;
         });
-        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        const link = document.createElement('a');
         link.href = url;
-        link.download = `Export_Cotisations_${new Date().toISOString().slice(0,10)}.csv`;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        link.download = `Export_Cotisations_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
         setExportModalType(null);
       } else if (exportModalType === 'PDF') {
         setPdfData(exportData);
@@ -194,7 +232,7 @@ export default function SuperAdminContributionsPage() {
           setExportModalType(null);
         }, 300);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
       alert("Erreur lors de l'exportation des données.");
     } finally {
@@ -311,7 +349,6 @@ export default function SuperAdminContributionsPage() {
         @keyframes scin { to { opacity: 1; transform: translateY(0); } }
         @keyframes scspin { to { transform: rotate(360deg); } }
 
-        /* ─── STYLES DU TABLEAU INTÉGRÉ ─── */
         .sct-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .sct-table thead tr { border-bottom: 1px solid rgba(220,38,38,.08); }
         .sct-table thead th { padding: .85rem 1.1rem; text-align: left; font-size: .66rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; color: #6B7280; background: rgba(254,242,242,.22); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -332,7 +369,6 @@ export default function SuperAdminContributionsPage() {
         .sct-status { display: inline-flex; align-items: center; gap: .32rem; padding: .25rem .62rem; border-radius: 999px; font-size: .7rem; font-weight: 800; white-space: nowrap; }
         .sct-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 
-        /* ── CARTES MOBILE ── */
         .sct-cards { display: none; }
 
         @media (max-width: 768px) {
@@ -350,7 +386,6 @@ export default function SuperAdminContributionsPage() {
           .sct-card-date { font-size: 0.7rem; color: #9CA3AF; font-weight: 600; }
         }
 
-        /* ── STYLES D'EXPORTATION ── */
         .export-flex-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
         .export-flex-item { flex: 1 1 calc(50% - 0.5rem); min-width: 140px; }
         .export-flex-item.full { flex: 1 1 100%; }
@@ -369,7 +404,6 @@ export default function SuperAdminContributionsPage() {
         }
         .printable-export-area { display: none; }
 
-        /* ── MODAL (Détails et Export) ── */
         .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadeIn 0.25s ease-out forwards; }
         .modal-content { background: white; width: 100%; max-width: 500px; border-radius: 24px; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
         .modal-header { padding: 1.5rem; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: white; z-index: 10; }
@@ -394,7 +428,6 @@ export default function SuperAdminContributionsPage() {
         .sc-modal-avatar { width: 42px; height: 42px; border-radius: 50%; background: linear-gradient(135deg,#059669,#047857); display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 900; color: white; flex-shrink: 0; box-shadow: 0 4px 10px rgba(5,150,105,0.2); }
       `}</style>
 
-      {/* ⚡ LA ZONE IMPRIMABLE CACHÉE POUR LE PDF */}
       {pdfData && (
         <div className="printable-export-area">
           <h2 style={{ textAlign: 'center', marginBottom: '20px', fontFamily: "'Cormorant Garamond', serif" }}>Rapport des Cotisations</h2>
@@ -411,16 +444,17 @@ export default function SuperAdminContributionsPage() {
               </tr>
             </thead>
             <tbody>
-              {pdfData.map(c => {
+              {pdfData.map((c) => {
                 const nom = c.member?.lastName || '';
                 const prenom = c.member?.firstName || '';
                 const email = c.member?.email || '';
                 const antenne = c.antenna?.name || '';
                 const montant = `${c.amount} ${c.currency || 'EUR'}`;
                 const date = formatDate(c.contributionDate || c.createdAt);
-                const type = formatContributionType((c as any).type);
+                const typed = (c as ContributionWithMonthRef).type;
+                const type = formatContributionType(typed ? String(typed) : '');
                 const statut = STATUS_MAP[c.status]?.label || c.status;
-                
+
                 return (
                   <tr key={c.id}>
                     <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold' }}>{prenom} {nom}</td>
@@ -618,8 +652,19 @@ export default function SuperAdminContributionsPage() {
                         </span>
                       </div>
                       <div className="sct-card-foot">
-                        <span className="sct-card-date">Le {formatDate(contribution.contributionDate || contribution.createdAt)}</span>
-                        <span style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 600 }}>Détails ➔</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                          <span className="sct-card-date">
+                            Le {formatDate(contribution.contributionDate || contribution.createdAt)}
+                          </span>
+                          {formatMonthRef(contribution as ContributionWithMonthRef) && (
+                            <span style={{ width: 'fit-content', fontSize: '0.68rem', fontWeight: 800, background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 99, padding: '0.15rem 0.5rem' }}>
+                              📅 {formatMonthRef(contribution as ContributionWithMonthRef)}
+                            </span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '0.7rem', color: '#6B7280', fontWeight: 600 }}>
+                          Détails ➔
+                        </span>
                       </div>
                     </div>
                   );
@@ -630,10 +675,9 @@ export default function SuperAdminContributionsPage() {
         </div>
       </div>
 
-      {/* ⚡ MODALE D'EXPORTATION SANS SURCHARGER LA PAGE */}
       {exportModalType && (
         <div className="modal-overlay" onClick={() => !actionBusy && setExportModalType(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ padding: '2.5rem', maxWidth: '540px' }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ padding: '2.5rem', maxWidth: '540px' }}>
             <div className="modal-header" style={{ padding: 0, border: 'none', position: 'relative', marginBottom: '2rem' }}>
               <h2 className="modal-title" style={{ fontSize: '2rem' }}>
                 Exporter en <span style={{ color: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}>{exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</span>
@@ -646,27 +690,27 @@ export default function SuperAdminContributionsPage() {
             <div className="export-flex-row">
               <div className="export-flex-item full">
                 <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.5rem', textTransform: 'uppercase' }}>Filtrer par Antenne</label>
-                <select className="sc-select" value={exportAntenna} onChange={e => setExportAntenna(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }}>
+                <select className="sc-select" value={exportAntenna} onChange={(e) => setExportAntenna(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }}>
                   <option value="">Toutes les antennes (Global)</option>
-                  {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  {antennas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                 </select>
               </div>
               <div className="export-flex-item">
                 <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.5rem', textTransform: 'uppercase' }}>Période (Début)</label>
-                <input type="month" className="sc-select" value={exportStartMonth} onChange={e => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }} />
+                <input type="month" className="sc-select" value={exportStartMonth} onChange={(e) => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }} />
               </div>
               <div className="export-flex-item">
                 <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.5rem', textTransform: 'uppercase' }}>Période (Fin)</label>
-                <input type="month" className="sc-select" value={exportEndMonth} onChange={e => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }} />
+                <input type="month" className="sc-select" value={exportEndMonth} onChange={(e) => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '46px', background: '#f8fafc', paddingRight: '0.85rem', backgroundImage: 'none' }} />
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: '1rem', marginTop: '2.5rem' }}>
               <button className="btn-cancel" style={{ flex: 1 }} onClick={() => setExportModalType(null)} disabled={actionBusy}>Annuler</button>
-              <button 
-                className="btn-save" 
-                style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }} 
-                onClick={() => void executeExport()} 
+              <button
+                className="btn-save"
+                style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}
+                onClick={() => void executeExport()}
                 disabled={actionBusy}
               >
                 {actionBusy ? 'Génération...' : 'Télécharger le document'}
@@ -676,11 +720,9 @@ export default function SuperAdminContributionsPage() {
         </div>
       )}
 
-      {/* ── MODAL DÉTAILS DE LA COTISATION ── */}
       {selectedItem && (
         <div className="modal-overlay" onClick={() => setSelectedItem(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-
             <div className="modal-header">
               <h2 className="modal-title">Détails de la cotisation</h2>
               <button className="modal-close" onClick={() => setSelectedItem(null)}>
@@ -719,7 +761,9 @@ export default function SuperAdminContributionsPage() {
               <div className="sm-dp-grid">
                 <div className="sm-dp-field">
                   <label>Type</label>
-                  <div className="sm-dp-value" style={{ fontWeight: 800 }}>{formatContributionType((selectedItem as any).type)}</div>
+                  <div className="sm-dp-value" style={{ fontWeight: 800 }}>
+                    {formatContributionType((selectedItem as ContributionWithMonthRef).type ?? undefined)}
+                  </div>
                 </div>
                 <div className="sm-dp-field">
                   <label>Statut</label>
@@ -742,6 +786,12 @@ export default function SuperAdminContributionsPage() {
                   <label>Méthode</label>
                   <div className="sm-dp-value">{METHOD_LABELS[selectedItem.paymentMethod || ''] || selectedItem.paymentMethod || '—'}</div>
                 </div>
+                <div className="sm-dp-field">
+                  <label>Mois concerné</label>
+                  <div className="sm-dp-value" style={formatMonthRef(selectedItem as ContributionWithMonthRef) ? { color: '#1D4ED8', fontWeight: 800 } : { color: '#9CA3AF' }}>
+                    {formatMonthRef(selectedItem as ContributionWithMonthRef) ?? '—'}
+                  </div>
+                </div>
                 <div className="sm-dp-field full">
                   <label>Référence Interne</label>
                   <div className="sm-dp-value" style={{ fontFamily: "'DM Mono', monospace", fontSize: '0.8rem', color: '#6B7280' }}>
@@ -750,11 +800,9 @@ export default function SuperAdminContributionsPage() {
                 </div>
               </div>
             </div>
-
           </div>
         </div>
       )}
-
     </AppShell>
   );
 }

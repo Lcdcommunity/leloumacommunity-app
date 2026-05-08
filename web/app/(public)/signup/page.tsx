@@ -797,7 +797,7 @@ export default function MemberSignupPage() {
                         {associationRole} {t('signup.selected', 'sélectionné(e)')}
                       </div>
                     )}
-                  </div>
+                  </div> 
 
                   <p className="sp-section-title" style={{ marginTop: '0.25rem' }}>{t('signup.birthOrigin', 'Naissance & Origine')}</p>
                   <div className="sp-grid-2">

@@ -1,32 +1,12 @@
 // web/app/(protected)/member/projects/propose/page.tsx
 'use client';
 
-import { useEffect, useState, useCallback, useRef, ChangeEvent } from 'react';
-import Image from 'next/image';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { AppShell } from '../../../../../components/layout/AppShell';
 import { api } from '../../../../../lib/api-client';
 import type { ProjectProposal } from '../../../../../types/project-proposal';
 
-// ─── Interfaces & Types stricts (Correction ESLint) ──────────────────────────
-type StatusKey = '' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED' | 'CONVERTED_TO_PROJECT';
-
-interface ProposalPayload {
-  title: string;
-  description: string;
-  expectedBudget?: number;
-  currency?: string;
-  attachmentFileAssetId?: string;
-}
-
-interface ApiError {
-  response?: {
-    data?: {
-      message?: string | string[];
-    };
-  };
-  message?: string;
-}
-
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface AttachedFile {
   id: string;
   url: string;
@@ -35,859 +15,870 @@ interface AttachedFile {
   sizeBytes?: number | null;
 }
 
-interface ExtendedProjectProposal extends ProjectProposal {
+interface ExtendedProposal extends ProjectProposal {
   attachedFile?: AttachedFile | null;
   attachmentFileAssetId?: string | null;
+  authorName?: string | null;
+  estimatedBudget?: number | null;
 }
 
-interface ActionDialogState {
-  isOpen: boolean;
-  type: 'edit' | 'delete';
-  title: string;
-  desc: string;
+interface PhotoFile {
+  file: File;
+  preview: string;
+  id: string;
 }
 
-// ─── Constantes ─────────────────────────────────────────────────────────────
-const STATUS_OPTIONS: { value: StatusKey; label: string }[] = [
-  { value: '',                      label: 'Tous' },
-  { value: 'SUBMITTED',             label: 'Soumises' },
-  { value: 'UNDER_REVIEW',          label: 'En revue' },
-  { value: 'APPROVED',              label: 'Approuvées' },
-  { value: 'REJECTED',              label: 'Rejetées' },
-  { value: 'CONVERTED_TO_PROJECT',  label: 'Converties' },
-];
+// ── Constantes ────────────────────────────────────────────────────────────────
+const MAX_PHOTOS = 5;
+const ACCEPT_IMG = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_MB = 5;
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string; border: string; dot: string }> = {
-  SUBMITTED:            { label: 'Soumise',   color: '#B45309', bg: '#FFFBEB', border: '#FDE68A', dot: '#D97706' },
-  UNDER_REVIEW:         { label: 'En revue',  color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', dot: '#3B82F6' },
-  APPROVED:             { label: 'Approuvée', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', dot: '#10B981' },
-  REJECTED:             { label: 'Rejetée',   color: '#B91C1C', bg: '#FEF2F2', border: '#FECACA', dot: '#EF4444' },
-  CONVERTED_TO_PROJECT: { label: 'Convertie', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', dot: '#8B5CF6' },
+// Statuts visibles par le membre
+const STATUS_META: Record<string, { label: string; color: string; bg: string; border: string; dot: string; desc: string }> = {
+  DRAFT:      { label: 'Brouillon',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', dot: '#9CA3AF', desc: 'Visible seulement par vous' },
+  SUBMITTED:  { label: 'Soumis',     color: '#B45309', bg: '#FFFBEB', border: '#FDE68A', dot: '#D97706', desc: 'En attente de validation admin' },
+  UNDER_REVIEW: { label: 'En revue', color: '#1D4ED8', bg: '#EFF6FF', border: '#BFDBFE', dot: '#3B82F6', desc: 'En cours d\'examen' },
+  APPROVED:   { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', dot: '#10B981', desc: 'Approuvé par l\'admin' },
+  REJECTED:   { label: 'Rejeté',     color: '#B91C1C', bg: '#FEF2F2', border: '#FECACA', dot: '#EF4444', desc: 'Non retenu' },
+  CONVERTED_TO_PROJECT: { label: 'Converti', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', dot: '#8B5CF6', desc: 'Transformé en projet officiel' },
 };
 
-function fmt(dateStr?: string | Date) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+function fmt(d?: string | Date) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function isFileImage(file: AttachedFile | null | undefined): boolean {
-  if (!file) return false;
-  const name = (file.fileName || file.url || '').toLowerCase();
-  if (name.endsWith('.pdf') || name.endsWith('.doc') || name.endsWith('.docx')) return false;
-  const mime = (file.mimeType || '').toLowerCase();
-  if (mime === 'application/pdf') return false;
-  if (mime.includes('image/')) return true;
-  return /\.(jpg|jpeg|png|webp|gif|avif)$/i.test(name);
+// ── Styles globaux partagés avec le formulaire admin ─────────────────────────
+const LS: React.CSSProperties = { fontSize: '.7rem', fontWeight: 900, color: '#374151', letterSpacing: '.07em', textTransform: 'uppercase', marginBottom: '.32rem', display: 'block' };
+const IS: React.CSSProperties = { width: '100%', height: 40, borderRadius: 11, border: '1px solid rgba(37,99,235,.15)', background: 'rgba(255,255,255,.88)', padding: '0 .9rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.84rem', fontWeight: 600, color: '#111827', outline: 'none', boxSizing: 'border-box' };
+const TA: React.CSSProperties = { width: '100%', borderRadius: 11, border: '1px solid rgba(37,99,235,.15)', background: 'rgba(255,255,255,.88)', padding: '.75rem .9rem', fontFamily: "'DM Sans',sans-serif", fontSize: '.84rem', fontWeight: 600, color: '#111827', outline: 'none', resize: 'vertical', minHeight: 90, boxSizing: 'border-box' };
+const SS: React.CSSProperties = { ...IS, appearance: 'none', cursor: 'pointer', backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right .75rem center', paddingRight: '2.2rem' };
+
+// ── FormValues ────────────────────────────────────────────────────────────────
+interface FormValues {
+  title: string;
+  summary: string;
+  description: string;
+  locationText: string;
+  promoterName: string;
+  budgetPlanned: string;
+  currency: string;
+  startsAt: string;
+  endsAt: string;
+  targetBeneficiaries: string;
+  populationImpact: string;
+  environmentalImpact: string;
+  implementationMethod: string;
+  risksAndMitigation: string;
+  specificObjectives: string;
+  expectedResults: string;
+  successIndicators: string;
 }
 
-// ─── Composant principal ─────────────────────────────────────────────────────
-export default function MemberProjectProposalsPage() {
+const EMPTY: FormValues = {
+  title: '', summary: '', description: '', locationText: '', promoterName: '',
+  budgetPlanned: '', currency: 'EUR', startsAt: '', endsAt: '',
+  targetBeneficiaries: '', populationImpact: '', environmentalImpact: '',
+  implementationMethod: '', risksAndMitigation: '',
+  specificObjectives: '', expectedResults: '', successIndicators: '',
+};
+
+// ── PhotoDropZone (identique admin) ──────────────────────────────────────────
+function UploadSlot({ photo, onRemove, onAdd, disabled }: { photo?: PhotoFile; onRemove?: () => void; onAdd?: () => void; disabled?: boolean }) {
+  if (photo) {
+    return (
+      <div style={{ position: 'relative', aspectRatio: '1/1', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(37,99,235,.15)', background: '#F8FAFC' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={photo.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '.3rem .4rem', background: 'linear-gradient(to top,rgba(15,23,42,.72),rgba(15,23,42,0))', color: 'white', fontSize: '.58rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{photo.file.name}</div>
+        <button type="button" onClick={onRemove} style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: 'rgba(15,23,42,.68)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
+          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+    );
+  }
+  return (
+    <button type="button" onClick={disabled ? undefined : onAdd} disabled={disabled} style={{ aspectRatio: '1/1', borderRadius: 12, border: '2px dashed rgba(37,99,235,.18)', background: 'rgba(239,246,255,.45)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: disabled ? 'not-allowed' : 'pointer', gap: '.28rem', color: '#93C5FD', opacity: disabled ? 0.55 : 1 }}>
+      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M12 4v16m8-8H4" /></svg>
+      <span style={{ fontSize: '.6rem', fontWeight: 800 }}>{disabled ? 'Plein' : 'Ajouter'}</span>
+    </button>
+  );
+}
+
+function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p: PhotoFile[]) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [drag, setDrag] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  function addFiles(files: FileList | File[]) {
+    setErr(null);
+    const arr = Array.from(files);
+    const valid: PhotoFile[] = [];
+    for (const f of arr) {
+      if (!ACCEPT_IMG.includes(f.type)) { setErr('Format non accepté (PNG, JPG, WEBP).'); continue; }
+      if (f.size > MAX_MB * 1024 * 1024) { setErr(`Fichier trop lourd — max ${MAX_MB} Mo.`); continue; }
+      if (photos.length + valid.length >= MAX_PHOTOS) { setErr(`Maximum ${MAX_PHOTOS} photos.`); break; }
+      valid.push({ file: f, preview: URL.createObjectURL(f), id: `${f.name}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` });
+    }
+    if (valid.length) onChange([...photos, ...valid]);
+  }
+
+  function remove(id: string) {
+    const p = photos.find(x => x.id === id);
+    if (p) URL.revokeObjectURL(p.preview);
+    onChange(photos.filter(x => x.id !== id));
+  }
+
+  const full = photos.length >= MAX_PHOTOS;
+  const remaining = MAX_PHOTOS - photos.length;
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '.65rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem' }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(37,99,235,.3)' }}>
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><circle cx="12" cy="13" r="3" /></svg>
+          </div>
+          <span style={{ fontSize: '.78rem', fontWeight: 900, color: '#1F2937', letterSpacing: '.04em', textTransform: 'uppercase' }}>Galerie photos</span>
+        </div>
+        <span style={{ fontSize: '.7rem', fontWeight: 800, color: photos.length > 0 ? '#2563EB' : '#9CA3AF', background: photos.length > 0 ? '#EFF6FF' : '#F3F4F6', border: `1px solid ${photos.length > 0 ? '#BFDBFE' : '#E5E7EB'}`, borderRadius: 99, padding: '.18rem .55rem', fontFamily: "'DM Mono',monospace" }}>
+          {photos.length}&thinsp;/&thinsp;{MAX_PHOTOS}
+        </span>
+      </div>
+      {!full && (
+        <div
+          onDragOver={e => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={e => { e.preventDefault(); setDrag(false); addFiles(e.dataTransfer.files); }}
+          onClick={() => inputRef.current?.click()}
+          style={{ border: `2px dashed ${drag ? '#2563EB' : 'rgba(37,99,235,.22)'}`, borderRadius: 14, padding: '1.4rem 1rem', textAlign: 'center', cursor: 'pointer', background: drag ? 'rgba(239,246,255,.7)' : 'rgba(239,246,255,.3)', transition: 'all .18s', marginBottom: '.75rem' }}
+        >
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(37,99,235,.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto .7rem', border: '1px solid rgba(37,99,235,.14)' }}>
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#2563EB" strokeWidth="1.8"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+          </div>
+          <p style={{ margin: '0 0 .3rem', fontSize: '.82rem', fontWeight: 800, color: '#1D4ED8' }}>Cliquez ou glissez vos photos</p>
+          <p style={{ margin: 0, fontSize: '.72rem', fontWeight: 600, color: '#9CA3AF' }}>PNG, JPG, WEBP — max {MAX_MB} Mo — {remaining} emplacement{remaining > 1 ? 's' : ''} restant{remaining > 1 ? 's' : ''}</p>
+          <input ref={inputRef} type="file" accept={ACCEPT_IMG.join(',')} multiple hidden onChange={e => { if (e.target.files) addFiles(e.target.files); e.target.value = ''; }} />
+        </div>
+      )}
+      {err && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.45rem', padding: '.55rem .8rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 9, marginBottom: '.6rem', fontSize: '.75rem', fontWeight: 700, color: '#B91C1C' }}>
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+          {err}
+        </div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,minmax(0,1fr))', gap: '.55rem' }}>
+        {Array.from({ length: MAX_PHOTOS }).map((_, i) => {
+          const photo = photos[i];
+          return <UploadSlot key={photo?.id ?? `slot-${i}`} photo={photo} onRemove={photo ? () => remove(photo.id) : undefined} onAdd={!photo ? () => inputRef.current?.click() : undefined} disabled={!photo && full} />;
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── ProposalForm ──────────────────────────────────────────────────────────────
+function ProposalForm({
+  initial,
+  editingId,
+  onSave,
+  onCancel,
+  submitting,
+  uploadProgress,
+}: {
+  initial?: FormValues;
+  editingId: string | null;
+  onSave: (v: FormValues, photos: File[], status: 'DRAFT' | 'SUBMITTED') => void;
+  onCancel: () => void;
+  submitting: boolean;
+  uploadProgress: string | null;
+}) {
+  const [v, setV] = useState<FormValues>(initial ?? EMPTY);
+  const [photos, setPhotos] = useState<PhotoFile[]>([]);
+  const f = (k: keyof FormValues) => ({
+    value: v[k],
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setV(p => ({ ...p, [k]: e.target.value })),
+  });
+
+  return (
+    <form onSubmit={e => e.preventDefault()}>
+      <div style={{ display: 'grid', gap: '1.2rem' }}>
+
+        {/* Section 1 — Informations générales */}
+        <div className="pp-form-section">
+          <h3 className="pp-form-section-title">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Informations Générales
+          </h3>
+          <div style={{ display: 'grid', gap: '.85rem' }}>
+            <div>
+              <label style={LS}>Titre du projet <span style={{ color: '#EF4444' }}>*</span></label>
+              <input style={IS} placeholder="Nom clair et concis du projet" required {...f('title')} />
+            </div>
+            <div>
+              <label style={LS}>Résumé court</label>
+              <input style={IS} placeholder="Une phrase d'accroche" {...f('summary')} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+              <div>
+                <label style={LS}>Promoteur / Responsable</label>
+                <input style={IS} placeholder="Nom du porteur du projet" {...f('promoterName')} />
+              </div>
+              <div>
+                <label style={LS}>Localisation</label>
+                <input style={IS} placeholder="Région, Ville…" {...f('locationText')} />
+              </div>
+            </div>
+            <div>
+              <label style={LS}>Description détaillée <span style={{ color: '#EF4444' }}>*</span></label>
+              <textarea style={{ ...TA, minHeight: 120 }} placeholder="Contexte, justification, besoin identifié…" required {...f('description')} />
+            </div>
+          </div>
+        </div>
+
+        {/* Section 2 — Impact & Objectifs */}
+        <div className="pp-form-section">
+          <h3 className="pp-form-section-title">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+            Impact & Objectifs
+          </h3>
+          <div style={{ display: 'grid', gap: '.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '.85rem' }}>
+              <div>
+                <label style={LS}>Bénéficiaires cibles</label>
+                <input style={IS} placeholder="Ex: Étudiants, Agriculteurs…" {...f('targetBeneficiaries')} />
+              </div>
+              <div>
+                <label style={LS}>Impact population</label>
+                <input style={IS} placeholder="Bénéfices sociaux attendus" {...f('populationImpact')} />
+              </div>
+            </div>
+            <div>
+              <label style={LS}>Impact environnemental</label>
+              <input style={IS} placeholder="Conséquences sur l'environnement" {...f('environmentalImpact')} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '.85rem' }}>
+              <div>
+                <label style={LS}>Objectifs spécifiques</label>
+                <textarea style={TA} placeholder="Liste des objectifs à atteindre" {...f('specificObjectives')} />
+              </div>
+              <div>
+                <label style={LS}>Indicateurs de succès</label>
+                <textarea style={TA} placeholder="Comment mesurer la réussite ?" {...f('successIndicators')} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3 — Exécution & Budget */}
+        <div className="pp-form-section">
+          <h3 className="pp-form-section-title">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            Exécution & Budget Estimatif
+          </h3>
+          <div style={{ display: 'grid', gap: '.85rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: '.85rem' }}>
+              <div>
+                <label style={LS}>Méthode d&apos;implémentation</label>
+                <textarea style={TA} placeholder="Étapes de réalisation…" {...f('implementationMethod')} />
+              </div>
+              <div>
+                <label style={LS}>Risques & Mitigations</label>
+                <textarea style={TA} placeholder="Risques potentiels et solutions…" {...f('risksAndMitigation')} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+              <div>
+                <label style={LS}>Début estimé</label>
+                <input style={IS} type="date" {...f('startsAt')} />
+              </div>
+              <div>
+                <label style={LS}>Fin estimée</label>
+                <input style={IS} type="date" {...f('endsAt')} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '.85rem' }}>
+              <div>
+                <label style={LS}>Budget estimatif <span style={{ fontWeight: 400, textTransform: 'none', color: '#9CA3AF' }}>(optionnel)</span></label>
+                <input style={IS} type="number" min="0" placeholder="0" {...f('budgetPlanned')} />
+              </div>
+              <div>
+                <label style={LS}>Devise</label>
+                <select style={SS} value={v.currency} onChange={e => setV(p => ({ ...p, currency: e.target.value }))}>
+                  <option value="GNF">GNF (FG)</option>
+                  <option value="EUR">EUR (€)</option>
+                  <option value="XOF">XOF (CFA)</option>
+                  <option value="USD">USD ($)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Photos */}
+        <PhotoDropZone photos={photos} onChange={setPhotos} />
+
+        {/* Progress upload */}
+        {uploadProgress && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.55rem', padding: '.65rem .9rem', background: 'rgba(239,246,255,.8)', border: '1px solid rgba(37,99,235,.18)', borderRadius: 10, fontSize: '.78rem', fontWeight: 700, color: '#1D4ED8' }}>
+            <div style={{ width: 14, height: 14, border: '2px solid rgba(37,99,235,.2)', borderTopColor: '#2563EB', borderRadius: '50%', animation: 'ppspin .7s linear infinite', flexShrink: 0 }} />
+            {uploadProgress}
+          </div>
+        )}
+
+        {/* Boutons d'action */}
+        <div style={{ display: 'flex', gap: '.55rem', marginTop: '.5rem', flexWrap: 'wrap' }}>
+          <button type="button" onClick={onCancel} disabled={submitting} style={{ flex: '0 0 auto', height: 44, padding: '0 1.2rem', borderRadius: 11, border: '1px solid #D1D5DB', background: '#F9FAFB', fontFamily: "'DM Sans',sans-serif", fontSize: '.84rem', fontWeight: 700, color: '#374151', cursor: 'pointer', opacity: submitting ? 0.5 : 1 }}>
+            Annuler
+          </button>
+          {/* Sauvegarder brouillon */}
+          <button
+            type="button"
+            disabled={submitting || !v.title.trim()}
+            onClick={() => onSave(v, photos.map(p => p.file), 'DRAFT')}
+            style={{ flex: 1, height: 44, borderRadius: 11, border: '1.5px solid #D1D5DB', background: 'white', fontFamily: "'DM Sans',sans-serif", fontSize: '.84rem', fontWeight: 800, color: '#374151', cursor: submitting || !v.title.trim() ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.4rem', opacity: (submitting || !v.title.trim()) ? 0.5 : 1 }}
+          >
+            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+            {submitting ? 'Sauvegarde…' : 'Brouillon'}
+          </button>
+          {/* Soumettre à l'admin */}
+          <button
+            type="button"
+            disabled={submitting || !v.title.trim() || !v.description.trim()}
+            onClick={() => onSave(v, photos.map(p => p.file), 'SUBMITTED')}
+            style={{ flex: 2, height: 44, borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#1D4ED8,#2563EB)', fontFamily: "'DM Sans',sans-serif", fontSize: '.88rem', fontWeight: 900, color: 'white', cursor: (submitting || !v.title.trim() || !v.description.trim()) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.5rem', boxShadow: '0 4px 14px rgba(37,99,235,.3)', opacity: (submitting || !v.title.trim() || !v.description.trim()) ? 0.7 : 1 }}
+          >
+            {submitting ? (
+              <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'ppspin .7s linear infinite' }} /> Envoi…</>
+            ) : (
+              <><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg> {editingId ? 'Mettre à jour & Soumettre' : 'Soumettre à l\'admin'}</>
+            )}
+          </button>
+        </div>
+
+      </div>
+    </form>
+  );
+}
+
+// ── Page principale ───────────────────────────────────────────────────────────
+export default function MemberProjectProposePage() {
   const [mounted, setMounted] = useState(false);
-  
-  // ── Gestion des vues ──
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedProposal, setSelectedProposal] = useState<ExtendedProjectProposal | null>(null);
-  const [imgError, setImgError] = useState(false); 
-  const [actionDialog, setActionDialog] = useState<ActionDialogState | null>(null);
-
-  // 🔥 ID de la proposition en cours de modification
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingInitial, setEditingInitial] = useState<FormValues | undefined>(undefined);
+  const [selectedProposal, setSelectedProposal] = useState<ExtendedProposal | null>(null);
 
-  // ── Liste propositions ──
-  const [items,      setItems]      = useState<ExtendedProjectProposal[]>([]);
-  const [status,     setStatus]     = useState<StatusKey>('');
-  const [search,     setSearch]     = useState('');
+  const [items, setItems] = useState<ExtendedProposal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [loading,    setLoading]    = useState(true);
+  const [search, setSearch] = useState('');
+
+  const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
-  // ── Formulaire ──
-  const [title,       setTitle]       = useState('');
-  const [description, setDescription] = useState('');
-  const [budget,      setBudget]      = useState('');
-  const [currency,    setCurrency]    = useState('EUR');
-  const [submitting,  setSubmitting]  = useState(false);
-  const [formError,   setFormError]   = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState(false);
-
-  // ── Pièce jointe (document) ──
-  const [uploadingAttachment, setUploadingAttachment] = useState(false);
-  const [attachmentAssetId,   setAttachmentAssetId]   = useState<string | null>(null);
-  const [attachmentPreview,   setAttachmentPreview]   = useState<{ name: string; size: string; type: string } | null>(null);
-  const [attachmentError,     setAttachmentError]     = useState<string | null>(null);
-  const attachmentRef = useRef<HTMLInputElement>(null);
-
-  // ── Photo ──
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [photoMeta,      setPhotoMeta]      = useState<{ name: string; size: string } | null>(null);
-  const [photoAssetId,   setPhotoAssetId]   = useState<string | null>(null);
-  const [photoError,     setPhotoError]     = useState<string | null>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ExtendedProposal | null>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    setImgError(false);
-  }, [selectedProposal]);
-
-  // ── Chargement liste ──
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.listMyProjectProposals({ page: 1, pageSize: 100, status: status || undefined });
-      setItems((res?.items as unknown as ExtendedProjectProposal[]) || []);
+      const res = await api.listMyProjectProposals({ page: 1, pageSize: 100 });
+      setItems((res?.items as unknown as ExtendedProposal[]) || []);
       setFetchError(null);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : 'Erreur chargement');
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
 
-  const filteredItems = items.filter(item => 
-    item.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = items.filter(i => i.title.toLowerCase().includes(search.toLowerCase()));
 
-  // ── Upload pièce jointe ──
-  async function handleAttachmentChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setAttachmentError(null);
-    if (!file) return;
+  const total = items.length;
+  const drafts = items.filter(i => i.status === 'DRAFT').length;
+  const submitted = items.filter(i => i.status === 'SUBMITTED' || i.status === 'UNDER_REVIEW').length;
+  const approved = items.filter(i => i.status === 'APPROVED' || i.status === 'CONVERTED_TO_PROJECT').length;
+  const rejected = items.filter(i => i.status === 'REJECTED').length;
 
-    const allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'image/jpeg', 'image/png', 'image/webp'];
-    if (!allowed.includes(file.type)) {
-      setAttachmentError('Format non supporté. Acceptés : PDF, DOC, DOCX, JPG, PNG, WEBP');
-      e.target.value = '';
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setAttachmentError('Fichier trop grand (max 10 Mo)');
-      e.target.value = '';
-      return;
-    }
-
-    const sizeStr = file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} Ko` : `${(file.size / (1024 * 1024)).toFixed(1)} Mo`;
-    const typeStr = file.type.includes('pdf') ? 'PDF' : file.type.includes('word') ? 'DOC' : 'Image';
-
-    setAttachmentPreview({ name: file.name, size: sizeStr, type: typeStr });
-    setUploadingAttachment(true);
-
-    try {
-      const result = await api.uploadFile(file, { category: 'PROJECT_DOCUMENT', folder: 'proposals' });
-      setAttachmentAssetId(result.id);
-    } catch {
-      setAttachmentError("Échec de l'upload. Réessayez.");
-      setAttachmentPreview(null);
-    } finally {
-      setUploadingAttachment(false);
-    }
-  }
-
-  function removeAttachment() {
-    setAttachmentPreview(null);
-    setAttachmentAssetId(null);
-    setAttachmentError(null);
-    if (attachmentRef.current) attachmentRef.current.value = '';
-  }
-
-  // ── Upload photo ──
-  async function handlePhotoChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] ?? null;
-    setPhotoError(null);
-    if (!file) return;
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setPhotoError('Formats acceptés : JPG, PNG, WEBP');
-      e.target.value = '';
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setPhotoError('Photo trop grande (max 5 Mo)');
-      e.target.value = '';
-      return;
-    }
-
-    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-    setPhotoPreviewUrl(URL.createObjectURL(file));
-    setPhotoMeta({ name: file.name, size: file.size < 1024 * 1024 ? `${(file.size / 1024).toFixed(0)} Ko` : `${(file.size / (1024 * 1024)).toFixed(1)} Mo` });
-    setUploadingPhoto(true);
-
-    try {
-      const result = await api.uploadFile(file, { category: 'PROJECT_IMAGE', folder: 'proposals' });
-      setPhotoAssetId(result.id);
-    } catch {
-      setPhotoError("Échec de l'upload. Réessayez.");
-      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-      setPhotoPreviewUrl(null);
-      setPhotoMeta(null);
-    } finally {
-      setUploadingPhoto(false);
-    }
-  }
-
-  function removePhoto() {
-    if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
-    setPhotoPreviewUrl(null);
-    setPhotoMeta(null);
-    setPhotoAssetId(null);
-    setPhotoError(null);
-    if (photoRef.current) photoRef.current.value = '';
-  }
-
-  useEffect(() => {
-    return () => { if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl); };
-  }, [photoPreviewUrl]);
-
-  // ── Annuler le formulaire ──
   function handleCancel() {
-    setEditingId(null);
-    setTitle('');
-    setDescription('');
-    setBudget('');
-    setCurrency('EUR');
-    removeAttachment();
-    removePhoto();
-    setFormError(null);
     setIsFormOpen(false);
+    setEditingId(null);
+    setEditingInitial(undefined);
+    setSaveError(null);
+    setSaveSuccess(null);
   }
 
-  // ── Actions Modification / Suppression avec Custom Dialog ──
-  function handleEditProposal() {
-    if (!selectedProposal) return;
-    
-    // Bascule en mode édition
-    setEditingId(selectedProposal.id);
-    setTitle(selectedProposal.title || '');
-    setDescription(selectedProposal.description || '');
-    setBudget(selectedProposal.expectedBudget ? String(selectedProposal.expectedBudget) : '');
-    setCurrency(selectedProposal.currency || 'GNF');
-
-    // Récupération des pièces jointes existantes
-    removeAttachment();
-    removePhoto();
-    
-    if (selectedProposal.attachedFile) {
-      if (isFileImage(selectedProposal.attachedFile)) {
-        setPhotoPreviewUrl(selectedProposal.attachedFile.url);
-        setPhotoAssetId(selectedProposal.attachmentFileAssetId || selectedProposal.attachedFile.id);
-        setPhotoMeta({ name: selectedProposal.attachedFile.fileName || '', size: 'Fichier existant' });
-      } else {
-        setAttachmentPreview({ name: selectedProposal.attachedFile.fileName || '', size: 'Fichier existant', type: 'DOC' });
-        setAttachmentAssetId(selectedProposal.attachmentFileAssetId || selectedProposal.attachedFile.id);
-      }
-    }
-
-    setActionDialog(null);
+  function handleEditProposal(proposal: ExtendedProposal) {
+    setEditingId(proposal.id);
+    setEditingInitial({
+      title: proposal.title || '',
+      summary: '',
+      description: proposal.description || '',
+      locationText: '',
+      promoterName: '',
+      budgetPlanned: proposal.expectedBudget ? String(proposal.expectedBudget) : '',
+      currency: proposal.currency || 'EUR',
+      startsAt: '',
+      endsAt: '',
+      targetBeneficiaries: '',
+      populationImpact: '',
+      environmentalImpact: '',
+      implementationMethod: '',
+      risksAndMitigation: '',
+      specificObjectives: '',
+      expectedResults: '',
+      successIndicators: '',
+    });
     setSelectedProposal(null);
     setIsFormOpen(true);
   }
 
-  function handleDeleteProposal() {
-    setActionDialog({
-      isOpen: true,
-      type: 'delete',
-      title: 'Supprimer la proposition',
-      desc: 'Voulez-vous vraiment supprimer cette proposition ? Cette action est irréversible.'
-    });
+  async function handleSave(values: FormValues, photos: File[], status: 'DRAFT' | 'SUBMITTED') {
+    setSaveError(null);
+    setSubmitting(true);
+    try {
+      // Upload photos si présentes — on prend seulement la 1ère comme pièce jointe principale
+      let attachmentFileAssetId: string | null = null;
+      if (photos.length > 0) {
+        setUploadProgress(`Upload photo 1/${photos.length}…`);
+        const up = await api.uploadFile(photos[0], { category: 'PROJECT_IMAGE', folder: 'proposals' });
+        attachmentFileAssetId = up.id;
+      }
+      setUploadProgress('Finalisation…');
+
+      const payload = {
+        title: values.title.trim(),
+        description: values.description.trim(),
+        expectedBudget: values.budgetPlanned ? Number(values.budgetPlanned) : undefined,
+        currency: values.currency || undefined,
+        attachmentFileAssetId: attachmentFileAssetId || undefined,
+        status,
+      };
+
+      if (editingId) {
+        await api.updateProjectProposalMember(editingId, payload as Parameters<typeof api.updateProjectProposalMember>[1]);
+      } else {
+        await api.createProjectProposalMember(payload as Parameters<typeof api.createProjectProposalMember>[0]);
+      }
+
+      setSaveSuccess(status === 'DRAFT' ? 'Brouillon sauvegardé.' : 'Proposition soumise à votre admin d\'antenne !');
+      setTimeout(() => {
+        setSaveSuccess(null);
+        handleCancel();
+        void load();
+      }, 2000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde.');
+    } finally {
+      setSubmitting(false);
+      setUploadProgress(null);
+    }
   }
 
-  async function executeDelete() {
-    if (!selectedProposal?.id) return;
-    
+  async function handleDelete() {
+    if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      await api.deleteProjectProposalMember(selectedProposal.id);
-      setActionDialog(null);
+      await api.deleteProjectProposalMember(deleteTarget.id);
+      setDeleteTarget(null);
       setSelectedProposal(null);
       void load();
-    } catch (err: unknown) {
-      const errorObj = err as ApiError;
-      alert(errorObj?.message || 'Erreur lors de la suppression.');
-      setActionDialog(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erreur suppression');
     } finally {
       setIsDeleting(false);
     }
   }
 
-  // ── Soumission ──
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim())       { setFormError('Le titre est obligatoire.'); return; }
-    if (!description.trim()) { setFormError('La description est obligatoire.'); return; }
-    if (uploadingAttachment || uploadingPhoto) { setFormError('Upload en cours, patientez…'); return; }
-
-    setFormError(null);
-    setSubmitting(true);
+  // Soumettre un brouillon existant directement depuis la liste
+  async function handleSubmitDraft(proposal: ExtendedProposal) {
     try {
-      const payload: ProposalPayload = {
-        title:       title.trim(),
-        description: description.trim(),
-      };
-
-      if (budget) {
-        payload.expectedBudget = Number(budget);
-        payload.currency = currency;
-      }
-
-      const finalAssetId = attachmentAssetId || photoAssetId;
-      if (finalAssetId) {
-        payload.attachmentFileAssetId = finalAssetId;
-      }
-
-      if (editingId) {
-        await api.updateProjectProposalMember(editingId, payload as unknown as Parameters<typeof api.updateProjectProposalMember>[1]);
-      } else {
-        await api.createProjectProposalMember(payload as unknown as Parameters<typeof api.createProjectProposalMember>[0]);
-      }
-      
-      setFormSuccess(true);
-      setTimeout(() => {
-        setFormSuccess(false);
-        handleCancel();
-        void load();
-      }, 2000);
-    } catch (err: unknown) {
-      const errorObj = err as ApiError;
-      const msg = errorObj?.response?.data?.message || errorObj?.message;
-      setFormError(Array.isArray(msg) ? msg[0] : (msg || 'Erreur lors de la soumission.'));
-    } finally {
-      setSubmitting(false);
+      await api.updateProjectProposalMember(proposal.id, { status: 'SUBMITTED' } as Parameters<typeof api.updateProjectProposalMember>[1]);
+      setSelectedProposal(null);
+      void load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erreur');
     }
   }
 
-  const total     = items.length;
-  const submitted = items.filter(i => i.status === 'SUBMITTED').length;
-  const underRev  = items.filter(i => i.status === 'UNDER_REVIEW').length;
-  const approved  = items.filter(i => i.status === 'APPROVED').length;
-  const rejected  = items.filter(i => i.status === 'REJECTED').length;
+  if (!mounted) return null;
 
   return (
     <AppShell title="Proposer un projet">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 
-        :root {
-          --b-deep:   #1D4ED8;
-          --b-mid:    #2563EB;
-          --b-light:  #3B82F6;
-          --b-pale:   #EFF6FF;
-          --b-faint:  #F5F8FF;
-          --b-border: rgba(37,99,235,0.12);
-          --s-dark:   #0F172A;
-          --s-mid:    #374151;
-          --s-muted:  #6B7280;
-          --card-bg:  #FFFFFF;
+        @keyframes ppin { to { opacity:1; transform:translateY(0); } }
+        @keyframes ppspin { to { transform:rotate(360deg); } }
+        @keyframes modalPop { from { opacity:0; transform:scale(0.95) translateY(8px); } to { opacity:1; transform:scale(1) translateY(0); } }
+        @keyframes fadein { from{opacity:0} to{opacity:1} }
+
+        .pp-wrap { font-family:'DM Sans',sans-serif; padding:clamp(1rem,3vw,2rem); max-width:880px; margin:0 auto; color:#0F172A; }
+
+        .pp-header { display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:1.5rem; flex-wrap:wrap; gap:1rem; opacity:0; transform:translateY(10px); animation:ppin .5s .04s cubic-bezier(.22,1,.36,1) forwards; }
+        .pp-eyebrow { font-size:.65rem; font-weight:900; letter-spacing:.12em; text-transform:uppercase; color:#2563EB; margin-bottom:.35rem; display:flex; align-items:center; gap:.4rem; }
+        .pp-eyebrow-dot { width:6px; height:6px; background:#3B82F6; border-radius:50%; animation:fadein 2s ease-in-out infinite; }
+        .pp-page-title { font-family:'Cormorant Garamond',serif; font-size:clamp(1.4rem,4vw,2rem); font-weight:700; color:#111827; letter-spacing:-.02em; line-height:1.15; margin:0; }
+
+        .pp-primary-btn { background:linear-gradient(135deg,#1D4ED8,#2563EB); color:white; border:none; padding:.7rem 1.2rem; border-radius:99px; font-weight:700; font-size:.85rem; cursor:pointer; transition:all .2s; display:inline-flex; align-items:center; gap:.4rem; box-shadow:0 4px 12px rgba(37,99,235,.2); }
+        .pp-primary-btn:hover { transform:translateY(-1px); box-shadow:0 6px 16px rgba(37,99,235,.3); }
+        .pp-back-btn { background:white; color:#374151; border:1px solid #E2E8F0; padding:.6rem 1rem; border-radius:99px; font-weight:600; font-size:.8rem; cursor:pointer; transition:all .2s; display:inline-flex; align-items:center; gap:.4rem; }
+        .pp-back-btn:hover { background:#F8FAFC; border-color:#CBD5E1; }
+
+        .pp-panel { background:white; border-radius:24px; border:1px solid rgba(37,99,235,.09); box-shadow:0 10px 30px -10px rgba(0,0,0,.05); overflow:hidden; opacity:0; transform:translateY(10px); animation:ppin .5s .09s cubic-bezier(.22,1,.36,1) forwards; }
+
+        /* Bandeau d'édition */
+        .pp-edit-banner { display:flex; align-items:center; gap:.4rem; font-size:.72rem; font-weight:800; color:#2563EB; padding:.5rem .75rem; background:rgba(239,246,255,.9); border:1px solid rgba(37,99,235,.2); border-radius:9px; margin-bottom:.7rem; }
+        .pp-save-err { display:flex; align-items:center; gap:.5rem; padding:.65rem .85rem; background:#FEF2F2; border:1px solid #FECACA; border-radius:9px; color:#B91C1C; font-size:.78rem; font-weight:800; margin-bottom:.7rem; }
+        .pp-save-ok { display:flex; align-items:center; gap:.5rem; padding:.65rem .85rem; background:#ECFDF5; border:1px solid #A7F3D0; border-radius:9px; color:#065F46; font-size:.78rem; font-weight:800; margin-bottom:.7rem; }
+
+        /* Head wrapper */
+        .pp-wrapper-head { padding:1.25rem 1.5rem; border-bottom:1px solid rgba(0,0,0,.04); display:flex; align-items:center; gap:.6rem; }
+        .pp-head-ico { width:32px; height:32px; border-radius:10px; display:flex; align-items:center; justify-content:center; }
+        .pp-head-title { font-size:.75rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#0F172A; }
+
+        /* Stats */
+        .pp-stat-grid { display:flex; flex-wrap:wrap; gap:1rem; padding:1.5rem; border-bottom:1px solid rgba(0,0,0,.04); }
+        .pp-stat-card { flex:1; min-width:90px; position:relative; background:white; border-radius:12px; padding:1.2rem .5rem; border:1px solid #E2E8F0; text-align:center; overflow:hidden; transition:transform .15s; }
+        .pp-stat-card:hover { transform:translateY(-2px); }
+        .pp-stat-val { font-family:'Cormorant Garamond',serif; font-size:1.8rem; font-weight:700; color:#0F172A; display:block; line-height:1; margin-bottom:.4rem; }
+        .pp-stat-lbl { font-size:.62rem; font-weight:800; text-transform:uppercase; color:#6B7280; letter-spacing:.05em; }
+
+        /* Filtre */
+        .pp-filter-bar { padding:1.2rem 1.5rem; border-bottom:1px solid rgba(0,0,0,.04); display:flex; align-items:center; gap:.6rem; flex-wrap:nowrap; background:#FAFAFA; overflow-x:auto; }
+        .pp-search-box { display:flex; align-items:center; gap:.5rem; background:white; border:1.5px solid #E2E8F0; border-radius:99px; padding:.4rem .8rem; flex:1; min-width:130px; transition:border-color .2s; }
+        .pp-search-box:focus-within { border-color:#2563EB; box-shadow:0 0 0 3px rgba(37,99,235,.08); }
+        .pp-search-box input { border:none; outline:none; font-family:'DM Sans',sans-serif; font-size:.85rem; width:100%; color:#0F172A; background:transparent; }
+        .pp-refresh-btn { height:36px; padding:0 1rem; background:white; border:1.5px solid #E2E8F0; border-radius:99px; cursor:pointer; color:#2563EB; font-family:'DM Sans',sans-serif; font-size:.8rem; font-weight:600; display:inline-flex; align-items:center; gap:.4rem; transition:all .2s; flex-shrink:0; }
+        .pp-refresh-btn:hover { background:#EFF6FF; border-color:#2563EB; }
+
+        /* Liste */
+        .pp-list-container { padding:1.5rem; display:flex; flex-direction:column; gap:1rem; background:#FAFAFA; }
+        .pp-item-card { background:rgba(239,246,255,.5); border:1px solid rgba(191,219,254,.8); border-radius:16px; padding:1.25rem 1.5rem; cursor:pointer; display:flex; flex-direction:column; gap:.8rem; transition:all .2s; }
+        .pp-item-card:hover { transform:translateY(-3px); box-shadow:0 12px 24px rgba(37,99,235,.08); background:rgba(239,246,255,.9); border-color:#93C5FD; }
+        .pp-item-card.draft { background:rgba(243,244,246,.5); border-color:rgba(209,213,219,.8); }
+        .pp-item-card.draft:hover { border-color:#D1D5DB; }
+        .pp-item-header { display:flex; justify-content:space-between; align-items:center; }
+        .pp-item-date { font-size:.75rem; color:#6B7280; font-weight:600; display:flex; align-items:center; gap:.4rem; }
+        .pp-status-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.25rem .65rem; border-radius:99px; font-size:.65rem; font-weight:700; border:1px solid; white-space:nowrap; }
+        .pp-status-dot { width:6px; height:6px; border-radius:50%; }
+        .pp-item-title { font-family:'Cormorant Garamond',serif; font-size:1.5rem; font-weight:700; color:#0F172A; line-height:1.2; margin:0; }
+        .pp-item-divider { border:none; border-top:1.5px dotted #93C5FD; margin:.5rem 0; }
+        .pp-item-card.draft .pp-item-divider { border-top-color:#D1D5DB; }
+
+        /* Formulaire */
+        .pp-form-body { padding:1.5rem; }
+        .pp-form-section { background:rgba(255,255,255,.6); border:1px solid rgba(37,99,235,.1); padding:1.2rem; border-radius:14px; margin-bottom:1rem; }
+        .pp-form-section-title { margin:0 0 1rem; font-size:.8rem; font-weight:800; color:#1D4ED8; text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:.4rem; border-bottom:1px dashed rgba(37,99,235,.15); padding-bottom:.6rem; }
+
+        /* Modal */
+        .pp-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(4px); z-index:999; display:flex; align-items:center; justify-content:center; padding:1rem; animation:fadein .2s ease; }
+        .pp-modal-content { background:white; width:100%; max-width:540px; border-radius:24px; box-shadow:0 20px 40px rgba(0,0,0,.2); overflow:hidden; animation:modalPop .3s cubic-bezier(.2,.8,.2,1); max-height:90vh; display:flex; flex-direction:column; }
+        .pp-modal-header { padding:1.5rem; border-bottom:1px solid #E2E8F0; display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; }
+        .pp-modal-body { padding:1.5rem; overflow-y:auto; display:flex; flex-direction:column; gap:1.25rem; }
+        .pp-modal-close { width:34px; height:34px; border-radius:10px; background:#F1F5F9; border:1px solid transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#6B7280; flex-shrink:0; transition:all .2s; }
+        .pp-modal-close:hover { background:#E2E8F0; }
+        .pp-icon-btn { width:34px; height:34px; border-radius:10px; border:1px solid #E2E8F0; background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; flex-shrink:0; }
+        .pp-edit-btn { color:#2563EB; }
+        .pp-edit-btn:hover { background:#EFF6FF; border-color:#BFDBFE; }
+        .pp-delete-btn { color:#DC2626; }
+        .pp-delete-btn:hover { background:#FEF2F2; border-color:#FECACA; }
+        .pp-submit-draft-btn { height:34px; padding:0 .85rem; background:#ECFDF5; border:1px solid #A7F3D0; color:#059669; border-radius:9px; font-size:.75rem; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:.35rem; transition:all .2s; }
+        .pp-submit-draft-btn:hover { background:#D1FAE5; }
+        .pp-detail-block { background:#F8FAFC; border:1px solid #E2E8F0; border-radius:12px; padding:1rem; }
+        .pp-detail-lbl { font-size:.65rem; font-weight:800; text-transform:uppercase; letter-spacing:.08em; color:#6B7280; margin-bottom:.4rem; }
+        .pp-detail-txt { font-size:.9rem; color:#0F172A; line-height:1.6; white-space:pre-wrap; }
+        .pp-empty-state { text-align:center; padding:3rem 1rem; color:#6B7280; }
+        .pp-loader { display:flex; align-items:center; justify-content:center; padding:3rem; gap:.7rem; color:#6B7280; font-size:.82rem; }
+        .pp-ring { width:22px; height:22px; border:2.5px solid rgba(37,99,235,.1); border-top-color:#2563EB; border-radius:50%; animation:ppspin .8s linear infinite; }
+
+        /* Dialog suppression */
+        .pp-dialog-overlay { position:fixed; inset:0; background:rgba(15,23,42,.6); backdrop-filter:blur(4px); z-index:1000; display:flex; align-items:center; justify-content:center; padding:1rem; animation:fadein .2s ease; }
+        .pp-dialog-card { background:white; width:100%; max-width:380px; border-radius:20px; box-shadow:0 25px 50px -12px rgba(0,0,0,.25); padding:1.5rem; text-align:center; animation:modalPop .3s cubic-bezier(.2,.8,.2,1); }
+
+        @media(max-width:640px) {
+          .pp-stat-grid { gap:.6rem; }
+          .pp-stat-card { padding:.85rem .4rem; }
+          .pp-stat-val { font-size:1.4rem; }
+          .pp-filter-bar { padding:.8rem 1rem; }
         }
-
-        .pp-root { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 860px; margin: 0 auto; color: var(--s-dark); }
-
-        /* HEADER & BOUTONS */
-        .pp-top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
-        .pp-page-title { font-family: 'Cormorant Garamond', serif; font-size: 2.2rem; font-weight: 700; color: var(--s-dark); line-height: 1.1; margin: 0; }
-        .pp-page-subtitle { font-size: 0.85rem; color: var(--s-muted); margin-top: 0.2rem; }
-        
-        .pp-primary-btn { background: var(--b-mid); color: white; border: none; padding: 0.7rem 1.2rem; border-radius: 99px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem; box-shadow: 0 4px 12px rgba(37,99,235,0.2); }
-        .pp-primary-btn:hover { background: var(--b-deep); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(37,99,235,0.3); }
-        
-        .pp-back-btn { background: white; color: var(--s-mid); border: 1px solid #E2E8F0; padding: 0.6rem 1rem; border-radius: 99px; font-weight: 600; font-size: 0.8rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem; }
-        .pp-back-btn:hover { background: #F8FAFC; color: var(--s-dark); border-color: #CBD5E1; }
-
-        /* WRAPPER PRINCIPAL */
-        .pp-main-wrapper { background: var(--card-bg); border-radius: 24px; border: 1px solid var(--b-border); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.05); overflow: hidden; animation: ppfade 0.4s ease forwards; }
-        @keyframes ppfade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* EN-TÊTE DU WRAPPER */
-        .pp-wrapper-head { padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(0,0,0,0.04); display: flex; align-items: center; gap: 0.6rem; }
-        .pp-head-ico { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; background: #F5F3FF; color: #7C3AED; }
-        .pp-head-title { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--s-dark); }
-
-        /* GRILLE DE STATS EXACTE */
-        .pp-stat-grid { display: flex; flex-wrap: wrap; gap: 1rem; padding: 1.5rem; border-bottom: 1px solid rgba(0,0,0,0.04); }
-        .pp-stat-card { flex: 1; min-width: 100px; position: relative; background: white; border-radius: 12px; padding: 1.2rem 0.5rem; border: 1px solid #E2E8F0; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.02); overflow: hidden; transition: transform 0.15s; }
-        .pp-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.04); }
-        .pp-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.8rem; font-weight: 700; color: var(--s-dark); display: block; line-height: 1; margin-bottom: 0.4rem; }
-        .pp-stat-lbl { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; color: var(--s-muted); letter-spacing: 0.05em; }
-
-        /* BARRE DE FILTRES : Forcée sur une ligne (Mobile) */
-        .pp-filter-bar { padding: 1.2rem 1.5rem; border-bottom: 1px solid rgba(0,0,0,0.04); display: flex; align-items: center; gap: 0.6rem; flex-wrap: nowrap; background: #FAFAFA; overflow-x: auto; }
-        .pp-search-box { display: flex; align-items: center; gap: 0.5rem; background: white; border: 1.5px solid #E2E8F0; border-radius: 99px; padding: 0.4rem 0.8rem; flex: 1; min-width: 130px; transition: border-color 0.2s; }
-        .pp-search-box:focus-within { border-color: var(--b-mid); box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
-        .pp-search-box input { border: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; width: 100%; color: var(--s-dark); background: transparent; }
-        .pp-search-box input::placeholder { color: #9CA3AF; }
-        .pp-status-select { border: 1.5px solid #E2E8F0; border-radius: 99px; padding: 0.4rem 0.8rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--s-mid); outline: none; background: white; cursor: pointer; transition: border-color 0.2s; flex-shrink: 0; }
-        .pp-status-select:focus { border-color: var(--b-mid); }
-        .pp-refresh-btn { height: 36px; padding: 0 1rem; background: white; border: 1.5px solid #E2E8F0; border-radius: 99px; cursor: pointer; color: var(--b-mid); font-family: 'DM Sans', sans-serif; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s; flex-shrink: 0; }
-        .pp-refresh-btn:hover { background: var(--b-pale); border-color: var(--b-mid); }
-        
-        @media (max-width: 640px) { 
-          .pp-filter-bar { padding: 0.8rem 1rem; gap: 0.4rem; }
-          .pp-search-box { min-width: 100px; padding: 0.35rem 0.6rem; }
-          .pp-search-box input { font-size: 0.75rem; }
-          .pp-status-select { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
-          .pp-refresh-btn { padding: 0 0.6rem; font-size: 0.75rem; height: 32px; }
-          .pp-refresh-text { display: none; }
-        }
-
-        /* LISTE DES CARTES : Transparentes Bleu Ciel */
-        .pp-list-container { padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; background: #FAFAFA; }
-        .pp-item-card { background: rgba(239, 246, 255, 0.5); border: 1px solid rgba(191, 219, 254, 0.8); border-radius: 16px; padding: 1.25rem 1.5rem; transition: transform 0.2s, box-shadow 0.2s, background 0.2s; cursor: pointer; display: flex; flex-direction: column; gap: 0.8rem; }
-        .pp-item-card:hover { transform: translateY(-3px); box-shadow: 0 12px 24px rgba(37,99,235,0.08); background: rgba(239, 246, 255, 0.9); border-color: #93C5FD; }
-        
-        .pp-item-header { display: flex; justify-content: space-between; align-items: center; }
-        .pp-item-date { font-size: 0.75rem; color: var(--s-muted); font-weight: 600; display: flex; align-items: center; gap: 0.4rem; }
-        .pp-status-badge { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.65rem; border-radius: 99px; font-size: 0.65rem; font-weight: 700; border: 1px solid; white-space: nowrap; }
-        .pp-status-dot { width: 6px; height: 6px; border-radius: 50%; }
-        
-        .pp-item-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; color: var(--s-dark); line-height: 1.2; margin: 0; }
-        .pp-item-divider { border: none; border-top: 1.5px dotted #93C5FD; margin: 0.5rem 0; }
-        
-        .pp-item-budget-lbl { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--s-muted); margin-bottom: 0.3rem; }
-        .pp-item-budget-val { font-family: 'DM Mono', monospace; font-size: 1.1rem; font-weight: 700; color: var(--b-mid); background: white; display: inline-block; padding: 0.25rem 0.6rem; border-radius: 6px; border: 1px solid #E0E7FF; }
-
-        /* FORMULAIRE */
-        .pp-form-body { padding: 1.5rem; }
-        .pp-field { margin-bottom: 1.2rem; }
-        .pp-label { display: block; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--s-mid); margin-bottom: 0.4rem; letter-spacing: 0.05em; }
-        .pp-input, .pp-textarea { width: 100%; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #FAFAFA; padding: 0.8rem 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.95rem; outline: none; transition: all 0.2s; }
-        .pp-input:focus, .pp-textarea:focus { border-color: var(--b-mid); background: white; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
-        .pp-textarea { min-height: 140px; resize: vertical; line-height: 1.6; }
-        
-        .pp-budget-wrap { display: flex; border: 1.5px solid #E2E8F0; border-radius: 12px; overflow: hidden; background: #FAFAFA; transition: all 0.2s; }
-        .pp-budget-wrap:focus-within { border-color: var(--b-mid); background: white; box-shadow: 0 0 0 3px rgba(37,99,235,0.08); }
-        .pp-currency-select { border: none; background: transparent; padding: 0 1rem; font-weight: 700; font-size: 0.9rem; color: var(--b-mid); border-right: 1px solid #E2E8F0; outline: none; cursor: pointer; }
-        .pp-budget-input { border: none !important; background: transparent !important; box-shadow: none !important; padding: 0.8rem 1rem; font-family: 'DM Mono', monospace; font-size: 1rem; flex: 1; outline: none; }
-
-        .pp-upload-zone { background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem; }
-        .pp-upload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-        @media (max-width: 480px) { .pp-upload-grid { grid-template-columns: 1fr; } }
-        
-        .pp-upload-btn { height: 100px; border: 1.5px dashed #CBD5E1; border-radius: 12px; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
-        .pp-upload-btn:hover { border-color: var(--b-mid); background: var(--b-pale); }
-        .pp-upload-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
-        .pp-upload-err-txt { font-size: 0.65rem; color: #DC2626; margin-top: 0.4rem; text-align: center; padding: 0 0.5rem; }
-
-        .pp-file-preview { display: flex; align-items: center; gap: 0.8rem; background: white; padding: 0.8rem; border-radius: 12px; border: 1px solid #E2E8F0; height: 100%; }
-        .pp-file-thumb { position: relative; width: 40px; height: 40px; border-radius: 8px; background: var(--b-pale); overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: var(--b-mid); flex-shrink: 0; }
-        .pp-file-info { flex: 1; min-width: 0; }
-        .pp-file-name { font-size: 0.75rem; font-weight: 700; overflow-wrap: anywhere; word-break: break-word; line-height: 1.3; }
-        .pp-file-meta { font-size: 0.65rem; color: var(--s-muted); margin-top: 0.2rem; display: flex; align-items: center; gap: 0.4rem; }
-        .pp-file-remove { background: #FEF2F2; color: #EF4444; border: 1px solid #FECACA; width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.18s; }
-        .pp-file-remove:hover { background: #FEE2E2; transform: scale(1.1); }
-
-        .pp-form-actions { display: flex; gap: 1rem; margin-top: 1rem; }
-        .pp-cancel-btn { flex: 1; padding: 1rem; background: white; border: 1.5px solid #E2E8F0; border-radius: 14px; font-weight: 700; color: var(--s-mid); cursor: pointer; transition: all 0.2s; }
-        .pp-cancel-btn:hover { background: #F8FAFC; border-color: #CBD5E1; color: var(--s-dark); }
-        .pp-submit-btn { flex: 2; padding: 1rem; background: var(--b-mid); color: white; border: none; border-radius: 14px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px rgba(37,99,235,0.2); display: flex; align-items: center; justify-content: center; gap: 0.6rem; }
-        .pp-submit-btn:hover:not(:disabled) { background: var(--b-deep); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(37,99,235,0.3); }
-        .pp-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-        .pp-alert { padding: 1rem; border-radius: 12px; margin-top: 1rem; font-size: 0.85rem; font-weight: 500; display: flex; align-items: flex-start; gap: 0.6rem; animation: ppfade 0.3s ease; }
-        .pp-alert-err { background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; }
-        .pp-alert-ok { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
-
-        /* MODAL PRINCIPAL */
-        .pp-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 999; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadein 0.2s ease; }
-        @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
-        .pp-modal-content { background: white; width: 100%; max-width: 540px; border-radius: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.2); overflow: hidden; animation: slideup 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); max-height: 90vh; display: flex; flex-direction: column; }
-        @keyframes slideup { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
-        .pp-modal-header { padding: 1.5rem; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
-        .pp-modal-body { padding: 1.5rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem; }
-        
-        /* 🔥 ICÔNES D'ACTION (MODAL) */
-        .pp-modal-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
-        .pp-icon-btn { width: 34px; height: 34px; border-radius: 10px; border: 1px solid #E2E8F0; background: white; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
-        .pp-edit-btn { color: var(--b-mid); }
-        .pp-edit-btn:hover { background: #EFF6FF; border-color: #BFDBFE; transform: scale(1.05); }
-        .pp-delete-btn { color: #DC2626; }
-        .pp-delete-btn:hover { background: #FEF2F2; border-color: #FECACA; transform: scale(1.05); }
-        .pp-modal-actions-divider { width: 1px; height: 24px; background: #E2E8F0; margin: 0 0.2rem; }
-
-        .pp-modal-close { width: 34px; height: 34px; border-radius: 10px; background: #F1F5F9; border: 1px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--s-muted); flex-shrink: 0; transition: all 0.2s; }
-        .pp-modal-close:hover { background: #E2E8F0; color: var(--s-dark); border-color: #CBD5E1; }
-        
-        .pp-detail-block { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 1rem; }
-        .pp-detail-lbl { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--s-muted); margin-bottom: 0.4rem; }
-        .pp-detail-txt { font-size: 0.9rem; color: var(--s-dark); line-height: 1.6; white-space: pre-wrap; }
-
-        .pp-empty-state { text-align: center; padding: 3rem 1rem; color: var(--s-muted); }
-
-        /* 🔥 MODAL DE CONFIRMATION (REMPLACE WINDOW.ALERT) */
-        .pp-dialog-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: fadein 0.2s ease; }
-        .pp-dialog-card { background: white; width: 100%; max-width: 400px; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); padding: 1.5rem; text-align: center; animation: slideup 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
-        .pp-dialog-icon { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; }
-        .pp-dialog-icon.danger { background: #FEF2F2; color: #DC2626; }
-        .pp-dialog-icon.info { background: #EFF6FF; color: #2563EB; }
-        .pp-dialog-title { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; color: var(--s-dark); margin-bottom: 0.5rem; line-height: 1.2; }
-        .pp-dialog-desc { font-size: 0.85rem; color: var(--s-muted); line-height: 1.5; margin-bottom: 1.5rem; }
-        .pp-dialog-actions { display: flex; gap: 0.8rem; justify-content: center; }
-        .pp-dialog-btn { flex: 1; padding: 0.7rem 1rem; border-radius: 12px; font-weight: 700; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; border: none; display: flex; align-items: center; justify-content: center; gap: 0.4rem; }
-        .pp-dialog-btn-cancel { background: #F1F5F9; color: var(--s-mid); }
-        .pp-dialog-btn-cancel:hover:not(:disabled) { background: #E2E8F0; color: var(--s-dark); }
-        .pp-dialog-btn-danger { background: #DC2626; color: white; box-shadow: 0 4px 12px rgba(220,38,38,0.2); }
-        .pp-dialog-btn-danger:hover:not(:disabled) { background: #B91C1C; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(220,38,38,0.3); }
-        .pp-dialog-btn:disabled { opacity: 0.6; cursor: not-allowed; }
       `}</style>
 
-      <div className={`pp-root${mounted ? '' : ''}`}>
-        
-        {/* EN-TÊTE PRINCIPAL */}
-        <div className="pp-top-bar">
+      <div className="pp-wrap">
+
+        {/* HEADER */}
+        <div className="pp-header">
           <div>
-            <h1 className="pp-page-title">Projets proposés</h1>
-            <p className="pp-page-subtitle">Gérez et soumettez vos idées de projets pour l&apos;antenne.</p>
+            <div className="pp-eyebrow"><div className="pp-eyebrow-dot" />Espace membre</div>
+            <h1 className="pp-page-title">Mes propositions</h1>
           </div>
           {!isFormOpen ? (
             <button className="pp-primary-btn" onClick={() => setIsFormOpen(true)}>
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               Nouvelle proposition
             </button>
           ) : (
             <button className="pp-back-btn" onClick={handleCancel}>
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
               Retour à la liste
             </button>
           )}
         </div>
 
-        {/* ─── VUE 1 : LISTE DES PROPOSITIONS ─── */}
-        {!isFormOpen && (
-          <div className="pp-main-wrapper">
-            <div className="pp-wrapper-head">
-              <div className="pp-head-ico">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2"/>
-                </svg>
-              </div>
-              <span className="pp-head-title">Mes propositions</span>
-            </div>
+        <div className="pp-panel">
 
-            {/* GRILLE STATS */}
-            <div className="pp-stat-grid">
-              {[
-                { label: 'Total',      count: total,     color: '#1D4ED8' },
-                { label: 'Soumises',   count: submitted, color: '#B45309' },
-                { label: 'En revue',   count: underRev,  color: '#1D4ED8' },
-                { label: 'Approuvées', count: approved,  color: '#059669' },
-                { label: 'Rejetées',   count: rejected,  color: '#B91C1C' },
-              ].map(c => (
-                <div key={c.label} className="pp-stat-card">
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '4px', background: c.color, borderRadius: '12px 12px 0 0' }} />
-                  <span className="pp-stat-val">{c.count}</span>
-                  <span className="pp-stat-lbl">{c.label}</span>
+          {/* FORMULAIRE */}
+          {isFormOpen ? (
+            <>
+              <div className="pp-wrapper-head">
+                <div className="pp-head-ico" style={{ background: '#EFF6FF', color: '#2563EB' }}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
                 </div>
-              ))}
-            </div>
-
-            {/* BARRE DE FILTRES (Mobile Optimisée) */}
-            <div className="pp-filter-bar">
-              <div className="pp-search-box">
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <input type="text" placeholder="Rechercher par titre..." value={search} onChange={e => setSearch(e.target.value)} />
+                <span className="pp-head-title">{editingId ? 'Modifier la proposition' : 'Nouvelle proposition de projet'}</span>
               </div>
-              
-              <select className="pp-status-select" value={status} onChange={e => setStatus(e.target.value as StatusKey)}>
-                {STATUS_OPTIONS.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+              <div className="pp-form-body">
+                {editingId && (
+                  <div className="pp-edit-banner">
+                    <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#2563EB', flexShrink: 0 }} />
+                    Mode modification
+                  </div>
+                )}
+                {saveError && (
+                  <div className="pp-save-err">
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" /></svg>
+                    {saveError}
+                  </div>
+                )}
+                {saveSuccess && (
+                  <div className="pp-save-ok">
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    {saveSuccess}
+                  </div>
+                )}
+                <ProposalForm
+                  key={editingId ?? 'new'}
+                  initial={editingInitial}
+                  editingId={editingId}
+                  onSave={handleSave}
+                  onCancel={handleCancel}
+                  submitting={submitting}
+                  uploadProgress={uploadProgress}
+                />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* HEADER DU PANEL LISTE */}
+              <div className="pp-wrapper-head">
+                <div className="pp-head-ico" style={{ background: '#F5F3FF', color: '#7C3AED' }}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <span className="pp-head-title">Mes propositions</span>
+              </div>
+
+              {/* STATS */}
+              <div className="pp-stat-grid">
+                {[
+                  { label: 'Total',     count: total,    color: '#1D4ED8' },
+                  { label: 'Brouillons', count: drafts,   color: '#6B7280' },
+                  { label: 'Soumises',  count: submitted, color: '#B45309' },
+                  { label: 'Approuvées', count: approved, color: '#059669' },
+                  { label: 'Rejetées',  count: rejected,  color: '#B91C1C' },
+                ].map(c => (
+                  <div key={c.label} className="pp-stat-card">
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: c.color, borderRadius: '12px 12px 0 0' }} />
+                    <span className="pp-stat-val">{c.count}</span>
+                    <span className="pp-stat-lbl">{c.label}</span>
+                  </div>
                 ))}
-              </select>
+              </div>
 
-              <button className="pp-refresh-btn" onClick={() => void load()} type="button" title="Actualiser">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                <span className="pp-refresh-text">Actualiser</span>
-              </button>
-            </div>
+              {/* FILTRE */}
+              <div className="pp-filter-bar">
+                <div className="pp-search-box">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  <input type="text" placeholder="Rechercher par titre…" value={search} onChange={e => setSearch(e.target.value)} />
+                </div>
+                <button className="pp-refresh-btn" onClick={() => void load()} type="button">
+                  <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  Actualiser
+                </button>
+              </div>
 
-            {/* LISTE DES CARTES (Bleu Ciel Transparent) */}
-            <div className="pp-list-container">
-              {loading ? (
-                <div className="pp-empty-state">Chargement...</div>
-              ) : fetchError ? (
-                <div className="pp-empty-state" style={{ color: '#DC2626' }}>{fetchError}</div>
-              ) : filteredItems.length === 0 ? (
-                <div className="pp-empty-state">Aucune proposition trouvée.</div>
-              ) : (
-                filteredItems.map(item => {
-                  const meta = STATUS_META[item.status] ?? { label: item.status, color: '#374151', bg: '#F3F4F6', border: '#E5E7EB', dot: '#9CA3AF' };
-                  return (
-                    <div key={item.id} className="pp-item-card" onClick={() => setSelectedProposal(item)}>
-                      <div className="pp-item-header">
-                        <span className="pp-item-date">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                          {fmt(item.createdAt)}
-                        </span>
-                        <span className="pp-status-badge" style={{ background: meta.bg, borderColor: meta.border, color: meta.color }}>
-                          <span className="pp-status-dot" style={{ background: meta.dot }} />
-                          {meta.label}
-                        </span>
-                      </div>
-                      
-                      <h3 className="pp-item-title">{item.title}</h3>
-                      <hr className="pp-item-divider" />
-                      
-                      <div>
-                        <div className="pp-item-budget-lbl">BUDGET ESTIMÉ</div>
-                        <div className="pp-item-budget-val">
-                          {item.expectedBudget != null ? `${Number(item.expectedBudget).toLocaleString('fr-FR')} ${item.currency ?? 'GNF'}` : 'Non défini'}
+              {/* LISTE */}
+              <div className="pp-list-container">
+                {loading ? (
+                  <div className="pp-loader"><div className="pp-ring" />Chargement…</div>
+                ) : fetchError ? (
+                  <div className="pp-empty-state" style={{ color: '#DC2626' }}>{fetchError}</div>
+                ) : filtered.length === 0 ? (
+                  <div className="pp-empty-state">
+                    <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.3" style={{ margin: '0 auto 1rem' }}><path strokeLinecap="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <div style={{ fontWeight: 700, color: '#374151', marginBottom: '.3rem' }}>Aucune proposition trouvée</div>
+                    <div style={{ fontSize: '.8rem' }}>Cliquez sur <strong>Nouvelle proposition</strong> pour commencer.</div>
+                  </div>
+                ) : (
+                  filtered.map(item => {
+                    const meta = STATUS_META[item.status] ?? STATUS_META['SUBMITTED'];
+                    const isDraft = item.status === 'DRAFT';
+                    const canEdit = item.status === 'DRAFT' || item.status === 'SUBMITTED';
+                    return (
+                      <div key={item.id} className={`pp-item-card${isDraft ? ' draft' : ''}`} onClick={() => setSelectedProposal(item)}>
+                        <div className="pp-item-header">
+                          <span className="pp-item-date">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>
+                            {fmt(item.createdAt)}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                            {isDraft && (
+                              <span style={{ fontSize: '.62rem', fontWeight: 700, color: '#6B7280', background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: 99, padding: '.18rem .5rem' }}>
+                                👁 Visible seulement par vous
+                              </span>
+                            )}
+                            <span className="pp-status-badge" style={{ background: meta.bg, borderColor: meta.border, color: meta.color }}>
+                              <span className="pp-status-dot" style={{ background: meta.dot }} />
+                              {meta.label}
+                            </span>
+                          </div>
+                        </div>
+                        <h3 className="pp-item-title">{item.title}</h3>
+                        <hr className="pp-item-divider" />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '.5rem' }}>
+                          <div>
+                            <div style={{ fontSize: '.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.08em', color: '#6B7280', marginBottom: '.3rem' }}>Budget estimé</div>
+                            <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1.05rem', fontWeight: 700, color: isDraft ? '#6B7280' : '#2563EB', background: 'white', display: 'inline-block', padding: '.2rem .5rem', borderRadius: 6, border: `1px solid ${isDraft ? '#E5E7EB' : '#E0E7FF'}` }}>
+                              {item.expectedBudget != null ? `${Number(item.expectedBudget).toLocaleString('fr-FR')} ${item.currency ?? ''}` : 'Non défini'}
+                            </div>
+                          </div>
+                          {canEdit && (
+                            <div style={{ display: 'flex', gap: '.4rem' }} onClick={e => e.stopPropagation()}>
+                              {isDraft && (
+                                <button className="pp-submit-draft-btn" onClick={() => void handleSubmitDraft(item)} title="Soumettre à l'admin">
+                                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                                  Soumettre
+                                </button>
+                              )}
+                              <button className="pp-icon-btn pp-edit-btn" title="Modifier" onClick={() => handleEditProposal(item)}>
+                                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                              </button>
+                              <button className="pp-icon-btn pp-delete-btn" title="Supprimer" onClick={() => setDeleteTarget(item)}>
+                                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
-                  );
-                })
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* MODAL DÉTAIL */}
+      {selectedProposal && !isFormOpen && (
+        <div className="pp-modal-overlay" onClick={() => setSelectedProposal(null)}>
+          <div className="pp-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="pp-modal-header">
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', marginBottom: '.6rem' }}>
+                  <span className="pp-status-badge" style={{ background: STATUS_META[selectedProposal.status]?.bg, color: STATUS_META[selectedProposal.status]?.color, borderColor: STATUS_META[selectedProposal.status]?.border }}>
+                    {STATUS_META[selectedProposal.status]?.label}
+                  </span>
+                  <span style={{ fontSize: '.72rem', color: '#6B7280', fontWeight: 600 }}>{STATUS_META[selectedProposal.status]?.desc}</span>
+                </div>
+                <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.7rem', fontWeight: 700, margin: 0, color: '#0F172A', lineHeight: 1.2 }}>
+                  {selectedProposal.title}
+                </h2>
+              </div>
+              <div style={{ display: 'flex', gap: '.4rem', flexShrink: 0 }}>
+                {(selectedProposal.status === 'DRAFT' || selectedProposal.status === 'SUBMITTED') && (
+                  <>
+                    <button className="pp-icon-btn pp-edit-btn" title="Modifier" onClick={() => handleEditProposal(selectedProposal)}>
+                      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                    <button className="pp-icon-btn pp-delete-btn" title="Supprimer" onClick={() => { setDeleteTarget(selectedProposal); setSelectedProposal(null); }}>
+                      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </>
+                )}
+                <button className="pp-modal-close" onClick={() => setSelectedProposal(null)}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+            </div>
+            <div className="pp-modal-body">
+              {selectedProposal.status === 'DRAFT' && (
+                <div style={{ padding: '.75rem 1rem', background: '#FEF9C3', border: '1px solid #FDE047', borderRadius: 12, fontSize: '.82rem', color: '#854D0E', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                  <span>👁</span>
+                  Ce brouillon est visible seulement par vous. Soumettez-le pour que votre admin d&apos;antenne puisse le voir.
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="pp-detail-block" style={{ flex: 1 }}>
+                  <div className="pp-detail-lbl">Budget demandé</div>
+                  <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1.2rem', fontWeight: 700, color: '#2563EB' }}>
+                    {selectedProposal.expectedBudget != null ? `${Number(selectedProposal.expectedBudget).toLocaleString('fr-FR')} ${selectedProposal.currency ?? ''}` : 'Non défini'}
+                  </div>
+                </div>
+                <div className="pp-detail-block" style={{ flex: 1 }}>
+                  <div className="pp-detail-lbl">Soumis le</div>
+                  <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '.9rem', fontWeight: 700, color: '#374151' }}>{fmt(selectedProposal.createdAt)}</div>
+                </div>
+              </div>
+              <div>
+                <div className="pp-detail-lbl" style={{ marginBottom: '.6rem' }}>Description</div>
+                <div className="pp-detail-txt">{selectedProposal.description}</div>
+              </div>
+              {selectedProposal.status === 'DRAFT' && (
+                <button
+                  className="pp-submit-draft-btn"
+                  style={{ width: '100%', justifyContent: 'center', height: 44, fontSize: '.85rem' }}
+                  onClick={() => { void handleSubmitDraft(selectedProposal); }}
+                >
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                  Soumettre à l&apos;admin d&apos;antenne
+                </button>
               )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* ─── VUE 2 : FORMULAIRE ─── */}
-        {isFormOpen && (
-          <div className="pp-main-wrapper">
-            <div className="pp-wrapper-head">
-              <div className="pp-head-ico" style={{ background: '#EFF6FF', color: '#2563EB' }}>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                </svg>
-              </div>
-              <span className="pp-head-title">{editingId ? 'Modifier la proposition' : 'Rédiger une proposition'}</span>
+      {/* DIALOG SUPPRESSION */}
+      {deleteTarget && (
+        <div className="pp-dialog-overlay" onClick={() => setDeleteTarget(null)}>
+          <div className="pp-dialog-card" onClick={e => e.stopPropagation()}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#FEF2F2', border: '1px solid #FECACA', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+              <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
             </div>
-
-            <div className="pp-form-body">
-              <form onSubmit={(e) => { void handleSubmit(e); }}>
-                <div className="pp-field">
-                  <label className="pp-label">Titre du projet</label>
-                  <input className="pp-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="Un titre clair et concis…" maxLength={120} disabled={submitting} />
-                </div>
-
-                <div className="pp-field">
-                  <label className="pp-label">Description détaillée</label>
-                  <textarea className="pp-textarea" value={description} onChange={e => setDescription(e.target.value)} placeholder="Décrivez le besoin, l&apos;objectif, les bénéficiaires, l&apos;impact attendu…" disabled={submitting} />
-                </div>
-
-                <div className="pp-field">
-                  <label className="pp-label">Budget estimatif <span style={{ textTransform: 'none', fontWeight: 400, color: '#9CA3AF' }}>(optionnel)</span></label>
-                  <div className="pp-budget-wrap">
-                    <select className="pp-currency-select" value={currency} onChange={e => setCurrency(e.target.value)} disabled={submitting}>
-                      <option value="GNF">GNF (FG)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="XOF">XOF (CFA)</option>
-                      <option value="USD">USD ($)</option>
-                      <option value="CAD">CAD ($)</option>
-                    </select>
-                    <input className="pp-budget-input" type="number" min="0" step="any" value={budget} onChange={e => setBudget(e.target.value)} placeholder="0" disabled={submitting} />
-                  </div>
-                </div>
-
-                <div className="pp-upload-zone">
-                  <label className="pp-label" style={{ marginBottom: '1rem' }}>Documents & Illustrations</label>
-                  <div className="pp-upload-grid">
-                    
-                    {/* -- Upload Document -- */}
-                    <div style={{ position: 'relative' }}>
-                      {!attachmentPreview ? (
-                        <label className="pp-upload-btn">
-                          <input ref={attachmentRef} type="file" accept=".pdf,.doc,.docx,image/*" onChange={handleAttachmentChange} disabled={uploadingAttachment || submitting} />
-                          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="1.5" style={{ marginBottom: '0.5rem' }}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4B5563' }}>{uploadingAttachment ? 'Envoi...' : 'Ajouter Document'}</span>
-                        </label>
-                      ) : (
-                        <div className="pp-file-preview">
-                          <div className="pp-file-thumb">DOC</div>
-                          <div className="pp-file-info">
-                            <div className="pp-file-name">{attachmentPreview.name}</div>
-                            <div className="pp-file-meta">{attachmentPreview.size} {attachmentAssetId && <span style={{ color: '#059669' }}>✓</span>}</div>
-                          </div>
-                          <button type="button" className="pp-file-remove" onClick={removeAttachment}>×</button>
-                        </div>
-                      )}
-                      {attachmentError && <div className="pp-upload-err-txt">{attachmentError}</div>}
-                    </div>
-
-                    {/* -- Upload Photo -- */}
-                    <div style={{ position: 'relative' }}>
-                      {!photoPreviewUrl ? (
-                        <label className="pp-upload-btn">
-                          <input ref={photoRef} type="file" accept="image/*" onChange={handlePhotoChange} disabled={uploadingPhoto || submitting} />
-                          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#9CA3AF" strokeWidth="1.5" style={{ marginBottom: '0.5rem' }}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#4B5563' }}>{uploadingPhoto ? 'Envoi...' : 'Ajouter Photo'}</span>
-                        </label>
-                      ) : (
-                        <div className="pp-file-preview">
-                          <div className="pp-file-thumb">
-                            <Image src={photoPreviewUrl} alt="Aperçu" fill style={{ objectFit: 'cover' }} unoptimized />
-                          </div>
-                          <div className="pp-file-info">
-                            <div className="pp-file-name">{photoMeta?.name}</div>
-                            <div className="pp-file-meta">{photoMeta?.size} {photoAssetId && <span style={{ color: '#059669' }}>✓</span>}</div>
-                          </div>
-                          <button type="button" className="pp-file-remove" onClick={removePhoto}>×</button>
-                        </div>
-                      )}
-                      {photoError && <div className="pp-upload-err-txt">{photoError}</div>}
-                    </div>
-
-                  </div>
-                </div>
-
-                <div className="pp-form-actions">
-                  <button type="button" className="pp-cancel-btn" onClick={handleCancel} disabled={submitting}>Annuler</button>
-                  <button type="submit" className="pp-submit-btn" disabled={submitting || uploadingAttachment || uploadingPhoto}>
-                    {submitting ? (
-                      <><div className="pp-spinner" />Envoi en cours…</>
-                    ) : editingId ? (
-                      <>
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                        Mettre à jour
-                      </>
-                    ) : (
-                      <>
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
-                        Envoyer la proposition
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {formError && <div className="pp-alert pp-alert-err">{formError}</div>}
-                {formSuccess && <div className="pp-alert pp-alert-ok">Opération réussie ! Retour à la liste...</div>}
-              </form>
+            <h3 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.4rem', fontWeight: 700, margin: '0 0 .4rem', color: '#0F172A' }}>Supprimer cette proposition ?</h3>
+            <p style={{ fontSize: '.82rem', color: '#6B7280', margin: '0 0 1.5rem', lineHeight: 1.5 }}>
+              <strong style={{ color: '#0F172A' }}>{deleteTarget.title}</strong> sera supprimée définitivement.
+            </p>
+            <div style={{ display: 'flex', gap: '.75rem' }}>
+              <button onClick={() => setDeleteTarget(null)} disabled={isDeleting} style={{ flex: 1, height: 40, borderRadius: 10, border: '1px solid #D1D5DB', background: '#F9FAFB', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 700, color: '#374151', cursor: 'pointer' }}>Annuler</button>
+              <button onClick={() => void handleDelete()} disabled={isDeleting} style={{ flex: 1, height: 40, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#991B1B,#DC2626)', fontFamily: "'DM Sans',sans-serif", fontSize: '.82rem', fontWeight: 800, color: 'white', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.4rem' }}>
+                {isDeleting && <div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'ppspin .7s linear infinite' }} />}
+                Supprimer
+              </button>
             </div>
           </div>
-        )}
-
-        {/* ─── MODAL DE DÉTAIL D'UNE PROPOSITION ─── */}
-        {selectedProposal && (
-          <div className="pp-modal-overlay" onClick={() => setSelectedProposal(null)}>
-            <div className="pp-modal-content" onClick={e => e.stopPropagation()}>
-              
-              <div className="pp-modal-header">
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginBottom: '0.6rem' }}>
-                    <span className="pp-status-badge" style={{ background: STATUS_META[selectedProposal.status]?.bg, color: STATUS_META[selectedProposal.status]?.color, borderColor: STATUS_META[selectedProposal.status]?.border }}>
-                      {STATUS_META[selectedProposal.status]?.label}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 600 }}>Le {fmt(selectedProposal.createdAt)}</span>
-                  </div>
-                  <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: '1.8rem', fontWeight: 700, margin: 0, color: '#0F172A', lineHeight: 1.2 }}>
-                    {selectedProposal.title}
-                  </h2>
-                </div>
-                
-                {/* 🔥 BOUTONS D'ACTION MODERNES DANS LE MODAL */}
-                <div className="pp-modal-actions">
-                  {(selectedProposal.status === 'SUBMITTED' || selectedProposal.status === 'UNDER_REVIEW') && (
-                    <>
-                      <button className="pp-icon-btn pp-edit-btn" title="Modifier la proposition" onClick={handleEditProposal}>
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                      </button>
-                      <button className="pp-icon-btn pp-delete-btn" title="Supprimer la proposition" onClick={handleDeleteProposal}>
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                      </button>
-                      <div className="pp-modal-actions-divider" />
-                    </>
-                  )}
-                  <button className="pp-modal-close" onClick={() => setSelectedProposal(null)} title="Fermer">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="pp-modal-body">
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                  <div className="pp-detail-block" style={{ flex: 1 }}>
-                    <div className="pp-detail-lbl">BUDGET DEMANDÉ</div>
-                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '1.2rem', fontWeight: 700, color: '#2563EB' }}>
-                      {selectedProposal.expectedBudget != null ? `${Number(selectedProposal.expectedBudget).toLocaleString('fr-FR')} ${selectedProposal.currency ?? 'GNF'}` : 'Non défini'}
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="pp-detail-lbl" style={{ marginBottom: '0.6rem' }}>DESCRIPTION DÉTAILLÉE</div>
-                  <div className="pp-detail-txt">{selectedProposal.description}</div>
-                </div>
-
-                {/* 🔥 AFFICHAGE DYNAMIQUE DE LA PIÈCE JOINTE */}
-                {selectedProposal.attachedFile ? (
-                  <div className="pp-detail-block" style={{ background: '#F8FAFC', borderColor: '#E2E8F0' }}>
-                    <div className="pp-detail-lbl" style={{ marginBottom: '0.6rem' }}>PIÈCE JOINTE</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '0.8rem', background: 'white', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                      {isFileImage(selectedProposal.attachedFile) && !imgError ? (
-                        <div style={{ position: 'relative', width: '48px', height: '48px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 }}>
-                          <Image 
-                            src={selectedProposal.attachedFile.url} 
-                            alt="Aperçu" 
-                            fill 
-                            style={{ objectFit: 'cover' }} 
-                            unoptimized 
-                            onError={() => setImgError(true)} 
-                          />
-                        </div>
-                      ) : (
-                        <div style={{ width: '48px', height: '48px', borderRadius: '8px', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#2563EB', fontWeight: 700, fontSize: '0.75rem', flexShrink: 0 }}>
-                          {selectedProposal.attachedFile.fileName?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'DOC'}
-                        </div>
-                      )}
-                      
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {selectedProposal.attachedFile.fileName || 'Fichier joint'}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: '#6B7280', marginTop: '2px' }}>
-                          <a href={selectedProposal.attachedFile.url} target="_blank" rel="noopener noreferrer" style={{ color: '#2563EB', textDecoration: 'none', fontWeight: 600 }}>
-                            Ouvrir / Télécharger ➔
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="pp-detail-block" style={{ background: '#FFFBEB', borderColor: '#FDE68A' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#B45309', fontWeight: 600, fontSize: '0.85rem' }}>
-                      <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                      <span>Aucune pièce jointe (document ou photo) liée à cette proposition.</span>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ─── MODAL DE CONFIRMATION / INFO (REMPLACE WINDOW.ALERT) ─── */}
-        {actionDialog?.isOpen && (
-          <div className="pp-dialog-overlay" onClick={() => setActionDialog(null)}>
-            <div className="pp-dialog-card" onClick={e => e.stopPropagation()}>
-              
-              <div className={`pp-dialog-icon ${actionDialog.type === 'delete' ? 'danger' : 'info'}`}>
-                {actionDialog.type === 'delete' ? (
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                ) : (
-                  <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                )}
-              </div>
-              
-              <h3 className="pp-dialog-title">{actionDialog.title}</h3>
-              <p className="pp-dialog-desc">{actionDialog.desc}</p>
-              
-              <div className="pp-dialog-actions">
-                <button className="pp-dialog-btn pp-dialog-btn-cancel" onClick={() => setActionDialog(null)} disabled={isDeleting}>
-                  {actionDialog.type === 'delete' ? 'Annuler' : 'Fermer'}
-                </button>
-                {actionDialog.type === 'delete' && (
-                  <button className="pp-dialog-btn pp-dialog-btn-danger" onClick={executeDelete} disabled={isDeleting}>
-                    {isDeleting ? 'Suppression...' : 'Supprimer'}
-                  </button>
-                )}
-              </div>
-              
-            </div>
-          </div>
-        )}
-
-      </div>
+        </div>
+      )}
     </AppShell>
   );
 }

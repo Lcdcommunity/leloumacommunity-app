@@ -126,8 +126,8 @@ export class MemberService {
       }),
       this.prisma.antenna.findMany({
         where: { associationId: me.associationId, isActive: true },
-        select: { id: true, name: true, defaultCurrency: true }
-      })
+        select: { id: true, name: true, defaultCurrency: true },
+      }),
     ]);
 
     const antennaBalances = await Promise.all(
@@ -135,21 +135,21 @@ export class MemberService {
         const [aggC, aggE] = await Promise.all([
           this.prisma.contribution.aggregate({
             where: { associationId: me.associationId, antennaId: ant.id, status: ContributionStatus.VALIDATED },
-            _sum: { amount: true }
+            _sum: { amount: true },
           }),
           this.prisma.expense.aggregate({
             where: { associationId: me.associationId, antennaId: ant.id, status: ExpenseStatus.VALIDATED },
-            _sum: { amount: true }
-          })
+            _sum: { amount: true },
+          }),
         ]);
 
         return {
           id: ant.id,
           name: ant.name,
           balance: Number(aggC._sum.amount ?? 0) - Number(aggE._sum.amount ?? 0),
-          currency: ant.defaultCurrency || 'EUR' 
+          currency: ant.defaultCurrency || 'EUR',
         };
-      })
+      }),
     );
 
     let cardData = null;
@@ -185,7 +185,7 @@ export class MemberService {
         activeProjects,
       },
       virtualCard: cardData,
-      antennaBalances, 
+      antennaBalances,
     };
   }
 
@@ -204,12 +204,8 @@ export class MemberService {
         ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
         ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone.trim() || null } : {}),
-        ...(dto.addressLine1 !== undefined
-          ? { addressLine1: dto.addressLine1.trim() || null }
-          : {}),
-        ...(dto.addressLine2 !== undefined
-          ? { addressLine2: dto.addressLine2.trim() || null }
-          : {}),
+        ...(dto.addressLine1 !== undefined ? { addressLine1: dto.addressLine1.trim() || null } : {}),
+        ...(dto.addressLine2 !== undefined ? { addressLine2: dto.addressLine2.trim() || null } : {}),
         ...(dto.city !== undefined ? { city: dto.city.trim() || null } : {}),
         ...(dto.country !== undefined ? { country: dto.country.trim() || null } : {}),
         ...(dto.function !== undefined ? { function: dto.function.trim() || null } : {}),
@@ -237,15 +233,9 @@ export class MemberService {
         pushEnabled: dto.pushNotifications ?? false,
       },
       update: {
-        ...(dto.emailNotifications !== undefined
-          ? { emailEnabled: dto.emailNotifications }
-          : {}),
-        ...(dto.smsNotifications !== undefined
-          ? { smsEnabled: dto.smsNotifications }
-          : {}),
-        ...(dto.pushNotifications !== undefined
-          ? { pushEnabled: dto.pushNotifications }
-          : {}),
+        ...(dto.emailNotifications !== undefined ? { emailEnabled: dto.emailNotifications } : {}),
+        ...(dto.smsNotifications !== undefined ? { smsEnabled: dto.smsNotifications } : {}),
+        ...(dto.pushNotifications !== undefined ? { pushEnabled: dto.pushNotifications } : {}),
       },
     });
 
@@ -310,7 +300,7 @@ export class MemberService {
     if (dto.targetMemberId && dto.targetMemberId !== me.id) {
       const target = await this.prisma.user.findFirst({
         where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
-        include: { memberships: true }
+        include: { memberships: true },
       });
 
       if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
@@ -335,7 +325,7 @@ export class MemberService {
         memberUserId: finalMemberId,
         submitterUserId: submitterId,
         amount: new Prisma.Decimal(dto.amount),
-        currency: (dto.currency as CurrencyCode) || CurrencyCode.EUR, 
+        currency: (dto.currency as CurrencyCode) || CurrencyCode.EUR,
         paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
         externalReference: autoReference,
         contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
@@ -346,20 +336,19 @@ export class MemberService {
       },
       include: {
         submitter: { select: { firstName: true, lastName: true } },
-        member: { select: { firstName: true, lastName: true } }
-      }
+        member: { select: { firstName: true, lastName: true } },
+      },
     });
 
     const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
-    
-    // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour alerter les admins d'antenne
+
     await this.notifications.notifyAntennaAdminsWithPush(
       finalAntennaId,
       me.associationId,
       `Un nouveau versement de ${dto.amount} ${dto.currency || 'EUR'} a été déclaré pour ${targetName}.`,
       NotificationType.CONTRIBUTION_SUBMITTED,
       { contributionId: created.id },
-      '💰 Nouveau dépôt soumis'
+      '💰 Nouveau dépôt soumis',
     );
 
     return memberMapper.contribution(created);
@@ -378,7 +367,7 @@ export class MemberService {
       associationId: me.associationId,
       OR: [
         { memberUserId: userId },
-        { submitterUserId: userId }
+        { submitterUserId: userId },
       ],
       ...(query.status ? { status: query.status as ContributionStatus } : {}),
     };
@@ -392,15 +381,15 @@ export class MemberService {
         take: pageSize,
         include: {
           submitter: { select: { firstName: true, lastName: true } },
-          member: { select: { firstName: true, lastName: true } }
-        }
+          member: { select: { firstName: true, lastName: true } },
+        },
       }),
     ]);
 
     return {
       items: items.map(c => ({
         ...memberMapper.contribution(c),
-        currency: c.currency
+        currency: c.currency,
       })),
       total,
       page,
@@ -472,12 +461,12 @@ export class MemberService {
         },
       },
     });
+
     const now = new Date();
 
     const computed = members
       .map((m) => {
         const last = m.contributions[0]?.validatedAt ?? m.createdAt;
-
         return {
           id: m.id,
           firstName: m.firstName,
@@ -509,36 +498,11 @@ export class MemberService {
 
     const projectSearchOr: Prisma.ProjectWhereInput[] = query.q
       ? [
-          {
-            title: {
-              contains: query.q,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-          {
-            description: {
-              contains: query.q,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-          {
-            summary: {
-              contains: query.q,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-          {
-            locationText: {
-              contains: query.q,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-          {
-            promoterName: {
-              contains: query.q,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
+          { title: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
+          { description: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
+          { summary: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
+          { locationText: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
+          { promoterName: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
         ]
       : [];
 
@@ -583,6 +547,7 @@ export class MemberService {
         },
       }),
     ]);
+
     return {
       items: items.map(memberMapper.project),
       total,
@@ -591,12 +556,21 @@ export class MemberService {
     };
   }
 
+  // ─── PROPOSITIONS DE PROJETS ────────────────────────────────────────────────
+
   async createProjectProposal(
     userId: string,
     dto: CreateProjectProposalDto & { attachmentFileAssetId?: string },
   ) {
     const me = await this.getMeOrThrow(userId);
     this.ensureMemberActiveEnough(me.status);
+
+    // 🔥 PATCH : Respecter le statut choisi par le membre (DRAFT ou SUBMITTED)
+    // Par défaut SUBMITTED si non précisé (rétrocompatibilité)
+    const initialStatus =
+      (dto as any).status === 'DRAFT'
+        ? ProposalStatus.DRAFT
+        : ProposalStatus.SUBMITTED;
 
     const created = await this.prisma.projectProposal.create({
       data: {
@@ -609,7 +583,7 @@ export class MemberService {
           ? new Prisma.Decimal(dto.expectedBudget)
           : null,
         currency: dto.currency || CurrencyCode.EUR,
-        status: ProposalStatus.SUBMITTED,
+        status: initialStatus,
         ...(dto.attachmentFileAssetId
           ? {
               attachments: {
@@ -622,15 +596,15 @@ export class MemberService {
       },
     });
 
-    if (me.antennaId) {
-      // 🔥 AJOUT CHIRURGICAL : Upgrade Push pour alerter les admins d'antenne
+    // 🔥 N'envoyer la notif admin QUE si c'est une soumission (pas un brouillon)
+    if (me.antennaId && initialStatus === ProposalStatus.SUBMITTED) {
       await this.notifications.notifyAntennaAdminsWithPush(
         me.antennaId,
         me.associationId,
         `Une nouvelle proposition de projet "${dto.title.trim()}" a été soumise par ${me.firstName} ${me.lastName}.`,
         NotificationType.PROJECT_PROPOSAL_SUBMITTED,
         { proposalId: created.id },
-        '💡 Nouvelle proposition de projet'
+        '💡 Nouvelle proposition de projet',
       );
     }
 
@@ -668,11 +642,11 @@ export class MemberService {
                   mimeType: true,
                   sizeBytes: true,
                   originalFilename: true,
-                }
-              }
-            }
-          }
-        }
+                },
+              },
+            },
+          },
+        },
       }),
     ]);
 
@@ -687,10 +661,14 @@ export class MemberService {
       pageSize,
     };
   }
+
   async updateProjectProposal(
     userId: string,
     proposalId: string,
-    dto: Partial<CreateProjectProposalDto> & { attachmentFileAssetId?: string | null },
+    dto: Partial<CreateProjectProposalDto> & {
+      attachmentFileAssetId?: string | null;
+      status?: string;
+    },
   ) {
     const me = await this.getMeOrThrow(userId);
 
@@ -702,9 +680,23 @@ export class MemberService {
       throw new NotFoundException('Proposition introuvable.');
     }
 
-    if (proposal.status !== ProposalStatus.SUBMITTED && proposal.status !== ProposalStatus.UNDER_REVIEW) {
+    // 🔥 PATCH : DRAFT est maintenant aussi modifiable
+    if (
+      proposal.status !== ProposalStatus.DRAFT &&
+      proposal.status !== ProposalStatus.SUBMITTED &&
+      proposal.status !== ProposalStatus.UNDER_REVIEW
+    ) {
       throw new BadRequestException('Cette proposition ne peut plus être modifiée.');
     }
+
+    // 🔥 PATCH : Détecter une transition DRAFT → SUBMITTED pour envoyer la notif
+    const isSubmitting =
+      dto.status === 'SUBMITTED' && proposal.status === ProposalStatus.DRAFT;
+
+    // Résoudre le nouveau statut Prisma
+    let newStatus: ProposalStatus | undefined;
+    if (dto.status === 'DRAFT') newStatus = ProposalStatus.DRAFT;
+    else if (dto.status === 'SUBMITTED') newStatus = ProposalStatus.SUBMITTED;
 
     const updated = await this.prisma.projectProposal.update({
       where: { id: proposalId },
@@ -715,6 +707,8 @@ export class MemberService {
           ? { estimatedBudget: dto.expectedBudget ? new Prisma.Decimal(dto.expectedBudget) : null }
           : {}),
         ...(dto.currency ? { currency: dto.currency as CurrencyCode } : {}),
+        // 🔥 PATCH : Mettre à jour le statut si fourni
+        ...(newStatus !== undefined ? { status: newStatus } : {}),
         ...(dto.attachmentFileAssetId !== undefined
           ? {
               attachments: dto.attachmentFileAssetId
@@ -727,6 +721,18 @@ export class MemberService {
           : {}),
       },
     });
+
+    // Notifier l'admin si transition DRAFT → SUBMITTED
+    if (isSubmitting && me.antennaId) {
+      await this.notifications.notifyAntennaAdminsWithPush(
+        me.antennaId,
+        me.associationId,
+        `Une proposition de projet "${updated.title}" a été soumise par ${me.firstName} ${me.lastName}.`,
+        NotificationType.PROJECT_PROPOSAL_SUBMITTED,
+        { proposalId: updated.id },
+        '💡 Nouvelle proposition de projet',
+      );
+    }
 
     return memberMapper.projectProposal(updated);
   }
@@ -742,7 +748,12 @@ export class MemberService {
       throw new NotFoundException('Proposition introuvable.');
     }
 
-    if (proposal.status !== ProposalStatus.SUBMITTED && proposal.status !== ProposalStatus.UNDER_REVIEW) {
+    // 🔥 PATCH : DRAFT est aussi supprimable
+    if (
+      proposal.status !== ProposalStatus.DRAFT &&
+      proposal.status !== ProposalStatus.SUBMITTED &&
+      proposal.status !== ProposalStatus.UNDER_REVIEW
+    ) {
       throw new BadRequestException('Cette proposition ne peut plus être supprimée.');
     }
 
@@ -753,6 +764,8 @@ export class MemberService {
     return { success: true };
   }
 
+  // ─── DOCUMENTS ──────────────────────────────────────────────────────────────
+
   async listDocuments(
     userId: string,
     query: MemberDocumentsQueryDto,
@@ -762,13 +775,13 @@ export class MemberService {
     const pageSize = query.pageSize ?? 50;
 
     const visibilityOr: Prisma.DocumentWhereInput[] = [
-      { visibility: { in: ['ALL', 'MEMBER'] } }
+      { visibility: { in: ['ALL', 'MEMBER'] } },
     ];
 
     if (me.antennaId) {
       visibilityOr.push({
         antennaId: me.antennaId,
-        visibility: { in: ['ALL', 'MEMBER', 'ANTENNA'] } 
+        visibility: { in: ['ALL', 'MEMBER', 'ANTENNA'] },
       });
     }
 
@@ -783,7 +796,7 @@ export class MemberService {
         OR: [
           { title: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
           { description: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
-        ]
+        ],
       });
     }
 
@@ -821,6 +834,8 @@ export class MemberService {
     };
   }
 
+  // ─── CONTENUS ───────────────────────────────────────────────────────────────
+
   async listContents(
     userId: string,
     query: MemberContentsQueryDto,
@@ -831,20 +846,11 @@ export class MemberService {
 
     const contentSearchOr: Prisma.NewsPostWhereInput[] = query.q
       ? [
-          {
-            title: {
-              contains: query.q,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
-          {
-            content: {
-              contains: query.q,
-              mode: Prisma.QueryMode.insensitive,
-            },
-          },
+          { title: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
+          { content: { contains: query.q, mode: Prisma.QueryMode.insensitive } },
         ]
       : [];
+
     const where: Prisma.NewsPostWhereInput = {
       associationId: me.associationId,
       status: PostStatus.PUBLISHED,
@@ -881,6 +887,5 @@ function monthDiff(from: Date, to: Date): number {
   const years = to.getFullYear() - from.getFullYear();
   const months = to.getMonth() - from.getMonth();
   const total = years * 12 + months;
-
   return total < 0 ? 0 : total;
 }

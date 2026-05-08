@@ -11,24 +11,30 @@ import { formatDate } from '../../../../../lib/format';
 
 type ModalMode = 'view' | 'edit' | 'delete';
 
-interface ModalState { 
-  mode: ModalMode | null; 
-  contribution: Contribution & {
+interface ModalState {
+  mode: ModalMode | null;
+  contribution: (Contribution & {
     submitter?: { firstName: string; lastName: string } | null;
-  } | null; 
+  }) | null;
 }
 
-const getMember = (c: Contribution) => 
-  c.member || (c as unknown as Record<string, Contribution['member']>).user || null;
+type ContributionRecord = Record<string, Contribution['member']>;
+type ContributionStringRecord = Record<string, string>;
 
-const getMethod = (c: Contribution) => 
-  c.paymentMethod || (c as unknown as Record<string, string>).method || 'OTHER';
+const getMember = (c: Contribution) =>
+  c.member || (c as unknown as ContributionRecord).user || null;
 
-const getDate = (c: Contribution) => 
-  c.contributionDate || (c as unknown as Record<string, string>).depositedAt || c.createdAt || new Date().toISOString();
+const getMethod = (c: Contribution) =>
+  c.paymentMethod || (c as unknown as ContributionStringRecord).method || 'OTHER';
 
-const getNote = (c: Contribution) => 
-  c.memberComment || (c as unknown as Record<string, string>).note || '';
+const getDate = (c: Contribution) =>
+  c.contributionDate ||
+  (c as unknown as ContributionStringRecord).depositedAt ||
+  c.createdAt ||
+  new Date().toISOString();
+
+const getNote = (c: Contribution) =>
+  c.memberComment || (c as unknown as ContributionStringRecord).note || '';
 
 const PURPOSE_MAP: Record<string, string> = {
   REGULAR_QUOTA: 'Cotisation régulière',
@@ -45,31 +51,74 @@ const METHOD_MAP: Record<string, string> = {
   OTHER: 'Autre',
 };
 
+const MONTHS_FR = [
+  'Janvier',
+  'Février',
+  'Mars',
+  'Avril',
+  'Mai',
+  'Juin',
+  'Juillet',
+  'Août',
+  'Septembre',
+  'Octobre',
+  'Novembre',
+  'Décembre',
+] as const;
+
+type ContributionWithReference = Contribution & {
+  monthReference?: number | null;
+  yearReference?: number | null;
+};
+
+function formatMonthRef(c: Contribution): string | null {
+  const contribution = c as ContributionWithReference;
+
+  const month = contribution.monthReference;
+  const year = contribution.yearReference;
+
+  if (
+    typeof month !== 'number' ||
+    typeof year !== 'number' ||
+    month < 1 ||
+    month > 12
+  ) {
+    return null;
+  }
+
+  return `${MONTHS_FR[month - 1]} ${year}`;
+}
+
 function StatusBadge({ status }: { status: ContributionStatus | string }) {
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    VALIDATED: { label: 'Validée',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
-    REJECTED:  { label: 'Rejetée', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    VALIDATED: { label: 'Validée', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    REJECTED: { label: 'Rejetée', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
     PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
     PENDING: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
     CANCELLED: { label: 'Annulée', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
     SUBMITTED: { label: 'Soumise', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
-    DRAFT:     { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    DRAFT: { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
   };
   const s = map[status] || { label: String(status), color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
   return (
-    <span style={{ display:'inline-flex', alignItems:'center', gap:'0.3rem', fontSize:'0.65rem', fontWeight:800, color:s.color, background:s.bg, border:`1px solid ${s.border}`, borderRadius:99, padding:'0.25rem 0.6rem', textTransform:'uppercase', letterSpacing:'0.03em' }}>
-      <span style={{ width:5, height:5, borderRadius:'50%', background:s.color }} />{s.label}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.65rem', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '0.25rem 0.6rem', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color }} />{s.label}
     </span>
   );
 }
 
 /* ══════════════════════════════════════════════════════ MODAL COMPONENT */
-function ContributionDetailModal({ 
-  state, onClose, onConfirm, busy 
-}: { 
-  state: ModalState; 
-  onClose: () => void; 
-  onConfirm: (mode: ModalMode, val: string) => void; 
+
+type ApiClientWithDelete = {
+  deleteContributionAntenna?: (id: string) => Promise<void>;
+};
+
+function ContributionDetailModal({
+  state, onClose, onConfirm, busy,
+}: {
+  state: ModalState;
+  onClose: () => void;
+  onConfirm: (mode: ModalMode, val: string) => void;
   busy: boolean;
 }) {
   const [inputValue, setInputValue] = useState('');
@@ -91,7 +140,7 @@ function ContributionDetailModal({
 
   return (
     <div className="ach-modal-overlay" onClick={onClose}>
-      <div className="ach-modal" onClick={e => e.stopPropagation()}>
+      <div className="ach-modal" onClick={(e) => e.stopPropagation()}>
         <div className="ach-modal-head">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', alignItems: 'center', width: '100%' }}>
             <StatusBadge status={c.status} />
@@ -100,7 +149,7 @@ function ContributionDetailModal({
             </h2>
           </div>
           <button className="ach-modal-close" onClick={onClose} aria-label="Fermer" style={{ position: 'absolute', right: '1.25rem', top: '1.25rem' }}>
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
@@ -174,6 +223,15 @@ function ContributionDetailModal({
               </div>
             </div>
 
+            <div className="ach-grid-2">
+              <div className="ach-info-box">
+                <label>Mois concerné</label>
+                <span style={formatMonthRef(c) ? { color: '#1D4ED8', fontWeight: 800 } : { color: '#9CA3AF' }}>
+                  {formatMonthRef(c) ?? '—'}
+                </span>
+              </div>
+            </div>
+
             <div className="ach-info-box full" style={{ marginTop: '0.75rem', gridColumn: '1 / -1' }}>
               <label>Référence Interne</label>
               <span className="ach-text-mono" style={{ fontSize: '0.75rem', color: '#64748B' }}>{c.id}</span>
@@ -202,21 +260,21 @@ function ContributionDetailModal({
                 {mode === 'delete' ? 'Confirmation de sécurité (Obligatoire)' : 'Nouveau montant'}
               </label>
               {mode === 'edit' ? (
-                <input 
-                  type="number" 
-                  className="ach-input" 
-                  value={inputValue} 
-                  onChange={e => setInputValue(e.target.value)} 
-                  placeholder="Ex: 150" 
+                <input
+                  type="number"
+                  className="ach-input"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder="Ex: 150"
                 />
               ) : (
                 <>
-                  <input 
-                    type="text" 
-                    className="ach-input" 
-                    value={inputValue} 
-                    onChange={e => setInputValue(e.target.value)} 
-                    placeholder="Tapez SUPPRIMER pour confirmer" 
+                  <input
+                    type="text"
+                    className="ach-input"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder="Tapez SUPPRIMER pour confirmer"
                   />
                   {inputValue !== 'SUPPRIMER' && inputValue.length > 0 && (
                     <p style={{ fontSize: '0.7rem', color: '#DC2626', marginTop: '0.4rem', fontWeight: 600 }}>
@@ -228,7 +286,7 @@ function ContributionDetailModal({
             </div>
           )}
         </div>
-        
+
         <div className="ach-modal-footer">
           {!isView && <button className="ach-btn-sec" onClick={() => onConfirm('view', '')}>Annuler</button>}
 
@@ -245,7 +303,7 @@ function ContributionDetailModal({
                 </button>
               </>
             ) : (
-              <button 
+              <button
                 className={`ach-btn ${mode === 'delete' ? 'ach-btn-red' : 'ach-btn-blue'}`}
                 style={{ flex: 1 }}
                 disabled={busy || (mode === 'delete' && inputValue !== 'SUPPRIMER') || (mode === 'edit' && !inputValue)}
@@ -270,7 +328,6 @@ export default function AdminContributionsHistoryPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>({ mode: null, contribution: null });
 
-  // ⚡ ÉTATS D'EXPORTATION CHIRURGICALE
   const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
   const [exportStartMonth, setExportStartMonth] = useState('');
   const [exportEndMonth, setExportEndMonth] = useState('');
@@ -281,10 +338,12 @@ export default function AdminContributionsHistoryPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.listAntennaContributions({ 
-        page: 1, pageSize: 100, status: status || undefined, q: q || undefined 
+      const res = await api.listAntennaContributions({
+        page: 1, pageSize: 100, status: status || undefined, q: q || undefined,
       });
-      const data = Array.isArray(res) ? res : (res as unknown as { items?: Contribution[] })?.items ?? [];
+      const data = Array.isArray(res)
+        ? res
+        : (res as unknown as { items?: Contribution[] })?.items ?? [];
       setItems(data as Contribution[]);
     } finally { setLoading(false); }
   }, [status, q]);
@@ -293,7 +352,7 @@ export default function AdminContributionsHistoryPage() {
 
   async function handleAction(mode: ModalMode, value: string) {
     if (mode !== 'view' && modal.mode === 'view') {
-      setModal(prev => ({ ...prev, mode }));
+      setModal((prev) => ({ ...prev, mode }));
       return;
     }
 
@@ -306,7 +365,7 @@ export default function AdminContributionsHistoryPage() {
         await api.updateContributionAntenna(c.id, { amount: parseFloat(value.replace(',', '.')) });
       }
       if (mode === 'delete') {
-        const apiClient = api as unknown as { deleteContributionAntenna?: (id: string) => Promise<void> };
+        const apiClient = api as unknown as ApiClientWithDelete;
         if (apiClient.deleteContributionAntenna) {
           await apiClient.deleteContributionAntenna(c.id);
         }
@@ -316,26 +375,29 @@ export default function AdminContributionsHistoryPage() {
     } finally { setBusyId(null); }
   }
 
-  // ⚡ FONCTION D'EXPORTATION
   const executeExport = async () => {
     try {
       setActionBusy(true);
       const fetchRes = await api.listAntennaContributions({
         page: 1,
         pageSize: 10000,
-        status: exportStatus || undefined
+        status: exportStatus || undefined,
       });
 
-      let exportData = (Array.isArray(fetchRes) ? fetchRes : (fetchRes as any).items || []) as Contribution[];
+      let exportData = (
+        Array.isArray(fetchRes)
+          ? fetchRes
+          : (fetchRes as unknown as { items?: Contribution[] }).items ?? []
+      ) as Contribution[];
 
       if (exportStartMonth) {
         const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
-        exportData = exportData.filter(c => new Date(getDate(c)) >= start);
+        exportData = exportData.filter((c) => new Date(getDate(c)) >= start);
       }
       if (exportEndMonth) {
         const end = new Date(`${exportEndMonth}-01T00:00:00Z`);
         end.setMonth(end.getMonth() + 1);
-        exportData = exportData.filter(c => new Date(getDate(c)) < end);
+        exportData = exportData.filter((c) => new Date(getDate(c)) < end);
       }
 
       if (exportData.length === 0) {
@@ -344,8 +406,13 @@ export default function AdminContributionsHistoryPage() {
       }
 
       if (exportModalType === 'EXCEL') {
-        let csv = "Nom;Prenom;Email;Montant;Date;Type;Statut\n";
-        exportData.forEach(c => {
+        const sMap: Record<string, string> = {
+          VALIDATED: 'Validée', REJECTED: 'Rejetée',
+          PENDING_VALIDATION: 'En attente', PENDING: 'En attente',
+          CANCELLED: 'Annulée', SUBMITTED: 'Soumise', DRAFT: 'Brouillon',
+        };
+        let csv = 'Nom;Prenom;Email;Montant;Mois concerne;Date;Type;Statut\n';
+        exportData.forEach((c) => {
           const m = getMember(c);
           const nom = m?.lastName || '';
           const prenom = m?.firstName || '';
@@ -353,17 +420,19 @@ export default function AdminContributionsHistoryPage() {
           const montant = `${c.amount} ${c.currency || 'EUR'}`;
           const date = formatDate(getDate(c));
           const type = PURPOSE_MAP[c.purpose] || c.purpose;
-          const sMap: Record<string, string> = { VALIDATED: 'Validée', REJECTED: 'Rejetée', PENDING_VALIDATION: 'En attente', PENDING: 'En attente', CANCELLED: 'Annulée', SUBMITTED: 'Soumise', DRAFT: 'Brouillon' };
           const statut = sMap[c.status] || c.status;
-
-          csv += `"${nom}";"${prenom}";"${email}";"${montant}";"${date}";"${type}";"${statut}"\n`;
+          const moisRef = formatMonthRef(c) ?? '—';
+          csv += `"${nom}";"${prenom}";"${email}";"${montant}";"${moisRef}";"${date}";"${type}";"${statut}"\n`;
         });
-        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        const link = document.createElement('a');
         link.href = url;
-        link.download = `Export_Cotisations_Antenne_${new Date().toISOString().slice(0,10)}.csv`;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        link.download = `Export_Cotisations_Antenne_${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
         setExportModalType(null);
       } else if (exportModalType === 'PDF') {
         setPdfData(exportData);
@@ -373,7 +442,7 @@ export default function AdminContributionsHistoryPage() {
           setExportModalType(null);
         }, 300);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error(err);
       alert("Erreur lors de l'exportation des données.");
     } finally {
@@ -383,9 +452,9 @@ export default function AdminContributionsHistoryPage() {
 
   const isPendingStatus = (s: string) => s === 'PENDING' || s === 'SUBMITTED' || s === 'PENDING_VALIDATION';
   const validated = items.filter((i) => i.status === 'VALIDATED').length;
-  const pending   = items.filter((i) => isPendingStatus(i.status)).length;
-  const rejected  = items.filter((i) => i.status === 'REJECTED').length;
-  const total     = items.reduce((sum, item) => sum + (item.amount ?? 0), 0);
+  const pending = items.filter((i) => isPendingStatus(i.status)).length;
+  const rejected = items.filter((i) => i.status === 'REJECTED').length;
+  const total = items.reduce((sum, item) => sum + (item.amount ?? 0), 0);
   const mainCurrency = items[0]?.currency || 'EUR';
 
   return (
@@ -395,7 +464,6 @@ export default function AdminContributionsHistoryPage() {
         
         .ach-wrap { font-family: 'DM Sans', 'Inter', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 900px; margin: 0 auto; }
         
-        /* Header & Stats */
         .ach-header-row { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
         .ach-header { margin-bottom: 0; }
         .ach-eyebrow { font-size: 0.65rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
@@ -415,7 +483,6 @@ export default function AdminContributionsHistoryPage() {
         .ach-stat-val { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; line-height: 1; margin-bottom: 0.3rem; }
         .ach-stat-lbl { font-size: 0.65rem; font-weight: 800; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; }
 
-        /* Toolbar */
         .ach-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: nowrap; width: 100%; box-sizing: border-box; align-items: center; }
         .ach-select, .ach-search { height: 40px; border-radius: 10px; border: 1px solid #CBD5E1; padding: 0 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 500; color: #1E293B; outline: none; background: white; transition: border-color 0.2s, box-shadow 0.2s; }
         .ach-select:focus, .ach-search:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
@@ -429,7 +496,6 @@ export default function AdminContributionsHistoryPage() {
           .ach-select { padding-right: 1.4rem; background-position: right 0.4rem center; }
         }
         
-        /* Cartes (Liste principale) */
         .ach-card { background: white; border-radius: 16px; border: 1px solid #E2E8F0; padding: 1.25rem; margin-bottom: 1rem; cursor: pointer; transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); position: relative; }
         .ach-card:hover { border-color: #93C5FD; transform: translateY(-2px); box-shadow: 0 12px 24px -10px rgba(37,99,235,0.15); }
         
@@ -447,7 +513,6 @@ export default function AdminContributionsHistoryPage() {
         .ach-card-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed #E2E8F0; display: flex; justify-content: space-between; align-items: center; }
         .ach-card-method { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; display: flex; align-items: center; gap: 5px; letter-spacing: 0.03em; }
 
-        /* Modale Existant */
         .ach-modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.5); backdrop-filter: blur(4px); z-index: 1000; animation: fadeIn 0.2s ease-out; display: flex; align-items: center; justify-content: center; padding: 1rem; }
         .ach-modal { width: 100%; max-width: 480px; background: #FFFFFF; border-radius: 20px; display: flex; flex-direction: column; max-height: calc(100vh - 2rem); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.22, 1, 0.36, 1); position: relative; }
         
@@ -500,7 +565,6 @@ export default function AdminContributionsHistoryPage() {
         
         .ach-spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
         
-        /* ⚡ CSS EXPORT */
         .export-flex-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
         .export-flex-item { flex: 1 1 calc(50% - 0.5rem); min-width: 140px; }
         .export-flex-item.full { flex: 1 1 100%; }
@@ -518,7 +582,6 @@ export default function AdminContributionsHistoryPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
-      {/* ⚡ LA ZONE IMPRIMABLE CACHÉE POUR LE PDF */}
       {pdfData && (
         <div className="printable-export-area">
           <h2 style={{ textAlign: 'center', marginBottom: '20px', fontFamily: "'Cormorant Garamond', serif" }}>Rapport des Cotisations de l&apos;Antenne</h2>
@@ -529,20 +592,26 @@ export default function AdminContributionsHistoryPage() {
                 <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Email</th>
                 <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Montant</th>
                 <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Date</th>
+                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Mois concerné</th>
                 <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Type</th>
                 <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Statut</th>
               </tr>
             </thead>
             <tbody>
-              {pdfData.map(c => {
+              {pdfData.map((c) => {
                 const m = getMember(c);
-                const sMap: Record<string, string> = { VALIDATED: 'Validée', REJECTED: 'Rejetée', PENDING_VALIDATION: 'En attente', PENDING: 'En attente', CANCELLED: 'Annulée', SUBMITTED: 'Soumise', DRAFT: 'Brouillon' };
+                const sMap: Record<string, string> = {
+                  VALIDATED: 'Validée', REJECTED: 'Rejetée',
+                  PENDING_VALIDATION: 'En attente', PENDING: 'En attente',
+                  CANCELLED: 'Annulée', SUBMITTED: 'Soumise', DRAFT: 'Brouillon',
+                };
                 return (
                   <tr key={c.id}>
                     <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold' }}>{m?.firstName} {m?.lastName}</td>
                     <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{m?.email}</td>
                     <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontFamily: "'DM Mono', monospace", fontWeight: 'bold' }}>{c.amount} {c.currency || 'EUR'}</td>
                     <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDate(getDate(c))}</td>
+                    <td style={{ border: '1px solid #cbd5e1', padding: '8px', color: '#1D4ED8', fontWeight: 700 }}>{formatMonthRef(c) ?? '—'}</td>
                     <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{PURPOSE_MAP[c.purpose] || c.purpose}</td>
                     <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{sMap[c.status] || c.status}</td>
                   </tr>
@@ -559,15 +628,14 @@ export default function AdminContributionsHistoryPage() {
             <div className="ach-eyebrow"><div className="ach-dot" />Archives antenne</div>
             <h1 className="ach-title">Historique des <span>cotisations</span></h1>
           </div>
-          
-          {/* ⚡ BOUTONS D'EXPORTATION DANS LE HEADER */}
+
           <div className="ach-export-group">
             <button className="btn-export btn-pdf" onClick={() => setExportModalType('PDF')}>
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z"/></svg>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z" /></svg>
               PDF
             </button>
             <button className="btn-export btn-excel" onClick={() => setExportModalType('EXCEL')}>
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+              <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" /></svg>
               EXCEL
             </button>
           </div>
@@ -576,9 +644,9 @@ export default function AdminContributionsHistoryPage() {
         <div className="ach-stats">
           {([
             { label: 'Total reçu', value: `${total.toLocaleString('fr-FR')} ${mainCurrency}`, color: '#2563EB' },
-            { label: 'Validées',   value: validated, color: '#059669' },
-            { label: 'En attente', value: pending,   color: '#D97706' },
-            { label: 'Rejetées',   value: rejected,  color: '#DC2626' },
+            { label: 'Validées', value: validated, color: '#059669' },
+            { label: 'En attente', value: pending, color: '#D97706' },
+            { label: 'Rejetées', value: rejected, color: '#DC2626' },
           ] as const).map((s) => (
             <div key={s.label} className="ach-stat" style={{ borderTopColor: s.color }}>
               <div className="ach-stat-val" style={{ color: s.color }}>{s.value}</div>
@@ -597,23 +665,23 @@ export default function AdminContributionsHistoryPage() {
             <option value="REJECTED">Rejetée</option>
             <option value="CANCELLED">Annulée</option>
           </select>
-          <input 
-            type="text" 
-            className="ach-search" 
-            placeholder="Rechercher membre / référence..." 
-            value={q} 
+          <input
+            type="text"
+            className="ach-search"
+            placeholder="Rechercher membre / référence..."
+            value={q}
             onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && load()}
+            onKeyDown={(e) => e.key === 'Enter' && void load()}
           />
         </div>
 
         {loading ? (
-          <div style={{textAlign:'center', padding:'4rem', color:'#64748B', fontWeight: 600}}>
-            <div className="ach-spinner" style={{borderColor: 'rgba(37,99,235,0.2)', borderTopColor: '#2563EB', margin: '0 auto 1rem', width: '24px', height: '24px'}} />
+          <div style={{ textAlign: 'center', padding: '4rem', color: '#64748B', fontWeight: 600 }}>
+            <div className="ach-spinner" style={{ borderColor: 'rgba(37,99,235,0.2)', borderTopColor: '#2563EB', margin: '0 auto 1rem', width: '24px', height: '24px' }} />
             Chargement des données...
           </div>
         ) : items.length === 0 ? (
-          <div style={{textAlign:'center', padding:'5rem 2rem', color:'#94A3B8', fontWeight: 600}}>
+          <div style={{ textAlign: 'center', padding: '5rem 2rem', color: '#94A3B8', fontWeight: 600 }}>
             Aucune cotisation trouvée pour ces critères.
           </div>
         ) : items.map((c) => {
@@ -628,13 +696,16 @@ export default function AdminContributionsHistoryPage() {
                 <div className="ach-avatar">{initials}</div>
                 <div className="ach-card-content">
                   <div className="ach-card-name">{name}</div>
-
                   {c.submitter && (
                     <div style={{ fontSize: '0.65rem', color: '#059669', fontWeight: 800, textTransform: 'uppercase', marginBottom: '2px' }}>
                       Payé par {c.submitter.firstName}
                     </div>
-                  )}                  <div className="ach-card-ref">{c.id.slice(0, 8)}</div>
+                  )}
+                  <div className="ach-card-ref">{c.id.slice(0, 8)}</div>
                   <div className="ach-card-purpose">{PURPOSE_MAP[c.purpose] || c.purpose}</div>
+                  <div style={{ fontSize: '0.72rem', color: formatMonthRef(c) ? '#1D4ED8' : '#94A3B8', fontWeight: 700, marginTop: '0.25rem' }}>
+                    {formatMonthRef(c) ?? '—'}
+                  </div>
                 </div>
                 <div className="ach-card-right">
                   <div className="ach-card-amount">{Number(c.amount).toLocaleString('fr-FR')} {c.currency || 'EUR'}</div>
@@ -644,7 +715,7 @@ export default function AdminContributionsHistoryPage() {
 
               <div className="ach-card-footer">
                 <div className="ach-card-method">
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
                   {METHOD_MAP[method] || method}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
@@ -656,10 +727,9 @@ export default function AdminContributionsHistoryPage() {
         })}
       </div>
 
-      {/* ⚡ MODALE D'EXPORTATION */}
       {exportModalType && (
         <div className="ach-modal-overlay" onClick={() => !actionBusy && setExportModalType(null)}>
-          <div className="ach-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', margin: 'auto', borderRadius: '24px', overflow: 'hidden' }}>
+          <div className="ach-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px', margin: 'auto', borderRadius: '24px', overflow: 'hidden' }}>
             <div className="ach-modal-head" style={{ borderBottom: 'none', paddingBottom: '0.5rem' }}>
               <h2 className="ach-modal-title" style={{ fontSize: '1.8rem', color: '#111827' }}>
                 Exporter en <span style={{ color: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626' }}>{exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</span>
@@ -668,12 +738,12 @@ export default function AdminContributionsHistoryPage() {
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            
+
             <div className="ach-modal-body" style={{ paddingTop: 0 }}>
               <div className="export-flex-row">
                 <div className="export-flex-item full">
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Filtrer par Statut</label>
-                  <select className="ach-select" value={exportStatus} onChange={e => setExportStatus(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC' }}>
+                  <select className="ach-select" value={exportStatus} onChange={(e) => setExportStatus(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC' }}>
                     <option value="">Tous les statuts</option>
                     <option value="DRAFT">Brouillon</option>
                     <option value="SUBMITTED">Soumise</option>
@@ -685,20 +755,20 @@ export default function AdminContributionsHistoryPage() {
                 </div>
                 <div className="export-flex-item">
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Période (Début)</label>
-                  <input type="month" className="ach-input" value={exportStartMonth} onChange={e => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC', border: '1px solid #CBD5E1' }} />
+                  <input type="month" className="ach-input" value={exportStartMonth} onChange={(e) => setExportStartMonth(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC', border: '1px solid #CBD5E1' }} />
                 </div>
                 <div className="export-flex-item">
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Période (Fin)</label>
-                  <input type="month" className="ach-input" value={exportEndMonth} onChange={e => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC', border: '1px solid #CBD5E1' }} />
+                  <input type="month" className="ach-input" value={exportEndMonth} onChange={(e) => setExportEndMonth(e.target.value)} style={{ width: '100%', height: '44px', background: '#F8FAFC', border: '1px solid #CBD5E1' }} />
                 </div>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
                 <button className="ach-btn ach-btn-sec" style={{ flex: 1, border: '1px solid #E2E8F0', borderRadius: '12px' }} onClick={() => setExportModalType(null)} disabled={actionBusy}>Annuler</button>
-                <button 
-                  className="ach-btn" 
-                  style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626', color: 'white', border: 'none', borderRadius: '12px' }} 
-                  onClick={() => void executeExport()} 
+                <button
+                  className="ach-btn"
+                  style={{ flex: 1.5, background: exportModalType === 'EXCEL' ? '#10B981' : '#DC2626', color: 'white', border: 'none', borderRadius: '12px' }}
+                  onClick={() => void executeExport()}
                   disabled={actionBusy}
                 >
                   {actionBusy ? 'Génération...' : 'Télécharger'}
@@ -709,12 +779,12 @@ export default function AdminContributionsHistoryPage() {
         </div>
       )}
 
-      <ContributionDetailModal 
-        state={modal} 
-        onClose={() => setModal({ mode:null, contribution:null })}
+      <ContributionDetailModal
+        state={modal}
+        onClose={() => setModal({ mode: null, contribution: null })}
         busy={busyId !== null}
         onConfirm={(mode, val) => {
-          if (mode === 'view') setModal({ mode:null, contribution:null });
+          if (mode === 'view') setModal({ mode: null, contribution: null });
           else void handleAction(mode, val);
         }}
       />
