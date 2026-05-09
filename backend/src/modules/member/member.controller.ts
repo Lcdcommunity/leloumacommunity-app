@@ -33,7 +33,6 @@ import { PushSubscriptionDto } from './dto/push-subscription.dto';
 @Roles(UserRole.MEMBER)
 export class MemberController {
   constructor(private readonly service: MemberService) {}
-  
 
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {
@@ -51,7 +50,6 @@ export class MemberController {
     return this.service.updatePreferences(user.id, dto);
   }
 
-  // 🔥 NOUVELLE ROUTE : Enregistrement des notifications push
   @Post('push-subscription')
   subscribeToPush(@CurrentUser() user: AuthUser, @Body() dto: PushSubscriptionDto) {
     return this.service.subscribeToPushNotifications(user.id, dto);
@@ -63,7 +61,8 @@ export class MemberController {
     return this.service.searchMembers(user.id, q);
   }
 
-  // Cotisations
+  // ─── COTISATIONS ───────────────────────────────────────────────────────────
+
   @Post('contributions')
   createContribution(@CurrentUser() user: AuthUser, @Body() dto: CreateMemberContributionDto) {
     return this.service.createContribution(user.id, dto);
@@ -72,6 +71,25 @@ export class MemberController {
   @Get('contributions')
   listMyContributions(@CurrentUser() user: AuthUser, @Query() query: MemberContributionsQueryDto) {
     return this.service.listMyContributions(user.id, query);
+  }
+
+  // 🔥 NOUVEAU : Modifier le montant d'une transaction PENDING (membre sur ses propres contributions)
+  @Patch('contributions/:id')
+  updateMyContribution(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { amount: number },
+  ) {
+    return this.service.updateMyContribution(user.id, id, body.amount);
+  }
+
+  // 🔥 NOUVEAU : Supprimer une transaction PENDING (membre sur ses propres contributions)
+  @Delete('contributions/:id')
+  deleteMyContribution(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.service.deleteMyContribution(user.id, id);
   }
 
   // Visibilité association
@@ -109,7 +127,7 @@ export class MemberController {
   updateProjectProposal(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() dto: Partial<CreateProjectProposalDto> & { attachmentFileAssetId?: string }
+    @Body() dto: Partial<CreateProjectProposalDto> & { attachmentFileAssetId?: string },
   ) {
     return this.service.updateProjectProposal(user.id, id, dto);
   }

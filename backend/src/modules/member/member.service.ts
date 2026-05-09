@@ -834,7 +834,7 @@ export class MemberService {
     };
   }
 
-  // ─── CONTENUS ───────────────────────────────────────────────────────────────
+// ─── CONTENUS ───────────────────────────────────────────────────────────────
 
   async listContents(
     userId: string,
@@ -880,6 +880,79 @@ export class MemberService {
       page,
       pageSize,
     };
+  }
+
+  // ─── CONTRIBUTIONS MEMBRE (MODIFICATION & SUPPRESSION) ───────────────────
+
+  /**
+   * 🔥 Modifier le montant d'une contribution PENDING par le membre lui-même.
+   * Vérifie que la contribution appartient bien au membre et qu'elle est en attente.
+   */
+  async updateMyContribution(userId: string, contributionId: string, newAmount: number) {
+    const me = await this.getMeOrThrow(userId);
+
+    const contribution = await this.prisma.contribution.findFirst({
+      where: {
+        id: contributionId,
+        associationId: me.associationId,
+        OR: [
+          { memberUserId: userId },
+          { submitterUserId: userId },
+        ],
+      },
+    });
+
+    if (!contribution) {
+      throw new NotFoundException('Contribution introuvable.');
+    }
+
+    if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
+      throw new BadRequestException(
+        'Seules les contributions en attente de validation peuvent être modifiées.',
+      );
+    }
+
+    if (newAmount <= 0) {
+      throw new BadRequestException('Le montant doit être supérieur à 0.');
+    }
+
+    return this.prisma.contribution.update({
+      where: { id: contributionId },
+      data: { amount: new Prisma.Decimal(newAmount) },
+    });
+  }
+
+  /**
+   * 🔥 Supprimer une contribution PENDING par le membre lui-même.
+   * Vérifie que la contribution appartient bien au membre et qu'elle est en attente.
+   */
+  async deleteMyContribution(userId: string, contributionId: string) {
+    const me = await this.getMeOrThrow(userId);
+
+    const contribution = await this.prisma.contribution.findFirst({
+      where: {
+        id: contributionId,
+        associationId: me.associationId,
+        OR: [
+          { memberUserId: userId },
+          { submitterUserId: userId },
+        ],
+      },
+    });
+
+    if (!contribution) {
+      throw new NotFoundException('Contribution introuvable.');
+    }
+
+    if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
+      throw new BadRequestException(
+        'Seules les contributions en attente de validation peuvent être supprimées.',
+      );
+    }
+
+    await this.prisma.contribution.delete({ where: { id: contributionId } });
+
+    return { success: true };
   }
 }
 

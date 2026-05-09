@@ -395,8 +395,16 @@ export default function SuperAdminMembersPage() {
   }, [q, status]);
 
   // 🔥 FIX : filtrage par antenne entièrement côté frontend
+  // 🔥 FIX : le backend retourne memberships[0].antennaId, pas u.antennaId directement
+  const getMemberAntennaId = (u: ExtendedUser): string | null => {
+    const withMemberships = u as ExtendedUser & {
+      memberships?: { antennaId?: string | null }[];
+    };
+    return withMemberships.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
+  };
+
   const items = antennaId
-    ? allItems.filter(u => (u as ExtendedUser).antennaId === antennaId)
+    ? allItems.filter(u => getMemberAntennaId(u) === antennaId)
     : allItems;
 
   useEffect(() => {
@@ -518,7 +526,12 @@ export default function SuperAdminMembersPage() {
       let exportData = fetchRes.items as ExtendedUser[];
 
       // Filtre antenne pour export
-      if (exportAntenna) exportData = exportData.filter(u => u.antennaId === exportAntenna);
+      // 🔥 FIX : lire depuis memberships[0].antennaId (structure backend réelle)
+      if (exportAntenna) exportData = exportData.filter(u => {
+        const withM = u as ExtendedUser & { memberships?: { antennaId?: string | null }[] };
+        const aid = withM.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
+        return aid === exportAntenna;
+      });
 
       if (exportStartMonth) {
         const start = new Date(`${exportStartMonth}-01T00:00:00Z`);

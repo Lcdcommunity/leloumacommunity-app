@@ -747,6 +747,115 @@ export class AdminService {
       total, page, pageSize, totalPages: Math.ceil(total / pageSize) 
     };
   }
+  // ─── PATCH CHIRURGICAL admin.service.ts ──────────────────────────────────────
+// Ajouter ces 2 méthodes dans la classe AdminService,
+// juste après listProjectProposals() et avant createProject()
+// ─────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * 🔥 Approuver une proposition de projet.
+   * Passe la proposition en APPROVED et crée automatiquement un projet officiel.
+   */
+  async approveProjectProposal(proposalId: string, adminId: string, reviewComment?: string) {
+    const { antennaId, associationId } = await this.getAdminContext(adminId);
+
+    const proposal = await this.prisma.projectProposal.findFirst({
+      where: {
+        id: proposalId,
+        associationId,
+        ...(antennaId ? { antennaId } : {}),
+      },
+      include: { author: true },
+    });
+
+    if (!proposal) throw new NotFoundException('Proposition introuvable.');
+
+    // Marquer la proposition comme approuvée
+    const updated = await this.prisma.projectProposal.update({
+      where: { id: proposalId },
+      data: {
+        status: ProposalStatus.APPROVED,
+        reviewComment: reviewComment ?? null,
+        reviewedByUserId: adminId,
+        reviewedAt: new Date(),
+      },
+    });
+
+    // Créer le projet officiel depuis la proposition
+    const project = await this.prisma.project.create({
+      data: {
+        associationId,
+        antennaId: antennaId ?? proposal.antennaId ?? null,
+        title: proposal.title,
+        description: proposal.description,
+        budgetAmount: proposal.estimatedBudget ?? null,
+        currency: proposal.currency ?? 'EUR',
+        status: ProjectStatus.PROPOSED,
+        createdByUserId: adminId,
+      },
+    });
+
+    // Notifier le membre auteur
+    if (proposal.authorUserId) {
+      await this.notifications.createForUserWithPush({
+        associationId,
+        userId: proposal.authorUserId,
+        message: `Votre proposition de projet "${proposal.title}" a été approuvée !${reviewComment ? ` Commentaire : ${reviewComment}` : ''}`,
+        type: NotificationType.PROJECT_PROPOSAL_APPROVED,
+        title: '✅ Proposition approuvée',
+        pushTitle: '✅ Proposition approuvée',
+        pushBody: `Votre projet "${proposal.title}" est maintenant officiel.`,
+      });
+    }
+
+    return {
+      ...memberMapper.projectProposal(updated),
+      project: memberMapper.project({ ...project, attachments: [] }),
+    };
+  }
+
+  /**
+   * 🔥 Rejeter une proposition de projet avec commentaire optionnel.
+   */
+  async rejectProjectProposal(proposalId: string, adminId: string, reviewComment?: string) {
+    const { antennaId, associationId } = await this.getAdminContext(adminId);
+
+    const proposal = await this.prisma.projectProposal.findFirst({
+      where: {
+        id: proposalId,
+        associationId,
+        ...(antennaId ? { antennaId } : {}),
+      },
+      include: { author: true },
+    });
+
+    if (!proposal) throw new NotFoundException('Proposition introuvable.');
+
+    const updated = await this.prisma.projectProposal.update({
+      where: { id: proposalId },
+      data: {
+        status: ProposalStatus.REJECTED,
+        reviewComment: reviewComment ?? null,
+        reviewedByUserId: adminId,
+        reviewedAt: new Date(),
+      },
+    });
+
+    // Notifier le membre auteur
+    if (proposal.authorUserId) {
+      await this.notifications.createForUserWithPush({
+        associationId,
+        userId: proposal.authorUserId,
+        message: `Votre proposition de projet "${proposal.title}" n'a pas été retenue.${reviewComment ? ` Motif : ${reviewComment}` : ''}`,
+        type: NotificationType.PROJECT_PROPOSAL_REJECTED,
+        title: '❌ Proposition rejetée',
+        pushTitle: '❌ Proposition rejetée',
+        pushBody: `Votre projet "${proposal.title}" n'a pas été retenu.`,
+      });
+    }
+
+    return memberMapper.projectProposal(updated);
+  }
   
   async createProject(adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
@@ -794,47 +903,69 @@ export class AdminService {
     return project;
   }
 
+  // ─── PATCH CHIRURGICAL admin.service.ts ──────────────────────────────────────
+// Remplacer la méthode updateProject() existante par celle-ci.
+// Seul ajout : gestion des attachments (photoIds) en fin de méthode.
+// ─────────────────────────────────────────────────────────────────────────────
+
   async updateProject(projectId: string, adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
-    const project = await this.prisma.project.findFirst({ 
-      where: { 
-        id: projectId, 
+    const project = await this.prisma.project.findFirst({
+      where: {
+        id: projectId,
         associationId,
-        ...(antennaId ? { antennaId } : {}) 
-      } 
+        ...(antennaId ? { antennaId } : {}),
+      },
     });
-    if (!project) throw new NotFoundException("Projet introuvable.");
+    if (!project) throw new NotFoundException('Projet introuvable.');
 
     let safeStatus = data.status;
-    if (safeStatus === 'DRAFT') safeStatus = ProjectStatus.PROPOSED;
+    if (safeStatus === 'DRAFT')            safeStatus = ProjectStatus.PROPOSED;
     if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
-    if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
+    if (safeStatus === 'SUSPENDED')        safeStatus = ProjectStatus.ON_HOLD;
 
-    return this.prisma.project.update({ 
-      where: { id: projectId }, 
-      data: { 
-        title: data.title,
-        summary: data.summary,
-        description: data.description,
-        locationText: data.locationText,
-        promoterName: data.promoterName,
-        targetBeneficiaries: data.targetBeneficiaries,
-        populationImpact: data.populationImpact,
-        environmentalImpact: data.environmentalImpact,
+    // 🔥 FIX : Mettre à jour les champs scalaires du projet
+    const updated = await this.prisma.project.update({
+      where: { id: projectId },
+      data: {
+        title:                data.title,
+        summary:              data.summary,
+        description:          data.description,
+        locationText:         data.locationText,
+        promoterName:         data.promoterName,
+        targetBeneficiaries:  data.targetBeneficiaries,
+        populationImpact:     data.populationImpact,
+        environmentalImpact:  data.environmentalImpact,
         implementationMethod: data.implementationMethod,
-        risksAndMitigation: data.risksAndMitigation,
-        specificObjectives: data.specificObjectives,
-        expectedResults: data.expectedResults,
-        successIndicators: data.successIndicators,
-        status: safeStatus,
-        startDate: data.startsAt ? new Date(data.startsAt) : undefined,
-        endDate: data.endsAt ? new Date(data.endsAt) : undefined,
+        risksAndMitigation:   data.risksAndMitigation,
+        specificObjectives:   data.specificObjectives,
+        expectedResults:      data.expectedResults,
+        successIndicators:    data.successIndicators,
+        status:               safeStatus,
+        startDate:  data.startsAt ? new Date(data.startsAt) : undefined,
+        endDate:    data.endsAt   ? new Date(data.endsAt)   : undefined,
         budgetAmount: data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : undefined,
-        amountSpent: data.budgetSpent ? new Prisma.Decimal(data.budgetSpent) : undefined,
-      } 
+        amountSpent:  data.budgetSpent   ? new Prisma.Decimal(data.budgetSpent)   : undefined,
+      },
     });
-  }
 
+    // 🔥 FIX PHOTOS : Si de nouveaux photoIds sont fournis, on remplace les attachments
+    if (Array.isArray(data.photoIds) && data.photoIds.length > 0) {
+      // Supprimer les anciens attachments
+      await this.prisma.projectAttachment.deleteMany({
+        where: { projectId },
+      });
+      // Créer les nouveaux
+      await this.prisma.projectAttachment.createMany({
+        data: data.photoIds.map((fileId: string) => ({
+          projectId,
+          fileId,
+        })),
+      });
+    }
+
+    return updated;
+  }
   async deleteProject(projectId: string, adminId: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const project = await this.prisma.project.findFirst({ 

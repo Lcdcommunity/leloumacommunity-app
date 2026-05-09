@@ -93,6 +93,8 @@ const adminItems: NavItem[] = [
   { href: '/admin/documents',                 label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
   { href: '/admin/contents',                  label: 'Informations',           icon: <Ico d={ICO.news} /> },
   { href: '/admin/late-members',              label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
+  // 🔥 NOUVEAU : Partenaires en lecture seule
+  { href: '/admin/sponsors',                  label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
   { href: '/admin/communication',             label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> },
   { href: '/admin/notifications',             label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
   { href: '/admin/audit',                     label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
@@ -114,6 +116,8 @@ const memberItems: NavItem[] = [
   { href: '/member/documents',                 label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },
   { href: '/member/contents',                  label: 'Informations',           icon: <Ico d={ICO.news} /> },
   { href: '/member/late-members',              label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
+  // 🔥 NOUVEAU : Partenaires en lecture seule
+  { href: '/member/sponsors',                  label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
   { href: '/member/notifications',             label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
   { href: '/member/profile',                   label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
   { href: '/member/settings',                  label: 'Paramètres',             icon: <Ico d={ICO.gear} /> },

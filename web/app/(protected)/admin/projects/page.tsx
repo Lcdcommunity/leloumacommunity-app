@@ -942,37 +942,83 @@ export default function AdminProjectsPage() {
   function openEdit(p: Project) { setEditing(p); setSaveError(null); setFormMode('edit'); setDetailProject(null); }
   function closeForm() { setFormMode('hidden'); setEditing(null); setSaveError(null); }
 
+  // ─── PATCH CHIRURGICAL web/app/(protected)/admin/projects/page.tsx ───────────
+// Remplacer la fonction handleSave() existante par celle-ci.
+// Correction : lors d'une modification, les anciennes photos du projet
+// sont préservées et les nouvelles s'y ajoutent.
+// ─────────────────────────────────────────────────────────────────────────────
+
   async function handleSave(values: FormValues, photos: File[]) {
-    setSaveError(null); setSubmitting(true);
+    setSaveError(null);
+    setSubmitting(true);
     try {
-      const photoIds: string[] = [];
+      // 1. Upload des nouvelles photos sélectionnées
+      const newPhotoIds: string[] = [];
       for (let i = 0; i < photos.length; i++) {
         setUploadProgress(`Upload photo ${i + 1}\u202f/\u202f${photos.length}\u2026`);
         const up = await api.uploadFile(photos[i], { category: 'PROJECT_IMAGE', folder: 'projects' });
-        photoIds.push(up.id);
+        newPhotoIds.push(up.id);
       }
+
       setUploadProgress('Finalisation\u2026');
 
-      const payload = {
-        title: values.title, summary: values.summary || undefined, description: values.description || undefined,
-        locationText: values.locationText || undefined, status: values.status, promoterName: values.promoterName || undefined,
-        targetBeneficiaries: values.targetBeneficiaries || undefined, populationImpact: values.populationImpact || undefined,
-        environmentalImpact: values.environmentalImpact || undefined, risksAndMitigation: values.risksAndMitigation || undefined,
-        implementationMethod: values.implementationMethod || undefined, specificObjectives: values.specificObjectives || undefined,
-        expectedResults: values.expectedResults || undefined, successIndicators: values.successIndicators || undefined,
-        budgetPlanned: values.budgetPlanned ? Number(values.budgetPlanned) : undefined,
-        budgetSpent: values.budgetSpent ? Number(values.budgetSpent) : undefined,
-        startsAt: values.startsAt || null, endsAt: values.endsAt || null, ...(photoIds.length > 0 && { photoIds }),
+      const payload: Record<string, unknown> = {
+        title:                values.title,
+        summary:              values.summary || undefined,
+        description:          values.description || undefined,
+        locationText:         values.locationText || undefined,
+        status:               values.status,
+        promoterName:         values.promoterName || undefined,
+        targetBeneficiaries:  values.targetBeneficiaries || undefined,
+        populationImpact:     values.populationImpact || undefined,
+        environmentalImpact:  values.environmentalImpact || undefined,
+        risksAndMitigation:   values.risksAndMitigation || undefined,
+        implementationMethod: values.implementationMethod || undefined,
+        specificObjectives:   values.specificObjectives || undefined,
+        expectedResults:      values.expectedResults || undefined,
+        successIndicators:    values.successIndicators || undefined,
+        budgetPlanned:        values.budgetPlanned ? Number(values.budgetPlanned) : undefined,
+        budgetSpent:          values.budgetSpent ? Number(values.budgetSpent) : undefined,
+        startsAt:             values.startsAt || null,
+        endsAt:               values.endsAt || null,
       };
 
-      if (editing) await api.updateAntennaProject(editing.id, payload as Parameters<typeof api.updateAntennaProject>[1]);
-      else await api.createAntennaProject(payload as Parameters<typeof api.createAntennaProject>[0]);
+      if (editing) {
+        // 🔥 FIX MODIFICATION : combiner les IDs des photos existantes + nouvelles
+        // Les photos existantes sont dans editing.attachments (fileAsset ids)
+        const existingPhotoIds: string[] = (
+          (editing.attachments ?? []) as Array<{ id?: string; url?: string }>
+        )
+          .map(a => a.id)
+          .filter((id): id is string => Boolean(id));
 
-      closeForm(); await load();
+        // On n'envoie photoIds QUE s'il y a des nouvelles photos à ajouter
+        // (sinon on laisse les existantes telles quelles côté backend)
+        if (newPhotoIds.length > 0) {
+          payload.photoIds = [...existingPhotoIds, ...newPhotoIds];
+        }
+
+        await api.updateAntennaProject(
+          editing.id,
+          payload as Parameters<typeof api.updateAntennaProject>[1],
+        );
+      } else {
+        // Création : on envoie les nouveaux IDs directement
+        if (newPhotoIds.length > 0) {
+          payload.photoIds = newPhotoIds;
+        }
+        await api.createAntennaProject(
+          payload as Parameters<typeof api.createAntennaProject>[0],
+        );
+      }
+
+      closeForm();
+      await load();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Erreur enregistrement');
     } finally {
-      setSubmitting(false); setUploadProgress(null);
+      setSubmitting(false);
+      setUploadProgress(null);
     }
   }
 

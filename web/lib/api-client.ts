@@ -791,6 +791,16 @@ listElectionsAdmin: async () => {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
     ), 
+    // 🔥 NOUVEAU : Modifier le montant d'une contribution PENDING (membre uniquement)
+  // Route : PATCH /member/contributions/:id
+  updateMyContribution: (id: string, amount: number) =>
+    http(`/member/contributions/${id}`, { method: 'PATCH', body: { amount } }),
+ 
+  // 🔥 NOUVEAU : Supprimer une contribution PENDING (membre uniquement)
+  // Route : DELETE /member/contributions/:id
+  deleteMyContribution: (id: string) =>
+    http(`/member/contributions/${id}`, { method: 'DELETE' }),
+ 
 
   runContributionProjection: (body: {
     expectedMembersPaying: number;

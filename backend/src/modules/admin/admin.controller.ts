@@ -11,7 +11,6 @@ import { CreateMemberDto } from './dto/create-member.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
-// 🔥 CORRECTION : On autorise l'Admin d'Antenne ET le Super Admin à utiliser ces routes
 @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN)
 export class AdminController {
   constructor(private readonly service: AdminService) {}
@@ -35,11 +34,11 @@ export class AdminController {
   // --- GESTION DES MEMBRES ---
   @Get('members')
   listMembers(
-    @CurrentUser() user: AuthUser, 
-    @Query('page') page = 1, 
-    @Query('pageSize') pageSize = 100, 
-    @Query('q') q?: string, 
-    @Query('status') status?: string
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = 1,
+    @Query('pageSize') pageSize = 100,
+    @Query('q') q?: string,
+    @Query('status') status?: string,
   ) {
     return this.service.listMembers(user.id, +page, +pageSize, q, status);
   }
@@ -85,11 +84,11 @@ export class AdminController {
   // --- GESTION DES COTISATIONS ---
   @Get('contributions')
   listContributions(
-    @CurrentUser() user: AuthUser, 
-    @Query('page') page = 1, 
-    @Query('pageSize') pageSize = 100, 
-    @Query('status') status?: string, 
-    @Query('q') q?: string
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = 1,
+    @Query('pageSize') pageSize = 100,
+    @Query('status') status?: string,
+    @Query('q') q?: string,
   ) {
     return this.service.listContributions(user.id, +page, +pageSize, status, q);
   }
@@ -117,11 +116,11 @@ export class AdminController {
   // --- GESTION DES PROJETS (ANTENNE) ---
   @Get('projects')
   listProjects(
-    @CurrentUser() user: AuthUser, 
-    @Query('page') page = 1, 
-    @Query('pageSize') pageSize = 10, 
-    @Query('status') status?: string, 
-    @Query('q') q?: string
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = 1,
+    @Query('pageSize') pageSize = 10,
+    @Query('status') status?: string,
+    @Query('q') q?: string,
   ) {
     return this.service.listProjects(user.id, +page, +pageSize, status, q);
   }
@@ -152,14 +151,36 @@ export class AdminController {
     return this.service.deleteProject(id, user.id);
   }
 
+  // --- PROPOSITIONS DE PROJETS ---
+
   @Get('project-proposals')
-  async listProjectProposals(
-    @CurrentUser() user: AuthUser, 
-    @Query('page') page = 1, 
-    @Query('pageSize') pageSize = 10, 
-    @Query('status') status?: string
+  listProjectProposals(
+    @CurrentUser() user: AuthUser,
+    @Query('page') page = 1,
+    @Query('pageSize') pageSize = 10,
+    @Query('status') status?: string,
   ) {
     return this.service.listProjectProposals(user.id, +page, +pageSize, status);
+  }
+
+  // 🔥 NOUVEAU : Approuver une proposition → crée automatiquement un projet officiel
+  @Patch('project-proposals/:id/approve')
+  approveProjectProposal(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body('reviewComment') reviewComment?: string,
+  ) {
+    return this.service.approveProjectProposal(id, user.id, reviewComment);
+  }
+
+  // 🔥 NOUVEAU : Rejeter une proposition avec commentaire optionnel
+  @Patch('project-proposals/:id/reject')
+  rejectProjectProposal(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+    @Body('reviewComment') reviewComment?: string,
+  ) {
+    return this.service.rejectProjectProposal(id, user.id, reviewComment);
   }
 
   // --- GESTION DES DOCUMENTS (ANTENNE) ---
@@ -175,10 +196,7 @@ export class AdminController {
 
   @Post('documents')
   createDocument(@CurrentUser() user: AuthUser, @Body() body: any) {
-    const payload = {
-      ...body,
-      fileId: body.fileId || body.fileAssetId,
-    };
+    const payload = { ...body, fileId: body.fileId || body.fileAssetId };
     return this.service.createDocument(user.id, payload);
   }
 
@@ -194,7 +212,7 @@ export class AdminController {
     @Query('page') page = 1,
     @Query('pageSize') pageSize = 100,
     @Query('q') q?: string,
-    @Query('status') status?: string
+    @Query('status') status?: string,
   ) {
     return this.service.listContents(user.id, +page, +pageSize, q, status);
   }

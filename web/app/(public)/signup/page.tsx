@@ -475,6 +475,11 @@ export default function MemberSignupPage() {
 
   if (!mounted) return null;
 
+  // ── Required star component ──────────────────────────────────────────────
+  const Req = () => (
+    <span style={{ color: '#DC2626', marginLeft: '0.2rem', fontWeight: 900, fontSize: '0.75rem' }} aria-label="Champ obligatoire">*</span>
+  );
+
   return (
     <>
       <style>{`
@@ -513,11 +518,9 @@ export default function MemberSignupPage() {
         .sp-badge-dot { width: 6px; height: 6px; background: var(--theme-blue); border-radius: 50%; animation: blink 2s ease-in-out infinite; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-        /* ── TITRE PRINCIPAL : slate profond, plus lisible ── */
         .sp-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.6rem, 4.5vw, 2.3rem); font-weight: 600; color: #1E293B; letter-spacing: -0.02em; line-height: 1.15; }
         .sp-title span { background: linear-gradient(135deg, ${theme.primary}, #3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 
-        /* ── SOUS-TITRE : slate moyen ── */
         .sp-subtitle { font-size: 0.82rem; color: #64748B; margin-top: 0.45rem; line-height: 1.6; font-weight: 500; }
 
         .sp-stepper { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.75rem; }
@@ -528,12 +531,10 @@ export default function MemberSignupPage() {
         .sp-step-item.active .sp-step-circle { border-color: ${theme.primary}; background: ${theme.primary}; color: white; box-shadow: 0 0 0 4px ${getLightColor(theme.primary, 0.15)}; }
         .sp-step-item.done .sp-step-circle { border-color: ${theme.secondary}; background: ${getLightColor(theme.secondary, 0.1)}; color: ${theme.secondary}; }
 
-        /* ── LABELS STEPPER : lisibles ── */
         .sp-step-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; transition: color 0.3s; }
         .sp-step-item.active .sp-step-label { color: #1E40AF; }
         .sp-step-item.done .sp-step-label { color: #047857; }
 
-        /* ── TITRES DE SECTIONS : slate-600, discrets mais lisibles ── */
         .sp-section-title { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #475569; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
         .sp-section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, #CBD5E1, transparent); }
 
@@ -541,9 +542,16 @@ export default function MemberSignupPage() {
         .sp-stack { display: flex; flex-direction: column; gap: 0.2rem; }
         .sp-field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
 
-        /* ── LABELS DE CHAMPS : slate-600 ── */
         .sp-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569; }
         .sp-label .sp-opt { font-weight: 500; color: #94A3B8; text-transform: none; letter-spacing: 0; font-size: 0.65rem; margin-left: 0.3rem; }
+
+        /* ── Helper hint text under fields ── */
+        .sp-hint { font-size: 0.67rem; font-weight: 500; color: #94A3B8; margin-top: 0.2rem; line-height: 1.45; display: flex; align-items: flex-start; gap: 0.3rem; }
+        .sp-hint svg { flex-shrink: 0; margin-top: 1px; }
+
+        /* ── Required legend ── */
+        .sp-required-legend { font-size: 0.68rem; color: #94A3B8; font-weight: 500; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.3rem; }
+        .sp-required-legend span { color: #DC2626; font-weight: 900; font-size: 0.75rem; }
 
         .sp-input-wrap { position: relative; }
         .sp-input, .sp-select { width: 100%; min-height: 48px; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #FFFFFF; padding: 0 1rem; color: #111827; font-weight: 500; font-family: var(--font-main); font-size: 0.88rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
@@ -565,11 +573,9 @@ export default function MemberSignupPage() {
 
         .sp-nav { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
 
-        /* ── BOUTON RETOUR : visible, sobre ── */
         .sp-btn-back { flex: 0 0 auto; min-height: 48px; padding: 0 1.25rem; background: white; border: 1.5px solid #94A3B8; border-radius: 12px; color: #334155; font-family: var(--font-main); font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: border-color 0.2s, background 0.2s; }
         .sp-btn-back:hover { border-color: #64748B; background: #F8FAFC; }
 
-        /* ── BOUTONS CONTINUER / CRÉER MON COMPTE : vert emeraude visible ── */
         .sp-btn-next, .sp-btn-submit { flex: 1; min-height: 48px; background: linear-gradient(135deg, #047857, #059669); border: none; border-radius: 12px; color: white; font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.45rem; box-shadow: 0 4px 14px rgba(5,150,105,0.28); transition: opacity 0.2s, box-shadow 0.2s; }
         .sp-btn-next:hover, .sp-btn-submit:hover { box-shadow: 0 6px 20px rgba(5,150,105,0.38); }
         .sp-btn-next:disabled, .sp-btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -584,13 +590,11 @@ export default function MemberSignupPage() {
         .sp-photo-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .sp-photo-box { border: 1.5px dashed #CBD5E1; border-radius: 16px; padding: 1.5rem 1rem; background: #F8FAFC; text-align: center; }
 
-        /* ── BOUTON CHOISIR UNE PHOTO : visible avec bordure bleue ── */
         .sp-file-label { min-height: 46px; padding: 0 1.25rem; border-radius: 12px; border: 1.5px solid #93C5FD; background: #EFF6FF; color: #1D4ED8; font-family: var(--font-main); font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.45rem; cursor: pointer; transition: background 0.2s, border-color 0.2s; }
         .sp-file-label:hover { background: #DBEAFE; border-color: #60A5FA; }
         .sp-file-input { display: none; }
         .sp-photo-remove-btn { min-height: 46px; padding: 0 1rem; border-radius: 12px; border: 1.5px solid rgba(220,38,38,0.2); background: rgba(254,242,242,0.6); color: #DC2626; font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; }
 
-        /* ── SELECT POSTE / RÔLE ── */
         .sp-role-select {
           width: 100%; min-height: 48px; border-radius: 12px;
           border: 1.5px solid ${getLightColor(theme.secondary, 0.3)};
@@ -606,7 +610,6 @@ export default function MemberSignupPage() {
           box-shadow: 0 0 0 3px ${getLightColor(theme.secondary, 0.15)};
         }
 
-        /* ── LABEL RÔLE : couleur solide lisible ── */
         .sp-role-label {
           font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em;
           text-transform: uppercase; color: #047857;
@@ -727,25 +730,66 @@ export default function MemberSignupPage() {
                     </svg>
                     {t('signup.activationNotice', 'Le compte sera activé après vérification email et validation par l\'administrateur de votre antenne.')}
                   </div>
+
+                  {/* Required legend */}
+                  <p className="sp-required-legend">
+                    <span>*</span> Les champs marqués d&apos;une étoile sont obligatoires.
+                  </p>
+
                   <p className="sp-section-title">{t('signup.personalInfo', 'Informations personnelles')}</p>
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">{t('signup.firstName', 'Prénom')}</label>
-                      <input className="sp-input" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Mamadou" required />
+                      <label className="sp-label">
+                        {t('signup.firstName', 'Prénom')}<Req />
+                      </label>
+                      <input
+                        className="sp-input"
+                        value={firstName}
+                        onChange={e => setFirstName(e.target.value)}
+                        placeholder="Ex : Mamadou"
+                        required
+                      />
+                      <span className="sp-hint">
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                        Tel qu&apos;il apparaîtra sur votre carte membre.
+                      </span>
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">{t('signup.lastName', 'Nom')}</label>
-                      <input className="sp-input" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Diallo" required />
+                      <label className="sp-label">
+                        {t('signup.lastName', 'Nom')}<Req />
+                      </label>
+                      <input
+                        className="sp-input"
+                        value={lastName}
+                        onChange={e => setLastName(e.target.value)}
+                        placeholder="Ex : Diallo"
+                        required
+                      />
+                      <span className="sp-hint">
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                        Votre nom de famille officiel.
+                      </span>
                     </div>
                   </div>
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.antenna', 'Antenne de rattachement')}</label>
-                    <select className="sp-select" value={antennaId} onChange={e => setAntennaId(e.target.value)} required>
+                    <label className="sp-label">
+                      {t('signup.antenna', 'Antenne de rattachement')}<Req />
+                    </label>
+                    <select
+                      className="sp-select"
+                      value={antennaId}
+                      onChange={e => setAntennaId(e.target.value)}
+                      required
+                    >
                       <option value="">{loadingAntennas ? t('signup.loading', 'Chargement...') : t('signup.selectAntenna', 'Sélectionnez une antenne')}</option>
                       {antennas.map(a => (
                         <option key={a.id} value={a.id}>{a.name}{a.city ? ` (${a.city})` : ''}</option>
                       ))}
                     </select>
+                    <span className="sp-hint">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                      Choisissez l&apos;antenne la plus proche de votre lieu de résidence.
+                    </span>
                   </div>
                 </div>
               )}
@@ -753,19 +797,43 @@ export default function MemberSignupPage() {
               {/* ── STEP 1 : Contact, Origine & Naissance ── */}
               {step === 1 && (
                 <div className="sp-panel sp-stack">
+
+                  {/* Required legend */}
+                  <p className="sp-required-legend">
+                    <span>*</span> Les champs marqués d&apos;une étoile sont obligatoires.
+                  </p>
+
                   <p className="sp-section-title">{t('signup.communityIdentity', 'Identité communautaire')}</p>
 
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.originCommune', 'Commune d\'origine')}</label>
-                    <select className="sp-select" value={originSubPrefecture} onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }} required>
+                    <label className="sp-label">
+                      {t('signup.originCommune', 'Commune d\'origine')}<Req />
+                    </label>
+                    <select
+                      className="sp-select"
+                      value={originSubPrefecture}
+                      onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}
+                      required
+                    >
                       <option value="">{t('signup.selectCommune', 'Sélectionnez votre commune...')}</option>
                       {COMMUNES_ORIGINE.map(commune => (
                         <option key={commune} value={commune}>{commune}</option>
                       ))}
                     </select>
                     {originSubPrefecture === 'Autre' && (
-                      <input className="sp-input" value={customOriginSubPrefecture} onChange={e => setCustomOriginSubPrefecture(e.target.value)} placeholder={t('signup.specifyCommune', 'Précisez votre commune')} required style={{ marginTop: '0.4rem' }} />
+                      <input
+                        className="sp-input"
+                        value={customOriginSubPrefecture}
+                        onChange={e => setCustomOriginSubPrefecture(e.target.value)}
+                        placeholder={t('signup.specifyCommune', 'Précisez votre commune')}
+                        required
+                        style={{ marginTop: '0.4rem' }}
+                      />
                     )}
+                    <span className="sp-hint">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                      La commune de votre famille ou de votre village d&apos;origine en Guinée.
+                    </span>
                   </div>
 
                   <div className="sp-field">
@@ -773,7 +841,7 @@ export default function MemberSignupPage() {
                       <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       </svg>
-                      {t('signup.associationRole', 'Poste occupé dans l\'association')}
+                      {t('signup.associationRole', 'Poste occupé dans l\'association')}<Req />
                     </label>
                     <select
                       className="sp-role-select"
@@ -787,7 +855,14 @@ export default function MemberSignupPage() {
                       ))}
                     </select>
                     {associationRole === 'Autre' && (
-                      <input className="sp-input" value={customAssociationRole} onChange={e => setCustomAssociationRole(e.target.value)} placeholder={t('signup.specifyRole', 'Précisez le poste occupé')} required style={{ marginTop: '0.4rem' }} />
+                      <input
+                        className="sp-input"
+                        value={customAssociationRole}
+                        onChange={e => setCustomAssociationRole(e.target.value)}
+                        placeholder={t('signup.specifyRole', 'Précisez le poste occupé')}
+                        required
+                        style={{ marginTop: '0.4rem' }}
+                      />
                     )}
                     {associationRole && associationRole !== 'Membre (simple)' && associationRole !== 'Autre' && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.68rem', fontWeight: 700, color: '#047857' }}>
@@ -797,68 +872,156 @@ export default function MemberSignupPage() {
                         {associationRole} {t('signup.selected', 'sélectionné(e)')}
                       </div>
                     )}
-                  </div> 
+                    <span className="sp-hint">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                      Si vous n&apos;avez pas de poste particulier, choisissez &quot;Membre (simple)&quot;.
+                    </span>
+                  </div>
 
                   <p className="sp-section-title" style={{ marginTop: '0.25rem' }}>{t('signup.birthOrigin', 'Naissance & Origine')}</p>
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">{t('signup.birthDate', 'Date de naissance')} <span className="sp-opt">(JJ/MM/AAAA)</span></label>
-                      <input className="sp-input" type="text" value={birthDate} onChange={handleBirthDateChange} placeholder="12/05/1990" required />
+                      <label className="sp-label">
+                        {t('signup.birthDate', 'Date de naissance')}<Req />
+                        <span className="sp-opt">(JJ/MM/AAAA)</span>
+                      </label>
+                      <input
+                        className="sp-input"
+                        type="text"
+                        value={birthDate}
+                        onChange={handleBirthDateChange}
+                        placeholder="12/05/1990"
+                        required
+                      />
+                      <span className="sp-hint">
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                        Format : jour/mois/année. Âge minimum requis : 16 ans.
+                      </span>
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">{t('signup.birthPlace', 'Lieu de naissance')}</label>
-                      <input className="sp-input" value={placeOfBirth} onChange={e => setPlaceOfBirth(e.target.value)} placeholder="Ex : Lélouma" required />
+                      <label className="sp-label">
+                        {t('signup.birthPlace', 'Lieu de naissance')}<Req />
+                      </label>
+                      <input
+                        className="sp-input"
+                        value={placeOfBirth}
+                        onChange={e => setPlaceOfBirth(e.target.value)}
+                        placeholder="Ex : Pita, Lélouma"
+                        required
+                      />
+                      <span className="sp-hint">
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                        Ville ou préfecture de naissance.
+                      </span>
                     </div>
                   </div>
 
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.birthCountry', 'Pays de naissance')}</label>
-                    <select className="sp-select" value={birthCountry} onChange={e => { setBirthCountry(e.target.value); if (e.target.value !== 'Autre') setCustomBirthCountry(''); }} required>
+                    <label className="sp-label">
+                      {t('signup.birthCountry', 'Pays de naissance')}<Req />
+                    </label>
+                    <select
+                      className="sp-select"
+                      value={birthCountry}
+                      onChange={e => { setBirthCountry(e.target.value); if (e.target.value !== 'Autre') setCustomBirthCountry(''); }}
+                      required
+                    >
                       <option value="">{t('signup.selectCountry', 'Sélectionnez un pays...')}</option>
                       {COUNTRIES.map(c => (
                         <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
                     {birthCountry === 'Autre' && (
-                      <input className="sp-input" value={customBirthCountry} onChange={e => setCustomBirthCountry(e.target.value)} placeholder={t('signup.specifyCountry', 'Précisez votre pays')} required style={{ marginTop: '0.4rem' }} />
+                      <input
+                        className="sp-input"
+                        value={customBirthCountry}
+                        onChange={e => setCustomBirthCountry(e.target.value)}
+                        placeholder={t('signup.specifyCountry', 'Précisez votre pays')}
+                        required
+                        style={{ marginTop: '0.4rem' }}
+                      />
                     )}
                   </div>
 
                   <p className="sp-section-title">{t('signup.contactProfession', 'Coordonnées & Profession')}</p>
 
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.residenceCountry', 'Pays de résidence')}</label>
-                    <select className="sp-select" value={country} onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre') setCustomCountry(''); }} required>
+                    <label className="sp-label">
+                      {t('signup.residenceCountry', 'Pays de résidence')}<Req />
+                    </label>
+                    <select
+                      className="sp-select"
+                      value={country}
+                      onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre') setCustomCountry(''); }}
+                      required
+                    >
                       <option value="">{t('signup.selectCountry', 'Sélectionnez votre pays...')}</option>
                       {COUNTRIES.map(c => (
                         <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
                     {country === 'Autre' && (
-                      <input className="sp-input" value={customCountry} onChange={e => setCustomCountry(e.target.value)} placeholder={t('signup.specifyCountry', 'Précisez votre pays')} required style={{ marginTop: '0.4rem' }} />
+                      <input
+                        className="sp-input"
+                        value={customCountry}
+                        onChange={e => setCustomCountry(e.target.value)}
+                        placeholder={t('signup.specifyCountry', 'Précisez votre pays')}
+                        required
+                        style={{ marginTop: '0.4rem' }}
+                      />
                     )}
+                    <span className="sp-hint">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                      Sélectionnez d&apos;abord votre pays pour que l&apos;indicatif téléphonique se mette à jour automatiquement.
+                    </span>
                   </div>
 
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">Email</label>
-                      <input className="sp-input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="vous@exemple.com" required />
-                    </div>
-                    <div className="sp-field">
-                      <label className="sp-label">{t('signup.phone', 'Téléphone')}</label>
-                      <input 
-                        className="sp-input" 
-                        value={phone} 
-                        onChange={e => setPhone(e.target.value)} 
-                        placeholder={country ? t('signup.enterPhone', "Entrez le numéro") : t('signup.phoneHint', "Sélectionnez un pays d'abord")} 
+                      <label className="sp-label">
+                        Email<Req />
+                      </label>
+                      <input
+                        className="sp-input"
+                        type="email"
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="vous@exemple.com"
                         required
                       />
+                      <span className="sp-hint">
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                        Un email de vérification vous sera envoyé ici.
+                      </span>
+                    </div>
+                    <div className="sp-field">
+                      <label className="sp-label">
+                        {t('signup.phone', 'Téléphone')}<Req />
+                      </label>
+                      <input
+                        className="sp-input"
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                        placeholder={country ? t('signup.enterPhone', "Entrez le numéro") : t('signup.phoneHint', "Sélectionnez un pays d'abord")}
+                        required
+                      />
+                      <span className="sp-hint">
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                        Indicatif + numéro. Ex : +224 621 00 00 00
+                      </span>
                     </div>
                   </div>
 
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.profession', 'Profession / Situation')}</label>
-                    <select className="sp-select" value={profession} onChange={e => setProfession(e.target.value)} required>
+                    <label className="sp-label">
+                      {t('signup.profession', 'Profession / Situation')}<Req />
+                    </label>
+                    <select
+                      className="sp-select"
+                      value={profession}
+                      onChange={e => setProfession(e.target.value)}
+                      required
+                    >
                       <option value="">{t('signup.selectProfession', 'Sélectionnez une profession')}</option>
                       {PROFESSION_LIST.map(p => (
                         <option key={p} value={p}>{p}</option>
@@ -870,18 +1033,47 @@ export default function MemberSignupPage() {
                   
                   <div className="sp-grid-2">
                     <div className="sp-field">
-                      <label className="sp-label">{t('signup.city', 'Ville')}</label>
-                      <input className="sp-input" value={city} onChange={e => setCity(e.target.value)} placeholder="Ex: Paris, Conakry" required />
+                      <label className="sp-label">
+                        {t('signup.city', 'Ville')}<Req />
+                      </label>
+                      <input
+                        className="sp-input"
+                        value={city}
+                        onChange={e => setCity(e.target.value)}
+                        placeholder="Ex : Paris, Conakry"
+                        required
+                      />
                     </div>
                     <div className="sp-field">
-                      <label className="sp-label">{t('signup.postalCode', 'Code postal')} <span className="sp-opt">({t('signup.optional', 'optionnel')})</span></label>
-                      <input className="sp-input" value={postalCode} onChange={e => setPostalCode(e.target.value)} placeholder="Ex: 75001" maxLength={5} />
+                      <label className="sp-label">
+                        {t('signup.postalCode', 'Code postal')}
+                        <span className="sp-opt">({t('signup.optional', 'optionnel')})</span>
+                      </label>
+                      <input
+                        className="sp-input"
+                        value={postalCode}
+                        onChange={e => setPostalCode(e.target.value)}
+                        placeholder="Ex : 75001"
+                        maxLength={5}
+                      />
                     </div>
                   </div>
 
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.address1', 'Adresse de résidence')}</label>
-                    <input className="sp-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} placeholder="12 rue..." required />
+                    <label className="sp-label">
+                      {t('signup.address1', 'Adresse de résidence')}<Req />
+                    </label>
+                    <input
+                      className="sp-input"
+                      value={addressLine1}
+                      onChange={e => setAddressLine1(e.target.value)}
+                      placeholder="Ex : 12 rue des Fleurs, Apt 3"
+                      required
+                    />
+                    <span className="sp-hint">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                      Numéro, rue, bâtiment ou quartier.
+                    </span>
                   </div>
                 </div>
               )}
@@ -891,21 +1083,54 @@ export default function MemberSignupPage() {
                 <div className="sp-panel sp-stack">
                   <p className="sp-section-title">{t('signup.profilePhoto', 'Photo de profil')}</p>
 
+                  <div className="sp-notice">
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0, marginTop: '1px' }}>
+                      <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+                    </svg>
+                    La photo est <strong>facultative</strong> mais recommandée — elle apparaîtra sur votre carte membre et facilitera votre identification par l&apos;administrateur.
+                  </div>
+
                   <div className="sp-photo-box">
                     <div className="sp-photo-avatar">
                       {photoPreviewUrl
                         ? <Image src={photoPreviewUrl} alt="Aperçu" width={100} height={100} unoptimized />
                         : (initials || '?')}
                     </div>
-                    <div className="sp-photo-actions">
+
+                    {photoError && (
+                      <div className="sp-error" style={{ marginBottom: '0.75rem', justifyContent: 'center' }}>
+                        {photoError}
+                      </div>
+                    )}
+
+                    <div className="sp-photo-actions" style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                       <label className="sp-file-label" htmlFor="signup-photo-input">
+                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
                         {photoPreviewUrl ? t('signup.changePhoto', 'Changer la photo') : t('signup.choosePhoto', 'Choisir une photo')}
                       </label>
-                      <input ref={photoInputRef} id="signup-photo-input" className="sp-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={handlePhotoChange} />
+                      <input
+                        ref={photoInputRef}
+                        id="signup-photo-input"
+                        className="sp-file-input"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={handlePhotoChange}
+                      />
                       {photoPreviewUrl && (
-                        <button type="button" className="sp-photo-remove-btn" onClick={removePhoto}>{t('signup.delete', 'Supprimer')}</button>
+                        <button type="button" className="sp-photo-remove-btn" onClick={removePhoto}>
+                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                          {t('signup.delete', 'Supprimer')}
+                        </button>
                       )}
                     </div>
+
+                    <p style={{ marginTop: '0.85rem', fontSize: '0.7rem', color: '#94A3B8', fontWeight: 500 }}>
+                      Formats acceptés : JPG, PNG, WEBP · Taille max : 5 Mo
+                    </p>
                   </div>
                 </div>
               )}
@@ -913,12 +1138,32 @@ export default function MemberSignupPage() {
               {/* ── STEP 3 : Sécurité ── */}
               {step === 3 && (
                 <div className="sp-panel sp-stack">
+                  {/* Required legend */}
+                  <p className="sp-required-legend">
+                    <span>*</span> Les champs marqués d&apos;une étoile sont obligatoires.
+                  </p>
+
                   <p className="sp-section-title">{t('signup.passwordTitle', 'Mot de passe')}</p>
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.passwordTitle', 'Mot de passe')}</label>
+                    <label className="sp-label">
+                      {t('signup.passwordTitle', 'Mot de passe')}<Req />
+                    </label>
                     <div className="sp-input-wrap">
-                      <input className="sp-input has-icon" type={showPwd ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder={t('signup.pwdMin', '8 caractères minimum')} required />
-                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd(v => !v)}>{showPwd ? t('signup.hide', 'Cacher') : t('signup.show', 'Voir')}</button>
+                      <input
+                        className="sp-input has-icon"
+                        type={showPwd ? 'text' : 'password'}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder={t('signup.pwdMin', '8 caractères minimum')}
+                        required
+                      />
+                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd(v => !v)}>
+                        {showPwd ? (
+                          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                        ) : (
+                          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        )}
+                      </button>
                     </div>
                     {password && (
                       <div className="sp-pwd-strength">
@@ -930,13 +1175,44 @@ export default function MemberSignupPage() {
                         <span className="sp-pwd-label" style={{ color: strengthColor }}>{strengthLabel}</span>
                       </div>
                     )}
+                    <span className="sp-hint">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                      Pour un mot de passe fort : mélangez majuscules, chiffres et symboles.
+                    </span>
                   </div>
                   <div className="sp-field">
-                    <label className="sp-label">{t('signup.confirmPwd', 'Confirmer le mot de passe')}</label>
+                    <label className="sp-label">
+                      {t('signup.confirmPwd', 'Confirmer le mot de passe')}<Req />
+                    </label>
                     <div className="sp-input-wrap">
-                      <input className="sp-input has-icon" type={showPwd2 ? 'text' : 'password'} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)} placeholder={t('signup.retypePwd', 'Répétez le mot de passe')} required />
-                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd2(v => !v)}>{showPwd2 ? t('signup.hide', 'Cacher') : t('signup.show', 'Voir')}</button>
+                      <input
+                        className="sp-input has-icon"
+                        type={showPwd2 ? 'text' : 'password'}
+                        value={passwordConfirm}
+                        onChange={e => setPasswordConfirm(e.target.value)}
+                        placeholder={t('signup.retypePwd', 'Répétez le mot de passe')}
+                        required
+                      />
+                      <button type="button" className="sp-eye-btn" onClick={() => setShowPwd2(v => !v)}>
+                        {showPwd2 ? (
+                          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268-2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                        ) : (
+                          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        )}
+                      </button>
                     </div>
+                    {passwordConfirm && password !== passwordConfirm && (
+                      <span className="sp-hint" style={{ color: '#DC2626' }}>
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
+                        Les mots de passe ne correspondent pas encore.
+                      </span>
+                    )}
+                    {passwordConfirm && password === passwordConfirm && (
+                      <span className="sp-hint" style={{ color: '#047857' }}>
+                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        Les mots de passe correspondent.
+                      </span>
+                    )}
                   </div>
 
                   <div className="sp-checkbox-wrapper">
@@ -950,6 +1226,7 @@ export default function MemberSignupPage() {
                     />
                     <label htmlFor="legal-accept" className="sp-legal-label">
                       {t('signup.acceptLegal1', 'J\'ai lu et j\'accepte sans réserve les')} <Link href="/mentions-legales" className="sp-legal-link" target="_blank">{t('signup.legalMentions', 'Mentions Légales')}</Link> {t('signup.acceptLegal2', 'ainsi que la')} <Link href="/confidentialite" className="sp-legal-link" target="_blank">{t('signup.privacyPolicy', 'Politique de Confidentialité')}</Link> {t('signup.acceptLegal3', `de l'association ${theme.name}.`)}
+                      <span style={{ color: '#DC2626', marginLeft: '0.2rem', fontWeight: 900 }}>*</span>
                     </label>
                   </div>
 
@@ -957,16 +1234,39 @@ export default function MemberSignupPage() {
               )}
 
               {/* Error */}
-              {error && <div className="sp-error" style={{ marginTop: '1.25rem' }}>{error}</div>}
+              {error && (
+                <div className="sp-error" style={{ marginTop: '1.25rem' }}>
+                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0 }}>
+                    <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
+                  </svg>
+                  {error}
+                </div>
+              )}
 
               {/* Navigation */}
               <div className="sp-nav">
-                {step > 0 && <button type="button" className="sp-btn-back" onClick={prevStep}>{t('signup.back', 'Retour')}</button>}
+                {step > 0 && (
+                  <button type="button" className="sp-btn-back" onClick={prevStep}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 12H5M12 5l-7 7 7 7" />
+                    </svg>
+                    {t('signup.back', 'Retour')}
+                  </button>
+                )}
                 {step < STEPS.length - 1 ? (
-                  <button type="button" className="sp-btn-next" onClick={nextStep} disabled={step === 2 && !!photoError}>{t('signup.continue', 'Continuer')}</button>
+                  <button type="button" className="sp-btn-next" onClick={nextStep} disabled={step === 2 && !!photoError}>
+                    {t('signup.continue', 'Continuer')}
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 ) : (
                   <button type="submit" className="sp-btn-submit" disabled={submitting || !termsAccepted}>
-                    {submitting ? <div className="sp-spinner" /> : t('signup.createAccount', 'Créer mon compte')}
+                    {submitting ? (
+                      <><div className="sp-spinner" /> {t('signup.submitting', 'Envoi en cours…')}</>
+                    ) : (
+                      <>{t('signup.createAccount', 'Créer mon compte')}</>
+                    )}
                   </button>
                 )}
               </div>

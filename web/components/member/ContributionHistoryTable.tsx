@@ -49,17 +49,6 @@ function getMethodLabel(method?: string | null) {
   return method ? (map[method] ?? method) : '—';
 }
 
-function getMethodLabelShort(method?: string | null) {
-  const map: Record<string, string> = {
-    CASH: 'Espèces',
-    BANK_TRANSFER: 'Virement',
-    MOBILE_MONEY: 'Mobile',
-    CARD: 'Carte',
-    OTHER: 'Autre',
-  };
-  return method ? (map[method] ?? method) : '—';
-}
-
 function getPurposeConfig(purpose?: string | null) {
   const map: Record<string, { label: string; icon: string; color: string; bg: string }> = {
     REGULAR_QUOTA:   { label: 'Cotisation régulière',  icon: '📅', color: '#059669', bg: '#ECFDF5' },
@@ -126,7 +115,7 @@ function EditAmountModal({
   const [value, setValue] = useState(String(item.amount ?? ''));
   const [busy, setBusy] = useState(false);
 
-  const handleConfirm = async () => {
+  const handleConfirm = () => {
     const num = parseFloat(value.replace(',', '.'));
     if (!num || num <= 0) return;
     setBusy(true);
@@ -152,7 +141,6 @@ function EditAmountModal({
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '1.25rem' }}>
           <div style={{
             width: 40, height: 40, borderRadius: '50%',
@@ -173,7 +161,6 @@ function EditAmountModal({
           </div>
         </div>
 
-        {/* Input */}
         <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.45rem' }}>
           Nouveau montant ({item.currency || 'EUR'})
         </label>
@@ -191,33 +178,16 @@ function EditAmountModal({
             fontSize: '1.2rem', fontWeight: 700, color: '#111827',
             outline: 'none', boxSizing: 'border-box',
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = '#2563EB'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'; }}
-          onBlur={e => { e.currentTarget.style.borderColor = '#BFDBFE'; e.currentTarget.style.boxShadow = 'none'; }}
         />
 
-        {/* Buttons */}
         <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
-          <button
-            onClick={onClose}
-            style={{
-              flex: 1, height: 42, borderRadius: 10,
-              border: '1.5px solid #E5E7EB', background: 'white',
-              color: '#374151', fontFamily: "'DM Sans', sans-serif",
-              fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer',
-            }}
-          >
+          <button onClick={onClose} style={{ flex: 1, height: 42, borderRadius: 10, border: '1.5px solid #E5E7EB', background: 'white', color: '#374151', fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}>
             Annuler
           </button>
           <button
-            onClick={() => void handleConfirm()}
+            onClick={handleConfirm}
             disabled={busy || !value || parseFloat(value) <= 0}
-            style={{
-              flex: 1, height: 42, borderRadius: 10, border: 'none',
-              background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)',
-              color: 'white', fontFamily: "'DM Sans', sans-serif",
-              fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer',
-              opacity: busy ? 0.65 : 1,
-            }}
+            style={{ flex: 1, height: 42, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#1D4ED8,#3B82F6)', color: 'white', fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', fontWeight: 800, cursor: 'pointer', opacity: busy ? 0.65 : 1 }}
           >
             {busy ? '…' : 'Enregistrer'}
           </button>
@@ -232,155 +202,84 @@ function EditAmountModal({
 function DetailPanel({
   item,
   onClose,
-  onCancel,
+  onDelete,
   onEdit,
 }: {
   item: ExtendedContribution;
   onClose: () => void;
-  onCancel?: (id: string) => void;
-  onEdit?: (id: string, newAmount: number) => void;
+  onDelete?: (id: string) => Promise<void>;
+  onEdit?: (id: string, newAmount: number) => Promise<void>;
 }) {
   const purposeCfg = getPurposeConfig(item.purpose);
   const statusCfg = getStatusConfig(item.status);
   const isPending = item.status === 'PENDING_VALIDATION' || item.status === 'PENDING';
   const [showEditModal, setShowEditModal] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete(item.id);
+      onClose();
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleEditConfirm = async (newAmount: number) => {
+    if (!onEdit) return;
+    await onEdit(item.id, newAmount);
+    setShowEditModal(false);
+    onClose();
+  };
 
   return (
     <>
       <style>{`
         .dp-overlay {
           position: fixed; inset: 0; z-index: 1000;
-          background: rgba(0,0,0,0.45);
-          backdrop-filter: blur(3px);
+          background: rgba(0,0,0,0.45); backdrop-filter: blur(3px);
           animation: dpfadein 0.2s ease;
           display: flex; align-items: center; justify-content: center;
           padding: 1.25rem;
         }
         @keyframes dpfadein { from { opacity: 0; } to { opacity: 1; } }
-
         .dp-sheet {
-          width: 100%;
-          max-width: 420px;
-          background: #fff;
-          border-radius: 22px;
-          padding: 0 0 0;
-          max-height: 88vh;
-          overflow-y: auto;
+          width: 100%; max-width: 420px; background: #fff; border-radius: 22px;
+          max-height: 88vh; overflow-y: auto;
           animation: dppopin 0.28s cubic-bezier(.22,1,.36,1);
           box-shadow: 0 24px 60px rgba(0,0,0,0.18);
         }
         @keyframes dppopin { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
-
-        .dp-header {
-          padding: 1rem 1.25rem 0.75rem;
-          border-bottom: 1px solid #F3F4F6;
-          display: flex; justify-content: space-between; align-items: center;
-        }
-        .dp-title {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 1.25rem; font-weight: 500; color: #111827;
-        }
-        .dp-close {
-          width: 32px; height: 32px; border-radius: 50%;
-          background: #F3F4F6; border: none; cursor: pointer;
-          display: flex; align-items: center; justify-content: center;
-          color: #6B7280;
-        }
-
-        .dp-amount-block {
-          padding: 1.25rem 1.25rem 0;
-          display: flex; align-items: baseline; gap: 0.5rem;
-        }
-        .dp-amount {
-          font-family: 'Cormorant Garamond', serif;
-          font-size: 2rem; font-weight: 600; color: #111827;
-        }
-
-        .dp-body { padding: 1rem 1.25rem 0; display: flex; flex-direction: column; gap: 0; }
-
-        .dp-row {
-          display: flex; align-items: flex-start; justify-content: space-between;
-          padding: 0.72rem 0;
-          border-bottom: 1px solid #F9FAFB;
-          gap: 1rem;
-        }
+        .dp-header { padding: 1rem 1.25rem 0.75rem; border-bottom: 1px solid #F3F4F6; display: flex; justify-content: space-between; align-items: center; }
+        .dp-title { font-family: 'Cormorant Garamond', serif; font-size: 1.25rem; font-weight: 500; color: #111827; }
+        .dp-close { width: 32px; height: 32px; border-radius: 50%; background: #F3F4F6; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #6B7280; }
+        .dp-amount-block { padding: 1.25rem 1.25rem 0; display: flex; align-items: baseline; gap: 0.5rem; }
+        .dp-amount { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 600; color: #111827; }
+        .dp-body { padding: 1rem 1.25rem 0; display: flex; flex-direction: column; }
+        .dp-row { display: flex; align-items: flex-start; justify-content: space-between; padding: 0.72rem 0; border-bottom: 1px solid #F9FAFB; gap: 1rem; }
         .dp-row:last-child { border-bottom: none; }
-        .dp-row-label {
-          font-size: 0.71rem; font-weight: 700; letter-spacing: 0.07em;
-          text-transform: uppercase; color: #9CA3AF;
-          flex-shrink: 0; padding-top: 1px;
-        }
-        .dp-row-value {
-          font-size: 0.83rem; color: #1F2937; font-weight: 500;
-          text-align: right; word-break: break-word;
-        }
+        .dp-row-label { font-size: 0.71rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #9CA3AF; flex-shrink: 0; padding-top: 1px; }
+        .dp-row-value { font-size: 0.83rem; color: #1F2937; font-weight: 500; text-align: right; word-break: break-word; }
         .dp-row-value.muted { color: #9CA3AF; font-weight: 400; }
-
-        .dp-purpose-tag {
-          display: inline-flex; align-items: center; gap: 0.35rem;
-          font-size: 0.78rem; font-weight: 600;
-          padding: 0.25rem 0.65rem; border-radius: 99px;
-        }
-        .dp-note-box {
-          background: #F9FAFB; border: 1px solid #E5E7EB;
-          border-radius: 10px; padding: 0.65rem 0.85rem;
-          font-size: 0.8rem; color: #374151; line-height: 1.55;
-          font-style: italic; text-align: left; width: 100%;
-          margin-top: 0.25rem; box-sizing: border-box;
-        }
-
-        /* ← Member action footer */
-        .dp-member-actions {
-          padding: 1rem 1.25rem 1.25rem;
-          display: flex; flex-direction: column; gap: 0.55rem;
-          border-top: 1px solid #F3F4F6; margin-top: 0.5rem;
-        }
-        .dp-action-label {
-          font-size: 0.62rem; font-weight: 900; color: #9CA3AF;
-          text-transform: uppercase; letter-spacing: 0.08em;
-          margin-bottom: 0.1rem;
-        }
+        .dp-purpose-tag { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; padding: 0.25rem 0.65rem; border-radius: 99px; }
+        .dp-note-box { background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 10px; padding: 0.65rem 0.85rem; font-size: 0.8rem; color: #374151; line-height: 1.55; font-style: italic; text-align: left; width: 100%; margin-top: 0.25rem; box-sizing: border-box; }
+        .dp-member-actions { padding: 1rem 1.25rem 1.25rem; display: flex; flex-direction: column; gap: 0.55rem; border-top: 1px solid #F3F4F6; margin-top: 0.5rem; }
+        .dp-action-label { font-size: 0.62rem; font-weight: 900; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.1rem; }
         .dp-action-row { display: flex; gap: 0.55rem; }
-        .dp-btn-edit {
-          flex: 1; height: 42px; border-radius: 11px;
-          border: 1.5px solid #BFDBFE; background: #EFF6FF;
-          color: #1D4ED8; font-family: 'DM Sans', sans-serif;
-          font-size: 0.78rem; font-weight: 800; cursor: pointer;
-          display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-          transition: all 0.2s;
-        }
+        .dp-btn-edit { flex: 1; height: 42px; border-radius: 11px; border: 1.5px solid #BFDBFE; background: #EFF6FF; color: #1D4ED8; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s; }
         .dp-btn-edit:hover { background: #DBEAFE; border-color: #3B82F6; }
-        .dp-btn-cancel {
-          flex: 1; height: 42px; border-radius: 11px;
-          border: 1.5px solid #FECACA; background: #FEF2F2;
-          color: #DC2626; font-family: 'DM Sans', sans-serif;
-          font-size: 0.78rem; font-weight: 800; cursor: pointer;
-          display: flex; align-items: center; justify-content: center; gap: 0.4rem;
-          transition: all 0.2s;
-        }
-        .dp-btn-cancel:hover { background: #FEE2E2; border-color: #EF4444; }
-        .dp-confirm-cancel {
-          background: #FEF2F2; border: 1.5px solid #FECACA;
-          border-radius: 12px; padding: 0.85rem 1rem;
-          display: flex; flex-direction: column; gap: 0.6rem;
-        }
-        .dp-confirm-text {
-          font-size: 0.78rem; color: '#374151'; font-weight: 600; line-height: 1.5;
-        }
+        .dp-btn-delete { flex: 1; height: 42px; border-radius: 11px; border: 1.5px solid #FECACA; background: #FEF2F2; color: #DC2626; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s; }
+        .dp-btn-delete:hover:not(:disabled) { background: #FEE2E2; border-color: #EF4444; }
+        .dp-btn-delete:disabled { opacity: 0.55; cursor: not-allowed; }
+        .dp-confirm-box { background: #FEF2F2; border: 1.5px solid #FECACA; border-radius: 12px; padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+        .dp-confirm-text { font-size: 0.78rem; color: #374151; font-weight: 600; line-height: 1.5; }
         .dp-confirm-row { display: flex; gap: 0.5rem; }
-        .dp-confirm-yes {
-          flex: 1; height: 38px; border-radius: 9px;
-          border: none; background: #DC2626; color: white;
-          font-family: 'DM Sans', sans-serif; font-size: 0.78rem;
-          font-weight: 800; cursor: pointer;
-        }
-        .dp-confirm-no {
-          flex: 1; height: 38px; border-radius: 9px;
-          border: 1.5px solid #E5E7EB; background: white; color: #374151;
-          font-family: 'DM Sans', sans-serif; font-size: 0.78rem;
-          font-weight: 700; cursor: pointer;
-        }
+        .dp-confirm-yes { flex: 1; height: 38px; border-radius: 9px; border: none; background: #DC2626; color: white; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.35rem; }
+        .dp-confirm-yes:disabled { opacity: 0.6; cursor: not-allowed; }
+        .dp-confirm-no { flex: 1; height: 38px; border-radius: 9px; border: 1.5px solid #E5E7EB; background: white; color: #374151; font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 700; cursor: pointer; }
       `}</style>
 
       <div className="dp-overlay" onClick={onClose}>
@@ -389,7 +288,7 @@ function DetailPanel({
             <span className="dp-title">Détail du versement</span>
             <button className="dp-close" onClick={onClose} aria-label="Fermer">
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
           </div>
@@ -409,7 +308,6 @@ function DetailPanel({
               </div>
             )}
 
-            {/* Mois concerné */}
             <div className="dp-row">
               <span className="dp-row-label">Mois concerné</span>
               <MonthRefPill month={item.monthReference} year={item.yearReference} />
@@ -434,18 +332,13 @@ function DetailPanel({
 
             <div className="dp-row">
               <span className="dp-row-label">Référence</span>
-              <span className={`dp-row-value${item.reference ? '' : ' muted'}`}
-                style={{ fontFamily: item.reference ? 'monospace' : 'inherit', fontSize: item.reference ? '0.78rem' : '0.83rem' }}>
+              <span
+                className={`dp-row-value${item.reference ? '' : ' muted'}`}
+                style={{ fontFamily: item.reference ? 'monospace' : 'inherit', fontSize: item.reference ? '0.78rem' : '0.83rem' }}
+              >
                 {item.reference ?? '—'}
               </span>
             </div>
-
-            {item.antenna && (
-              <div className="dp-row">
-                <span className="dp-row-label">Antenne</span>
-                <span className="dp-row-value">{item.antenna.name}</span>
-              </div>
-            )}
 
             <div className="dp-row">
               <span className="dp-row-label">Statut</span>
@@ -478,52 +371,53 @@ function DetailPanel({
             )}
           </div>
 
-          {/* ── Member actions: visible only if PENDING ── */}
-          {isPending && (onCancel || onEdit) && (
+          {/* ── Actions membre : visibles seulement si EN ATTENTE ── */}
+          {isPending && (onDelete || onEdit) && (
             <div className="dp-member-actions">
-              <div className="dp-action-label">Actions disponibles</div>
+              <div className="dp-action-label">Actions sur ce versement</div>
 
-              {!confirmCancel ? (
+              {!confirmDelete ? (
                 <div className="dp-action-row">
                   {onEdit && (
-                    <button
-                      className="dp-btn-edit"
-                      onClick={() => setShowEditModal(true)}
-                    >
-                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <button className="dp-btn-edit" onClick={() => setShowEditModal(true)}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
-                      Modifier le montant
+                      Modifier
                     </button>
                   )}
-                  {onCancel && (
-                    <button
-                      className="dp-btn-cancel"
-                      onClick={() => setConfirmCancel(true)}
-                    >
-                      <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  {onDelete && (
+                    <button className="dp-btn-delete" onClick={() => setConfirmDelete(true)}>
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
-                      Annuler le dépôt
+                      Supprimer
                     </button>
                   )}
                 </div>
               ) : (
-                <div className="dp-confirm-cancel">
-                  <p className="dp-confirm-text" style={{ margin: 0, color: '#374151' }}>
-                    Confirmer l&apos;annulation de ce dépôt de{' '}
-                    <strong>{formatCurrency(item.amount, item.currency)}</strong> ?
-                    Cette action est irréversible.
-                  </p>
+                /* ── Confirmation suppression ── */
+                <div className="dp-confirm-box">
+                  <div className="dp-confirm-text">
+                    ⚠️ Supprimer ce versement de <strong>{formatCurrency(item.amount, item.currency)}</strong> ?<br />
+                    Cette action est <strong>irréversible</strong>.
+                  </div>
                   <div className="dp-confirm-row">
-                    <button className="dp-confirm-no" onClick={() => setConfirmCancel(false)}>
-                      Retour
+                    <button className="dp-confirm-no" onClick={() => setConfirmDelete(false)}>
+                      Annuler
                     </button>
                     <button
                       className="dp-confirm-yes"
-                      onClick={() => { onCancel?.(item.id); onClose(); }}
+                      disabled={deleting}
+                      onClick={() => void handleDelete()}
                     >
-                      Oui, annuler
+                      {deleting
+                        ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />Suppression…</>
+                        : <>
+                          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          Oui, supprimer
+                        </>
+                      }
                     </button>
                   </div>
                 </div>
@@ -533,289 +427,169 @@ function DetailPanel({
         </div>
       </div>
 
-      {/* Edit amount modal stacked above */}
+      {/* Modal modification montant */}
       {showEditModal && (
         <EditAmountModal
           item={item}
           onClose={() => setShowEditModal(false)}
-          onConfirm={(newAmount) => {
-            onEdit?.(item.id, newAmount);
-            setShowEditModal(false);
-            onClose();
-          }}
+          onConfirm={handleEditConfirm}
         />
       )}
     </>
   );
 }
 
-// ─── Mobile card list ────────────────────────────────────────────────────────
-
-function MobileList({
-  items,
-  onSelect,
-}: {
-  items: ExtendedContribution[];
-  onSelect: (item: ExtendedContribution) => void;
-}) {
-  return (
-    <>
-      <style>{`
-        .ml-list { display: flex; flex-direction: column; }
-        .ml-row {
-          display: flex; align-items: center;
-          padding: 0.85rem 1rem; gap: 0.75rem;
-          border-bottom: 1px solid rgba(0,0,0,0.05);
-          cursor: pointer; transition: background 0.15s;
-          -webkit-tap-highlight-color: transparent;
-        }
-        .ml-row:last-child { border-bottom: none; }
-        .ml-row:active { background: #F9FAFB; }
-        .ml-left { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.18rem; }
-        .ml-amount { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; font-weight: 600; color: #111827; }
-        .ml-meta {
-          font-size: 0.72rem; color: #6B7280;
-          display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;
-        }
-        .ml-meta-sep { color: #D1D5DB; }
-        .ml-meta-label { font-weight: 700; color: #9CA3AF; margin-right: -0.15rem; }
-        .ml-method-chip {
-          display: inline-flex; align-items: center;
-          font-size: 0.68rem; font-weight: 600;
-          background: #F3F4F6; color: #374151;
-          border: 1px solid #E5E7EB; border-radius: 6px; padding: 0.1rem 0.45rem;
-        }
-        .ml-month-chip {
-          display: inline-flex; align-items: center; gap: 0.25rem;
-          font-size: 0.67rem; font-weight: 800;
-          background: #EFF6FF; color: #1D4ED8;
-          border: 1px solid #BFDBFE; border-radius: 6px; padding: 0.1rem 0.45rem;
-        }
-        .ml-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; flex-shrink: 0; }
-        .ml-chevron { color: #D1D5DB; }
-      `}</style>
-
-      <div className="ml-list">
-        {items.map(item => {
-          const monthLabel = formatMonthRef(item.monthReference, item.yearReference);
-          return (
-            <div key={item.id} className="ml-row" onClick={() => onSelect(item)} role="button" tabIndex={0}
-              onKeyDown={e => e.key === 'Enter' && onSelect(item)}>
-              <div className="ml-left">
-                <span className="ml-amount">{formatCurrency(item.amount, item.currency)}</span>
-                <div className="ml-meta">
-                  <span>{formatDate(item.contributionDate || item.createdAt)}</span>
-                  {monthLabel && (
-                    <>
-                      <span className="ml-meta-sep">·</span>
-                      <span className="ml-month-chip">
-                        <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                          <rect x="3" y="4" width="18" height="18" rx="2" />
-                          <path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" />
-                        </svg>
-                        {monthLabel}
-                      </span>
-                    </>
-                  )}
-                  <span className="ml-meta-sep">·</span>
-                  <span className="ml-meta-label">Méthode :</span>
-                  <span className="ml-method-chip">{getMethodLabelShort(item.paymentMethod)}</span>
-                </div>
-              </div>
-              <div className="ml-right">
-                <StatusBadge status={item.status} />
-                <svg className="ml-chevron" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/>
-                </svg>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-// ─── Desktop table ───────────────────────────────────────────────────────────
-
-function DesktopTable({
-  items,
-  onSelect,
-}: {
-  items: ExtendedContribution[];
-  onSelect: (item: ExtendedContribution) => void;
-}) {
-  const purposeCfgOf = (p?: string | null) => getPurposeConfig(p);
-
-  return (
-    <>
-      <style>{`
-        .cht-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        .cht-table { width: 100%; border-collapse: collapse; font-family: 'DM Sans', sans-serif; min-width: 720px; }
-        .cht-table thead tr { border-bottom: 1px solid rgba(5,150,105,0.08); }
-        .cht-table thead th {
-          padding: 0.6rem 1rem;
-          font-size: 0.63rem; font-weight: 700;
-          letter-spacing: 0.09em; text-transform: uppercase;
-          color: #9CA3AF; text-align: left; white-space: nowrap;
-        }
-        .cht-table tbody tr {
-          border-bottom: 1px solid rgba(5,150,105,0.05);
-          transition: background 0.15s; cursor: pointer;
-        }
-        .cht-table tbody tr:last-child { border-bottom: none; }
-        .cht-table tbody tr:hover { background: rgba(5,150,105,0.025); }
-        .cht-table td { padding: 0.72rem 1rem; font-size: 0.8rem; color: #374151; vertical-align: middle; }
-        .cht-amount { font-family: 'Cormorant Garamond', serif; font-size: 0.98rem; font-weight: 600; color: #111827; }
-        .cht-muted { color: #9CA3AF; font-size: 0.73rem; }
-        .cht-method-chip {
-          display: inline-flex; align-items: center; gap: 0.28rem;
-          font-size: 0.7rem; font-weight: 600;
-          background: #F3F4F6; color: #374151;
-          border: 1px solid #E5E7EB; border-radius: 7px; padding: 0.18rem 0.55rem;
-        }
-        .cht-purpose-pill {
-          display: inline-flex; align-items: center; gap: 0.35rem;
-          font-size: 0.73rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 99px;
-        }
-        .cht-ref { font-family: monospace; font-size: 0.72rem; color: #6B7280; }
-        .cht-submitter { font-size: 0.7rem; color: #059669; font-weight: 600; margin-top: 0.15rem; display: block; }
-        /* Pending indicator dot in table row */
-        .cht-pending-dot {
-          display: inline-block; width: 6px; height: 6px;
-          border-radius: 50%; background: #F59E0B; margin-right: 0.35rem;
-          vertical-align: middle; flex-shrink: 0;
-          animation: chtpulse 1.8s ease-in-out infinite;
-        }
-        @keyframes chtpulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
-      `}</style>
-
-      <div className="cht-wrap">
-        <table className="cht-table">
-          <thead>
-            <tr>
-              <th>Montant</th>
-              <th>Motif</th>
-              <th>Mois concerné</th>
-              <th>Méthode de paiement</th>
-              <th>Référence</th>
-              <th>Statut</th>
-              <th>Date dépôt</th>
-              <th>Validation</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(c => {
-              const pc = purposeCfgOf(c.purpose);
-              const isPending = c.status === 'PENDING_VALIDATION' || c.status === 'PENDING';
-              return (
-                <tr key={c.id} onClick={() => onSelect(c)} title={isPending ? 'Cliquez pour modifier ou annuler' : 'Voir les détails'}>
-                  <td>
-                    <span className="cht-amount">
-                      {isPending && <span className="cht-pending-dot" />}
-                      {formatCurrency(c.amount, c.currency)}
-                    </span>
-                  </td>
-                  <td>
-                    {pc ? (
-                      <span className="cht-purpose-pill" style={{ background: pc.bg, color: pc.color }}>
-                        {pc.icon} {pc.label}
-                      </span>
-                    ) : (
-                      <span className="cht-muted">—</span>
-                    )}
-                    {c.submitter && c.beneficiary && (
-                      <span className="cht-submitter">Par <strong>{c.submitter.firstName}</strong> pour <strong>{c.beneficiary.firstName}</strong></span>
-                    )}
-                  </td>
-                  <td>
-                    <MonthRefPill month={c.monthReference} year={c.yearReference} />
-                  </td>
-                  <td>
-                    <span className="cht-method-chip">{getMethodLabel(c.paymentMethod)}</span>
-                  </td>
-                  <td>
-                    {c.reference ? <span className="cht-ref">{c.reference}</span> : <span className="cht-muted">—</span>}
-                  </td>
-                  <td><StatusBadge status={c.status} /></td>
-                  <td className="cht-muted">{formatDate(c.contributionDate || c.createdAt)}</td>
-                  <td className="cht-muted">{formatDate(c.validatedAt ?? null)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-// ─── Empty state ─────────────────────────────────────────────────────────────
-
-function EmptyState() {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: '2.5rem 1rem', gap: '0.75rem',
-      color: '#9CA3AF',
-    }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: '50%',
-        background: '#F9FAFB', border: '1px solid #E5E7EB',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.5">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l-4-4 4-4m6 8l4-4-4-4"/>
-        </svg>
-      </div>
-      <p style={{ fontSize: '0.82rem', fontWeight: 500 }}>Aucune cotisation trouvée</p>
-    </div>
-  );
-}
-
-// ─── Main export ─────────────────────────────────────────────────────────────
+// ─── Main Export ─────────────────────────────────────────────────────────────
 
 export function ContributionHistoryTable({
   items,
-  onCancel,
+  onDelete,
   onEdit,
 }: {
   items: ExtendedContribution[];
-  onCancel?: (id: string) => void;
-  onEdit?: (id: string, newAmount: number) => void;
+  onDelete?: (id: string) => Promise<void>;
+  onEdit?: (id: string, newAmount: number) => Promise<void>;
 }) {
   const [selected, setSelected] = useState<ExtendedContribution | null>(null);
 
-  if (items.length === 0) return <EmptyState />;
+  // Tri : en attente en haut, puis par date décroissante
+  const sorted = [...items].sort((a, b) => {
+    const aP = a.status === 'PENDING_VALIDATION' || a.status === 'PENDING' ? 0 : 1;
+    const bP = b.status === 'PENDING_VALIDATION' || b.status === 'PENDING' ? 0 : 1;
+    if (aP !== bP) return aP - bP;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
   return (
     <>
       <style>{`
-        .cht-mobile { display: block; }
-        .cht-desktop { display: none; }
-        @media (min-width: 640px) {
-          .cht-mobile { display: none; }
-          .cht-desktop { display: block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .cht-list { display: flex; flex-direction: column; }
+
+        .cht-row {
+          display: flex; align-items: center; gap: 0.75rem;
+          padding: 0.9rem 1.25rem; border-bottom: 1px solid #F3F4F6;
+          cursor: pointer; transition: background 0.15s;
+          position: relative;
         }
+        .cht-row:last-child { border-bottom: none; }
+        .cht-row:hover { background: #F8FAFC; }
+        .cht-row.pending { background: #FFFBEB; }
+        .cht-row.pending:hover { background: #FEF3C7; }
+
+        /* Indicateur pending */
+        .cht-pending-bar {
+          position: absolute; left: 0; top: 20%; bottom: 20%;
+          width: 3px; border-radius: 0 3px 3px 0;
+          background: #D97706;
+        }
+
+        .cht-icon {
+          width: 38px; height: 38px; border-radius: 11px;
+          display: flex; align-items: center; justify-content: center;
+          flex-shrink: 0; font-size: 1.1rem;
+        }
+
+        .cht-info { flex: 1; min-width: 0; }
+        .cht-purpose { font-size: 0.82rem; font-weight: 700; color: #1E293B; margin-bottom: 2px; }
+        .cht-meta { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .cht-date { font-size: 0.68rem; color: #94A3B8; font-weight: 500; }
+        .cht-month { display: inline-flex; align-items: center; gap: 0.2rem; font-size: 0.62rem; font-weight: 700; color: #1D4ED8; background: #EFF6FF; border: 1px solid #BFDBFE; borderRadius: 99px; padding: 0.1rem 0.38rem; }
+
+        .cht-right { text-align: right; flex-shrink: 0; }
+        .cht-amount { font-family: 'DM Mono', monospace; font-size: 0.95rem; font-weight: 700; color: #1E293B; margin-bottom: 3px; }
+
+        .cht-edit-hint {
+          font-size: 0.6rem; font-weight: 800; color: #D97706;
+          background: #FEF3C7; border: 1px solid #FDE68A;
+          borderRadius: 99px; padding: 0.1rem 0.38rem;
+          display: inline-flex; align-items: center; gap: 0.2rem;
+          margin-top: 2px;
+        }
+
+        .cht-chevron { color: #D1D5DB; flex-shrink: 0; }
+        .cht-row:hover .cht-chevron { color: #2563EB; }
+
+        .cht-empty { padding: 3rem 1.5rem; text-align: center; color: #94A3B8; }
       `}</style>
 
-      {/* Mobile */}
-      <div className="cht-mobile">
-        <MobileList items={items} onSelect={setSelected} />
-      </div>
+      {sorted.length === 0 ? (
+        <div className="cht-empty">
+          <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.3" style={{ display: 'block', margin: '0 auto 0.75rem' }}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+          </svg>
+          <p style={{ fontWeight: 700, color: '#374151', marginBottom: '0.3rem' }}>Aucune cotisation</p>
+          <p style={{ fontSize: '0.8rem' }}>Vos versements apparaîtront ici.</p>
+        </div>
+      ) : (
+        <div className="cht-list">
+          {sorted.map(item => {
+            const purposeCfg = getPurposeConfig(item.purpose);
+            const isPending = item.status === 'PENDING_VALIDATION' || item.status === 'PENDING';
+            const monthLabel = formatMonthRef(item.monthReference, item.yearReference);
 
-      {/* Desktop */}
-      <div className="cht-desktop">
-        <DesktopTable items={items} onSelect={setSelected} />
-      </div>
+            return (
+              <div
+                key={item.id}
+                className={`cht-row${isPending ? ' pending' : ''}`}
+                onClick={() => setSelected(item)}
+              >
+                {isPending && <div className="cht-pending-bar" />}
 
-      {/* Detail panel */}
+                <div className="cht-icon" style={{ background: purposeCfg?.bg ?? '#F3F4F6' }}>
+                  {purposeCfg?.icon ?? '•'}
+                </div>
+
+                <div className="cht-info">
+                  <div className="cht-purpose">{purposeCfg?.label ?? item.purpose ?? 'Cotisation'}</div>
+                  <div className="cht-meta">
+                    <span className="cht-date">{formatDate(item.contributionDate || item.createdAt)}</span>
+                    {monthLabel && (
+                      <span className="cht-month">
+                        <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" /><path strokeLinecap="round" d="M16 2v4M8 2v4M3 10h18" /></svg>
+                        {monthLabel}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="cht-right">
+                  <div className="cht-amount">{formatCurrency(item.amount, item.currency)}</div>
+                  <StatusBadge status={item.status} />
+                  {isPending && (onDelete || onEdit) && (
+                    <div className="cht-edit-hint">
+                      <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      Modifiable
+                    </div>
+                  )}
+                </div>
+
+                <div className="cht-chevron">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {selected && (
         <DetailPanel
           item={selected}
           onClose={() => setSelected(null)}
-          onCancel={onCancel ? (id) => { onCancel(id); setSelected(null); } : undefined}
-          onEdit={onEdit ? (id, amount) => { onEdit(id, amount); setSelected(null); } : undefined}
+          onDelete={
+            (selected.status === 'PENDING_VALIDATION' || selected.status === 'PENDING') && onDelete
+              ? onDelete
+              : undefined
+          }
+          onEdit={
+            (selected.status === 'PENDING_VALIDATION' || selected.status === 'PENDING') && onEdit
+              ? onEdit
+              : undefined
+          }
         />
       )}
     </>

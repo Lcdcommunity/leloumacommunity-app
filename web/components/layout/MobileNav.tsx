@@ -103,6 +103,8 @@ const adminItems: NavItem[] = [
   { href: '/admin/documents',                 label: 'Documents & photos',     ico: ICO.fileText,    section: 'Contenu'   },
   { href: '/admin/contents',                  label: 'Informations',           ico: ICO.newspaper,   section: 'Contenu'   },
   { href: '/admin/late-members',              label: 'Retardataires +3 mois',  ico: ICO.clock,       section: 'Contenu'   },
+  // 🔥 NOUVEAU : Partenaires en lecture seule
+  { href: '/admin/sponsors',                  label: 'Partenaires',            ico: ICO.star,        section: 'Contenu'   },
   { href: '/admin/communication',             label: 'Envoi SMS & Push',       ico: ICO.send,        section: 'Outils'    },
   { href: '/admin/notifications',             label: 'Notifications',          ico: ICO.bell,        section: 'Outils'    },
   { href: '/admin/audit',                     label: 'Audit',                  ico: ICO.auditLog,    section: 'Outils'    },
@@ -124,6 +126,8 @@ const memberItems: NavItem[] = [
   { href: '/member/documents',                 label: 'Documents & photos',     ico: ICO.fileText,   section: 'Communauté' },
   { href: '/member/contents',                  label: 'Informations',           ico: ICO.newspaper,  section: 'Communauté' },
   { href: '/member/late-members',              label: 'Retardataires +3 mois',  ico: ICO.clock,      section: 'Communauté' },
+  // 🔥 NOUVEAU : Partenaires en lecture seule
+  { href: '/member/sponsors',                  label: 'Partenaires',            ico: ICO.star,       section: 'Communauté' },
   { href: '/member/notifications',             label: 'Notifications',          ico: ICO.bell,       section: 'Compte'     },
   { href: '/member/profile',                   label: 'Mon profil',             ico: ICO.user,       section: 'Compte'     },
   { href: '/member/settings',                  label: 'Paramètres',             ico: ICO.settings,   section: 'Compte'     },
