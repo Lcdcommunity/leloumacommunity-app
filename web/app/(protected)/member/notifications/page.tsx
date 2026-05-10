@@ -1,408 +1,402 @@
 // web/app/(protected)/member/notifications/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
+import { formatDate } from '../../../../lib/format';
 
-// On redéfinit le type localement pour s'aligner sur la vraie réponse du backend
 type NotificationItem = {
   id: string;
   message: string;
   createdAt: string;
   isRead: boolean;
   type?: string | null;
+  title?: string | null;
 };
 
-export default function MemberNotificationsPage() {
-  const [items, setItems] = useState<NotificationItem[]>([]);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
+type Filter = 'all' | 'unread' | 'read';
 
-  async function load() {
+function getTypeStyle(type?: string | null) {
+  switch (type) {
+    case 'CONTRIBUTION_VALIDATED':    return { emoji: '✅', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
+    case 'CONTRIBUTION_SUBMITTED':    return { emoji: '💰', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' };
+    case 'CONTRIBUTION_REJECTED':     return { emoji: '❌', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
+    case 'ACCOUNT_APPROVED':
+    case 'ACCOUNT_ACTIVATED':         return { emoji: '🎉', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
+    case 'ACCOUNT_SUSPENDED':         return { emoji: '🚫', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
+    case 'ACCOUNT_REJECTED':          return { emoji: '⛔', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
+    case 'PROJECT_PROPOSAL_APPROVED': return { emoji: '🎯', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' };
+    case 'PROJECT_PROPOSAL_REJECTED': return { emoji: '🚫', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
+    case 'PROJECT_PROPOSAL_SUBMITTED':return { emoji: '💡', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
+    case 'NEWS_PUBLISHED':            return { emoji: '📢', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' };
+    case 'DOCUMENT_PUBLISHED':        return { emoji: '📄', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
+    case 'PROJECT_CREATED':
+    case 'PROJECT_UPDATED':           return { emoji: '🏗️', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' };
+    case 'SYSTEM_ALERT':              return { emoji: '⚠️', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' };
+    default:                          return { emoji: '🔔', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' };
+  }
+}
+
+function typeLabel(type?: string | null): string {
+  const MAP: Record<string, string> = {
+    CONTRIBUTION_VALIDATED:    'Cotisation validée',
+    CONTRIBUTION_SUBMITTED:    'Cotisation soumise',
+    CONTRIBUTION_REJECTED:     'Cotisation rejetée',
+    ACCOUNT_APPROVED:          'Compte approuvé',
+    ACCOUNT_ACTIVATED:         'Compte activé',
+    ACCOUNT_SUSPENDED:         'Compte suspendu',
+    ACCOUNT_REJECTED:          'Compte rejeté',
+    PROJECT_PROPOSAL_APPROVED: 'Proposition approuvée',
+    PROJECT_PROPOSAL_REJECTED: 'Proposition rejetée',
+    PROJECT_PROPOSAL_SUBMITTED:'Proposition soumise',
+    NEWS_PUBLISHED:            'Actualité publiée',
+    DOCUMENT_PUBLISHED:        'Document publié',
+    PROJECT_CREATED:           'Projet créé',
+    PROJECT_UPDATED:           'Projet mis à jour',
+    SYSTEM_ALERT:              'Alerte système',
+  };
+  if (!type) return 'Notification';
+  return MAP[type] ?? type.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
+}
+
+const callDelete = (id: string) =>
+  (api as unknown as { deleteNotification?: (id: string) => Promise<void> })
+    .deleteNotification?.(id) ?? fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+
+export default function MemberNotificationsPage() {
+  const [items,       setItems]       = useState<NotificationItem[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [error,       setError]       = useState<string | null>(null);
+  const [filter,      setFilter]      = useState<Filter>('all');
+  const [selected,    setSelected]    = useState<Set<string>>(new Set());
+  const [busyIds,     setBusyIds]     = useState<Set<string>>(new Set());
+  const [bulkBusy,    setBulkBusy]    = useState(false);
+  const [selectMode,  setSelectMode]  = useState(false);
+  const [toast,       setToast]       = useState<{ msg: string; ok: boolean } | null>(null);
+
+  const showToast = (msg: string, ok = true) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 2600);
+  };
+
+  const addBusy    = (id: string) => setBusyIds(p => new Set(p).add(id));
+  const removeBusy = (id: string) => setBusyIds(p => { const s = new Set(p); s.delete(id); return s; });
+
+  const load = useCallback(async () => {
     setError(null);
     try {
-      // ✅ CORRECTION ICI : On déclare proprement les deux formats possibles pour ESLint
       const res = await api.listMyNotifications() as NotificationItem[] | { items: NotificationItem[] };
-      
-      if (Array.isArray(res)) {
-        setItems(res);
-      } else if (res && Array.isArray(res.items)) {
-        setItems(res.items);
-      } else {
-        setItems([]);
-      }
+      setItems(Array.isArray(res) ? res : (res?.items ?? []));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur chargement notifications');
+      setError(err instanceof Error ? err.message : 'Erreur chargement');
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [load]);
 
-  async function handleMarkRead(id: string) {
-    setBusyId(id);
+  const markRead = async (id: string) => {
+    addBusy(id);
     try {
       await api.markNotificationRead(id);
-      await load();
-    } finally {
-      setBusyId(null);
-    }
-  }
+      setItems(p => p.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } finally { removeBusy(id); }
+  };
 
-  async function handleMarkAllRead() {
+  const deleteOne = async (id: string) => {
+    addBusy(id);
+    try {
+      await callDelete(id);
+      setItems(p => p.filter(n => n.id !== id));
+      setSelected(p => { const s = new Set(p); s.delete(id); return s; });
+      showToast('Notification supprimée');
+    } catch { showToast('Erreur suppression', false); }
+    finally { removeBusy(id); }
+  };
+
+  const markAllRead = async () => {
+    setBulkBusy(true);
     const unread = items.filter(n => !n.isRead);
-    for (const n of unread) {
-      await api.markNotificationRead(n.id);
-    }
-    await load();
-  }
+    try {
+      await Promise.all(unread.map(n => api.markNotificationRead(n.id)));
+      setItems(p => p.map(n => ({ ...n, isRead: true })));
+      showToast(`${unread.length} notification${unread.length > 1 ? 's' : ''} marquée${unread.length > 1 ? 's' : ''} lues`);
+    } finally { setBulkBusy(false); }
+  };
 
-  const unreadCount = items.filter(n => !n.isRead).length;
-  const filtered = items.filter(n => {
-    if (filter === 'unread') return !n.isRead;
-    if (filter === 'read') return n.isRead;
-    return true;
+  const deleteSelected = async () => {
+    if (!selected.size) return;
+    setBulkBusy(true);
+    const ids = Array.from(selected);
+    try {
+      await Promise.all(ids.map(callDelete));
+      const c = ids.length;
+      setItems(p => p.filter(n => !selected.has(n.id)));
+      setSelected(new Set()); setSelectMode(false);
+      showToast(`${c} notification${c > 1 ? 's' : ''} supprimée${c > 1 ? 's' : ''}`);
+    } catch { showToast('Erreur suppression', false); }
+    finally { setBulkBusy(false); }
+  };
+
+  const deleteAll = async () => {
+    if (!window.confirm('Supprimer toutes les notifications ?')) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(items.map(n => callDelete(n.id)));
+      setItems([]); setSelected(new Set()); setSelectMode(false);
+      showToast('Toutes les notifications supprimées');
+    } catch { showToast('Erreur suppression', false); }
+    finally { setBulkBusy(false); }
+  };
+
+  const toggleSel = (id: string) => setSelected(p => {
+    const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s;
   });
 
-  // Petit helper pour formater la date
-  function formatDate(dateStr: string) {
-    const d = new Date(dateStr);
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    }).format(d);
-  }
+  const displayed   = items.filter(n => filter === 'unread' ? !n.isRead : filter === 'read' ? n.isRead : true);
+  const unreadCount = items.filter(n => !n.isRead).length;
+  const allSel      = !!displayed.length && selected.size === displayed.length;
+
+  const ICO_DEL = <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>;
+  const ICO_CHK = <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+  const ICO_SEL = <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="4" height="4" rx="1" strokeLinecap="round"/><rect x="10" y="3" width="4" height="4" rx="1" strokeLinecap="round"/><rect x="3" y="10" width="4" height="4" rx="1" strokeLinecap="round"/><rect x="10" y="10" width="4" height="4" rx="1" strokeLinecap="round"/></svg>;
+  const SPIN = (c: string) => <div style={{width:10,height:10,border:`2px solid ${c}33`,borderTopColor:c,borderRadius:'50%',animation:'nfspin .7s linear infinite'}}/>;
 
   return (
     <AppShell title="Notifications">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;500;600;700;800;900&family=DM+Mono:wght@500&display=swap');
 
-        .mn-wrap {
-          font-family: 'DM Sans', sans-serif;
-          padding: clamp(1.25rem, 3vw, 2rem);
-          max-width: 860px; margin: 0 auto;
-        }
+        @keyframes nfin   {from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes nfspin {to{transform:rotate(360deg)}}
+        @keyframes nfpop  {from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+        @keyframes nfpulse{0%,100%{opacity:1}50%{opacity:.3}}
+        @keyframes nftoast{0%{opacity:0;transform:translateX(-50%) translateY(10px)} 12%,82%{opacity:1;transform:translateX(-50%) translateY(0)} 100%{opacity:0;transform:translateX(-50%) translateY(-6px)}}
 
-        /* Header */
-        .mn-header {
-          display: flex; justify-content: space-between; align-items: flex-end;
-          flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem;
-          opacity: 0; transform: translateY(10px);
-          animation: mnin 0.5s 0.04s cubic-bezier(.22,1,.36,1) forwards;
-        }
-        .mn-eyebrow { font-size: 0.67rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #2563EB; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem; }
-        .mn-eyebrow-dot { width: 6px; height: 6px; background: #3B82F6; border-radius: 50%; animation: mnpulse 2s ease-in-out infinite; }
-        @keyframes mnpulse { 0%,100%{opacity:1;} 50%{opacity:.3;} }
-        .mn-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.5rem, 3vw, 1.9rem); font-weight: 500; color: #111827; letter-spacing: -0.02em; line-height: 1.15; }
-        .mn-title span { background: linear-gradient(135deg,#1D4ED8,#3B82F6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .nf-wrap{font-family:'DM Sans',sans-serif;padding:clamp(.85rem,3vw,1.5rem);max-width:700px;margin:0 auto;padding-bottom:6rem}
 
-        .mn-unread-badge {
-          display: inline-flex; align-items: center; justify-content: center;
-          min-width: 22px; height: 22px; padding: 0 0.45rem;
-          background: #EF4444; color: white; border-radius: 99px;
-          font-size: 0.65rem; font-weight: 800; margin-left: 0.5rem;
-          animation: mnpop 0.4s cubic-bezier(.22,1,.36,1);
-        }
-        @keyframes mnpop { from{opacity:0;transform:scale(.4);} to{opacity:1;transform:scale(1);} }
+        .nf-header{margin-bottom:1.1rem;opacity:0;animation:nfin .4s .03s cubic-bezier(.22,1,.36,1) forwards}
+        .nf-eyebrow{font-size:.59rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#059669;margin-bottom:.2rem;display:flex;align-items:center;gap:.32rem}
+        .nf-eyedot{width:5px;height:5px;background:#10B981;border-radius:50%;animation:nfpulse 2s ease-in-out infinite}
+        .nf-titlerow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
+        .nf-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,4vw,1.8rem);font-weight:700;color:#0F172A;letter-spacing:-.02em;margin:0;line-height:1.1}
+        .nf-title span{color:#059669}
+        .nf-pill{display:inline-flex;align-items:center;justify-content:center;min-width:21px;height:21px;padding:0 .42rem;background:#DC2626;color:white;border-radius:99px;font-size:.65rem;font-weight:900;animation:nfpop .3s cubic-bezier(.22,1,.36,1)}
 
-        .mn-markall-btn {
-          display: inline-flex; align-items: center; gap: 0.4rem;
-          height: 38px; padding: 0 1rem;
-          background: #EFF6FF; color: #1D4ED8;
-          border: 1.5px solid #BFDBFE; border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.76rem; font-weight: 700; cursor: pointer;
-          transition: background 0.15s, border-color 0.15s, transform 0.15s;
-          white-space: nowrap;
-        }
-        .mn-markall-btn:hover:not(:disabled) { background: #DBEAFE; border-color: #2563EB; transform: translateY(-1px); }
-        .mn-markall-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .nf-stats{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap;opacity:0;animation:nfin .4s .055s cubic-bezier(.22,1,.36,1) forwards}
+        .nf-stat{background:white;border:1px solid #E2E8F0;border-radius:9px;padding:.35rem .65rem;display:flex;align-items:center;gap:.35rem;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+        .nf-sn{font-family:'DM Mono',monospace;font-size:.95rem;font-weight:700;line-height:1}
+        .nf-sl{font-size:.56rem;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:.05em}
 
-        /* Filter tabs */
-        .mn-filters {
-          display: flex; gap: 0.4rem; flex-wrap: wrap;
-          margin-bottom: 1.1rem;
-          opacity: 0; transform: translateY(10px);
-          animation: mnin 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards;
-        }
-        .mn-tab {
-          height: 36px; padding: 0 0.95rem;
-          border-radius: 99px; border: 1.5px solid rgba(37,99,235,0.13);
-          background: rgba(255,255,255,0.85); cursor: pointer;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.75rem; font-weight: 600; color: #374151;
-          transition: all 0.2s; white-space: nowrap;
-          display: flex; align-items: center; gap: 0.35rem;
-        }
-        .mn-tab:hover { border-color: rgba(37,99,235,0.35); background: #EFF6FF; color: #1D4ED8; }
-        .mn-tab.active { background: #EFF6FF; border-color: #2563EB; color: #1D4ED8; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        .mn-tab-count {
-          display: inline-flex; align-items: center; justify-content: center;
-          min-width: 18px; height: 18px; padding: 0 0.32rem;
-          border-radius: 99px; font-size: 0.6rem; font-weight: 800;
-        }
+        .nf-bar{display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem;opacity:0;animation:nfin .4s .08s cubic-bezier(.22,1,.36,1) forwards}
+        .nf-tabs{display:flex;gap:.18rem;background:#F1F5F9;padding:.18rem;border-radius:9px}
+        .nf-tab{border:none;background:transparent;padding:.25rem .58rem;border-radius:7px;font-size:.68rem;font-weight:700;color:#64748B;cursor:pointer;transition:all .12s;white-space:nowrap}
+        .nf-tab.on{background:white;color:#059669;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
-        /* Error */
-        .mn-error { display: flex; align-items: center; gap: 0.6rem; padding: 1rem; color: #B91C1C; font-size: 0.8rem; background: #FEF2F2; border-radius: 12px; border: 1px solid #FECACA; margin-bottom: 1rem; }
+        .nb{height:30px;padding:0 .68rem;border-radius:8px;border:1px solid;font-family:'DM Sans',sans-serif;font-size:.68rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.28rem;transition:all .12s;white-space:nowrap}
+        .nb:disabled{opacity:.42;cursor:not-allowed}
+        .ng{background:#ECFDF5;color:#059669;border-color:#A7F3D0}.ng:hover:not(:disabled){background:#D1FAE5;border-color:#059669}
+        .nr{background:#FEF2F2;color:#DC2626;border-color:#FECACA}.nr:hover:not(:disabled){background:#FEE2E2;border-color:#DC2626}
+        .ns{background:#F8FAFC;color:#475569;border-color:#CBD5E1}.ns:hover:not(:disabled){background:#F1F5F9;border-color:#94A3B8}
+        .na{background:#FFFBEB;color:#D97706;border-color:#FDE68A}.na:hover:not(:disabled){background:#FEF3C7;border-color:#D97706}
+        .nf-sc{font-size:.68rem;font-weight:700;color:#7C3AED;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:99px;padding:.16rem .55rem;white-space:nowrap}
 
-        /* Loader */
-        .mn-loader { display: flex; align-items: center; justify-content: center; padding: 3rem; gap: 0.75rem; color: #6B7280; font-size: 0.82rem; }
-        .mn-ring { width: 24px; height: 24px; border: 2.5px solid rgba(37,99,235,0.1); border-top-color: #2563EB; border-radius: 50%; animation: mnspin 0.8s linear infinite; }
-        @keyframes mnspin { to { transform: rotate(360deg); } }
+        .nf-panel{background:white;border-radius:16px;border:1px solid #E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.04);overflow:hidden;opacity:0;animation:nfin .4s .11s cubic-bezier(.22,1,.36,1) forwards}
 
-        /* Empty */
-        .mn-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3.5rem 1rem; gap: 0.8rem; color: #9CA3AF; }
-        .mn-empty-ico { width: 54px; height: 54px; border-radius: 50%; background: #F9FAFB; border: 1px solid #E5E7EB; display: flex; align-items: center; justify-content: center; }
-        .mn-empty p { font-size: 0.82rem; font-weight: 500; }
+        .nf-selbar{display:flex;align-items:center;gap:.6rem;padding:.55rem 1rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0}
+        .nf-chk{width:15px;height:15px;accent-color:#059669;cursor:pointer}
 
-        /* Panel */
-        .mn-panel {
-          background: rgba(253,253,255,0.92);
-          backdrop-filter: blur(12px);
-          border-radius: 20px;
-          border: 1px solid rgba(37,99,235,0.09);
-          box-shadow: 0 2px 12px rgba(37,99,235,0.05), 0 0 0 1px rgba(255,255,255,0.85) inset;
-          overflow: hidden;
-          opacity: 0; transform: translateY(10px);
-          animation: mnin 0.5s 0.15s cubic-bezier(.22,1,.36,1) forwards;
-        }
+        .nf-item{display:flex;align-items:center;gap:.7rem;padding:.75rem 1rem;border-bottom:1px solid #F1F5F9;transition:background .1s;position:relative}
+        .nf-item:last-child{border-bottom:none}
+        .nf-item.unread{background:#F0FDF9}
+        .nf-item.unread:hover{background:#ECFDF5}
+        .nf-item.read:hover{background:#F8FAFC}
+        .nf-item.sel{background:#F5F3FF!important}
+        .nf-item.sm{cursor:pointer}
 
-        /* Notification row */
-        .mn-item {
-          display: flex; align-items: flex-start; gap: 0.85rem;
-          padding: clamp(0.85rem, 2.5%, 1.1rem) clamp(1rem, 3%, 1.3rem);
-          border-bottom: 1px solid rgba(37,99,235,0.05);
-          transition: background 0.15s;
-          position: relative;
-        }
-        .mn-item:last-child { border-bottom: none; }
-        .mn-item.unread { background: rgba(239,246,255,0.55); }
-        .mn-item.unread:hover { background: rgba(219,234,254,0.5); }
-        .mn-item.read:hover { background: rgba(37,99,235,0.018); }
+        .nf-leftbar{position:absolute;left:0;top:18%;bottom:18%;width:3px;border-radius:0 3px 3px 0;background:linear-gradient(180deg,#10B981,#059669)}
 
-        /* Unread dot */
-        .mn-dot {
-          width: 8px; height: 8px; border-radius: 50%;
-          background: #3B82F6; flex-shrink: 0; margin-top: 6px;
-          box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
-        }
-        .mn-dot-placeholder { width: 8px; flex-shrink: 0; }
+        .nf-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;border:1px solid}
 
-        /* Icon */
-        .mn-icon-wrap {
-          width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
-          display: flex; align-items: center; justify-content: center;
-        }
+        /* Texte resserré */
+        .nf-ct{flex:1;min-width:0}
+        .nf-msg{font-size:.82rem;color:#1E293B;line-height:1.35;font-weight:500;margin:0 0 .22rem;word-break:break-word}
+        .nf-item.read .nf-msg{color:#64748B;font-weight:400}
+        .nf-meta{display:flex;align-items:center;gap:.38rem;flex-wrap:wrap}
+        .nf-tag{font-size:.57rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:.1rem .38rem;border-radius:99px;border:1px solid}
+        .nf-date{font-size:.61rem;color:#94A3B8;font-weight:500}
 
-        /* Content */
-        .mn-content { flex: 1; min-width: 0; }
-        .mn-message {
-          font-size: 0.84rem; color: #111827; line-height: 1.55;
-          font-weight: 500; word-break: break-word;
-        }
-        .mn-item.read .mn-message { color: #6B7280; font-weight: 400; }
-        .mn-meta {
-          display: flex; align-items: center; gap: 0.6rem;
-          margin-top: 0.35rem; flex-wrap: wrap;
-        }
-        .mn-date { font-size: 0.68rem; color: #9CA3AF; display: flex; align-items: center; gap: 0.25rem; }
-        .mn-status-pill {
-          display: inline-flex; align-items: center; gap: 0.22rem;
-          font-size: 0.6rem; font-weight: 700; border-radius: 99px;
-          padding: 0.15rem 0.5rem; border: 1px solid;
-        }
+        .nf-acts{display:flex;gap:.22rem;align-items:center;flex-shrink:0;opacity:0;transition:opacity .12s}
+        .nf-item:hover .nf-acts{opacity:1}
+        @media(max-width:600px){.nf-acts{opacity:1}}
+        .nib{width:27px;height:27px;border-radius:7px;border:1px solid;background:white;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+        .nib:disabled{opacity:.35;cursor:not-allowed}
+        .nib.rd{color:#059669;border-color:#A7F3D0}.nib.rd:hover{background:#ECFDF5}
+        .nib.dl{color:#DC2626;border-color:#FECACA}.nib.dl:hover{background:#FEF2F2}
 
-        /* Action */
-        .mn-action { flex-shrink: 0; }
-        .mn-read-btn {
-          height: 32px; padding: 0 0.8rem;
-          background: none; border: 1.5px solid rgba(37,99,235,0.2);
-          border-radius: 8px; cursor: pointer; color: #2563EB;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 0.7rem; font-weight: 700;
-          display: flex; align-items: center; gap: 0.3rem;
-          transition: all 0.2s; white-space: nowrap;
-        }
-        .mn-read-btn:hover:not(:disabled) { background: #EFF6FF; border-color: #2563EB; }
-        .mn-read-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+        .nf-load{display:flex;align-items:center;justify-content:center;padding:2.5rem;gap:.5rem;color:#64748B;font-size:.8rem}
+        .nf-ring{width:19px;height:19px;border:2px solid #E2E8F0;border-top-color:#059669;border-radius:50%;animation:nfspin .8s linear infinite}
+        .nf-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1.5rem;gap:.5rem}
+        .nf-empty-e{font-size:1.9rem}
+        .nf-empty-t{font-size:.85rem;font-weight:700;color:#374151;margin:0}
+        .nf-empty-s{font-size:.72rem;color:#94A3B8;margin:0;text-align:center}
+        .nf-err{background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:.7rem .9rem;color:#B91C1C;font-size:.76rem;font-weight:600;display:flex;align-items:center;gap:.42rem;margin-bottom:.8rem}
 
-        .mn-spinner {
-          width: 13px; height: 13px;
-          border: 2px solid rgba(37,99,235,0.2);
-          border-top-color: #2563EB; border-radius: 50%;
-          animation: mnspin 0.7s linear infinite;
-        }
+        .nf-toast{position:fixed;bottom:5.5rem;left:50%;transform:translateX(-50%);border-radius:99px;padding:.52rem 1.1rem;font-size:.74rem;font-weight:700;white-space:nowrap;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.2);animation:nftoast 2.6s ease forwards;pointer-events:none;color:white}
 
-        @keyframes mnin { to { opacity: 1; transform: translateY(0); } }
-
-        @media (max-width: 500px) {
-          .mn-item { gap: 0.6rem; }
-          .mn-icon-wrap { display: none; }
-          .mn-read-btn span { display: none; }
-          .mn-read-btn { padding: 0 0.6rem; }
+        @media(max-width:480px){
+          .nf-sl{display:none}
+          .nf-title{font-size:1.35rem}
         }
       `}</style>
 
-      <div className="mn-wrap">
+      <div className="nf-wrap">
 
-        {/* Header */}
-        <div className="mn-header">
-          <div>
-            <div className="mn-eyebrow"><div className="mn-eyebrow-dot" />Espace membre</div>
-            <h1 className="mn-title">
-              Mes <span>notifications</span>
-              {unreadCount > 0 && <span className="mn-unread-badge">{unreadCount}</span>}
-            </h1>
+        {/* ── Header ── */}
+        <div className="nf-header">
+          <div className="nf-eyebrow"><div className="nf-eyedot"/>Espace membre</div>
+          <div className="nf-titlerow">
+            <h1 className="nf-title">Mes <span>notifications</span></h1>
+            {unreadCount > 0 && <span className="nf-pill">{unreadCount}</span>}
           </div>
-          {unreadCount > 0 && (
-            <button
-              className="mn-markall-btn"
-              onClick={() => void handleMarkAllRead()}
-              disabled={loading}
-            >
-              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-              </svg>
-              Tout marquer comme lu
-            </button>
-          )}
         </div>
 
-        {/* Filter tabs */}
-        <div className="mn-filters">
-          {([
-            { key: 'all',    label: 'Toutes',   count: items.length },
-            { key: 'unread', label: 'Non lues', count: items.filter(n => !n.isRead).length },
-            { key: 'read',   label: 'Lues',     count: items.filter(n => n.isRead).length },
-          ] as const).map(tab => (
-            <button
-              key={tab.key}
-              className={`mn-tab${filter === tab.key ? ' active' : ''}`}
-              onClick={() => setFilter(tab.key)}
-            >
-              {tab.label}
-              <span
-                className="mn-tab-count"
-                style={{
-                  background: filter === tab.key ? '#BFDBFE' : '#F3F4F6',
-                  color: filter === tab.key ? '#1D4ED8' : '#6B7280',
-                }}
-              >
-                {tab.count}
-              </span>
-            </button>
+        {/* ── Stats ── */}
+        <div className="nf-stats">
+          {[
+            {n: items.length,                     l: 'Total',    c: '#0F172A'},
+            {n: unreadCount,                      l: 'Non lues', c: '#DC2626'},
+            {n: items.filter(x=>x.isRead).length, l: 'Lues',     c: '#059669'},
+          ].map(s=>(
+            <div key={s.l} className="nf-stat">
+              <span className="nf-sn" style={{color:s.c}}>{s.n}</span>
+              <span className="nf-sl">{s.l}</span>
+            </div>
           ))}
         </div>
 
-        {/* Error */}
+        {/* ── Barre d'outils ── */}
+        <div className="nf-bar">
+          <div className="nf-tabs">
+            {(['all','unread','read'] as Filter[]).map(f=>(
+              <button key={f} className={`nf-tab${filter===f?' on':''}`} onClick={()=>setFilter(f)}>
+                {f==='all'?'Toutes':f==='unread'?'Non lues':'Lues'}
+              </button>
+            ))}
+          </div>
+
+          <div style={{display:'flex',gap:'.3rem',flexWrap:'wrap',marginLeft:'auto'}}>
+            {selectMode && selected.size>0 && (
+              <>
+                <span className="nf-sc">{selected.size} sél.</span>
+                <button className="nb nr" disabled={bulkBusy} onClick={()=>void deleteSelected()}>{ICO_DEL} Supprimer</button>
+              </>
+            )}
+            {unreadCount>0 && (
+              <button className="nb ng" disabled={bulkBusy} onClick={()=>void markAllRead()}>{ICO_CHK} Tout lire</button>
+            )}
+            <button className={`nb ${selectMode?'na':'ns'}`} onClick={()=>{setSelectMode(v=>!v);setSelected(new Set())}}>
+              {ICO_SEL} {selectMode?'Annuler':'Sélectionner'}
+            </button>
+            {items.length>0 && (
+              <button className="nb nr" disabled={bulkBusy} onClick={()=>void deleteAll()}>{ICO_DEL} Tout supprimer</button>
+            )}
+          </div>
+        </div>
+
         {error && (
-          <div className="mn-error">
-            <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2" style={{ flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
-            </svg>
+          <div className="nf-err">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
             {error}
           </div>
         )}
 
-        {/* Panel */}
-        <div className="mn-panel">
-          {loading ? (
-            <div className="mn-loader"><div className="mn-ring" />Chargement&#8230;</div>
-          ) : filtered.length === 0 ? (
-            <div className="mn-empty">
-              <div className="mn-empty-ico">
-                <svg width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="#D1D5DB" strokeWidth="1.5">
-                  <path strokeLinecap="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                </svg>
-              </div>
-              <p>
-                {filter === 'unread' ? 'Aucune notification non lue' :
-                 filter === 'read'   ? 'Aucune notification lue' :
-                 'Aucune notification'}
-              </p>
+        {/* ── Panel ── */}
+        <div className="nf-panel">
+
+          {/* Sélectionner tout */}
+          {selectMode && displayed.length>0 && (
+            <div className="nf-selbar">
+              <input type="checkbox" className="nf-chk" checked={allSel}
+                onChange={()=>allSel?setSelected(new Set()):setSelected(new Set(displayed.map(n=>n.id)))}/>
+              <span style={{fontSize:'.67rem',fontWeight:700,color:'#475569'}}>
+                {allSel?'Tout désélectionner':`Tout sélectionner (${displayed.length})`}
+              </span>
             </div>
-          ) : (
-            filtered.map((n, i) => (
+          )}
+
+          {loading ? (
+            <div className="nf-load"><div className="nf-ring"/>Chargement…</div>
+          ) : displayed.length===0 ? (
+            <div className="nf-empty">
+              <span className="nf-empty-e">🔕</span>
+              <p className="nf-empty-t">
+                {filter==='unread'?'Aucune notification non lue':filter==='read'?'Aucune notification lue':'Aucune notification'}
+              </p>
+              <p className="nf-empty-s">Vous êtes à jour.</p>
+            </div>
+          ) : displayed.map((n,i) => {
+            const ts   = getTypeStyle(n.type);
+            const isSel= selected.has(n.id);
+            const busy = busyIds.has(n.id);
+            return (
               <div
                 key={n.id}
-                className={`mn-item${n.isRead ? ' read' : ' unread'}`}
-                style={{ animationDelay: `${0.04 * i}s` }}
+                className={`nf-item${n.isRead?' read':' unread'}${isSel?' sel':''}${selectMode?' sm':''}`}
+                style={{animationDelay:`${i*.022}s`}}
+                onClick={selectMode?()=>toggleSel(n.id):undefined}
               >
-                {/* Unread dot */}
-                {n.isRead
-                  ? <div className="mn-dot-placeholder" />
-                  : <div className="mn-dot" />
-                }
+                {!n.isRead && <div className="nf-leftbar"/>}
 
-                {/* Icon */}
-                <div
-                  className="mn-icon-wrap"
-                  style={{
-                    background: n.isRead ? '#F3F4F6' : '#EFF6FF',
-                    color: n.isRead ? '#9CA3AF' : '#2563EB',
-                  }}
-                >
-                  <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                    <path strokeLinecap="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                  </svg>
+                {selectMode && (
+                  <input type="checkbox" className="nf-chk" checked={isSel}
+                    onChange={()=>toggleSel(n.id)}
+                    onClick={e=>e.stopPropagation()}/>
+                )}
+
+                <div className="nf-ico" style={{background:ts.bg,borderColor:ts.border}}>
+                  {ts.emoji}
                 </div>
 
-                {/* Content */}
-                <div className="mn-content">
-                  <p className="mn-message">{n.message}</p>
-                  <div className="mn-meta">
-                    <span className="mn-date">
-                      <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 6v6l4 2"/>
-                      </svg>
-                      {formatDate(n.createdAt)}
+                <div className="nf-ct">
+                  <p className="nf-msg">{n.message}</p>
+                  <div className="nf-meta">
+                    <span className="nf-tag" style={{color:ts.color,background:ts.bg,borderColor:ts.border}}>
+                      {typeLabel(n.type)}
                     </span>
-                    <span
-                      className="mn-status-pill"
-                      style={n.isRead
-                        ? { color: '#6B7280', background: '#F3F4F6', borderColor: '#E5E7EB' }
-                        : { color: '#1D4ED8', background: '#EFF6FF', borderColor: '#BFDBFE' }
-                      }
-                    >
-                      <span style={{ width: 4, height: 4, borderRadius: '50%', background: 'currentColor' }} />
-                      {n.isRead ? 'Lue' : 'Non lue'}
-                    </span>
+                    <span className="nf-date">{formatDate(n.createdAt)}</span>
                   </div>
                 </div>
 
-                {/* Action */}
-                <div className="mn-action">
-                  {!n.isRead && (
-                    <button
-                      className="mn-read-btn"
-                      disabled={busyId === n.id}
-                      onClick={() => void handleMarkRead(n.id)}
-                    >
-                      {busyId === n.id
-                        ? <div className="mn-spinner" />
-                        : (
-                          <>
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
-                            </svg>
-                            <span>Marquer lue</span>
-                          </>
-                        )
-                      }
+                {!selectMode && (
+                  <div className="nf-acts">
+                    {!n.isRead && (
+                      <button className="nib rd" disabled={busy}
+                        onClick={e=>{e.stopPropagation();void markRead(n.id)}}
+                        title="Marquer comme lue">
+                        {busy ? SPIN('#059669') : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7"/></svg>}
+                      </button>
+                    )}
+                    <button className="nib dl" disabled={busy}
+                      onClick={e=>{e.stopPropagation();void deleteOne(n.id)}}
+                      title="Supprimer">
+                      {busy ? SPIN('#DC2626') : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>}
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-            ))
-          )}
+            );
+          })}
         </div>
-
       </div>
+
+      {toast && (
+        <div className="nf-toast" style={{background: toast.ok ? '#0F172A' : '#7F1D1D'}}>
+          {toast.ok ? '✓ ' : '✕ '}{toast.msg}
+        </div>
+      )}
     </AppShell>
   );
 }

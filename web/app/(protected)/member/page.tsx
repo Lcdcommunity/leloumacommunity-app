@@ -12,6 +12,7 @@ import type { UserSummary } from '../../../types/user';
 import type { Contribution } from '../../../types/contribution';
 import type { Project } from '../../../types/project';
 import type { ContentPost } from '../../../types/content';
+import { WelcomePopup } from '../../../components/member/WelcomePopup';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -452,6 +453,9 @@ export default function MemberHomePage() {
   const [selectedProject, setSelectedProject] = useState<ExtendedCarouselProject | null>(null);
   const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<ExtendedContribution | null>(null);
+  // ── PATCH ② ──
+  const [showWelcomePopup, setShowWelcomePopup] = useState(false);
+  const [pricing, setPricing] = useState<Record<string, { monthlyQuota: number; membershipCard: number }> | null>(null);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -526,7 +530,26 @@ export default function MemberHomePage() {
         }
 
         if (balanceRes.status === 'fulfilled') { setBalanceSummary(balanceRes.value as BalanceSummary); }
-        if (contribRes.status === 'fulfilled') { setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]); }
+        if (contribRes.status === 'fulfilled') {
+          setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]);
+        }
+
+        // ── PATCH ③ ──
+        // 🔥 Charger le pricing pour les montants dans le popup
+        try {
+          const pricingRes = await api.getAssociationPricing();
+          setPricing(pricingRes);
+        } catch { /* ignore */ }
+        // 🔥 Afficher le popup après le chargement (délai 500ms pour laisser la page s'afficher)
+        setTimeout(() => {
+          // Vérifier si le popup a déjà été vu dans cette session
+          const popupKey = `wp_seen_${new Date().toDateString()}`;
+          if (!sessionStorage.getItem(popupKey)) {
+            sessionStorage.setItem(popupKey, '1');
+            setShowWelcomePopup(true);
+          }
+        }, 500);
+
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur inattendue');
       }
@@ -559,6 +582,23 @@ export default function MemberHomePage() {
     }
     return null;
   }, [data?.stats?.myLastContributionAt, recentContribs]);
+
+  // ── PATCH ④ ──
+  // Calcul pour le popup : cotisation régulière du mois payée ?
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear  = new Date().getFullYear();
+  const hasRegularThisMonth = recentContribs.some(c => {
+    if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
+    const cDate = new Date(c.depositedAt || c.createdAt);
+    return cDate.getMonth() + 1 === currentMonth && cDate.getFullYear() === currentYear;
+  });
+  const hasActiveCard = recentContribs.some(c =>
+    c.purpose === 'MEMBERSHIP_CARD' &&
+    (c.status === 'VALIDATED' || c.status === 'PENDING_VALIDATION') &&
+    new Date(c.depositedAt || c.createdAt).getFullYear() === currentYear
+  );
+  const popupCurrency = cur || 'EUR';
+  const popupPricing  = pricing?.[popupCurrency] ?? pricing?.['EUR'] ?? null;
 
   const firstName = data?.me?.firstName || data?.virtualCard?.user?.firstName || 'Membre';
 
@@ -1224,6 +1264,20 @@ export default function MemberHomePage() {
         <ContentDetailModal
           content={selectedContent}
           onClose={() => setSelectedContent(null)}
+        />
+      )}
+
+      {/* ── PATCH ⑤ ── */}
+      {showWelcomePopup && data && (
+        <WelcomePopup
+          firstName={firstName}
+          lateMonths={lateMonths}
+          hasRegularPending={!hasRegularThisMonth}
+          hasCardPending={!hasActiveCard}
+          currency={popupCurrency}
+          regularAmount={popupPricing?.monthlyQuota ?? null}
+          cardAmount={popupPricing?.membershipCard ?? null}
+          onClose={() => setShowWelcomePopup(false)}
         />
       )}
     </AppShell>
