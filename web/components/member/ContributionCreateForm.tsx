@@ -1,7 +1,7 @@
 //web/components/member/ContributionCreateForm.tsx
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api-client';
 
 type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | '';
@@ -279,6 +279,228 @@ interface ContributionsResponse {
   items?: ContributionItem[];
 }
 
+
+// ─── Celebration Overlay ─────────────────────────────────────────────────────
+
+interface CelebrationConfig {
+  emoji: string[];
+  title: string;
+  message: string;
+  colors: string[];
+  gradient: string;
+  titleColor: string;
+}
+
+function getCelebrationConfig(purpose: string): CelebrationConfig {
+  switch (purpose) {
+    case 'LATE_QUOTA':
+      return {
+        emoji: ['🎉', '💪', '🏆', '⭐', '✨', '🎊', '🌟'],
+        title: 'Retard rattrapé !',
+        message: 'Félicitations ! Vous avez régularisé votre situation. Chaque pas vers la ponctualité renforce notre communauté. Encourageons-nous mutuellement à rester à jour — ensemble, Lelouma grandit !',
+        colors: ['#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#8B5CF6', '#F97316'],
+        gradient: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+        titleColor: '#D97706',
+      };
+    case 'DONATION':
+      return {
+        emoji: ['💝', '🤝', '🌱', '💫', '🏡', '❤️', '🌍'],
+        title: 'Don reçu avec gratitude !',
+        message: "Votre geste témoigne d'une générosité rare et d'une volonté sincère d'œuvrer pour le développement de nos localités. Vous êtes la preuve vivante que l'amour de la patrie se manifeste par des actes. Merci du fond du cœur !",
+        colors: ['#EC4899', '#F43F5E', '#10B981', '#8B5CF6', '#F97316', '#3B82F6'],
+        gradient: 'linear-gradient(135deg, #FFF0F6, #FCE7F3)',
+        titleColor: '#DB2777',
+      };
+    case 'MEMBERSHIP_CARD':
+      return {
+        emoji: ['💳', '🏅', '🎖️', '⭐', '✨', '🎊', '🌟'],
+        title: 'Carte membre activée !',
+        message: 'Votre carte membre est en cours de validation. Elle symbolise votre appartenance officielle à la famille Lelouma. Portez-la avec fierté — vous êtes désormais un membre à part entière de notre belle communauté !',
+        colors: ['#2563EB', '#7C3AED', '#059669', '#F59E0B', '#EC4899', '#14B8A6'],
+        gradient: 'linear-gradient(135deg, #EFF6FF, #E0E7FF)',
+        titleColor: '#1D4ED8',
+      };
+    default: // REGULAR_QUOTA
+      return {
+        emoji: ['🎯', '✅', '🌿', '💚', '🎉', '🏆', '⭐'],
+        title: 'Cotisation enregistrée !',
+        message: 'Excellent ! Votre cotisation du mois a bien été enregistrée. Votre régularité est un exemple pour tous. En contribuant chaque mois, vous participez activement au développement de Lelouma. Continuez ainsi !',
+        colors: ['#10B981', '#059669', '#3B82F6', '#F59E0B', '#8B5CF6', '#F97316'],
+        gradient: 'linear-gradient(135deg, #ECFDF5, #D1FAE5)',
+        titleColor: '#047857',
+      };
+  }
+}
+
+// Particule individuelle
+interface ParticleProps {
+  x: number;
+  y: number;
+  color: string;
+  size: number;
+  vx: number;
+  vy: number;
+  rotation: number;
+  shape: 'circle' | 'rect' | 'triangle';
+  delay: number;
+}
+
+function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: () => void }) {
+  const config = getCelebrationConfig(purpose);
+  const [particles, setParticles] = React.useState<ParticleProps[]>([]);
+  const [visible, setVisible] = React.useState(false);
+  const [closing, setClosing] = React.useState(false);
+
+  React.useEffect(() => {
+    // Générer les particules
+    const generated: ParticleProps[] = Array.from({ length: 60 }, (_, i) => ({
+      x: 10 + Math.random() * 80,
+      y: -10,
+      color: config.colors[i % config.colors.length],
+      size: 6 + Math.random() * 10,
+      vx: (Math.random() - 0.5) * 4,
+      vy: 2 + Math.random() * 5,
+      rotation: Math.random() * 360,
+      shape: (['circle', 'rect', 'triangle'] as const)[Math.floor(Math.random() * 3)],
+      delay: Math.random() * 0.8,
+    }));
+    setParticles(generated);
+    // Apparition avec léger délai
+    const t = setTimeout(() => setVisible(true), 80);
+    // Fermeture automatique après 5s
+    const t2 = setTimeout(() => handleClose(), 5200);
+    return () => { clearTimeout(t); clearTimeout(t2); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleClose = () => {
+    setClosing(true);
+    setTimeout(() => onClose(), 400);
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 10000,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '1.25rem',
+        background: 'rgba(0,0,0,0.55)',
+        backdropFilter: 'blur(6px)',
+        opacity: closing ? 0 : visible ? 1 : 0,
+        transition: 'opacity 0.35s ease',
+      }}
+      onClick={handleClose}
+    >
+      {/* Particules confettis */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
+        {particles.map((p, i) => (
+          <div
+            key={i}
+            style={{
+              position: 'absolute',
+              left: `${p.x}%`,
+              top: '-20px',
+              width: p.size,
+              height: p.shape === 'rect' ? p.size * 0.5 : p.size,
+              background: p.shape === 'triangle' ? 'transparent' : p.color,
+              borderLeft: p.shape === 'triangle' ? `${p.size / 2}px solid transparent` : undefined,
+              borderRight: p.shape === 'triangle' ? `${p.size / 2}px solid transparent` : undefined,
+              borderBottom: p.shape === 'triangle' ? `${p.size}px solid ${p.color}` : undefined,
+              borderRadius: p.shape === 'circle' ? '50%' : p.shape === 'rect' ? '2px' : undefined,
+              animation: `ccf-fall-${i % 6} ${1.8 + p.vy * 0.3}s ${p.delay}s ease-in forwards`,
+              transform: `rotate(${p.rotation}deg)`,
+              opacity: 0.9,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Card centrale */}
+      <div
+        style={{
+          background: config.gradient,
+          borderRadius: 28,
+          padding: 'clamp(1.5rem, 5vw, 2.5rem)',
+          maxWidth: 380,
+          width: '100%',
+          textAlign: 'center',
+          boxShadow: '0 32px 80px rgba(0,0,0,0.3)',
+          border: '1px solid rgba(255,255,255,0.6)',
+          transform: closing ? 'scale(0.92)' : visible ? 'scale(1)' : 'scale(0.85)',
+          transition: 'transform 0.4s cubic-bezier(.22,1,.36,1)',
+          position: 'relative',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Emojis qui tombent en arc */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+          {config.emoji.map((e, i) => (
+            <span
+              key={i}
+              style={{
+                fontSize: i === 0 ? '2.8rem' : '1.6rem',
+                display: 'inline-block',
+                animation: `ccf-emoji-bounce ${0.5 + i * 0.1}s ${0.1 + i * 0.08}s cubic-bezier(.22,1,.36,1) both`,
+              }}
+            >
+              {e}
+            </span>
+          ))}
+        </div>
+
+        <h2 style={{
+          fontFamily: "'Cormorant Garamond', serif",
+          fontSize: 'clamp(1.5rem, 5vw, 1.85rem)',
+          fontWeight: 700,
+          color: config.titleColor,
+          marginBottom: '0.85rem',
+          lineHeight: 1.2,
+        }}>
+          {config.title}
+        </h2>
+
+        <p style={{
+          fontSize: '0.84rem',
+          color: '#374151',
+          lineHeight: 1.65,
+          marginBottom: '1.5rem',
+          fontFamily: "'DM Sans', sans-serif",
+        }}>
+          {config.message}
+        </p>
+
+        <button
+          onClick={handleClose}
+          style={{
+            width: '100%', height: 46, borderRadius: 13, border: 'none',
+            background: config.titleColor,
+            color: 'white', fontFamily: "'DM Sans', sans-serif",
+            fontSize: '0.88rem', fontWeight: 800,
+            cursor: 'pointer', letterSpacing: '0.04em',
+            boxShadow: `0 6px 20px ${config.titleColor}55`,
+            transition: 'all .2s',
+          }}
+        >
+          Parfait, merci ! 🙏
+        </button>
+
+        {/* Petites étincelles décoratives aux coins */}
+        {['top:0;left:0', 'top:0;right:0', 'bottom:0;left:0', 'bottom:0;right:0'].map((pos, i) => (
+          <div key={i} style={{
+            position: 'absolute',
+            ...Object.fromEntries(pos.split(';').map(p => p.split(':'))),
+            fontSize: '1.2rem',
+            animation: `ccf-sparkle ${0.8 + i * 0.2}s ${0.3 + i * 0.15}s ease-in-out infinite alternate`,
+            pointerEvents: 'none',
+          }}>
+            ✨
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function ContributionCreateForm({
   onSubmit,
@@ -336,6 +558,11 @@ export function ContributionCreateForm({
   const [cardNumber, setCardNumber] = useState('');
   const [cardExpiry, setCardExpiry] = useState('');
   const [cardCvc, setCardCvc] = useState('');
+
+  // ── Celebration state ─────────────────────────────────────────────────────
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationPurpose, setCelebrationPurpose] = useState('REGULAR_QUOTA');
+  const [pendingPayload, setPendingPayload] = useState<ContributionValues | null>(null);
 
   const currencyMeta = useMemo(() => getCurrencyMeta(selectedCurrency), [selectedCurrency]);
 
@@ -539,17 +766,25 @@ export function ContributionCreateForm({
       return;
     }
 
-    await onSubmit({
+    // 🎉 Capturer le motif et le payload AVANT l'appel async
+    // (le parent peut démonter ce composant après onSubmit, la célébration ne s'afficherait jamais)
+    const purposeSnapshot = values.purpose;
+    const payload = {
       amount: amountNum,
       currency: selectedCurrency,
       depositedAt: values.depositedAt,
       method: values.method,
       note: values.note,
-      purpose: values.purpose,
+      purpose: purposeSnapshot,
       targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
-      monthReference: (isQuota || isMembershipCard) ? refMonth : undefined,
-      yearReference: (isQuota || isMembershipCard) ? refYear : undefined,
-    });
+      monthReference: isQuota ? refMonth : undefined,
+      yearReference: isQuota ? refYear : undefined,
+    };
+
+    // 🎉 Afficher la célébration IMMÉDIATEMENT, soumettre en arrière-plan depuis onClose
+    setCelebrationPurpose(purposeSnapshot);
+    setPendingPayload(payload);
+    setShowCelebration(true);
   };
 
   const paddingLeftAmount = currencyMeta.prefix
@@ -775,6 +1010,22 @@ export function ContributionCreateForm({
         .ccf-submit:disabled { opacity: 0.6; cursor: not-allowed; }
         .ccf-spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: ccfspin 0.7s linear infinite; }
         @keyframes ccfspin { to { transform: rotate(360deg); } }
+
+        /* ── Célébration ── */
+        @keyframes ccf-emoji-bounce {
+          from { opacity: 0; transform: scale(0) translateY(20px) rotate(-15deg); }
+          to   { opacity: 1; transform: scale(1) translateY(0)     rotate(0deg); }
+        }
+        @keyframes ccf-sparkle {
+          from { opacity: 0.4; transform: scale(0.8) rotate(-10deg); }
+          to   { opacity: 1;   transform: scale(1.2) rotate(10deg);  }
+        }
+        @keyframes ccf-fall-0 { 0%{transform:translateY(0) rotate(0deg) scaleX(1)} 100%{transform:translateY(110vh) rotate(720deg) scaleX(0.5);opacity:0} }
+        @keyframes ccf-fall-1 { 0%{transform:translateY(0) rotate(0deg)} 100%{transform:translateY(110vh) rotate(-540deg) translateX(40px);opacity:0} }
+        @keyframes ccf-fall-2 { 0%{transform:translateY(0) scaleY(1)} 100%{transform:translateY(110vh) scaleY(0.3) translateX(-30px) rotate(360deg);opacity:0} }
+        @keyframes ccf-fall-3 { 0%{transform:translateY(0) rotate(45deg)} 100%{transform:translateY(110vh) rotate(900deg) translateX(20px);opacity:0} }
+        @keyframes ccf-fall-4 { 0%{transform:translateY(0)} 100%{transform:translateY(110vh) rotate(-720deg) scaleX(0.4);opacity:0} }
+        @keyframes ccf-fall-5 { 0%{transform:translateY(0) rotate(-45deg)} 100%{transform:translateY(110vh) rotate(540deg) translateX(-20px);opacity:0} }
       `}</style>
 
       {/* Smart Modal */}
@@ -872,7 +1123,7 @@ export function ContributionCreateForm({
         </div>
 
         {/* ── Mois de référence ── */}
-        {(isQuota || isMembershipCard) && (
+        {isQuota && (
           <div className="ccf-field">
             <span className="ccf-label">
               Mois de référence
@@ -1084,6 +1335,21 @@ export function ContributionCreateForm({
           )}
         </button>
       </form>
+
+      {/* 🎉 Célébration post-soumission */}
+      {showCelebration && (
+        <CelebrationOverlay
+          purpose={celebrationPurpose}
+          onClose={() => {
+            setShowCelebration(false);
+            // Soumettre le payload au parent une fois la célébration fermée
+            if (pendingPayload) {
+              void onSubmit(pendingPayload);
+              setPendingPayload(null);
+            }
+          }}
+        />
+      )}
     </>
   );
 }

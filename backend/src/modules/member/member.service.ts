@@ -425,6 +425,25 @@ export class MemberService {
       lastUpdatedAt: new Date().toISOString(),
     };
   }
+  async getPricing(userId: string): Promise<Record<string, { monthlyQuota: number; membershipCard: number }>> {
+  const me = await this.getMeOrThrow(userId);
+
+  const pricings = await this.prisma.pricing.findMany({
+    where: { associationId: me.associationId },
+    select: { currency: true, monthlyQuota: true, membershipCard: true },
+  });
+
+  return pricings.reduce<Record<string, { monthlyQuota: number; membershipCard: number }>>(
+    (acc, p) => {
+      acc[p.currency] = {
+        monthlyQuota: Number(p.monthlyQuota),
+        membershipCard: Number(p.membershipCard),
+      };
+      return acc;
+    },
+    {},
+  );
+  }
 
   async listLateMembers(
     userId: string,

@@ -1,5 +1,6 @@
 ////// backend/src/modules/notifications/notifications.controller.ts
-import { Controller, Get, Param, Patch, Post, Query, UseGuards, Body, ForbiddenException } from '@nestjs/common';
+// Import — ajoute Delete
+import { Controller, Get, Param, Patch, Delete, Post, Query, UseGuards, Body, ForbiddenException } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { PushService } from './push.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -24,6 +25,11 @@ export class NotificationsController {
   markRead(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.service.markAsRead(user.id, user.associationId, id);
   }
+  // Route — ajoute après @Patch(':id/read')
+@Delete(':id')
+deleteOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+  return this.service.deleteOne(user.id, user.associationId, id);
+}
 
   @Post('test-push')
   async testPushNotifications(@CurrentUser() user: AuthUser) {

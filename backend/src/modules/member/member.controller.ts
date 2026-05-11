@@ -97,6 +97,10 @@ export class MemberController {
   getAssociationBalanceSummary(@CurrentUser() user: AuthUser) {
     return this.service.getAssociationBalanceSummary(user.id);
   }
+  @Get('pricing')
+getPricing(@CurrentUser() user: AuthUser) {
+  return this.service.getPricing(user.id);
+}
 
   @Get('late-members')
   listLateMembers(@CurrentUser() user: AuthUser, @Query() query: LateMembersQueryDto) {

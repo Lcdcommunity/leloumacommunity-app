@@ -1,4 +1,5 @@
 // web/app/login/page.tsx
+// web/app/login/page.tsx
 'use client';
 
 import { FormEvent, useState, useEffect, useCallback, useRef } from 'react';
@@ -78,7 +79,7 @@ export default function LoginPage() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── FIX : abonnement i18n dans son propre effet, séparé du montage ──
   const handleLanguageChanged = useCallback((lng: string) => {

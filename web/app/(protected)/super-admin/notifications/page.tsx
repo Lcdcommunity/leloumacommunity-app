@@ -52,10 +52,6 @@ function typeLabel(type?: string | null): string {
   return MAP[type] ?? type.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
 }
 
-const callDelete = (id: string) =>
-  (api as unknown as { deleteNotification?: (id: string) => Promise<void> })
-    .deleteNotification?.(id) ?? fetch(`/api/notifications/${id}`, { method: 'DELETE' });
-
 export default function SuperAdminNotificationsPage() {
   const [items,      setItems]      = useState<NotificationItem[]>([]);
   const [loading,    setLoading]    = useState(true);
@@ -99,7 +95,7 @@ export default function SuperAdminNotificationsPage() {
   const deleteOne = async (id: string) => {
     addBusy(id);
     try {
-      await callDelete(id);
+      await api.deleteNotification(id);
       setItems(p => p.filter(n => n.id !== id));
       setSelected(p => { const s = new Set(p); s.delete(id); return s; });
       showToast('Notification supprimée');
@@ -122,7 +118,7 @@ export default function SuperAdminNotificationsPage() {
     setBulkBusy(true);
     const ids = Array.from(selected);
     try {
-      await Promise.all(ids.map(callDelete));
+      await Promise.all(ids.map(id => api.deleteNotification(id)));
       const c = ids.length;
       setItems(p => p.filter(n => !selected.has(n.id)));
       setSelected(new Set()); setSelectMode(false);
@@ -135,7 +131,7 @@ export default function SuperAdminNotificationsPage() {
     if (!window.confirm('Supprimer toutes les notifications ?')) return;
     setBulkBusy(true);
     try {
-      await Promise.all(items.map(n => callDelete(n.id)));
+      await Promise.all(items.map(n => api.deleteNotification(n.id)));
       setItems([]); setSelected(new Set()); setSelectMode(false);
       showToast('Toutes les notifications supprimées');
     } catch { showToast('Erreur suppression', false); }
@@ -143,8 +139,10 @@ export default function SuperAdminNotificationsPage() {
   };
 
   const toggleSel = (id: string) => setSelected(p => {
-    const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s;
-  });
+  const s = new Set(p);
+  if (s.has(id)) { s.delete(id); } else { s.add(id); }
+  return s;
+});
 
   const displayed   = items.filter(n => filter === 'unread' ? !n.isRead : filter === 'read' ? n.isRead : true);
   const unreadCount = items.filter(n => !n.isRead).length;
@@ -212,7 +210,6 @@ export default function SuperAdminNotificationsPage() {
 
         .snf-ico{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;border:1px solid}
 
-        /* Texte resserré */
         .snf-ct{flex:1;min-width:0}
         .snf-msg{font-size:.82rem;color:#1E293B;line-height:1.35;font-weight:500;margin:0 0 .22rem;word-break:break-word}
         .snf-item.read .snf-msg{color:#64748B;font-weight:400}
@@ -283,18 +280,18 @@ export default function SuperAdminNotificationsPage() {
             {selectMode && selected.size>0 && (
               <>
                 <span className="snf-sc">{selected.size} sél.</span>
-                <button className="sb sb-red" disabled={bulkBusy} onClick={()=>void deleteSelected()}>{ICO_DEL} Supprimer</button>
+                <button className="sb sb-red" disabled={bulkBusy} onClick={()=>{ void deleteSelected(); }}>{ICO_DEL} Supprimer</button>
               </>
             )}
             {unreadCount>0 && (
-              <button className="sb sb-g" disabled={bulkBusy} onClick={()=>void markAllRead()}>{ICO_CHK} Tout lire</button>
+              <button className="sb sb-g" disabled={bulkBusy} onClick={()=>{ void markAllRead(); }}>{ICO_CHK} Tout lire</button>
             )}
-            <button className="sb sb-s" onClick={()=>void load()}>{ICO_RELOAD} Actualiser</button>
+            <button className="sb sb-s" onClick={()=>{ void load(); }}>{ICO_RELOAD} Actualiser</button>
             <button className={`sb ${selectMode?'sb-a':'sb-s'}`} onClick={()=>{setSelectMode(v=>!v);setSelected(new Set())}}>
               {ICO_SEL} {selectMode?'Annuler':'Sélectionner'}
             </button>
             {items.length>0 && (
-              <button className="sb sb-red" disabled={bulkBusy} onClick={()=>void deleteAll()}>{ICO_DEL} Tout supprimer</button>
+              <button className="sb sb-red" disabled={bulkBusy} onClick={()=>{ void deleteAll(); }}>{ICO_DEL} Tout supprimer</button>
             )}
           </div>
         </div>
@@ -366,13 +363,13 @@ export default function SuperAdminNotificationsPage() {
                   <div className="snf-acts">
                     {!n.isRead && (
                       <button className="sib rd" disabled={busy}
-                        onClick={e=>{e.stopPropagation();void markRead(n.id)}}
+                        onClick={e=>{ e.stopPropagation(); void markRead(n.id); }}
                         title="Marquer comme lue">
                         {busy ? SPIN('#059669') : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7"/></svg>}
                       </button>
                     )}
                     <button className="sib dl" disabled={busy}
-                      onClick={e=>{e.stopPropagation();void deleteOne(n.id)}}
+                      onClick={e=>{ e.stopPropagation(); void deleteOne(n.id); }}
                       title="Supprimer">
                       {busy ? SPIN('#DC2626') : <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>}
                     </button>

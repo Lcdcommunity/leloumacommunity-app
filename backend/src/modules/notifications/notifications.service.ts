@@ -74,6 +74,23 @@ export class NotificationsService {
 
     return { ok: true };
   }
+  async deleteOne(userId: string, associationId: string, notificationId: string): Promise<{ ok: true }> {
+  const recipient = await this.prisma.notificationRecipient.findFirst({
+    where: {
+      notificationId,
+      userId,
+      notification: { associationId },
+    },
+  });
+
+  if (!recipient) throw new NotFoundException('Notification introuvable.');
+
+  await this.prisma.notificationRecipient.delete({
+    where: { id: recipient.id },
+  });
+
+  return { ok: true };
+}
 
   /**
    * Crée une notification pour un utilisateur spécifique

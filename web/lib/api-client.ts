@@ -1251,7 +1251,10 @@ listElectionsAdmin: async () => {
     ),
 
   markNotificationRead: (id: string) =>
-    http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+  http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+
+  deleteNotification: (id: string) =>
+  http<{ ok: boolean }>(`/notifications/${id}`, { method: 'DELETE' }),
 
   listAudit: (params?: { page?: number; pageSize?: number; action?: string }) =>
     http<ApiListResponse<AuditItem>>(
