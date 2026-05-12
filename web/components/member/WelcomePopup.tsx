@@ -1,4 +1,3 @@
-// web/components/member/WelcomePopup.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,8 +10,8 @@ type PopupMode = 'loading' | 'late' | 'regular' | 'card' | 'upToDate';
 interface WelcomePopupProps {
   firstName: string;
   lateMonths: number;          // mois de retard de cotisation
-  hasRegularPending: boolean;  // cotisation du mois en cours non payée
-  hasCardPending: boolean;     // carte membre annuelle non payée / expirée
+  hasRegularPending: boolean;  // cotisation du mois en cours non payée (purpose=REGULAR_QUOTA)
+  hasCardPending: boolean;     // carte membre annuelle non payée / expirée (purpose=MEMBERSHIP_CARD)
   currency: string;
   regularAmount?: number | null;
   cardAmount?: number | null;
@@ -68,7 +67,7 @@ const CONTENT: Record<PopupMode, {
     title: (name) => `Bonjour ${name},`,
     subtitle: 'Cotisation du mois',
     body: ({ regularAmount, currency }) =>
-      `Félicitations, vous êtes à jour sur vos retards ! C'est un beau geste pour la communauté.\n\nCependant, la cotisation du mois en cours${regularAmount ? ` (${regularAmount} ${currency})` : ''} n'a pas encore été enregistrée.\n\nN'attendez pas la fin du mois — un bon citoyen anticipe ses engagements. Votre ponctualité est une marque de respect envers tous les membres de Lelouma.`,
+      `Félicitations, vous êtes à jour sur vos retards ! C'est un beau geste pour la communauté.\n\nCependant, la cotisation mensuelle du mois en cours${regularAmount ? ` (${regularAmount} ${currency})` : ''} n'a pas encore été enregistrée. Les dons libres ne remplacent pas la cotisation mensuelle.\n\nN'attendez pas la fin du mois — un bon citoyen anticipe ses engagements. Votre ponctualité est une marque de respect envers tous les membres de Lelouma.`,
     ctaLabel: '✅ Payer ma cotisation du mois',
     ctaHref: '/member/contributions/new',
     ctaColor: '#D97706',
@@ -82,7 +81,7 @@ const CONTENT: Record<PopupMode, {
     title: (name) => `Bravo ${name} !`,
     subtitle: 'Carte membre annuelle',
     body: ({ cardAmount, currency }) =>
-      `Vos cotisations régulières sont en ordre — votre sérieux force l'admiration !\n\nIl reste une dernière étape : votre carte de membre annuelle${cardAmount ? ` (${cardAmount} ${currency})` : ''} n'est pas encore réglée pour cette année.\n\nLa carte membre est votre titre de citoyenneté dans notre communauté. Elle vous donne accès à tous les droits et privilèges des membres en règle de Lelouma.`,
+      `Vos cotisations régulières sont en ordre — votre sérieux force l'admiration !\n\nIl reste une dernière étape : votre carte de membre annuelle${cardAmount ? ` (${cardAmount} ${currency})` : ''} n'est pas encore réglée pour cette année.\n\nLa carte membre est votre titre de citoyenneté dans notre communauté. Elle vous donne accès à tous les droits et privilèges des membres en règle de Lelouma.\n\nNote : après votre paiement, votre carte sera activée par l'administration dans les plus brefs délais.`,
     ctaLabel: '🎫 Obtenir ma carte membre',
     ctaHref: '/member/contributions/new',
     ctaColor: '#2563EB',
@@ -96,7 +95,7 @@ const CONTENT: Record<PopupMode, {
     title: (name) => `Bravo ${name} !`,
     subtitle: 'Membre exemplaire',
     body: () =>
-      `Vous êtes pleinement en règle — cotisations à jour, carte membre active. Vous êtes un exemple pour notre communauté !\n\nContinuez sur cette lancée. Votre engagement constant pour Lelouma est une source d'inspiration pour tous les membres.\n\n« Le bon citoyen n'attend pas d'être rappelé à ses devoirs — il les assume avec fierté et constance. »\n\nMerci d'être ce pilier sur lequel repose l'avenir de Lelouma. Bienvenue !`,
+      `Vous êtes pleinement en règle — cotisations mensuelles à jour, carte membre active. Vous êtes un exemple pour notre communauté !\n\nContinuez sur cette lancée. Votre engagement constant pour Lelouma est une source d'inspiration pour tous les membres.\n\n« Le bon citoyen n'attend pas d'être rappelé à ses devoirs — il les assume avec fierté et constance. »\n\nMerci d'être ce pilier sur lequel repose l'avenir de Lelouma. Bienvenue !`,
     ctaLabel: '🏠 Accéder à mon espace',
     ctaHref: '',
     ctaColor: '#059669',
@@ -104,6 +103,44 @@ const CONTENT: Record<PopupMode, {
     showSkip: false,
   },
 };
+
+// ─── Logique d'affichage 2x/jour ──────────────────────────────────────────────
+// Clé : wp_seen_<userId?>_<YYYY-MM-DD>_<slot>
+// slot = 'am' (avant 12h) ou 'pm' (après 12h)
+// Si le slot courant n'a pas encore été vu → afficher
+
+function getTimeSlot(): 'am' | 'pm' {
+  return new Date().getHours() < 12 ? 'am' : 'pm';
+}
+
+function shouldShowPopup(keyPrefix: string): boolean {
+  const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const slot = getTimeSlot();
+  const key = `${keyPrefix}_${dateStr}_${slot}`;
+  if (typeof window === 'undefined') return false;
+  return !sessionStorage.getItem(key);
+}
+
+function markPopupSeen(keyPrefix: string): void {
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const slot = getTimeSlot();
+  const key = `${keyPrefix}_${dateStr}_${slot}`;
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem(key, '1');
+  }
+}
+
+// ─── Hook d'exposition publique ───────────────────────────────────────────────
+// Permet à la page parente de vérifier si le popup doit s'afficher
+export function shouldShowWelcomePopup(userId?: string): boolean {
+  const prefix = `wp_seen_${userId ?? 'anon'}`;
+  return shouldShowPopup(prefix);
+}
+
+export function markWelcomePopupSeen(userId?: string): void {
+  const prefix = `wp_seen_${userId ?? 'anon'}`;
+  markPopupSeen(prefix);
+}
 
 // ─── Composant ────────────────────────────────────────────────────────────────
 
@@ -121,7 +158,11 @@ export function WelcomePopup({
   const [visible, setVisible] = useState(false);
   const [closing, setClosing] = useState(false);
 
-  // Déterminer le mode
+  // ── Déterminer le mode ───────────────────────────────────────────────────
+  // Priorité : retard > cotisation mensuelle manquante > carte manquante > à jour
+  // Important : on ne se base QUE sur les motifs REGULAR_QUOTA/LATE_QUOTA
+  // pour hasRegularPending, et MEMBERSHIP_CARD pour hasCardPending.
+  // Les dons libres (DONATION) n'entrent PAS en compte.
   const mode: PopupMode =
     lateMonths > 0
       ? 'late'
@@ -189,14 +230,12 @@ export function WelcomePopup({
           animation: ${closing ? 'wp-modal-out' : 'wp-modal-in'} 0.35s cubic-bezier(.22,1,.36,1) forwards;
         }
 
-        /* Bande drapeau Guinée en haut */
         .wp-guinea-bar {
           height: 7px; width: 100%;
           background: linear-gradient(90deg, #CE1126 0% 33.33%, #FCD116 33.33% 66.66%, #009460 66.66% 100%);
           flex-shrink: 0;
         }
 
-        /* Zone hero colorée */
         .wp-hero {
           padding: 2rem 1.75rem 1.5rem;
           display: flex; flex-direction: column; align-items: center;
@@ -224,14 +263,12 @@ export function WelcomePopup({
           line-height: 1.2; margin: 0;
         }
 
-        /* Ligne décorative animée */
         .wp-accent-line {
           height: 3px; border-radius: 99px;
           animation: wp-line-in 0.6s 0.3s ease both;
           flex-shrink: 0; align-self: stretch;
         }
 
-        /* Corps blanc scrollable */
         .wp-body {
           background: #FFFFFF;
           padding: 1.5rem 1.75rem 1.75rem;
@@ -246,7 +283,6 @@ export function WelcomePopup({
           font-family: 'DM Sans', sans-serif;
         }
 
-        /* Citation pour upToDate */
         .wp-quote {
           background: #F0FDF4; border-left: 4px solid #10B981;
           border-radius: 0 12px 12px 0;
@@ -257,7 +293,13 @@ export function WelcomePopup({
           font-weight: 600;
         }
 
-        /* Badge mois de retard */
+        .wp-info-note {
+          background: #EFF6FF; border: 1px solid #BFDBFE;
+          border-radius: 10px; padding: 0.75rem 1rem;
+          font-size: 0.76rem; color: #1D4ED8; font-weight: 600;
+          line-height: 1.5; display: flex; align-items: flex-start; gap: 0.5rem;
+        }
+
         .wp-late-badge {
           display: inline-flex; align-items: center; gap: 0.45rem;
           background: #FEF2F2; border: 1.5px solid #FECACA;
@@ -266,7 +308,6 @@ export function WelcomePopup({
           align-self: flex-start;
         }
 
-        /* Bouton CTA principal */
         .wp-cta {
           width: 100%; height: 52px; border: none; border-radius: 16px;
           font-family: 'DM Sans', sans-serif; font-size: 0.92rem; font-weight: 800;
@@ -278,7 +319,6 @@ export function WelcomePopup({
         .wp-cta:hover { transform: translateY(-2px); filter: brightness(1.08); }
         .wp-cta:active { transform: scale(0.98); }
 
-        /* Shimmer effect sur CTA */
         .wp-cta::after {
           content: '';
           position: absolute; inset: 0;
@@ -287,7 +327,6 @@ export function WelcomePopup({
           animation: wp-shimmer 2.5s linear infinite;
         }
 
-        /* Bouton passer */
         .wp-skip {
           background: none; border: none; cursor: pointer;
           font-family: 'DM Sans', sans-serif; font-size: 0.78rem;
@@ -297,7 +336,6 @@ export function WelcomePopup({
         }
         .wp-skip:hover { color: #6B7280; }
 
-        /* Petite signature */
         .wp-signature {
           display: flex; align-items: center; justify-content: center; gap: 0.5rem;
           font-size: 0.68rem; color: #D1D5DB; font-weight: 600;
@@ -357,6 +395,19 @@ export function WelcomePopup({
               </>
             ) : (
               <p className="wp-text" style={{ margin: 0 }}>{bodyText}</p>
+            )}
+
+            {/* Note validation admin pour la carte */}
+            {mode === 'card' && (
+              <div className="wp-info-note">
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                  Après votre paiement, votre carte sera examinée et activée par l&apos;administration.
+                  Vous recevrez une notification dès que votre accès sera confirmé.
+                </span>
+              </div>
             )}
 
             {/* CTA */}

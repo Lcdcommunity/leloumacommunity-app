@@ -26,7 +26,6 @@ export class AdminService {
 
     if (!user) throw new ForbiddenException("Utilisateur introuvable.");
 
-    // Si c'est un SUPER_ADMIN, on renvoie antennaId undefined pour voir toute l'association
     if (user.role === UserRole.SUPER_ADMIN) {
       return {
         antennaId: undefined, 
@@ -47,6 +46,38 @@ export class AdminService {
       antennaId: assignment.antennaId,
       associationId: assignment.antenna.associationId
     };
+  }
+
+  /**
+   * Vérifie s'il reste au moins une contribution MEMBERSHIP_CARD validée
+   * pour ce membre. Si oui → carte déverrouillée. Sinon → reverrouillée.
+   */
+  private async _syncVirtualCardLock(memberUserId: string, associationId: string): Promise<void> {
+    const activeCardContribution = await this.prisma.contribution.findFirst({
+      where: {
+        memberUserId,
+        associationId,
+        purpose: 'MEMBERSHIP_CARD',
+        status: ContributionStatus.VALIDATED,
+      },
+    });
+
+    const shouldLock = !activeCardContribution;
+
+    await this.prisma.virtualCard.updateMany({
+      where: { userId: memberUserId },
+      data: { isLocked: shouldLock },
+    });
+
+    if (shouldLock) {
+      await this.notifications.createForUser({
+        associationId,
+        userId: memberUserId,
+        message: `Votre carte membre a été désactivée suite à l'annulation de votre cotisation.`,
+        type: NotificationType.SYSTEM_ALERT,
+        title: 'Carte membre désactivée',
+      });
+    }
   }
 
   // --- GESTION DES MEMBRES (APPROBATIONS) ---
@@ -316,6 +347,7 @@ export class AdminService {
 
     return updated;
   }
+
   async activateUser(userId: string, adminId: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
@@ -526,8 +558,13 @@ export class AdminService {
       type: NotificationType.CONTRIBUTION_REJECTED,
     });
 
+    // 🔥 Si c'était une carte membre, resynchroniser le verrou de la carte
+    if (contribution.purpose === 'MEMBERSHIP_CARD') {
+      await this._syncVirtualCardLock(contribution.memberUserId, associationId);
+    }
+
     return updated;
-  }  
+  }
 
   async updateContribution(contributionId: string, adminId: string, amount: number) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
@@ -556,7 +593,15 @@ export class AdminService {
       } 
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
-    return this.prisma.contribution.delete({ where: { id: contributionId } });
+
+    await this.prisma.contribution.delete({ where: { id: contributionId } });
+
+    // 🔥 Si c'était une carte membre validée, resynchroniser le verrou
+    if (contribution.purpose === 'MEMBERSHIP_CARD') {
+      await this._syncVirtualCardLock(contribution.memberUserId, associationId);
+    }
+
+    return { success: true };
   }
 
   // --- GESTION DES PROJETS ET PROPOSITIONS ---
@@ -572,9 +617,6 @@ export class AdminService {
 
     const andConditions: Prisma.ProjectWhereInput[] = [];
 
-    // 🔥 CORRECTION : Visibilité croisée inter-antennes
-    // Les brouillons et mises en attente sont strictement limités à l'antenne créatrice.
-    // Le reste (Approuvé, En cours, Terminé) est partagé au niveau de l'association entière.
     if (antennaId) {
       andConditions.push({
         OR: [
@@ -683,7 +725,7 @@ export class AdminService {
         if (project.expectedResults) addSection('Résultats Attendus', safeStringify(project.expectedResults));
         if (project.successIndicators) addSection('Indicateurs de Succès', safeStringify(project.successIndicators));
 
-        addSection('Méthode d\'Implémentation', project.implementationMethod);
+        addSection("Méthode d'Implémentation", project.implementationMethod);
         addSection('Risques et Mitigations', project.risksAndMitigation);
 
         doc.moveDown();
@@ -747,15 +789,7 @@ export class AdminService {
       total, page, pageSize, totalPages: Math.ceil(total / pageSize) 
     };
   }
-  // ─── PATCH CHIRURGICAL admin.service.ts ──────────────────────────────────────
-// Ajouter ces 2 méthodes dans la classe AdminService,
-// juste après listProjectProposals() et avant createProject()
-// ─────────────────────────────────────────────────────────────────────────────
 
-  /**
-   * 🔥 Approuver une proposition de projet.
-   * Passe la proposition en APPROVED et crée automatiquement un projet officiel.
-   */
   async approveProjectProposal(proposalId: string, adminId: string, reviewComment?: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
 
@@ -770,7 +804,6 @@ export class AdminService {
 
     if (!proposal) throw new NotFoundException('Proposition introuvable.');
 
-    // Marquer la proposition comme approuvée
     const updated = await this.prisma.projectProposal.update({
       where: { id: proposalId },
       data: {
@@ -781,7 +814,6 @@ export class AdminService {
       },
     });
 
-    // Créer le projet officiel depuis la proposition
     const project = await this.prisma.project.create({
       data: {
         associationId,
@@ -795,7 +827,6 @@ export class AdminService {
       },
     });
 
-    // Notifier le membre auteur
     if (proposal.authorUserId) {
       await this.notifications.createForUserWithPush({
         associationId,
@@ -814,9 +845,6 @@ export class AdminService {
     };
   }
 
-  /**
-   * 🔥 Rejeter une proposition de projet avec commentaire optionnel.
-   */
   async rejectProjectProposal(proposalId: string, adminId: string, reviewComment?: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
 
@@ -841,7 +869,6 @@ export class AdminService {
       },
     });
 
-    // Notifier le membre auteur
     if (proposal.authorUserId) {
       await this.notifications.createForUserWithPush({
         associationId,
@@ -856,7 +883,7 @@ export class AdminService {
 
     return memberMapper.projectProposal(updated);
   }
-  
+
   async createProject(adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
 
@@ -903,11 +930,6 @@ export class AdminService {
     return project;
   }
 
-  // ─── PATCH CHIRURGICAL admin.service.ts ──────────────────────────────────────
-// Remplacer la méthode updateProject() existante par celle-ci.
-// Seul ajout : gestion des attachments (photoIds) en fin de méthode.
-// ─────────────────────────────────────────────────────────────────────────────
-
   async updateProject(projectId: string, adminId: string, data: any) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const project = await this.prisma.project.findFirst({
@@ -924,7 +946,6 @@ export class AdminService {
     if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
     if (safeStatus === 'SUSPENDED')        safeStatus = ProjectStatus.ON_HOLD;
 
-    // 🔥 FIX : Mettre à jour les champs scalaires du projet
     const updated = await this.prisma.project.update({
       where: { id: projectId },
       data: {
@@ -949,23 +970,16 @@ export class AdminService {
       },
     });
 
-    // 🔥 FIX PHOTOS : Si de nouveaux photoIds sont fournis, on remplace les attachments
     if (Array.isArray(data.photoIds) && data.photoIds.length > 0) {
-      // Supprimer les anciens attachments
-      await this.prisma.projectAttachment.deleteMany({
-        where: { projectId },
-      });
-      // Créer les nouveaux
+      await this.prisma.projectAttachment.deleteMany({ where: { projectId } });
       await this.prisma.projectAttachment.createMany({
-        data: data.photoIds.map((fileId: string) => ({
-          projectId,
-          fileId,
-        })),
+        data: data.photoIds.map((fileId: string) => ({ projectId, fileId })),
       });
     }
 
     return updated;
   }
+
   async deleteProject(projectId: string, adminId: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const project = await this.prisma.project.findFirst({ 
@@ -1059,7 +1073,7 @@ export class AdminService {
       }),
       this.prisma.newsPost.count({ where }),
     ]);    
-    
+
     return {
       items: items.map(c => ({
         ...memberMapper.contentPost({ ...c, body: c.content }),

@@ -1,4 +1,3 @@
-// web/app/(protected)/member/page.tsx
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -453,7 +452,6 @@ export default function MemberHomePage() {
   const [selectedProject, setSelectedProject] = useState<ExtendedCarouselProject | null>(null);
   const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<ExtendedContribution | null>(null);
-  // ── PATCH ② ──
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
   const [pricing, setPricing] = useState<Record<string, { monthlyQuota: number; membershipCard: number }> | null>(null);
 
@@ -491,7 +489,6 @@ export default function MemberHomePage() {
 
           if (projectsRes.status === 'fulfilled') {
             const rawItems = projectsRes.value.items as unknown as RawApiProject[];
-
             res.projectsInProgress = rawItems
               .filter(p => !['DRAFT', 'CANCELLED', 'ARCHIVED'].includes(p.status as string))
               .map(p => ({
@@ -514,7 +511,6 @@ export default function MemberHomePage() {
                   ? p.attachments.map(a => ({ file: { url: (a as unknown as { url?: string | null }).url || null } }))
                   : null,
               })) as ExtendedCarouselProject[];
-
             if (res.stats) res.stats.activeProjects = res.projectsInProgress.length;
           }
           if (contentsRes.status === 'fulfilled') {
@@ -529,21 +525,28 @@ export default function MemberHomePage() {
           setError(dashRes.reason instanceof Error ? dashRes.reason.message : 'Erreur chargement dashboard');
         }
 
-        if (balanceRes.status === 'fulfilled') { setBalanceSummary(balanceRes.value as BalanceSummary); }
+        if (balanceRes.status === 'fulfilled') {
+          setBalanceSummary(balanceRes.value as BalanceSummary);
+        }
         if (contribRes.status === 'fulfilled') {
           setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]);
         }
 
-        // ── PATCH ③ ──
-        // 🔥 Charger le pricing pour les montants dans le popup
+        // ── Pricing ──
         try {
           const pricingRes = await api.getAssociationPricing();
           setPricing(pricingRes);
         } catch { /* ignore */ }
-        // 🔥 Afficher le popup après le chargement (délai 500ms pour laisser la page s'afficher)
+
+        // ── Popup 2x/jour (matin slot 'am' + après-midi slot 'pm') ──
+        const popupUserId = (dashRes.status === 'fulfilled'
+          ? (dashRes.value as DashboardData)?.me?.id
+          : null) ?? 'anon';
+
         setTimeout(() => {
-          // Vérifier si le popup a déjà été vu dans cette session
-          const popupKey = `wp_seen_${new Date().toDateString()}`;
+          const dateStr = new Date().toISOString().slice(0, 10);
+          const slot = new Date().getHours() < 12 ? 'am' : 'pm';
+          const popupKey = `wp_seen_${popupUserId}_${dateStr}_${slot}`;
           if (!sessionStorage.getItem(popupKey)) {
             sessionStorage.setItem(popupKey, '1');
             setShowWelcomePopup(true);
@@ -583,23 +586,27 @@ export default function MemberHomePage() {
     return null;
   }, [data?.stats?.myLastContributionAt, recentContribs]);
 
-  // ── PATCH ④ ──
-  // Calcul pour le popup : cotisation régulière du mois payée ?
+  // ── Calculs popup : basés sur le purpose, pas seulement le statut ──────────
   const currentMonth = new Date().getMonth() + 1;
   const currentYear  = new Date().getFullYear();
+
+  // Cotisation mensuelle : UNIQUEMENT REGULAR_QUOTA ou LATE_QUOTA — pas les dons
   const hasRegularThisMonth = recentContribs.some(c => {
+    if (c.purpose !== 'REGULAR_QUOTA' && c.purpose !== 'LATE_QUOTA') return false;
     if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
     const cDate = new Date(c.depositedAt || c.createdAt);
     return cDate.getMonth() + 1 === currentMonth && cDate.getFullYear() === currentYear;
   });
+
+  // Carte membre : MEMBERSHIP_CARD validée cette année (pas en attente)
   const hasActiveCard = recentContribs.some(c =>
     c.purpose === 'MEMBERSHIP_CARD' &&
-    (c.status === 'VALIDATED' || c.status === 'PENDING_VALIDATION') &&
+    c.status === 'VALIDATED' &&
     new Date(c.depositedAt || c.createdAt).getFullYear() === currentYear
   );
+
   const popupCurrency = cur || 'EUR';
   const popupPricing  = pricing?.[popupCurrency] ?? pricing?.['EUR'] ?? null;
-
   const firstName = data?.me?.firstName || data?.virtualCard?.user?.firstName || 'Membre';
 
   type StatCard = {
@@ -705,7 +712,6 @@ export default function MemberHomePage() {
           gap: 0.75rem; margin-bottom: 1.5rem;
         }
         .mb-span-1 { grid-column: span 1; }
-
         @media (max-width: 1100px) { .mb-stats { grid-template-columns: repeat(3, 1fr); } }
 
         .mb-stat {
@@ -779,11 +785,7 @@ export default function MemberHomePage() {
           font-size: 0.7rem; font-weight: 800; padding: 0.2rem 0.6rem;
           border-radius: 99px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;
         }
-
-        /* ─── FIX : overflow-x hidden sur le panel body pour éviter le scroll horizontal ─── */
         .mb-panel-body { overflow-x: hidden; width: 100%; }
-
-        /* ─── FIX : La table ne force plus une largeur minimale sur mobile ─── */
         .mb-table { width: 100%; border-collapse: collapse; }
         .mb-table thead tr { border-bottom: 1px solid rgba(37,99,235,0.1); }
         .mb-table thead th {
@@ -812,18 +814,13 @@ export default function MemberHomePage() {
         .mb-contrib-row:hover { background: rgba(37,99,235,0.04) !important; }
         .mb-contrib-row:active { background: rgba(37,99,235,0.08) !important; }
 
-        .mb-cards-viewport {
-          overflow: hidden; width: 100%; padding: 1.25rem 0;
-          position: relative;
-        }
+        .mb-cards-viewport { overflow: hidden; width: 100%; padding: 1.25rem 0; position: relative; }
         .mb-cards-track {
           display: flex; gap: 1rem; width: max-content;
           padding: 0 1.4rem;
           animation: panCards 18s ease-in-out infinite alternate;
         }
-        .mb-cards-track:hover, .mb-cards-track:active {
-          animation-play-state: paused;
-        }
+        .mb-cards-track:hover, .mb-cards-track:active { animation-play-state: paused; }
         @keyframes panCards {
           0%, 5% { transform: translateX(0); }
           95%, 100% { transform: translateX(calc(-100% + 100vw - 3rem)); }
@@ -916,18 +913,13 @@ export default function MemberHomePage() {
 
         .mb-status-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.7rem; font-weight: 800; border-radius: 99px; padding: 0.18rem 0.6rem; white-space: nowrap; }
         .mb-status-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
-
         .mb-motif-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.68rem; font-weight: 600; border-radius: 99px; padding: 0.18rem 0.55rem; white-space: nowrap; max-width: 100%; }
         .mb-motif-icon { flex-shrink: 0; }
         .mb-motif-text { overflow: hidden; text-overflow: ellipsis; }
-
         .truncate-cell { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-        /* ─── MOBILE ─────────────────────────────────────────────────────── */
         @media (max-width: 768px) {
           .hide-mobile { display: none !important; }
-
-          /* Stats grid */
           .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
           .mb-stat { padding: 0.6rem 0.5rem !important; border-radius: 12px !important; }
           .mb-stat-value { font-size: 1.1rem !important; word-break: break-word; }
@@ -936,27 +928,17 @@ export default function MemberHomePage() {
           .mb-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
           .mb-stat-icon svg { width: 12px; height: 12px; }
           .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
-
-          /* Panel head */
           .mb-panel-head { padding: 1rem; }
-
-          /* ─── FIX COTISATIONS : table sans largeur forcée, colonnes compressées ─── */
           .mb-table { min-width: unset; width: 100%; }
           .mb-table th { padding: 0.5rem 0.2rem; font-size: 0.55rem; letter-spacing: 0; text-align: center !important; }
           .mb-table td { padding: 0.5rem 0.2rem; font-size: 0.68rem; text-align: center !important; }
           .mb-table td.mono { font-size: 0.75rem; }
           .mb-status-badge { font-size: 0.52rem; padding: 0.1rem 0.28rem; gap: 0.18rem; }
           .mb-motif-badge  { font-size: 0.52rem; padding: 0.1rem 0.28rem; }
-
-          /* Truncate cell */
           .truncate-cell { max-width: 90px; overflow-wrap: break-word; white-space: normal; line-height: 1.2; }
-
-          /* ─── FIX CARTES INFOS : contenues dans le panel ─── */
           .mb-true-card { min-width: 200px; max-width: 220px; }
           .mb-cards-viewport { overflow: hidden; }
           .mb-cards-track { animation-duration: 10s; }
-
-          /* Membres retardataires */
           .mb-member-pill { gap: 0.4rem; }
           .mb-late-track { max-width: 45px; }
         }
@@ -980,7 +962,6 @@ export default function MemberHomePage() {
 
       {data && (
         <div className="mb-wrap">
-
           <div className="mb-header">
             <div>
               <div className="mb-eyebrow"><div className="mb-eyebrow-dot"/>Espace membre</div>
@@ -1094,7 +1075,6 @@ export default function MemberHomePage() {
                   </span>
                 )}
               </div>
-
               <div className="mb-cards-viewport">
                 {(data.projectsInProgress || []).length === 0 ? (
                   <div className="mb-empty">Aucun projet actif</div>
@@ -1129,7 +1109,6 @@ export default function MemberHomePage() {
                   Informations récentes
                 </div>
               </div>
-
               <div className="mb-cards-viewport">
                 {(data.latestContents || []).length === 0 ? (
                   <div className="mb-empty">Aucune actualité publiée</div>
@@ -1267,7 +1246,6 @@ export default function MemberHomePage() {
         />
       )}
 
-      {/* ── PATCH ⑤ ── */}
       {showWelcomePopup && data && (
         <WelcomePopup
           firstName={firstName}

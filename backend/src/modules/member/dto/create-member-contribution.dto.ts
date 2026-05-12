@@ -1,5 +1,4 @@
-//backend/src/modules/member/dto/create-member-contribution.dto.ts
-import { IsNumber, IsOptional, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsString, IsInt, Min } from 'class-validator';
 
 export class CreateMemberContributionDto {
   @IsNumber()
@@ -29,8 +28,18 @@ export class CreateMemberContributionDto {
   @IsString()
   receiptFileAssetId?: string;
 
-  // 🔥 NOUVEAU : Identifiant du membre pour qui on paie
   @IsOptional()
   @IsString()
   targetMemberId?: string;
+
+  // 🔥 AJOUT CHIRURGICAL
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  monthReference?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(2000)
+  yearReference?: number;
 }

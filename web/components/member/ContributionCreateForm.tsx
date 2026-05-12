@@ -1,7 +1,6 @@
-//web/components/member/ContributionCreateForm.tsx
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/api-client';
 
 type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | '';
@@ -104,6 +103,7 @@ interface ModalProps {
   open: boolean;
   onClose: () => void;
   onConfirm?: () => void;
+  onCancel?: () => void;
   type: 'info' | 'warning' | 'confirm';
   title: string;
   body: string | React.ReactNode;
@@ -111,11 +111,11 @@ interface ModalProps {
   cancelLabel?: string;
 }
 
-function SmartModal({ open, onClose, onConfirm, type, title, body, confirmLabel = 'OK', cancelLabel = 'Annuler' }: ModalProps) {
+function SmartModal({ open, onClose, onConfirm, onCancel, type, title, body, confirmLabel = 'OK', cancelLabel = 'Annuler' }: ModalProps) {
   if (!open) return null;
 
   const colors = {
-    info: { bg: '#EFF6FF', border: '#BFDBFE', icon: '#2563EB', btn: 'linear-gradient(135deg,#1D4ED8,#3B82F6)' },
+    info:    { bg: '#EFF6FF', border: '#BFDBFE', icon: '#2563EB', btn: 'linear-gradient(135deg,#1D4ED8,#3B82F6)' },
     warning: { bg: '#FEF3C7', border: '#FDE68A', icon: '#D97706', btn: 'linear-gradient(135deg,#B45309,#F59E0B)' },
     confirm: { bg: '#ECFDF5', border: '#A7F3D0', icon: '#059669', btn: 'linear-gradient(135deg,#047857,#10B981)' },
   }[type];
@@ -155,7 +155,6 @@ function SmartModal({ open, onClose, onConfirm, type, title, body, confirmLabel 
         boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
         animation: 'smPanelIn 0.25s cubic-bezier(.22,1,.36,1)',
       }}>
-        {/* Icon badge */}
         <div style={{
           width: 52, height: 52, borderRadius: '50%',
           background: colors.bg, border: `2px solid ${colors.border}`,
@@ -176,7 +175,7 @@ function SmartModal({ open, onClose, onConfirm, type, title, body, confirmLabel 
           {onConfirm && (
             <button
               type="button"
-              onClick={onClose}
+              onClick={onCancel ?? onClose}
               style={{
                 flex: 1, height: 42, borderRadius: 10, border: '1.5px solid #E5E7EB',
                 background: 'white', color: '#374151', fontFamily: "'DM Sans', sans-serif",
@@ -279,7 +278,6 @@ interface ContributionsResponse {
   items?: ContributionItem[];
 }
 
-
 // ─── Celebration Overlay ─────────────────────────────────────────────────────
 
 interface CelebrationConfig {
@@ -320,7 +318,7 @@ function getCelebrationConfig(purpose: string): CelebrationConfig {
         gradient: 'linear-gradient(135deg, #EFF6FF, #E0E7FF)',
         titleColor: '#1D4ED8',
       };
-    default: // REGULAR_QUOTA
+    default:
       return {
         emoji: ['🎯', '✅', '🌿', '💚', '🎉', '🏆', '⭐'],
         title: 'Cotisation enregistrée !',
@@ -332,7 +330,6 @@ function getCelebrationConfig(purpose: string): CelebrationConfig {
   }
 }
 
-// Particule individuelle
 interface ParticleProps {
   x: number;
   y: number;
@@ -352,7 +349,6 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
   const [closing, setClosing] = React.useState(false);
 
   React.useEffect(() => {
-    // Générer les particules
     const generated: ParticleProps[] = Array.from({ length: 60 }, (_, i) => ({
       x: 10 + Math.random() * 80,
       y: -10,
@@ -365,9 +361,7 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
       delay: Math.random() * 0.8,
     }));
     setParticles(generated);
-    // Apparition avec léger délai
     const t = setTimeout(() => setVisible(true), 80);
-    // Fermeture automatique après 5s
     const t2 = setTimeout(() => handleClose(), 5200);
     return () => { clearTimeout(t); clearTimeout(t2); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -391,7 +385,6 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
       }}
       onClick={handleClose}
     >
-      {/* Particules confettis */}
       <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
         {particles.map((p, i) => (
           <div
@@ -415,7 +408,6 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
         ))}
       </div>
 
-      {/* Card centrale */}
       <div
         style={{
           background: config.gradient,
@@ -432,7 +424,6 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
         }}
         onClick={e => e.stopPropagation()}
       >
-        {/* Emojis qui tombent en arc */}
         <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           {config.emoji.map((e, i) => (
             <span
@@ -484,7 +475,6 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
           Parfait, merci ! 🙏
         </button>
 
-        {/* Petites étincelles décoratives aux coins */}
         {['top:0;left:0', 'top:0;right:0', 'bottom:0;left:0', 'bottom:0;right:0'].map((pos, i) => (
           <div key={i} style={{
             position: 'absolute',
@@ -518,7 +508,7 @@ export function ContributionCreateForm({
   const [isSearching, setIsSearching] = useState(false);
   const [selectedMember, setSelectedMember] = useState<SearchMemberResult | null>(null);
 
-  // Month reference (NEW)
+  // Month reference
   const now = new Date();
   const [refMonth, setRefMonth] = useState<number>(now.getMonth() + 1);
   const [refYear, setRefYear] = useState<number>(now.getFullYear());
@@ -530,6 +520,7 @@ export function ContributionCreateForm({
     title: string;
     body: string | React.ReactNode;
     onConfirm?: () => void;
+    onCancel?: () => void;
     confirmLabel?: string;
     cancelLabel?: string;
   }>({ open: false, type: 'info', title: '', body: '' });
@@ -563,6 +554,11 @@ export function ContributionCreateForm({
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationPurpose, setCelebrationPurpose] = useState('REGULAR_QUOTA');
   const [pendingPayload, setPendingPayload] = useState<ContributionValues | null>(null);
+
+  // ── Excess choice state ───────────────────────────────────────────────────
+  const [excessChoice, setExcessChoice] = useState<'anticipate' | 'donate' | null>(null);
+  const [pendingSubmitAfterExcess, setPendingSubmitAfterExcess] = useState(false);
+  const pendingDonationRef = useRef<ContributionValues | null>(null);
 
   const currencyMeta = useMemo(() => getCurrencyMeta(selectedCurrency), [selectedCurrency]);
 
@@ -623,7 +619,7 @@ export function ContributionCreateForm({
     return () => { mounted = false; };
   }, []);
 
-  // ── Visible results: derived, no setState in effect ──────────────────────
+  // ── Visible results: derived ──────────────────────────────────────────────
   const visibleResults = useMemo(
     () => (paymentTarget === 'OTHER' && searchQuery && !selectedMember ? searchResults : []),
     [paymentTarget, searchQuery, selectedMember, searchResults],
@@ -642,11 +638,75 @@ export function ContributionCreateForm({
     return () => clearTimeout(timer);
   }, [searchQuery, paymentTarget, selectedMember]);
 
+  // ── Excess choice effect ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!pendingSubmitAfterExcess || excessChoice === null) return;
+    setPendingSubmitAfterExcess(false);
+
+    const purposeSnapshot = values.purpose;
+
+    if (excessChoice === 'anticipate') {
+      // Soumettre normalement — le backend découpe sur plusieurs années
+      const payload: ContributionValues = {
+        amount: amountNum,
+        currency: selectedCurrency,
+        depositedAt: values.depositedAt,
+        method: values.method,
+        note: values.note,
+        purpose: purposeSnapshot,
+        targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
+        monthReference: refMonth,
+        yearReference: refYear,
+      };
+      setCelebrationPurpose(purposeSnapshot);
+      setPendingPayload(payload);
+      setShowCelebration(true);
+    } else {
+      // Soumettre cotisations année en cours + don pour l'excédent
+      const monthsInStartYear = 12 - refMonth + 1;
+      const quotaAmount = monthsInStartYear * monthlyPrice;
+      const donationAmount = amountNum - quotaAmount;
+
+      const payloadQuota: ContributionValues = {
+        amount: quotaAmount,
+        currency: selectedCurrency,
+        depositedAt: values.depositedAt,
+        method: values.method,
+        note: values.note,
+        purpose: purposeSnapshot,
+        targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
+        monthReference: refMonth,
+        yearReference: refYear,
+      };
+
+      if (donationAmount > 0) {
+        pendingDonationRef.current = {
+          amount: donationAmount,
+          currency: selectedCurrency,
+          depositedAt: values.depositedAt,
+          method: values.method,
+          note: '[Excédent converti en don]',
+          purpose: 'DONATION',
+          targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
+        };
+        setCelebrationPurpose('DONATION');
+      } else {
+        setCelebrationPurpose(purposeSnapshot);
+      }
+
+      setPendingPayload(payloadQuota);
+      setShowCelebration(true);
+    }
+
+    setExcessChoice(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSubmitAfterExcess, excessChoice]);
+
   // ── Purpose selection with smart guards ───────────────────────────────────
   const handlePurposeSelect = useCallback((purposeValue: string) => {
     if (purposeValue === 'MEMBERSHIP_CARD') {
-      const cardPrice = currentPricing.membershipCard;
-      if (cardPrice > 0 && selectedCurrency) {
+      const cardPriceLocal = currentPricing.membershipCard;
+      if (cardPriceLocal > 0 && selectedCurrency) {
         setModal({
           open: true,
           type: 'info',
@@ -655,7 +715,7 @@ export function ContributionCreateForm({
             <span>
               Le prix de la carte membre est fixé à{' '}
               <strong style={{ color: '#059669', fontSize: '1rem' }}>
-                {cardPrice.toLocaleString('fr-FR')} {selectedCurrency}
+                {cardPriceLocal.toLocaleString('fr-FR')} {selectedCurrency}
               </strong>{' '}
               par l&apos;administrateur. Ce montant sera automatiquement appliqué.
             </span>
@@ -663,7 +723,7 @@ export function ContributionCreateForm({
           confirmLabel: 'Compris',
           onConfirm: undefined,
         });
-        setValues(prev => ({ ...prev, purpose: purposeValue, amount: cardPrice.toString() }));
+        setValues(prev => ({ ...prev, purpose: purposeValue, amount: cardPriceLocal.toString() }));
         return;
       }
     }
@@ -674,7 +734,7 @@ export function ContributionCreateForm({
           open: true,
           type: 'warning',
           title: 'Aucun retard détecté',
-          body: 'Votre historique de cotisations ne présente pas de retard de paiement. Vous ne pouvez pas sélectionner ce motif. Choisissez &quot;Cotisation régulière&quot; pour payer le mois en cours.',
+          body: 'Votre historique de cotisations ne présente pas de retard de paiement. Vous ne pouvez pas sélectionner ce motif. Choisissez la cotisation régulière pour payer le mois en cours.',
           confirmLabel: 'Compris',
           onConfirm: undefined,
         });
@@ -745,16 +805,15 @@ export function ContributionCreateForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (isMembershipCardPriceLocked && amountNum !== cardPrice) {
+    // ── Validation carte membre : montant minimum ─────────────────────────
+    if (isMembershipCard && cardPrice > 0 && amountNum < cardPrice) {
       setModal({
-        open: true,
-        type: 'warning',
-        title: 'Montant incorrect',
+        open: true, type: 'warning',
+        title: 'Montant insuffisant',
         body: (
           <span>
-            Le montant de la carte membre doit être exactement{' '}
+            Le montant minimum pour la carte membre est{' '}
             <strong>{cardPrice.toLocaleString('fr-FR')} {selectedCurrency}</strong>.
-            Veuillez corriger le montant.
           </span>
         ),
         confirmLabel: 'Corriger',
@@ -766,10 +825,50 @@ export function ContributionCreateForm({
       return;
     }
 
-    // 🎉 Capturer le motif et le payload AVANT l'appel async
-    // (le parent peut démonter ce composant après onSubmit, la célébration ne s'afficherait jamais)
+    // ── Vérification dépassement d'année ──────────────────────────────────
+    if (isQuota && monthlyPrice > 0 && monthsCovered > 1) {
+      const lastMonthIdx = refMonth - 1 + monthsCovered - 1;
+      const lastYear = refYear + Math.floor(lastMonthIdx / 12);
+
+      if (lastYear > refYear) {
+        const monthsInStartYear = 12 - refMonth + 1;
+        const excessMonths = monthsCovered - monthsInStartYear;
+        const excessAmount = excessMonths * monthlyPrice;
+
+        setModal({
+          open: true,
+          type: 'confirm',
+          title: 'Paiement sur plusieurs années',
+          body: (
+            <span>
+              Votre paiement couvre <strong>{monthsCovered} mois</strong> et s&apos;étend
+              jusqu&apos;en <strong>{lastYear}</strong>.<br /><br />
+              L&apos;excédent représente <strong>{excessMonths} mois</strong>{' '}
+              · <strong>{excessAmount.toLocaleString('fr-FR')} {selectedCurrency}</strong>.<br /><br />
+              Souhaitez-vous anticiper ces mois pour <strong>{lastYear}</strong>, ou
+              convertir l&apos;excédent en <strong>don</strong> ?
+            </span>
+          ),
+          confirmLabel: '📅 Anticiper',
+          cancelLabel: '🤝 Convertir en don',
+          onConfirm: () => {
+            setModal(m => ({ ...m, open: false }));
+            setExcessChoice('anticipate');
+            setPendingSubmitAfterExcess(true);
+          },
+          onCancel: () => {
+            setModal(m => ({ ...m, open: false }));
+            setExcessChoice('donate');
+            setPendingSubmitAfterExcess(true);
+          },
+        });
+        return;
+      }
+    }
+
+    // ── Soumission directe ────────────────────────────────────────────────
     const purposeSnapshot = values.purpose;
-    const payload = {
+    const payload: ContributionValues = {
       amount: amountNum,
       currency: selectedCurrency,
       depositedAt: values.depositedAt,
@@ -781,7 +880,6 @@ export function ContributionCreateForm({
       yearReference: isQuota ? refYear : undefined,
     };
 
-    // 🎉 Afficher la célébration IMMÉDIATEMENT, soumettre en arrière-plan depuis onClose
     setCelebrationPurpose(purposeSnapshot);
     setPendingPayload(payload);
     setShowCelebration(true);
@@ -801,7 +899,6 @@ export function ContributionCreateForm({
 
         .ccf-form { display: flex; flex-direction: column; gap: 1.25rem; font-family: 'DM Sans', sans-serif; }
 
-        /* Tiers search */
         .ccf-target-tabs {
           display: flex; gap: 0.5rem; background: #F3F4F6; padding: 0.35rem; border-radius: 12px; margin-bottom: 0.5rem;
         }
@@ -842,16 +939,12 @@ export function ContributionCreateForm({
           transition: all 0.2s; text-align: center;
           font-family: 'DM Sans', sans-serif; box-sizing: border-box;
         }
-
         .ccf-purpose-pill:hover { border-color: rgba(5,150,105,0.4); background: #ECFDF5; }
         .ccf-purpose-pill.active {
           border-color: #059669; background: #ECFDF5;
           box-shadow: 0 0 0 3px rgba(5,150,105,0.1);
         }
-        .ccf-purpose-pill.disabled {
-          opacity: 0.45; cursor: not-allowed;
-          border-color: rgba(0,0,0,0.08);
-        }
+        .ccf-purpose-pill.disabled { opacity: 0.45; cursor: not-allowed; border-color: rgba(0,0,0,0.08); }
         .ccf-purpose-emoji { font-size: 1.3rem; line-height: 1; }
         .ccf-purpose-label { font-size: 0.72rem; font-weight: 700; color: #1E293B; line-height: 1.2; }
         .ccf-purpose-desc { font-size: 0.62rem; color: #94A3B8; }
@@ -912,7 +1005,6 @@ export function ContributionCreateForm({
         }
         .ccf-amount-input { font-family: 'Cormorant Garamond', serif !important; font-size: 1.1rem !important; font-weight: 700 !important; }
 
-        /* Card price lock badge */
         .ccf-price-lock {
           background: #ECFDF5; border: 1.5px solid #A7F3D0; border-radius: 10px;
           padding: 0.7rem 1rem;
@@ -924,7 +1016,6 @@ export function ContributionCreateForm({
           display: flex; align-items: center; justify-content: center; color: #059669; flex-shrink: 0;
         }
 
-        /* Anticipation info box */
         .ccf-anticipation-box {
           margin-top: 0.5rem; padding: 0.9rem 1rem; background: #EFF6FF; border: 1px solid #BFDBFE;
           border-radius: 12px; font-size: 0.76rem; color: #1D4ED8; line-height: 1.6;
@@ -937,7 +1028,6 @@ export function ContributionCreateForm({
           padding: 0.2rem 0.6rem; font-size: 0.68rem; font-weight: 800; color: #1D4ED8;
         }
 
-        /* Month ref section */
         .ccf-month-ref-section {
           background: rgba(5,150,105,0.04); border: 1px solid rgba(5,150,105,0.15);
           border-radius: 12px; padding: 0.9rem 1rem;
@@ -1011,14 +1101,13 @@ export function ContributionCreateForm({
         .ccf-spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: ccfspin 0.7s linear infinite; }
         @keyframes ccfspin { to { transform: rotate(360deg); } }
 
-        /* ── Célébration ── */
         @keyframes ccf-emoji-bounce {
           from { opacity: 0; transform: scale(0) translateY(20px) rotate(-15deg); }
-          to   { opacity: 1; transform: scale(1) translateY(0)     rotate(0deg); }
+          to   { opacity: 1; transform: scale(1) translateY(0) rotate(0deg); }
         }
         @keyframes ccf-sparkle {
           from { opacity: 0.4; transform: scale(0.8) rotate(-10deg); }
-          to   { opacity: 1;   transform: scale(1.2) rotate(10deg);  }
+          to   { opacity: 1;   transform: scale(1.2) rotate(10deg); }
         }
         @keyframes ccf-fall-0 { 0%{transform:translateY(0) rotate(0deg) scaleX(1)} 100%{transform:translateY(110vh) rotate(720deg) scaleX(0.5);opacity:0} }
         @keyframes ccf-fall-1 { 0%{transform:translateY(0) rotate(0deg)} 100%{transform:translateY(110vh) rotate(-540deg) translateX(40px);opacity:0} }
@@ -1037,6 +1126,7 @@ export function ContributionCreateForm({
         confirmLabel={modal.confirmLabel}
         cancelLabel={modal.cancelLabel}
         onConfirm={modal.onConfirm}
+        onCancel={modal.onCancel}
         onClose={() => setModal(m => ({ ...m, open: false }))}
       />
 
@@ -1147,7 +1237,6 @@ export function ContributionCreateForm({
 
         {/* ── Montant + Devise ── */}
         <div className="ccf-row-montant-devise">
-          {/* Montant */}
           <div className="ccf-field">
             <span className="ccf-label">
               Montant
@@ -1192,7 +1281,6 @@ export function ContributionCreateForm({
             )}
           </div>
 
-          {/* Devise */}
           <div className="ccf-field">
             <span className="ccf-label">Devise</span>
             <select
@@ -1342,9 +1430,13 @@ export function ContributionCreateForm({
           purpose={celebrationPurpose}
           onClose={() => {
             setShowCelebration(false);
-            // Soumettre le payload au parent une fois la célébration fermée
             if (pendingPayload) {
-              void onSubmit(pendingPayload);
+              void onSubmit(pendingPayload).then(() => {
+                if (pendingDonationRef.current) {
+                  void onSubmit(pendingDonationRef.current);
+                  pendingDonationRef.current = null;
+                }
+              });
               setPendingPayload(null);
             }
           }}

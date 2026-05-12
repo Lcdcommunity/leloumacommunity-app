@@ -284,119 +284,197 @@ export class MemberService {
   }
 
   async createContribution(userId: string, dto: CreateMemberContributionDto) {
-    const me = await this.getMeOrThrow(userId);
-    this.ensureMemberActiveEnough(me.status);
+  const me = await this.getMeOrThrow(userId);
+  this.ensureMemberActiveEnough(me.status);
 
-    if (!me.associationId || !me.antennaId) {
+  if (!me.associationId || !me.antennaId) {
+    throw new BadRequestException('Utilisateur non rattaché à une association / antenne.');
+  }
+
+  let finalMemberId = me.id;
+  let finalAntennaId = me.antennaId;
+  let submitterId: string | null = null;
+
+  if (dto.targetMemberId && dto.targetMemberId !== me.id) {
+    const target = await this.prisma.user.findFirst({
+      where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
+      include: { memberships: true },
+    });
+    if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
+    finalMemberId = target.id;
+    submitterId = me.id;
+    const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
+    if (primaryMembership?.antennaId) finalAntennaId = primaryMembership.antennaId;
+  }
+
+  // ── Récupérer le pricing ──────────────────────────────────────────────────
+  const pricingSetting = await this.prisma.associationSetting.findUnique({
+    where: { associationId_key: { associationId: me.associationId, key: 'PRICING_CONFIG' } },
+  });
+  const allPricing = (pricingSetting?.value as Record<string, any>) || {};
+  const resolvedCurrency = dto.currency || 'EUR';
+  const localPricing = allPricing[resolvedCurrency] || { monthlyQuota: 0, membershipCard: 0 };
+  const monthlyPrice = Number(localPricing.monthlyQuota) || 0;
+  const cardPrice = Number(localPricing.membershipCard) || 0;
+
+  const purpose = (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA;
+  const totalAmount = Number(dto.amount);
+
+  // ── Validation carte membre ───────────────────────────────────────────────
+  if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
+    if (totalAmount < cardPrice) {
       throw new BadRequestException(
-        'Utilisateur non rattaché à une association / antenne.',
+        `Le montant minimum pour la carte membre est ${cardPrice} ${resolvedCurrency}.`,
       );
     }
+  }
 
-    let finalMemberId = me.id;
-    let finalAntennaId = me.antennaId;
-    let submitterId: string | null = null;
+  const autoReference = `TR-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
 
-    if (dto.targetMemberId && dto.targetMemberId !== me.id) {
-      const target = await this.prisma.user.findFirst({
-        where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
-        include: { memberships: true },
-      });
+  const baseData = {
+    associationId: me.associationId,
+    antennaId: finalAntennaId,
+    memberUserId: finalMemberId,
+    submitterUserId: submitterId,
+    currency: resolvedCurrency as CurrencyCode,
+    paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
+    externalReference: autoReference,
+    contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
+    memberComment: dto.note ?? null,
+    proofFileId: dto.receiptFileAssetId ?? null,
+    status: ContributionStatus.PENDING_VALIDATION,
+    purpose,
+  };
 
-      if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
+  const contributionsToCreate: Prisma.ContributionUncheckedCreateInput[] = [];
 
-      finalMemberId = target.id;
-      submitterId = me.id;
-
-      const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
-      if (primaryMembership && primaryMembership.antennaId) {
-        finalAntennaId = primaryMembership.antennaId;
+  // ── Carte membre : montant exact + excédent en anticipation régulière ────
+  if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
+    contributionsToCreate.push({
+      ...baseData,
+      amount: new Prisma.Decimal(cardPrice),
+      monthReference: null,
+      yearReference: null,
+    });
+    const excess = totalAmount - cardPrice;
+    if (excess > 0 && monthlyPrice > 0) {
+      // L'excédent est reporté en cotisation anticipée
+      let remaining = excess;
+      let m = new Date().getMonth() + 1;
+      let y = new Date().getFullYear();
+      while (remaining >= monthlyPrice) {
+        contributionsToCreate.push({
+          ...baseData,
+          purpose: ContributionPurpose.REGULAR_QUOTA,
+          amount: new Prisma.Decimal(monthlyPrice),
+          monthReference: m,
+          yearReference: y,
+          memberComment: '[Anticipation depuis excédent carte]',
+        });
+        remaining -= monthlyPrice;
+        m++;
+        if (m > 12) { m = 1; y++; }
       }
     }
+  }
+  // ── Cotisation régulière / retard : découpage en mois ────────────────────
+  else if (
+    (purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA) &&
+    monthlyPrice > 0 &&
+    totalAmount >= monthlyPrice
+  ) {
+    let remaining = totalAmount;
+    let m = dto.monthReference ?? (new Date().getMonth() + 1);
+    let y = dto.yearReference ?? new Date().getFullYear();
+    const currentYear = new Date().getFullYear();
 
-    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const autoReference = `TR-${datePart}-${randomPart}`;
+    while (remaining >= monthlyPrice) {
+      contributionsToCreate.push({
+        ...baseData,
+        amount: new Prisma.Decimal(monthlyPrice),
+        monthReference: m,
+        yearReference: y,
+        memberComment: remaining !== totalAmount
+          ? `${dto.note?.trim() || ''} [Avance automatique]`.trim()
+          : dto.note?.trim() ?? null,
+      });
+      remaining -= monthlyPrice;
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
 
-    const created = await this.prisma.contribution.create({
-      data: {
-        associationId: me.associationId,
-        antennaId: finalAntennaId,
-        memberUserId: finalMemberId,
-        submitterUserId: submitterId,
-        amount: new Prisma.Decimal(dto.amount),
-        currency: (dto.currency as CurrencyCode) || CurrencyCode.EUR,
-        paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
-        externalReference: autoReference,
-        contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
-        memberComment: dto.note ?? null,
-        proofFileId: dto.receiptFileAssetId ?? null,
-        status: ContributionStatus.PENDING_VALIDATION,
-        purpose: (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA,
-      },
+    // Reliquat inférieur à un mois → on l'ignore (le frontend a déjà prévenu)
+    // Si on a dépassé l'année en cours lors du découpage, le frontend gère le popup don
+  }
+  // ── Don libre ou montant < mensualité ────────────────────────────────────
+  else {
+    contributionsToCreate.push({
+      ...baseData,
+      amount: new Prisma.Decimal(totalAmount),
+      monthReference: dto.monthReference ?? null,
+      yearReference: dto.yearReference ?? null,
+    });
+  }
+
+  const created = await this.prisma.$transaction(
+    contributionsToCreate.map(data => this.prisma.contribution.create({ data })),
+  );
+
+  const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
+  await this.notifications.notifyAntennaAdminsWithPush(
+    finalAntennaId,
+    me.associationId,
+    `Un nouveau versement de ${dto.amount} ${resolvedCurrency} a été déclaré pour ${targetName}.`,
+    NotificationType.CONTRIBUTION_SUBMITTED,
+    { contributionId: created[0].id },
+    '💰 Nouveau dépôt soumis',
+  );
+
+  return memberMapper.contribution(created[0]);
+}
+
+async listMyContributions(
+  userId: string,
+  query: MemberContributionsQueryDto,
+): Promise<PaginatedResponseDto<any>> {
+  const me = await this.getMeOrThrow(userId);
+
+  const page = query.page ?? 1;
+  const pageSize = query.pageSize ?? 50;
+
+  const where: Prisma.ContributionWhereInput = {
+    associationId: me.associationId,
+    OR: [
+      { memberUserId: userId },
+      { submitterUserId: userId },
+    ],
+    ...(query.status ? { status: query.status as ContributionStatus } : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    this.prisma.contribution.count({ where }),
+    this.prisma.contribution.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: {
         submitter: { select: { firstName: true, lastName: true } },
         member: { select: { firstName: true, lastName: true } },
       },
-    });
+    }),
+  ]);
 
-    const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
-
-    await this.notifications.notifyAntennaAdminsWithPush(
-      finalAntennaId,
-      me.associationId,
-      `Un nouveau versement de ${dto.amount} ${dto.currency || 'EUR'} a été déclaré pour ${targetName}.`,
-      NotificationType.CONTRIBUTION_SUBMITTED,
-      { contributionId: created.id },
-      '💰 Nouveau dépôt soumis',
-    );
-
-    return memberMapper.contribution(created);
-  }
-
-  async listMyContributions(
-    userId: string,
-    query: MemberContributionsQueryDto,
-  ): Promise<PaginatedResponseDto<any>> {
-    const me = await this.getMeOrThrow(userId);
-
-    const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? 50;
-
-    const where: Prisma.ContributionWhereInput = {
-      associationId: me.associationId,
-      OR: [
-        { memberUserId: userId },
-        { submitterUserId: userId },
-      ],
-      ...(query.status ? { status: query.status as ContributionStatus } : {}),
-    };
-
-    const [total, items] = await Promise.all([
-      this.prisma.contribution.count({ where }),
-      this.prisma.contribution.findMany({
-        where,
-        orderBy: [{ createdAt: 'desc' }],
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-        include: {
-          submitter: { select: { firstName: true, lastName: true } },
-          member: { select: { firstName: true, lastName: true } },
-        },
-      }),
-    ]);
-
-    return {
-      items: items.map(c => ({
-        ...memberMapper.contribution(c),
-        currency: c.currency,
-      })),
-      total,
-      page,
-      pageSize,
-    };
-  }
-
+  return {
+    items: items.map(c => ({
+      ...memberMapper.contribution(c),
+      currency: c.currency,
+    })),
+    total,
+    page,
+    pageSize,
+  };
+}
   async getAssociationBalanceSummary(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
@@ -445,67 +523,102 @@ export class MemberService {
   );
   }
 
-  async listLateMembers(
-    userId: string,
-    query: LateMembersQueryDto,
-  ): Promise<PaginatedResponseDto<any>> {
-    const me = await this.getMeOrThrow(userId);
-    const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? 50;
+  async listLateMembers(userId: string, query: LateMembersQueryDto): Promise<PaginatedResponseDto<any>> {
+  const me = await this.getMeOrThrow(userId);
+  const page = query.page ?? 1;
+  const pageSize = query.pageSize ?? 50;
 
-    const members = await this.prisma.user.findMany({
-      where: {
-        associationId: me.associationId,
-        role: 'MEMBER',
-        status: 'ACTIVE',
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        createdAt: true,
-        memberships: {
-          include: {
-            antenna: true,
-          },
+  // Récupérer le pricing pour calculer combien de mois couvre un crédit
+  const pricingSetting = await this.prisma.associationSetting.findUnique({
+    where: { associationId_key: { associationId: me.associationId, key: 'PRICING_CONFIG' } },
+  });
+  const allPricing = (pricingSetting?.value as Record<string, any>) || {};
+
+  const members = await this.prisma.user.findMany({
+    where: { associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      createdAt: true,
+      memberships: { include: { antenna: true } },
+      contributions: {
+        where: {
+          status: 'VALIDATED',
+          associationId: me.associationId,
+          purpose: { in: ['REGULAR_QUOTA', 'LATE_QUOTA'] },
         },
-        contributions: {
-          where: { status: 'VALIDATED', associationId: me.associationId },
-          orderBy: [{ validatedAt: 'desc' }],
-          take: 1,
-          select: {
-            validatedAt: true,
-            createdAt: true,
-          },
+        select: {
+          amount: true,
+          currency: true,
+          monthReference: true,
+          yearReference: true,
+          validatedAt: true,
+          createdAt: true,
         },
+        orderBy: { validatedAt: 'desc' },
       },
-    });
+    },
+  });
 
-    const now = new Date();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
 
-    const computed = members
-      .map((m) => {
-        const last = m.contributions[0]?.validatedAt ?? m.createdAt;
-        return {
-          id: m.id,
-          firstName: m.firstName,
-          lastName: m.lastName,
-          antennaName: m.memberships[0]?.antenna?.name ?? null,
-          lateMonths: monthDiff(last, now),
-        };
-      })
-      .filter((x) => x.lateMonths >= 3)
-      .sort((a, b) => b.lateMonths - a.lateMonths);
+  const computed = members.map(m => {
+    // Collecter tous les mois couverts par des contributions validées avec référence
+    const coveredMonths = new Set<string>();
 
-    const start = (page - 1) * pageSize;
+    for (const c of m.contributions) {
+      if (c.monthReference && c.yearReference) {
+        coveredMonths.add(`${c.yearReference}-${String(c.monthReference).padStart(2, '0')}`);
+      } else {
+        // Contribution sans référence : on considère le mois de validation
+        const d = c.validatedAt ?? c.createdAt;
+        if (d) {
+          const d2 = new Date(d);
+          coveredMonths.add(`${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}`);
+        }
+      }
+    }
+
+    // Calculer combien de mois consécutifs depuis l'inscription sont manquants
+    const joinDate = m.createdAt;
+    let lateMonths = 0;
+    let checkYear = currentYear;
+    let checkMonth = currentMonth;
+
+    // On remonte jusqu'à 24 mois en arrière maximum
+    for (let i = 0; i < 24; i++) {
+      const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
+      const monthStart = new Date(checkYear, checkMonth - 1, 1);
+
+      // Ne pas compter les mois avant l'inscription
+      if (monthStart < joinDate) break;
+
+      if (!coveredMonths.has(key)) {
+        lateMonths++;
+      }
+
+      // Mois précédent
+      checkMonth--;
+      if (checkMonth < 1) { checkMonth = 12; checkYear--; }
+    }
 
     return {
-      items: computed.slice(start, start + pageSize),
-      total: computed.length,
-      page,
-      pageSize,
+      id: m.id,
+      firstName: m.firstName,
+      lastName: m.lastName,
+      antennaName: m.memberships[0]?.antenna?.name ?? null,
+      lateMonths,
     };
-  }
+  })
+  .filter(x => x.lateMonths >= 3)
+  .sort((a, b) => b.lateMonths - a.lateMonths);
+
+  const start = (page - 1) * pageSize;
+  return { items: computed.slice(start, start + pageSize), total: computed.length, page, pageSize };
+}
 
   async listProjectsForMembers(
     userId: string,

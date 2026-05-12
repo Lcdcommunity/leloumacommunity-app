@@ -31,7 +31,7 @@ async function main() {
   // 2. Création du compte SUPER_ADMIN du client
   console.log('👤 Mise à jour du compte Super Admin...');
   await prisma.user.upsert({
-    where: { email: 'thiernodoniko@gmail.com' },
+    where: { email: 'lelouma.community@gmail.com' },
     update: {
       role: UserRole.SUPER_ADMIN,
       associationId: association.id,
@@ -40,7 +40,7 @@ async function main() {
     },
     create: {
       associationId: association.id,
-      email: 'thiernodoniko@gmail.com',
+      email: 'lelouma.community@gmail.com',
       passwordHash: hashedPwd,
       firstName: 'Thierno',
       lastName: 'DIALLO',
