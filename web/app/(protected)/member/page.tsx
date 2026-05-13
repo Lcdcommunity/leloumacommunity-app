@@ -11,7 +11,7 @@ import type { UserSummary } from '../../../types/user';
 import type { Contribution } from '../../../types/contribution';
 import type { Project } from '../../../types/project';
 import type { ContentPost } from '../../../types/content';
-import { WelcomePopup } from '../../../components/member/WelcomePopup';
+/*import { WelcomePopup } from '../../../components/member/WelcomePopup';*/
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
