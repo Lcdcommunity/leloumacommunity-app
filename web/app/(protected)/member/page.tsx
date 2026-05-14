@@ -11,7 +11,7 @@ import type { UserSummary } from '../../../types/user';
 import type { Contribution } from '../../../types/contribution';
 import type { Project } from '../../../types/project';
 import type { ContentPost } from '../../../types/content';
-/*import { WelcomePopup } from '../../../components/member/WelcomePopup';*/
+import { WelcomePopup } from '../../../components/member/WelcomePopup';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,7 @@ type DashboardData = {
     myContributionsValidatedTotal?: number;
     myPendingContributionsCount?: number;
     associationTotalBalance?: number;
+    // ✅ FIX : lateMonths et myLastContributionAt sont maintenant fournis par le backend
     lateMonths?: number;
     myLastContributionAt?: string | null;
     currency?: string;
@@ -86,6 +87,7 @@ type BalanceSummary = {
   lastUpdatedAt?: string | null;
 };
 
+// ✅ FIX : Ajout de monthReference et yearReference pour la détection correcte
 type ExtendedContribution = Contribution & {
   purpose?: string | null;
   currency?: string;
@@ -93,6 +95,8 @@ type ExtendedContribution = Contribution & {
   validatedAt?: string | null;
   note?: string | null;
   depositedAt?: string | null;
+  monthReference?: number | null;
+  yearReference?: number | null;
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -461,7 +465,9 @@ export default function MemberHomePage() {
         const [dashRes, balanceRes, contribRes, projectsRes, contentsRes, lateRes] = await Promise.allSettled([
           api.dashboardMember(),
           api.getAssociationBalanceSummary(),
-          api.listMyContributions({ page: 1, pageSize: 5 }),
+          // ✅ FIX : pageSize augmenté à 120 pour couvrir une année entière
+          // d'avances (12 mois) + historique récent sans tronquer
+          api.listMyContributions({ page: 1, pageSize: 120 }),
           api.listProjectsForMembers({ page: 1, pageSize: 5 }),
           api.listContentsForMembers({ page: 1, pageSize: 5 }),
           api.listLateMembersVisible({ page: 1, pageSize: 5 }),
@@ -572,9 +578,11 @@ export default function MemberHomePage() {
   const myAntenna = data?.antennaBalances?.find(a => a.id === myAntennaId);
   const cur = data?.stats?.currency || myAntenna?.currency || balanceSummary?.currency || 'EUR';
 
+  // ✅ FIX : lateMonths vient maintenant directement du backend (calculé correctement)
   const lateMonths = data?.stats?.lateMonths ?? 0;
 
   const lastContribDate = useMemo(() => {
+    // ✅ FIX : Priorité à myLastContributionAt calculé par le backend
     const fromStats = data?.stats?.myLastContributionAt;
     if (fromStats) return fromStats;
     if (recentContribs.length > 0) {
@@ -586,24 +594,43 @@ export default function MemberHomePage() {
     return null;
   }, [data?.stats?.myLastContributionAt, recentContribs]);
 
-  // ── Calculs popup : basés sur le purpose, pas seulement le statut ──────────
   const currentMonth = new Date().getMonth() + 1;
   const currentYear  = new Date().getFullYear();
 
-  // Cotisation mensuelle : UNIQUEMENT REGULAR_QUOTA ou LATE_QUOTA — pas les dons
-  const hasRegularThisMonth = recentContribs.some(c => {
-    if (c.purpose !== 'REGULAR_QUOTA' && c.purpose !== 'LATE_QUOTA') return false;
-    if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
-    const cDate = new Date(c.depositedAt || c.createdAt);
-    return cDate.getMonth() + 1 === currentMonth && cDate.getFullYear() === currentYear;
-  });
+  // ✅ FIX CRITIQUE : Détection via monthReference/yearReference (logique métier)
+  // et NON via depositedAt/createdAt (logique de date de saisie)
+  // On utilise aussi lateMonths du backend comme source de vérité principale.
+  const hasRegularThisMonth = useMemo(() => {
+    // Si le backend indique 0 mois de retard, le membre est à jour
+    // (y compris si ses paiements anticipés couvrent le mois courant)
+    if (lateMonths === 0 && data !== null) return true;
 
-  // Carte membre : MEMBERSHIP_CARD validée cette année (pas en attente)
-  const hasActiveCard = recentContribs.some(c =>
-    c.purpose === 'MEMBERSHIP_CARD' &&
-    c.status === 'VALIDATED' &&
-    new Date(c.depositedAt || c.createdAt).getFullYear() === currentYear
-  );
+    // Sinon, vérification fine dans les contributions chargées
+    return recentContribs.some(c => {
+      if (c.purpose !== 'REGULAR_QUOTA' && c.purpose !== 'LATE_QUOTA') return false;
+      if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
+
+      // ✅ Priorité absolue à monthReference/yearReference
+      if (c.monthReference != null && c.yearReference != null) {
+        return c.monthReference === currentMonth && c.yearReference === currentYear;
+      }
+
+      // Fallback uniquement pour les anciennes contributions sans référence
+      const cDate = new Date(c.depositedAt || c.createdAt);
+      return cDate.getMonth() + 1 === currentMonth && cDate.getFullYear() === currentYear;
+    });
+  }, [recentContribs, currentMonth, currentYear, lateMonths, data]);
+
+  // ✅ FIX : Détection carte via purpose MEMBERSHIP_CARD + année courante
+  // Ne dépend plus de la limite pageSize:5
+  const hasActiveCard = useMemo(() => {
+    return recentContribs.some(c => {
+      if (c.purpose !== 'MEMBERSHIP_CARD') return false;
+      if (c.status !== 'VALIDATED') return false;
+      const cDate = new Date(c.depositedAt || c.createdAt);
+      return cDate.getFullYear() === currentYear;
+    });
+  }, [recentContribs, currentYear]);
 
   const popupCurrency = cur || 'EUR';
   const popupPricing  = pricing?.[popupCurrency] ?? pricing?.['EUR'] ?? null;
@@ -1032,7 +1059,9 @@ export default function MemberHomePage() {
                     {recentContribs.length === 0 && (
                       <EmptyRow cols={3} label="Aucune cotisation enregistrée"/>
                     )}
-                    {recentContribs.map(c => {
+                    {/* ✅ Afficher seulement les 10 plus récentes dans le tableau
+                        (on charge 120 pour les calculs, mais on n'affiche pas tout) */}
+                    {recentContribs.slice(0, 10).map(c => {
                       const pc = getPurposeConfig(c.purpose);
                       return (
                         <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)} title="Voir le détail">

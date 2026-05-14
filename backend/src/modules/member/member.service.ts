@@ -34,6 +34,64 @@ import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PushSubscriptionDto } from './dto/push-subscription.dto';
 
+// ─── Helper : calcule les mois de retard d'un membre ─────────────────────────
+// Logique centralisée ici pour être réutilisée dans getDashboard ET listLateMembers
+function computeLateMonths(
+  contributions: Array<{
+    monthReference: number | null;
+    yearReference: number | null;
+    validatedAt: Date | null;
+    createdAt: Date;
+  }>,
+  joinDate: Date,
+  maxLookback = 24,
+): number {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  // Construire l'ensemble des mois couverts par des contributions VALIDATED REGULAR/LATE
+  const coveredMonths = new Set<string>();
+  for (const c of contributions) {
+    if (c.monthReference && c.yearReference) {
+      coveredMonths.add(
+        `${c.yearReference}-${String(c.monthReference).padStart(2, '0')}`,
+      );
+    } else {
+      // Fallback : utiliser le mois de validation si pas de référence explicite
+      const d = c.validatedAt ?? c.createdAt;
+      const d2 = new Date(d);
+      coveredMonths.add(
+        `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}`,
+      );
+    }
+  }
+
+  let lateMonths = 0;
+  let checkYear = currentYear;
+  let checkMonth = currentMonth;
+
+  for (let i = 0; i < maxLookback; i++) {
+    const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
+    const monthStart = new Date(checkYear, checkMonth - 1, 1);
+
+    // Ne pas compter les mois avant l'inscription
+    if (monthStart < new Date(joinDate.getFullYear(), joinDate.getMonth(), 1)) break;
+
+    if (!coveredMonths.has(key)) {
+      lateMonths++;
+    }
+
+    checkMonth--;
+    if (checkMonth < 1) {
+      checkMonth = 12;
+      checkYear--;
+    }
+  }
+
+  return lateMonths;
+}
+
 @Injectable()
 export class MemberService {
   constructor(
@@ -94,7 +152,17 @@ export class MemberService {
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
-    const [totalMyContributions, activeProjects, virtualCard, allAntennas] = await Promise.all([
+    const [
+      totalMyContributions,
+      activeProjects,
+      virtualCard,
+      allAntennas,
+      // ✅ FIX : Récupérer TOUTES les contributions régulières/retard validées
+      // avec leurs références mensuelles pour calculer lateMonths correctement
+      myRegularContributions,
+      // ✅ FIX : Récupérer la dernière contribution validée (toutes purposes)
+      lastContribution,
+    ] = await Promise.all([
       this.prisma.contribution.aggregate({
         where: {
           associationId: me.associationId,
@@ -128,17 +196,58 @@ export class MemberService {
         where: { associationId: me.associationId, isActive: true },
         select: { id: true, name: true, defaultCurrency: true },
       }),
+      // ✅ FIX : Pas de limite de page — on prend TOUT l'historique pour le calcul
+      this.prisma.contribution.findMany({
+        where: {
+          associationId: me.associationId,
+          memberUserId: userId,
+          status: ContributionStatus.VALIDATED,
+          purpose: { in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA] },
+        },
+        select: {
+          monthReference: true,
+          yearReference: true,
+          validatedAt: true,
+          createdAt: true,
+        },
+      }),
+      // ✅ FIX : Dernière contribution validée toutes purposes confondues
+      this.prisma.contribution.findFirst({
+        where: {
+          associationId: me.associationId,
+          memberUserId: userId,
+          status: ContributionStatus.VALIDATED,
+        },
+        orderBy: { validatedAt: 'desc' },
+        select: { validatedAt: true, createdAt: true },
+      }),
     ]);
+
+    // ✅ FIX : Calculer lateMonths avec la fonction centralisée
+    const lateMonths = computeLateMonths(myRegularContributions, me.createdAt);
+
+    // ✅ FIX : Calculer myLastContributionAt depuis la vraie dernière contribution
+    const myLastContributionAt = lastContribution
+      ? (lastContribution.validatedAt ?? lastContribution.createdAt).toISOString()
+      : null;
 
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
         const [aggC, aggE] = await Promise.all([
           this.prisma.contribution.aggregate({
-            where: { associationId: me.associationId, antennaId: ant.id, status: ContributionStatus.VALIDATED },
+            where: {
+              associationId: me.associationId,
+              antennaId: ant.id,
+              status: ContributionStatus.VALIDATED,
+            },
             _sum: { amount: true },
           }),
           this.prisma.expense.aggregate({
-            where: { associationId: me.associationId, antennaId: ant.id, status: ExpenseStatus.VALIDATED },
+            where: {
+              associationId: me.associationId,
+              antennaId: ant.id,
+              status: ExpenseStatus.VALIDATED,
+            },
             _sum: { amount: true },
           }),
         ]);
@@ -183,6 +292,9 @@ export class MemberService {
       stats: {
         myTotalContributions: Number(totalMyContributions._sum.amount ?? 0),
         activeProjects,
+        // ✅ FIX : Ces champs sont maintenant correctement calculés
+        lateMonths,
+        myLastContributionAt,
       },
       virtualCard: cardData,
       antennaBalances,
@@ -284,197 +396,189 @@ export class MemberService {
   }
 
   async createContribution(userId: string, dto: CreateMemberContributionDto) {
-  const me = await this.getMeOrThrow(userId);
-  this.ensureMemberActiveEnough(me.status);
+    const me = await this.getMeOrThrow(userId);
+    this.ensureMemberActiveEnough(me.status);
 
-  if (!me.associationId || !me.antennaId) {
-    throw new BadRequestException('Utilisateur non rattaché à une association / antenne.');
-  }
-
-  let finalMemberId = me.id;
-  let finalAntennaId = me.antennaId;
-  let submitterId: string | null = null;
-
-  if (dto.targetMemberId && dto.targetMemberId !== me.id) {
-    const target = await this.prisma.user.findFirst({
-      where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
-      include: { memberships: true },
-    });
-    if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
-    finalMemberId = target.id;
-    submitterId = me.id;
-    const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
-    if (primaryMembership?.antennaId) finalAntennaId = primaryMembership.antennaId;
-  }
-
-  // ── Récupérer le pricing ──────────────────────────────────────────────────
-  const pricingSetting = await this.prisma.associationSetting.findUnique({
-    where: { associationId_key: { associationId: me.associationId, key: 'PRICING_CONFIG' } },
-  });
-  const allPricing = (pricingSetting?.value as Record<string, any>) || {};
-  const resolvedCurrency = dto.currency || 'EUR';
-  const localPricing = allPricing[resolvedCurrency] || { monthlyQuota: 0, membershipCard: 0 };
-  const monthlyPrice = Number(localPricing.monthlyQuota) || 0;
-  const cardPrice = Number(localPricing.membershipCard) || 0;
-
-  const purpose = (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA;
-  const totalAmount = Number(dto.amount);
-
-  // ── Validation carte membre ───────────────────────────────────────────────
-  if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
-    if (totalAmount < cardPrice) {
-      throw new BadRequestException(
-        `Le montant minimum pour la carte membre est ${cardPrice} ${resolvedCurrency}.`,
-      );
+    if (!me.associationId || !me.antennaId) {
+      throw new BadRequestException('Utilisateur non rattaché à une association / antenne.');
     }
-  }
 
-  const autoReference = `TR-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.random().toString(36).substring(2,6).toUpperCase()}`;
+    let finalMemberId = me.id;
+    let finalAntennaId = me.antennaId;
+    let submitterId: string | null = null;
 
-  const baseData = {
-    associationId: me.associationId,
-    antennaId: finalAntennaId,
-    memberUserId: finalMemberId,
-    submitterUserId: submitterId,
-    currency: resolvedCurrency as CurrencyCode,
-    paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
-    externalReference: autoReference,
-    contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
-    memberComment: dto.note ?? null,
-    proofFileId: dto.receiptFileAssetId ?? null,
-    status: ContributionStatus.PENDING_VALIDATION,
-    purpose,
-  };
+    if (dto.targetMemberId && dto.targetMemberId !== me.id) {
+      const target = await this.prisma.user.findFirst({
+        where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
+        include: { memberships: true },
+      });
+      if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
+      finalMemberId = target.id;
+      submitterId = me.id;
+      const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
+      if (primaryMembership?.antennaId) finalAntennaId = primaryMembership.antennaId;
+    }
 
-  const contributionsToCreate: Prisma.ContributionUncheckedCreateInput[] = [];
-
-  // ── Carte membre : montant exact + excédent en anticipation régulière ────
-  if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
-    contributionsToCreate.push({
-      ...baseData,
-      amount: new Prisma.Decimal(cardPrice),
-      monthReference: null,
-      yearReference: null,
+    const pricingSetting = await this.prisma.associationSetting.findUnique({
+      where: { associationId_key: { associationId: me.associationId, key: 'PRICING_CONFIG' } },
     });
-    const excess = totalAmount - cardPrice;
-    if (excess > 0 && monthlyPrice > 0) {
-      // L'excédent est reporté en cotisation anticipée
-      let remaining = excess;
-      let m = new Date().getMonth() + 1;
-      let y = new Date().getFullYear();
+    const allPricing = (pricingSetting?.value as Record<string, any>) || {};
+    const resolvedCurrency = dto.currency || 'EUR';
+    const localPricing = allPricing[resolvedCurrency] || { monthlyQuota: 0, membershipCard: 0 };
+    const monthlyPrice = Number(localPricing.monthlyQuota) || 0;
+    const cardPrice = Number(localPricing.membershipCard) || 0;
+
+    const purpose = (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA;
+    const totalAmount = Number(dto.amount);
+
+    if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
+      if (totalAmount < cardPrice) {
+        throw new BadRequestException(
+          `Le montant minimum pour la carte membre est ${cardPrice} ${resolvedCurrency}.`,
+        );
+      }
+    }
+
+    const autoReference = `TR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+    const baseData = {
+      associationId: me.associationId,
+      antennaId: finalAntennaId,
+      memberUserId: finalMemberId,
+      submitterUserId: submitterId,
+      currency: resolvedCurrency as CurrencyCode,
+      paymentMethod: (dto.method as PaymentMethod) || PaymentMethod.OTHER,
+      externalReference: autoReference,
+      contributionDate: dto.depositedAt ? new Date(dto.depositedAt) : new Date(),
+      memberComment: dto.note ?? null,
+      proofFileId: dto.receiptFileAssetId ?? null,
+      status: ContributionStatus.PENDING_VALIDATION,
+      purpose,
+    };
+
+    const contributionsToCreate: Prisma.ContributionUncheckedCreateInput[] = [];
+
+    if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
+      contributionsToCreate.push({
+        ...baseData,
+        amount: new Prisma.Decimal(cardPrice),
+        monthReference: null,
+        yearReference: null,
+      });
+      const excess = totalAmount - cardPrice;
+      if (excess > 0 && monthlyPrice > 0) {
+        let remaining = excess;
+        let m = new Date().getMonth() + 1;
+        let y = new Date().getFullYear();
+        while (remaining >= monthlyPrice) {
+          contributionsToCreate.push({
+            ...baseData,
+            purpose: ContributionPurpose.REGULAR_QUOTA,
+            amount: new Prisma.Decimal(monthlyPrice),
+            monthReference: m,
+            yearReference: y,
+            memberComment: '[Anticipation depuis excédent carte]',
+          });
+          remaining -= monthlyPrice;
+          m++;
+          if (m > 12) { m = 1; y++; }
+        }
+      }
+    } else if (
+      (purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA) &&
+      monthlyPrice > 0 &&
+      totalAmount >= monthlyPrice
+    ) {
+      let remaining = totalAmount;
+      let m = dto.monthReference ?? (new Date().getMonth() + 1);
+      let y = dto.yearReference ?? new Date().getFullYear();
+
       while (remaining >= monthlyPrice) {
         contributionsToCreate.push({
           ...baseData,
-          purpose: ContributionPurpose.REGULAR_QUOTA,
           amount: new Prisma.Decimal(monthlyPrice),
           monthReference: m,
           yearReference: y,
-          memberComment: '[Anticipation depuis excédent carte]',
+          memberComment: remaining !== totalAmount
+            ? `${dto.note?.trim() || ''} [Avance automatique]`.trim()
+            : dto.note?.trim() ?? null,
         });
         remaining -= monthlyPrice;
         m++;
         if (m > 12) { m = 1; y++; }
       }
-    }
-  }
-  // ── Cotisation régulière / retard : découpage en mois ────────────────────
-  else if (
-    (purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA) &&
-    monthlyPrice > 0 &&
-    totalAmount >= monthlyPrice
-  ) {
-    let remaining = totalAmount;
-    let m = dto.monthReference ?? (new Date().getMonth() + 1);
-    let y = dto.yearReference ?? new Date().getFullYear();
-    const currentYear = new Date().getFullYear();
-
-    while (remaining >= monthlyPrice) {
+    } else {
       contributionsToCreate.push({
         ...baseData,
-        amount: new Prisma.Decimal(monthlyPrice),
-        monthReference: m,
-        yearReference: y,
-        memberComment: remaining !== totalAmount
-          ? `${dto.note?.trim() || ''} [Avance automatique]`.trim()
-          : dto.note?.trim() ?? null,
+        amount: new Prisma.Decimal(totalAmount),
+        monthReference: dto.monthReference ?? null,
+        yearReference: dto.yearReference ?? null,
       });
-      remaining -= monthlyPrice;
-      m++;
-      if (m > 12) { m = 1; y++; }
     }
 
-    // Reliquat inférieur à un mois → on l'ignore (le frontend a déjà prévenu)
-    // Si on a dépassé l'année en cours lors du découpage, le frontend gère le popup don
+    const created = await this.prisma.$transaction(
+      contributionsToCreate.map(data => this.prisma.contribution.create({ data })),
+    );
+
+    const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
+    await this.notifications.notifyAntennaAdminsWithPush(
+      finalAntennaId,
+      me.associationId,
+      `Un nouveau versement de ${dto.amount} ${resolvedCurrency} a été déclaré pour ${targetName}.`,
+      NotificationType.CONTRIBUTION_SUBMITTED,
+      { contributionId: created[0].id },
+      '💰 Nouveau dépôt soumis',
+    );
+
+    return memberMapper.contribution(created[0]);
   }
-  // ── Don libre ou montant < mensualité ────────────────────────────────────
-  else {
-    contributionsToCreate.push({
-      ...baseData,
-      amount: new Prisma.Decimal(totalAmount),
-      monthReference: dto.monthReference ?? null,
-      yearReference: dto.yearReference ?? null,
-    });
+
+  async listMyContributions(
+    userId: string,
+    query: MemberContributionsQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
+    const me = await this.getMeOrThrow(userId);
+
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+
+    const where: Prisma.ContributionWhereInput = {
+      associationId: me.associationId,
+      OR: [
+        { memberUserId: userId },
+        { submitterUserId: userId },
+      ],
+      ...(query.status ? { status: query.status as ContributionStatus } : {}),
+    };
+
+    const [total, items] = await Promise.all([
+      this.prisma.contribution.count({ where }),
+      this.prisma.contribution.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        include: {
+          submitter: { select: { firstName: true, lastName: true } },
+          member: { select: { firstName: true, lastName: true } },
+        },
+      }),
+    ]);
+
+    return {
+      items: items.map(c => ({
+        ...memberMapper.contribution(c),
+        currency: c.currency,
+        // ✅ FIX : Exposer monthReference et yearReference au frontend
+        monthReference: c.monthReference,
+        yearReference: c.yearReference,
+      })),
+      total,
+      page,
+      pageSize,
+    };
   }
 
-  const created = await this.prisma.$transaction(
-    contributionsToCreate.map(data => this.prisma.contribution.create({ data })),
-  );
-
-  const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
-  await this.notifications.notifyAntennaAdminsWithPush(
-    finalAntennaId,
-    me.associationId,
-    `Un nouveau versement de ${dto.amount} ${resolvedCurrency} a été déclaré pour ${targetName}.`,
-    NotificationType.CONTRIBUTION_SUBMITTED,
-    { contributionId: created[0].id },
-    '💰 Nouveau dépôt soumis',
-  );
-
-  return memberMapper.contribution(created[0]);
-}
-
-async listMyContributions(
-  userId: string,
-  query: MemberContributionsQueryDto,
-): Promise<PaginatedResponseDto<any>> {
-  const me = await this.getMeOrThrow(userId);
-
-  const page = query.page ?? 1;
-  const pageSize = query.pageSize ?? 50;
-
-  const where: Prisma.ContributionWhereInput = {
-    associationId: me.associationId,
-    OR: [
-      { memberUserId: userId },
-      { submitterUserId: userId },
-    ],
-    ...(query.status ? { status: query.status as ContributionStatus } : {}),
-  };
-
-  const [total, items] = await Promise.all([
-    this.prisma.contribution.count({ where }),
-    this.prisma.contribution.findMany({
-      where,
-      orderBy: [{ createdAt: 'desc' }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      include: {
-        submitter: { select: { firstName: true, lastName: true } },
-        member: { select: { firstName: true, lastName: true } },
-      },
-    }),
-  ]);
-
-  return {
-    items: items.map(c => ({
-      ...memberMapper.contribution(c),
-      currency: c.currency,
-    })),
-    total,
-    page,
-    pageSize,
-  };
-}
   async getAssociationBalanceSummary(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
@@ -503,122 +607,74 @@ async listMyContributions(
       lastUpdatedAt: new Date().toISOString(),
     };
   }
+
   async getPricing(userId: string): Promise<Record<string, { monthlyQuota: number; membershipCard: number }>> {
-  const me = await this.getMeOrThrow(userId);
+    const me = await this.getMeOrThrow(userId);
 
-  const pricings = await this.prisma.pricing.findMany({
-    where: { associationId: me.associationId },
-    select: { currency: true, monthlyQuota: true, membershipCard: true },
-  });
+    const pricings = await this.prisma.pricing.findMany({
+      where: { associationId: me.associationId },
+      select: { currency: true, monthlyQuota: true, membershipCard: true },
+    });
 
-  return pricings.reduce<Record<string, { monthlyQuota: number; membershipCard: number }>>(
-    (acc, p) => {
-      acc[p.currency] = {
-        monthlyQuota: Number(p.monthlyQuota),
-        membershipCard: Number(p.membershipCard),
-      };
-      return acc;
-    },
-    {},
-  );
+    return pricings.reduce<Record<string, { monthlyQuota: number; membershipCard: number }>>(
+      (acc, p) => {
+        acc[p.currency] = {
+          monthlyQuota: Number(p.monthlyQuota),
+          membershipCard: Number(p.membershipCard),
+        };
+        return acc;
+      },
+      {},
+    );
   }
 
   async listLateMembers(userId: string, query: LateMembersQueryDto): Promise<PaginatedResponseDto<any>> {
-  const me = await this.getMeOrThrow(userId);
-  const page = query.page ?? 1;
-  const pageSize = query.pageSize ?? 50;
+    const me = await this.getMeOrThrow(userId);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
 
-  // Récupérer le pricing pour calculer combien de mois couvre un crédit
-  const pricingSetting = await this.prisma.associationSetting.findUnique({
-    where: { associationId_key: { associationId: me.associationId, key: 'PRICING_CONFIG' } },
-  });
-  const allPricing = (pricingSetting?.value as Record<string, any>) || {};
-
-  const members = await this.prisma.user.findMany({
-    where: { associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      createdAt: true,
-      memberships: { include: { antenna: true } },
-      contributions: {
-        where: {
-          status: 'VALIDATED',
-          associationId: me.associationId,
-          purpose: { in: ['REGULAR_QUOTA', 'LATE_QUOTA'] },
+    const members = await this.prisma.user.findMany({
+      where: { associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        createdAt: true,
+        memberships: { include: { antenna: true } },
+        contributions: {
+          where: {
+            status: 'VALIDATED',
+            associationId: me.associationId,
+            purpose: { in: ['REGULAR_QUOTA', 'LATE_QUOTA'] },
+          },
+          select: {
+            amount: true,
+            currency: true,
+            monthReference: true,
+            yearReference: true,
+            validatedAt: true,
+            createdAt: true,
+          },
+          orderBy: { validatedAt: 'desc' },
         },
-        select: {
-          amount: true,
-          currency: true,
-          monthReference: true,
-          yearReference: true,
-          validatedAt: true,
-          createdAt: true,
-        },
-        orderBy: { validatedAt: 'desc' },
       },
-    },
-  });
+    });
 
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+    // ✅ FIX : Utiliser la même fonction centralisée computeLateMonths
+    const computed = members
+      .map(m => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        antennaName: m.memberships[0]?.antenna?.name ?? null,
+        lateMonths: computeLateMonths(m.contributions, m.createdAt),
+      }))
+      .filter(x => x.lateMonths >= 3)
+      .sort((a, b) => b.lateMonths - a.lateMonths);
 
-  const computed = members.map(m => {
-    // Collecter tous les mois couverts par des contributions validées avec référence
-    const coveredMonths = new Set<string>();
-
-    for (const c of m.contributions) {
-      if (c.monthReference && c.yearReference) {
-        coveredMonths.add(`${c.yearReference}-${String(c.monthReference).padStart(2, '0')}`);
-      } else {
-        // Contribution sans référence : on considère le mois de validation
-        const d = c.validatedAt ?? c.createdAt;
-        if (d) {
-          const d2 = new Date(d);
-          coveredMonths.add(`${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}`);
-        }
-      }
-    }
-
-    // Calculer combien de mois consécutifs depuis l'inscription sont manquants
-    const joinDate = m.createdAt;
-    let lateMonths = 0;
-    let checkYear = currentYear;
-    let checkMonth = currentMonth;
-
-    // On remonte jusqu'à 24 mois en arrière maximum
-    for (let i = 0; i < 24; i++) {
-      const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
-      const monthStart = new Date(checkYear, checkMonth - 1, 1);
-
-      // Ne pas compter les mois avant l'inscription
-      if (monthStart < joinDate) break;
-
-      if (!coveredMonths.has(key)) {
-        lateMonths++;
-      }
-
-      // Mois précédent
-      checkMonth--;
-      if (checkMonth < 1) { checkMonth = 12; checkYear--; }
-    }
-
-    return {
-      id: m.id,
-      firstName: m.firstName,
-      lastName: m.lastName,
-      antennaName: m.memberships[0]?.antenna?.name ?? null,
-      lateMonths,
-    };
-  })
-  .filter(x => x.lateMonths >= 3)
-  .sort((a, b) => b.lateMonths - a.lateMonths);
-
-  const start = (page - 1) * pageSize;
-  return { items: computed.slice(start, start + pageSize), total: computed.length, page, pageSize };
-}
+    const start = (page - 1) * pageSize;
+    return { items: computed.slice(start, start + pageSize), total: computed.length, page, pageSize };
+  }
 
   async listProjectsForMembers(
     userId: string,
@@ -688,8 +744,6 @@ async listMyContributions(
     };
   }
 
-  // ─── PROPOSITIONS DE PROJETS ────────────────────────────────────────────────
-
   async createProjectProposal(
     userId: string,
     dto: CreateProjectProposalDto & { attachmentFileAssetId?: string },
@@ -697,8 +751,6 @@ async listMyContributions(
     const me = await this.getMeOrThrow(userId);
     this.ensureMemberActiveEnough(me.status);
 
-    // 🔥 PATCH : Respecter le statut choisi par le membre (DRAFT ou SUBMITTED)
-    // Par défaut SUBMITTED si non précisé (rétrocompatibilité)
     const initialStatus =
       (dto as any).status === 'DRAFT'
         ? ProposalStatus.DRAFT
@@ -728,7 +780,6 @@ async listMyContributions(
       },
     });
 
-    // 🔥 N'envoyer la notif admin QUE si c'est une soumission (pas un brouillon)
     if (me.antennaId && initialStatus === ProposalStatus.SUBMITTED) {
       await this.notifications.notifyAntennaAdminsWithPush(
         me.antennaId,
@@ -812,7 +863,6 @@ async listMyContributions(
       throw new NotFoundException('Proposition introuvable.');
     }
 
-    // 🔥 PATCH : DRAFT est maintenant aussi modifiable
     if (
       proposal.status !== ProposalStatus.DRAFT &&
       proposal.status !== ProposalStatus.SUBMITTED &&
@@ -821,11 +871,9 @@ async listMyContributions(
       throw new BadRequestException('Cette proposition ne peut plus être modifiée.');
     }
 
-    // 🔥 PATCH : Détecter une transition DRAFT → SUBMITTED pour envoyer la notif
     const isSubmitting =
       dto.status === 'SUBMITTED' && proposal.status === ProposalStatus.DRAFT;
 
-    // Résoudre le nouveau statut Prisma
     let newStatus: ProposalStatus | undefined;
     if (dto.status === 'DRAFT') newStatus = ProposalStatus.DRAFT;
     else if (dto.status === 'SUBMITTED') newStatus = ProposalStatus.SUBMITTED;
@@ -839,7 +887,6 @@ async listMyContributions(
           ? { estimatedBudget: dto.expectedBudget ? new Prisma.Decimal(dto.expectedBudget) : null }
           : {}),
         ...(dto.currency ? { currency: dto.currency as CurrencyCode } : {}),
-        // 🔥 PATCH : Mettre à jour le statut si fourni
         ...(newStatus !== undefined ? { status: newStatus } : {}),
         ...(dto.attachmentFileAssetId !== undefined
           ? {
@@ -854,7 +901,6 @@ async listMyContributions(
       },
     });
 
-    // Notifier l'admin si transition DRAFT → SUBMITTED
     if (isSubmitting && me.antennaId) {
       await this.notifications.notifyAntennaAdminsWithPush(
         me.antennaId,
@@ -880,7 +926,6 @@ async listMyContributions(
       throw new NotFoundException('Proposition introuvable.');
     }
 
-    // 🔥 PATCH : DRAFT est aussi supprimable
     if (
       proposal.status !== ProposalStatus.DRAFT &&
       proposal.status !== ProposalStatus.SUBMITTED &&
@@ -895,8 +940,6 @@ async listMyContributions(
 
     return { success: true };
   }
-
-  // ─── DOCUMENTS ──────────────────────────────────────────────────────────────
 
   async listDocuments(
     userId: string,
@@ -966,8 +1009,6 @@ async listMyContributions(
     };
   }
 
-// ─── CONTENUS ───────────────────────────────────────────────────────────────
-
   async listContents(
     userId: string,
     query: MemberContentsQueryDto,
@@ -1014,12 +1055,6 @@ async listMyContributions(
     };
   }
 
-  // ─── CONTRIBUTIONS MEMBRE (MODIFICATION & SUPPRESSION) ───────────────────
-
-  /**
-   * 🔥 Modifier le montant d'une contribution PENDING par le membre lui-même.
-   * Vérifie que la contribution appartient bien au membre et qu'elle est en attente.
-   */
   async updateMyContribution(userId: string, contributionId: string, newAmount: number) {
     const me = await this.getMeOrThrow(userId);
 
@@ -1054,10 +1089,6 @@ async listMyContributions(
     });
   }
 
-  /**
-   * 🔥 Supprimer une contribution PENDING par le membre lui-même.
-   * Vérifie que la contribution appartient bien au membre et qu'elle est en attente.
-   */
   async deleteMyContribution(userId: string, contributionId: string) {
     const me = await this.getMeOrThrow(userId);
 
@@ -1086,11 +1117,4 @@ async listMyContributions(
 
     return { success: true };
   }
-}
-
-function monthDiff(from: Date, to: Date): number {
-  const years = to.getFullYear() - from.getFullYear();
-  const months = to.getMonth() - from.getMonth();
-  const total = years * 12 + months;
-  return total < 0 ? 0 : total;
 }
