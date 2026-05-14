@@ -289,16 +289,16 @@ export function WelcomePopup({
         }
 
         .wp-hero {
-          padding: 2rem 1.75rem 1.5rem;
+          padding: 1.5rem 1.75rem 1.25rem;
           display: flex; flex-direction: column; align-items: center;
-          gap: 0.75rem; position: relative; flex-shrink: 0;
+          gap: 0.6rem; position: relative; flex-shrink: 0;
         }
 
         .wp-emoji-wrap {
-          width: 80px; height: 80px; border-radius: 50%;
+          width: 68px; height: 68px; border-radius: 50%;
           background: white; display: flex; align-items: center; justify-content: center;
-          font-size: 2.4rem; line-height: 1;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 0 0 6px rgba(255,255,255,0.25);
+          font-size: 2rem; line-height: 1;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 0 0 5px rgba(255,255,255,0.25);
           animation: wp-emoji-in 0.5s 0.15s cubic-bezier(.22,1,.36,1) both;
           flex-shrink: 0;
         }
@@ -308,13 +308,13 @@ export function WelcomePopup({
         }
 
         .wp-subtitle {
-          font-size: 0.65rem; font-weight: 900; letter-spacing: 0.14em;
+          font-size: 0.62rem; font-weight: 900; letter-spacing: 0.14em;
           text-transform: uppercase; opacity: 0.65; text-align: center;
         }
 
         .wp-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: clamp(1.55rem, 5vw, 1.85rem);
+          font-size: clamp(1.35rem, 5vw, 1.75rem);
           font-weight: 700; text-align: center;
           line-height: 1.2; margin: 0;
         }
@@ -325,11 +325,23 @@ export function WelcomePopup({
           flex-shrink: 0; align-self: stretch;
         }
 
+        /* Corps scrollable — prend tout l'espace restant */
         .wp-body {
           background: #FFFFFF;
-          padding: 1.5rem 1.75rem 1.75rem;
+          padding: 1.25rem 1.5rem 0;
           overflow-y: auto; flex: 1;
-          display: flex; flex-direction: column; gap: 1.25rem;
+          display: flex; flex-direction: column; gap: 1rem;
+          /* scroll fluide sur iOS */
+          -webkit-overflow-scrolling: touch;
+        }
+
+        /* Zone CTA collée en bas — toujours visible */
+        .wp-footer {
+          background: #FFFFFF;
+          padding: 1rem 1.5rem 1.25rem;
+          display: flex; flex-direction: column; gap: 0.6rem;
+          flex-shrink: 0;
+          border-top: 1px solid #F3F4F6;
         }
 
         .wp-text {
@@ -412,8 +424,7 @@ export function WelcomePopup({
 
         .wp-signature {
           display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-          font-size: 0.68rem; color: #D1D5DB; font-weight: 600;
-          padding-top: 0.5rem; border-top: 1px solid #F3F4F6;
+          font-size: 0.68rem; color: #9CA3AF; font-weight: 600;
         }
         .wp-flag-mini {
           display: inline-flex; height: 10px; width: 18px;
@@ -421,11 +432,34 @@ export function WelcomePopup({
         }
         .wp-flag-stripe { flex: 1; height: 100%; }
 
+        /* Dégradé de fondu en bas du corps pour signaler qu'il y a plus à lire */
+        .wp-scroll-fade {
+          height: 28px; flex-shrink: 0;
+          background: linear-gradient(to bottom, rgba(255,255,255,0), #fff);
+          margin-top: -28px; pointer-events: none;
+          position: relative; z-index: 1;
+        }
+
         @media (max-width: 440px) {
-          .wp-modal { border-radius: 22px; }
-          .wp-hero { padding: 1.5rem 1.25rem 1.25rem; }
-          .wp-body { padding: 1.25rem 1.25rem 1.5rem; }
-          .wp-emoji-wrap { width: 64px; height: 64px; font-size: 1.9rem; }
+          .wp-modal { border-radius: 20px; }
+          .wp-hero { padding: 1.1rem 1.1rem 1rem; gap: 0.45rem; }
+          .wp-body { padding: 1rem 1.1rem 0; gap: 0.85rem; }
+          .wp-footer { padding: 0.85rem 1.1rem 1rem; }
+          .wp-emoji-wrap { width: 56px; height: 56px; font-size: 1.7rem; }
+          .wp-title { font-size: 1.25rem; }
+          .wp-cta { height: 48px; font-size: 0.88rem; }
+        }
+
+        /* Très petits écrans (iPhone SE, Galaxy A) */
+        @media (max-height: 680px) {
+          .wp-hero { padding: 0.85rem 1rem 0.75rem; gap: 0.3rem; }
+          .wp-emoji-wrap { width: 48px; height: 48px; font-size: 1.45rem; }
+          .wp-title { font-size: 1.15rem; }
+          .wp-subtitle { font-size: 0.57rem; }
+          .wp-body { gap: 0.65rem; }
+          .wp-text { font-size: 0.82rem; line-height: 1.58; }
+          .wp-footer { padding: 0.7rem 1rem 0.85rem; gap: 0.45rem; }
+          .wp-cta { height: 44px; }
         }
       `}</style>
 
@@ -443,10 +477,10 @@ export function WelcomePopup({
             <div className="wp-accent-line" style={{ background: `linear-gradient(90deg, ${c.accentColor}, ${c.accentColor}55)` }} />
           </div>
 
-          {/* Corps */}
+          {/* Corps scrollable */}
           <div className="wp-body">
 
-            {/* ✅ NOUVEAU : Bannière "En attente de validation" pour les modes pending */}
+            {/* Bannière "En attente de validation" pour les modes pending */}
             {c.isPending && (
               <div className="wp-pending-banner">
                 <div className="wp-pending-spinner" />
@@ -456,7 +490,7 @@ export function WelcomePopup({
               </div>
             )}
 
-            {/* Badge retard (uniquement si retard ET pas encore de paiement en attente) */}
+            {/* Badge retard (mode late : pas encore de paiement soumis) */}
             {mode === 'late' && lateMonths > 0 && (
               <div className="wp-late-badge">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -466,7 +500,7 @@ export function WelcomePopup({
               </div>
             )}
 
-            {/* Badge retard (mode latePending : affiche combien de mois restent à régulariser) */}
+            {/* Badge retard (mode latePending : paiement soumis, en cours de validation) */}
             {mode === 'latePending' && lateMonths > 0 && (
               <div className="wp-late-badge" style={{ background: '#FFFBEB', borderColor: '#FCD34D', color: '#92400E' }}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -491,7 +525,7 @@ export function WelcomePopup({
               <p className="wp-text" style={{ margin: 0 }}>{bodyText}</p>
             )}
 
-            {/* Note validation admin pour la carte (mode card uniquement, pas cardPending qui a sa propre logique) */}
+            {/* Note validation admin pour la carte (mode card uniquement) */}
             {mode === 'card' && (
               <div className="wp-info-note">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -504,7 +538,17 @@ export function WelcomePopup({
               </div>
             )}
 
-            {/* CTA */}
+            {/* Espace de respiration en bas du scroll */}
+            <div style={{ height: '0.5rem', flexShrink: 0 }} />
+          </div>
+
+          {/* Dégradé de fondu signalant le scroll */}
+          <div className="wp-scroll-fade" />
+
+          {/* ✅ FOOTER STICKY — CTA toujours visible, jamais masqué */}
+          <div className="wp-footer">
+
+            {/* CTA principal */}
             <button
               className="wp-cta"
               style={{
@@ -533,6 +577,7 @@ export function WelcomePopup({
               Association Lelouma — Espace membre
             </div>
           </div>
+
         </div>
       </div>
     </>
