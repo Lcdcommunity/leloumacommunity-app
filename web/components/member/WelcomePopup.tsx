@@ -11,16 +11,16 @@ type PopupMode = 'loading' | 'late' | 'latePending' | 'regular' | 'regularPendin
 interface WelcomePopupProps {
   firstName: string;
   lateMonths: number;
-  // Ces deux props sont calculées correctement dans page.tsx
-  // via monthReference/yearReference et lateMonths du backend
+  // true si lateMonths === 0 ET mois courant non couvert par une contribution validée
   hasRegularPending: boolean;
+  // true si lateMonths === 0 ET !hasRegularPending ET pas de carte validée cette année
   hasCardPending: boolean;
   currency: string;
   regularAmount?: number | null;
   cardAmount?: number | null;
-  // ✅ NOUVEAU : true si au moins une cotisation/carte est en statut "En attente" (soumise mais pas encore validée)
+  // true si une cotisation REGULAR/LATE est en PENDING_VALIDATION (soumise, pas encore validée)
   hasPendingContribution?: boolean;
-  // ✅ NOUVEAU : true spécifiquement si une carte en attente de validation
+  // true si une MEMBERSHIP_CARD est en PENDING_VALIDATION (soumise, pas encore validée)
   hasPendingCard?: boolean;
   onClose: () => void;
 }
@@ -55,7 +55,7 @@ const CONTENT: Record<PopupMode, {
     showSkip: false,
   },
 
-  // ─── RETARD avec paiement en attente de validation ────────────────────────
+  // ─── RETARD + cotisation soumise en attente de validation ─────────────────
   latePending: {
     emoji: '🕐',
     gradient: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 50%, #ECFDF5 100%)',
@@ -72,7 +72,7 @@ const CONTENT: Record<PopupMode, {
     isPending: true,
   },
 
-  // ─── RETARD sans paiement en attente ─────────────────────────────────────
+  // ─── RETARD sans paiement soumis ──────────────────────────────────────────
   late: {
     emoji: '🙏',
     gradient: 'linear-gradient(135deg, #FFF7ED 0%, #FEF2F2 50%, #FFFBEB 100%)',
@@ -88,7 +88,7 @@ const CONTENT: Record<PopupMode, {
     showSkip: true,
   },
 
-  // ─── COTISATION MENSUELLE avec paiement en attente ────────────────────────
+  // ─── COTISATION MENSUELLE + cotisation soumise en attente ─────────────────
   regularPending: {
     emoji: '🕐',
     gradient: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 50%, #ECFDF5 100%)',
@@ -105,7 +105,7 @@ const CONTENT: Record<PopupMode, {
     isPending: true,
   },
 
-  // ─── COTISATION MENSUELLE sans paiement en attente ────────────────────────
+  // ─── COTISATION MENSUELLE manquante, rien soumis ──────────────────────────
   regular: {
     emoji: '📅',
     gradient: 'linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 50%, #ECFDF5 100%)',
@@ -121,7 +121,7 @@ const CONTENT: Record<PopupMode, {
     showSkip: true,
   },
 
-  // ─── CARTE MEMBRE avec paiement en attente ────────────────────────────────
+  // ─── CARTE MEMBRE + carte soumise en attente ──────────────────────────────
   cardPending: {
     emoji: '🕐',
     gradient: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 50%, #E0E7FF 100%)',
@@ -138,7 +138,7 @@ const CONTENT: Record<PopupMode, {
     isPending: true,
   },
 
-  // ─── CARTE MEMBRE sans paiement en attente ────────────────────────────────
+  // ─── CARTE MEMBRE manquante, rien soumis ─────────────────────────────────
   card: {
     emoji: '💳',
     gradient: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 50%, #E0E7FF 100%)',
@@ -192,20 +192,20 @@ export function WelcomePopup({
   // ─── Logique de priorité ──────────────────────────────────────────────────
   //
   // SOURCE DE VÉRITÉ :
-  //   lateMonths          → vient du backend (via monthReference/yearReference)
-  //   hasRegularPending   → true seulement si lateMonths === 0 ET mois courant non couvert
-  //   hasCardPending      → true seulement si lateMonths === 0 ET !hasRegularPending ET pas de carte cette année
-  //   hasPendingContribution → true si une cotisation est soumise mais en statut "En attente" (non validée)
-  //   hasPendingCard      → true si une carte est soumise mais en statut "En attente" (non validée)
+  //   lateMonths             → backend (computeLateMonths via monthReference/yearReference)
+  //   hasRegularPending      → frontend : lateMonths === 0 ET mois courant non couvert (validé)
+  //   hasCardPending         → frontend : lateMonths === 0 ET !hasRegularPending ET pas de carte validée cette année
+  //   hasPendingContribution → frontend : une REGULAR/LATE_QUOTA est en PENDING_VALIDATION
+  //   hasPendingCard         → frontend : une MEMBERSHIP_CARD est en PENDING_VALIDATION
   //
-  // PRIORITÉ :
-  //   1. retard ET paiement en attente   → latePending   (encourage, remercie, rassure)
-  //   2. retard sans paiement en attente → late          (demande de régularisation)
-  //   3. cotisation mensuelle en attente → regularPending (remercie, attend validation)
-  //   4. cotisation mensuelle manquante  → regular        (invite à payer)
-  //   5. carte en attente                → cardPending    (remercie, attend validation)
-  //   6. carte manquante                 → card           (invite à obtenir la carte)
-  //   7. tout est en règle               → upToDate
+  // PRIORITÉ (ordre décroissant d'urgence) :
+  //   1. retard + cotisation soumise en attente → latePending    (remercie, rassure)
+  //   2. retard sans paiement soumis            → late           (demande régularisation)
+  //   3. mois courant manquant + soumis         → regularPending (remercie, attend validation)
+  //   4. mois courant manquant sans soumission  → regular        (invite à payer)
+  //   5. carte manquante + carte soumise        → cardPending    (remercie, attend validation)
+  //   6. carte manquante sans soumission        → card           (invite à obtenir la carte)
+  //   7. tout est en règle                      → upToDate
   //
   const mode: PopupMode =
     lateMonths > 0
@@ -257,7 +257,6 @@ export function WelcomePopup({
         @keyframes wp-modal-out   { from{opacity:1;transform:scale(1) translateY(0)} to{opacity:0;transform:scale(.94) translateY(12px)} }
         @keyframes wp-emoji-in    { from{opacity:0;transform:scale(.4) rotate(-15deg)} to{opacity:1;transform:scale(1) rotate(0deg)} }
         @keyframes wp-line-in     { from{width:0} to{width:100%} }
-        @keyframes wp-pulse       { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
         @keyframes wp-shimmer     { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
         @keyframes wp-spin        { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
         @keyframes wp-pulse-ring  { 0%{box-shadow:0 0 0 0 rgba(217,119,6,0.4)} 70%{box-shadow:0 0 0 10px rgba(217,119,6,0)} 100%{box-shadow:0 0 0 0 rgba(217,119,6,0)} }
@@ -331,11 +330,10 @@ export function WelcomePopup({
           padding: 1.25rem 1.5rem 0;
           overflow-y: auto; flex: 1;
           display: flex; flex-direction: column; gap: 1rem;
-          /* scroll fluide sur iOS */
           -webkit-overflow-scrolling: touch;
         }
 
-        /* Zone CTA collée en bas — toujours visible */
+        /* Zone CTA collée en bas — toujours visible, jamais masquée */
         .wp-footer {
           background: #FFFFFF;
           padding: 1rem 1.5rem 1.25rem;
@@ -368,7 +366,7 @@ export function WelcomePopup({
           line-height: 1.5; display: flex; align-items: flex-start; gap: 0.5rem;
         }
 
-        /* ✅ NOUVEAU : Bannière "En attente de validation" */
+        /* Bannière spinner "En attente de validation" */
         .wp-pending-banner {
           display: flex; align-items: center; gap: 0.65rem;
           background: linear-gradient(135deg, #FFFBEB, #FEF3C7);
@@ -404,7 +402,6 @@ export function WelcomePopup({
         }
         .wp-cta:hover { transform: translateY(-2px); filter: brightness(1.08); }
         .wp-cta:active { transform: scale(0.98); }
-
         .wp-cta::after {
           content: '';
           position: absolute; inset: 0;
@@ -432,7 +429,7 @@ export function WelcomePopup({
         }
         .wp-flag-stripe { flex: 1; height: 100%; }
 
-        /* Dégradé de fondu en bas du corps pour signaler qu'il y a plus à lire */
+        /* Dégradé de fondu en bas du corps — signale qu'il y a plus à lire */
         .wp-scroll-fade {
           height: 28px; flex-shrink: 0;
           background: linear-gradient(to bottom, rgba(255,255,255,0), #fff);
@@ -480,7 +477,7 @@ export function WelcomePopup({
           {/* Corps scrollable */}
           <div className="wp-body">
 
-            {/* Bannière "En attente de validation" pour les modes pending */}
+            {/* Bannière spinner — modes *Pending uniquement */}
             {c.isPending && (
               <div className="wp-pending-banner">
                 <div className="wp-pending-spinner" />
@@ -490,7 +487,7 @@ export function WelcomePopup({
               </div>
             )}
 
-            {/* Badge retard (mode late : pas encore de paiement soumis) */}
+            {/* Badge retard rouge — mode late uniquement */}
             {mode === 'late' && lateMonths > 0 && (
               <div className="wp-late-badge">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -500,7 +497,7 @@ export function WelcomePopup({
               </div>
             )}
 
-            {/* Badge retard (mode latePending : paiement soumis, en cours de validation) */}
+            {/* Badge retard doré — mode latePending : paiement soumis, en cours de validation */}
             {mode === 'latePending' && lateMonths > 0 && (
               <div className="wp-late-badge" style={{ background: '#FFFBEB', borderColor: '#FCD34D', color: '#92400E' }}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -525,7 +522,7 @@ export function WelcomePopup({
               <p className="wp-text" style={{ margin: 0 }}>{bodyText}</p>
             )}
 
-            {/* Note validation admin pour la carte (mode card uniquement) */}
+            {/* Note admin — mode card uniquement (pas cardPending) */}
             {mode === 'card' && (
               <div className="wp-info-note">
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: 1 }}>
@@ -545,10 +542,9 @@ export function WelcomePopup({
           {/* Dégradé de fondu signalant le scroll */}
           <div className="wp-scroll-fade" />
 
-          {/* ✅ FOOTER STICKY — CTA toujours visible, jamais masqué */}
+          {/* FOOTER STICKY — CTA toujours visible, jamais masqué */}
           <div className="wp-footer">
 
-            {/* CTA principal */}
             <button
               className="wp-cta"
               style={{
@@ -560,14 +556,13 @@ export function WelcomePopup({
               {c.ctaLabel}
             </button>
 
-            {/* Passer (masqué pour les modes "pending" et "upToDate") */}
+            {/* Passer — uniquement pour les modes qui le permettent (ni pending, ni upToDate) */}
             {c.showSkip && (
               <button className="wp-skip" onClick={handleClose}>
                 Passer pour l&apos;instant →
               </button>
             )}
 
-            {/* Signature */}
             <div className="wp-signature">
               <span className="wp-flag-mini">
                 <span className="wp-flag-stripe" style={{ background: '#CE1126' }} />

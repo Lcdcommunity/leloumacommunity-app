@@ -1,3 +1,4 @@
+//web/app/(protected)/member/page.tsx
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -46,7 +47,6 @@ type DashboardData = {
     myContributionsValidatedTotal?: number;
     myPendingContributionsCount?: number;
     associationTotalBalance?: number;
-    // ✅ FIX : lateMonths et myLastContributionAt sont maintenant fournis par le backend
     lateMonths?: number;
     myLastContributionAt?: string | null;
     currency?: string;
@@ -87,7 +87,7 @@ type BalanceSummary = {
   lastUpdatedAt?: string | null;
 };
 
-// ✅ FIX : Ajout de monthReference et yearReference pour la détection correcte
+// monthReference et yearReference sont exposés pour la détection correcte des états
 type ExtendedContribution = Contribution & {
   purpose?: string | null;
   currency?: string;
@@ -445,6 +445,7 @@ function ContentDetailModal({ content, onClose }: { content: ContentPost; onClos
 }
 
 // ─── Main page ───────────────────────────────────────────────────────────────
+
 export default function MemberHomePage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [myContributions, setMyContributions] = useState<ExtendedContribution[]>([]);
@@ -465,8 +466,8 @@ export default function MemberHomePage() {
         const [dashRes, balanceRes, contribRes, projectsRes, contentsRes, lateRes] = await Promise.allSettled([
           api.dashboardMember(),
           api.getAssociationBalanceSummary(),
-          // ✅ FIX : pageSize augmenté à 120 pour couvrir une année entière
-          // d'avances (12 mois) + historique récent sans tronquer
+          // pageSize 120 pour couvrir jusqu'à une année d'avances (12 mois)
+          // + l'historique récent sans risque de tronquer
           api.listMyContributions({ page: 1, pageSize: 120 }),
           api.listProjectsForMembers({ page: 1, pageSize: 5 }),
           api.listContentsForMembers({ page: 1, pageSize: 5 }),
@@ -538,13 +539,13 @@ export default function MemberHomePage() {
           setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]);
         }
 
-        // ── Pricing ──
+        // Pricing
         try {
           const pricingRes = await api.getAssociationPricing();
           setPricing(pricingRes);
         } catch { /* ignore */ }
 
-        // ── Popup 2x/jour (matin slot 'am' + après-midi slot 'pm') ──
+        // Popup 2x/jour : slot 'am' (avant midi) + slot 'pm' (après midi)
         const popupUserId = (dashRes.status === 'fulfilled'
           ? (dashRes.value as DashboardData)?.me?.id
           : null) ?? 'anon';
@@ -578,11 +579,10 @@ export default function MemberHomePage() {
   const myAntenna = data?.antennaBalances?.find(a => a.id === myAntennaId);
   const cur = data?.stats?.currency || myAntenna?.currency || balanceSummary?.currency || 'EUR';
 
-  // ✅ FIX : lateMonths vient maintenant directement du backend (calculé correctement)
+  // lateMonths vient du backend (source de vérité — calculé via monthReference/yearReference)
   const lateMonths = data?.stats?.lateMonths ?? 0;
 
   const lastContribDate = useMemo(() => {
-    // ✅ FIX : Priorité à myLastContributionAt calculé par le backend
     const fromStats = data?.stats?.myLastContributionAt;
     if (fromStats) return fromStats;
     if (recentContribs.length > 0) {
@@ -597,20 +597,19 @@ export default function MemberHomePage() {
   const currentMonth = new Date().getMonth() + 1;
   const currentYear  = new Date().getFullYear();
 
-  // ✅ FIX CRITIQUE : Détection via monthReference/yearReference (logique métier)
-  // et NON via depositedAt/createdAt (logique de date de saisie)
-  // On utilise aussi lateMonths du backend comme source de vérité principale.
+  // ── hasRegularThisMonth ────────────────────────────────────────────────────
+  // Court-circuit principal : si lateMonths === 0, le backend confirme que le
+  // membre est à jour (y compris s'il a anticipé plusieurs mois).
+  // Sinon, on vérifie finement dans les contributions chargées via
+  // monthReference/yearReference (jamais via depositedAt qui est une date de saisie).
   const hasRegularThisMonth = useMemo(() => {
-    // Si le backend indique 0 mois de retard, le membre est à jour
-    // (y compris si ses paiements anticipés couvrent le mois courant)
     if (lateMonths === 0 && data !== null) return true;
 
-    // Sinon, vérification fine dans les contributions chargées
     return recentContribs.some(c => {
       if (c.purpose !== 'REGULAR_QUOTA' && c.purpose !== 'LATE_QUOTA') return false;
       if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
 
-      // ✅ Priorité absolue à monthReference/yearReference
+      // Priorité absolue à monthReference/yearReference (logique métier)
       if (c.monthReference != null && c.yearReference != null) {
         return c.monthReference === currentMonth && c.yearReference === currentYear;
       }
@@ -621,16 +620,40 @@ export default function MemberHomePage() {
     });
   }, [recentContribs, currentMonth, currentYear, lateMonths, data]);
 
-  // ✅ FIX : Détection carte via purpose MEMBERSHIP_CARD + année courante
-  // Ne dépend plus de la limite pageSize:5
+  // ── hasActiveCard ──────────────────────────────────────────────────────────
+  // Une carte VALIDÉE cette année = membre couvert.
+  // Une carte PENDING_VALIDATION cette année = démarche engagée → on considère
+  // que la carte est "en cours" pour ne pas redemander le paiement.
   const hasActiveCard = useMemo(() => {
     return recentContribs.some(c => {
       if (c.purpose !== 'MEMBERSHIP_CARD') return false;
-      if (c.status !== 'VALIDATED') return false;
+      // VALIDATED = carte active | PENDING_VALIDATION = soumise, pas encore activée
+      if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
       const cDate = new Date(c.depositedAt || c.createdAt);
       return cDate.getFullYear() === currentYear;
     });
   }, [recentContribs, currentYear]);
+
+  // ── hasPendingContribution ─────────────────────────────────────────────────
+  // Détecte si une cotisation régulière ou de retard a été soumise
+  // mais n'est pas encore validée par l'admin.
+  // → Permet d'afficher le mode latePending ou regularPending dans le popup.
+  const hasPendingContribution = useMemo(() => {
+    return recentContribs.some(c =>
+      (c.purpose === 'REGULAR_QUOTA' || c.purpose === 'LATE_QUOTA') &&
+      c.status === 'PENDING_VALIDATION',
+    );
+  }, [recentContribs]);
+
+  // ── hasPendingCard ─────────────────────────────────────────────────────────
+  // Détecte si une carte membre a été soumise mais n'est pas encore validée.
+  // → Permet d'afficher le mode cardPending dans le popup.
+  const hasPendingCard = useMemo(() => {
+    return recentContribs.some(c =>
+      c.purpose === 'MEMBERSHIP_CARD' &&
+      c.status === 'PENDING_VALIDATION',
+    );
+  }, [recentContribs]);
 
   const popupCurrency = cur || 'EUR';
   const popupPricing  = pricing?.[popupCurrency] ?? pricing?.['EUR'] ?? null;
@@ -1059,8 +1082,8 @@ export default function MemberHomePage() {
                     {recentContribs.length === 0 && (
                       <EmptyRow cols={3} label="Aucune cotisation enregistrée"/>
                     )}
-                    {/* ✅ Afficher seulement les 10 plus récentes dans le tableau
-                        (on charge 120 pour les calculs, mais on n'affiche pas tout) */}
+                    {/* Afficher les 10 plus récentes dans le tableau
+                        (on charge 120 pour les calculs métier, on n'affiche pas tout) */}
                     {recentContribs.slice(0, 10).map(c => {
                       const pc = getPurposeConfig(c.purpose);
                       return (
@@ -1279,11 +1302,16 @@ export default function MemberHomePage() {
         <WelcomePopup
           firstName={firstName}
           lateMonths={lateMonths}
+          // true si le mois courant n'est pas couvert (pas de contribution validée ou en attente)
           hasRegularPending={!hasRegularThisMonth}
+          // true si pas de carte validée NI en attente pour cette année
           hasCardPending={!hasActiveCard}
           currency={popupCurrency}
           regularAmount={popupPricing?.monthlyQuota ?? null}
           cardAmount={popupPricing?.membershipCard ?? null}
+          // ✅ CÂBLAGE CORRECT : ces deux props déclenchent les modes *Pending
+          hasPendingContribution={hasPendingContribution}
+          hasPendingCard={hasPendingCard}
           onClose={() => setShowWelcomePopup(false)}
         />
       )}

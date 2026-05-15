@@ -1,4 +1,5 @@
 // backend/src/modules/member/member.service.ts
+// backend/src/modules/member/member.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -68,8 +69,18 @@ function computeLateMonths(
   }
 
   let lateMonths = 0;
+
+  // ✅ CORRECTION : on démarre au mois PRÉCÉDENT (currentMonth - 1).
+  // Le mois en cours n'est jamais compté en retard — le membre a jusqu'à
+  // la fin du mois pour payer. Seuls les mois passés non couverts sont du retard.
+  let checkMonth = currentMonth - 1;
   let checkYear = currentYear;
-  let checkMonth = currentMonth;
+
+  // Si on est en janvier, le mois précédent est décembre de l'année précédente
+  if (checkMonth < 1) {
+    checkMonth = 12;
+    checkYear--;
+  }
 
   for (let i = 0; i < maxLookback; i++) {
     const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
@@ -157,10 +168,7 @@ export class MemberService {
       activeProjects,
       virtualCard,
       allAntennas,
-      // ✅ FIX : Récupérer TOUTES les contributions régulières/retard validées
-      // avec leurs références mensuelles pour calculer lateMonths correctement
       myRegularContributions,
-      // ✅ FIX : Récupérer la dernière contribution validée (toutes purposes)
       lastContribution,
     ] = await Promise.all([
       this.prisma.contribution.aggregate({
@@ -196,7 +204,8 @@ export class MemberService {
         where: { associationId: me.associationId, isActive: true },
         select: { id: true, name: true, defaultCurrency: true },
       }),
-      // ✅ FIX : Pas de limite de page — on prend TOUT l'historique pour le calcul
+      // Toutes les contributions régulières/retard validées avec leurs références
+      // mensuelles — nécessaire pour computeLateMonths
       this.prisma.contribution.findMany({
         where: {
           associationId: me.associationId,
@@ -211,7 +220,7 @@ export class MemberService {
           createdAt: true,
         },
       }),
-      // ✅ FIX : Dernière contribution validée toutes purposes confondues
+      // Dernière contribution validée toutes purposes confondues
       this.prisma.contribution.findFirst({
         where: {
           associationId: me.associationId,
@@ -223,10 +232,9 @@ export class MemberService {
       }),
     ]);
 
-    // ✅ FIX : Calculer lateMonths avec la fonction centralisée
+    // lateMonths : mois passés non couverts uniquement (mois courant exclu)
     const lateMonths = computeLateMonths(myRegularContributions, me.createdAt);
 
-    // ✅ FIX : Calculer myLastContributionAt depuis la vraie dernière contribution
     const myLastContributionAt = lastContribution
       ? (lastContribution.validatedAt ?? lastContribution.createdAt).toISOString()
       : null;
@@ -292,7 +300,6 @@ export class MemberService {
       stats: {
         myTotalContributions: Number(totalMyContributions._sum.amount ?? 0),
         activeProjects,
-        // ✅ FIX : Ces champs sont maintenant correctement calculés
         lateMonths,
         myLastContributionAt,
       },
@@ -569,7 +576,6 @@ export class MemberService {
       items: items.map(c => ({
         ...memberMapper.contribution(c),
         currency: c.currency,
-        // ✅ FIX : Exposer monthReference et yearReference au frontend
         monthReference: c.monthReference,
         yearReference: c.yearReference,
       })),
@@ -660,7 +666,7 @@ export class MemberService {
       },
     });
 
-    // ✅ FIX : Utiliser la même fonction centralisée computeLateMonths
+    // Même fonction centralisée — le mois courant n'est pas compté en retard
     const computed = members
       .map(m => ({
         id: m.id,
