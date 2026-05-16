@@ -17,7 +17,13 @@ type ContributionFormData = {
   note?: string;
   purpose?: string;
   receiptFileAssetId?: string;
-  targetMemberId?: string; // 🔥 NOUVEAU
+  targetMemberId?: string;
+};
+
+type DashboardResponse = {
+  stats?: {
+    lateMonths?: number;
+  };
 };
 
 export default function MemberNewContributionPage() {
@@ -25,6 +31,7 @@ export default function MemberNewContributionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBootLoading, setIsBootLoading] = useState(true);
   const [pricing, setPricing] = useState<{ monthlyQuota: number; membershipCard: number }>({ monthlyQuota: 0, membershipCard: 0 });
+  const [lateMonths, setLateMonths] = useState<number | undefined>(undefined);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -33,18 +40,27 @@ export default function MemberNewContributionPage() {
 
     async function bootstrap() {
       try {
-        const [allPricing] = await Promise.all([
-          api.getAssociationPricing().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)), 
+        const apiAny = api as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+
+        const [allPricing, dashboard] = await Promise.all([
+          api.getAssociationPricing().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)),
+          (typeof apiAny['getMemberDashboard'] === 'function'
+            ? apiAny['getMemberDashboard']()
+            : Promise.resolve(null)
+          ).catch(() => null) as Promise<DashboardResponse | null>,
         ]);
 
         if (!mounted) return;
 
-        // On récupère les tarifs par défaut (en EUR ou GNF par ex) pour les afficher en suggestion si besoin
         const localPricing = allPricing['EUR'] || allPricing['GNF'] || { monthlyQuota: 0, membershipCard: 0 };
         setPricing({
           monthlyQuota: Number(localPricing.monthlyQuota) || 0,
           membershipCard: Number(localPricing.membershipCard) || 0,
         });
+
+        if (dashboard?.stats?.lateMonths !== undefined) {
+          setLateMonths(dashboard.stats.lateMonths);
+        }
 
       } catch (error) {
         console.error('Erreur récupération infos:', error);
@@ -79,7 +95,7 @@ export default function MemberNewContributionPage() {
         note: values.note,
         purpose: values.purpose,
         receiptFileAssetId: values.receiptFileAssetId ?? null,
-        targetMemberId: values.targetMemberId, // 🔥 NOUVEAU
+        targetMemberId: values.targetMemberId,
       });
 
       setSuccess(true);
@@ -311,6 +327,7 @@ export default function MemberNewContributionPage() {
                     onSubmit={handleSubmit}
                     isSubmitting={isSubmitting}
                     pricing={pricing}
+                    lateMonths={lateMonths}
                   />
                 </>
               )}

@@ -1,3 +1,4 @@
+//web/components/member/ContributionCreateForm.tsx
 'use client';
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -30,6 +31,7 @@ interface Props {
   isSubmitting?: boolean;
   defaultPurpose?: string;
   pricing?: { monthlyQuota: number; membershipCard: number };
+  lateMonths?: number;
 }
 
 const PURPOSES = [
@@ -268,14 +270,16 @@ function MonthYearPicker({ month, year, onChange }: MonthYearPickerProps) {
 }
 
 // ── Types for api responses ───────────────────────────────────────────────────
-interface ContributionItem {
-  status: string;
-  validatedAt?: string;
-  createdAt: string;
-}
 
-interface ContributionsResponse {
-  items?: ContributionItem[];
+// ─── Celebration Overlay ─────────────────────────────────────────────────────
+
+interface CelebrationConfig {
+  emoji: string[];
+  title: string;
+  message: string;
+  colors: string[];
+  gradient: string;
+  titleColor: string;
 }
 
 // ─── Celebration Overlay ─────────────────────────────────────────────────────
@@ -497,6 +501,7 @@ export function ContributionCreateForm({
   isSubmitting,
   defaultPurpose,
   pricing,
+  lateMonths: lateMonthsProp,
 }: Props) {
 
   const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>('');
@@ -568,56 +573,43 @@ export function ContributionCreateForm({
   }, [pricing]);
 
   // ── Check if user has late months on mount ─────────────────────────────────
+
+   // ── Check if user has late months on mount ─────────────────────────────────
   useEffect(() => {
+    // Priorité à la prop fournie par le parent (dashboard) — valeur fiable du backend
+    if (lateMonthsProp !== undefined) {
+      setHasLateMonths(lateMonthsProp > 0);
+      return;
+    }
+
+    // Fallback si la prop n'est pas fournie : appel dashboard
     let mounted = true;
+
+    type DashboardResult = { stats?: { lateMonths?: number } };
+
     async function checkLate() {
       try {
-        const apiAny = api as Record<string, unknown>;
-        const listFn = apiAny['listMyContributions'];
-        if (typeof listFn !== 'function') {
-          if (mounted) setHasLateMonths(true);
-          return;
-        }
-
-        let contributions: ContributionsResponse | ContributionItem[] | null = null;
-        try {
-          contributions = await (listFn as (opts: { pageSize: number }) => Promise<ContributionsResponse | ContributionItem[]>)({ pageSize: 50 });
-        } catch {
-          contributions = null;
-        }
+        const apiAny = api as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
+        const res = typeof apiAny['getMemberDashboard'] === 'function'
+          ? (await apiAny['getMemberDashboard']()) as DashboardResult
+          : null;
 
         if (!mounted) return;
 
-        if (!contributions) {
+        if (res?.stats?.lateMonths !== undefined) {
+          setHasLateMonths(res.stats.lateMonths > 0);
+        } else {
+          // En cas de doute, on déverrouille — l'admin valide en dernier ressort
           setHasLateMonths(true);
-          return;
         }
-
-        const items: ContributionItem[] = Array.isArray(contributions)
-          ? contributions
-          : (contributions.items ?? []);
-
-        const validated = items.filter((c) => c.status === 'VALIDATED');
-
-        if (validated.length === 0) {
-          setHasLateMonths(false);
-          return;
-        }
-
-        validated.sort((a, b) =>
-          new Date(b.validatedAt ?? b.createdAt).getTime() - new Date(a.validatedAt ?? a.createdAt).getTime()
-        );
-
-        const lastValidated = new Date(validated[0].validatedAt ?? validated[0].createdAt);
-        const monthsAgo = (Date.now() - lastValidated.getTime()) / (1000 * 60 * 60 * 24 * 30);
-        setHasLateMonths(monthsAgo > 1);
       } catch {
         if (mounted) setHasLateMonths(true);
       }
     }
+
     void checkLate();
     return () => { mounted = false; };
-  }, []);
+  }, [lateMonthsProp]);
 
   // ── Visible results: derived ──────────────────────────────────────────────
   const visibleResults = useMemo(

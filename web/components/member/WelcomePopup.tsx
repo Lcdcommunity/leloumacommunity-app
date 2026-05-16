@@ -63,7 +63,7 @@ const CONTENT: Record<PopupMode, {
     title: (name) => `Merci ${name} !`,
     subtitle: 'Paiement en cours de validation',
     body: ({ lateMonths }) =>
-      `Nous avons bien reçu votre paiement et nous vous en remercions sincèrement.\n\nVotre contribution est actuellement en attente de validation par l'administration de Lelouma. Ce processus prend généralement peu de temps.\n\n${lateMonths && lateMonths > 0 ? `Une fois validée, votre retard de ${lateMonths} mois sera régularisé et votre compte mis à jour. ` : ''}Vous recevrez une notification dès que votre paiement sera confirmé.\n\nVotre engagement pour la communauté est précieux. Merci de votre geste !`,
+      `Nous avons bien reçu votre paiement et nous vous en remercions sincèrement.\n\nVotre contribution est actuellement en attente de validation par l'administration de LCD. Ce processus prend généralement peu de temps.\n\n${lateMonths && lateMonths > 0 ? `Une fois validée, votre retard de ${lateMonths} mois sera régularisé et votre compte mis à jour. ` : ''}Vous recevrez une notification dès que votre paiement sera confirmé.\n\nVotre engagement pour la communauté est précieux. Merci de votre geste !`,
     ctaLabel: '🏠 Retour à mon espace',
     ctaHref: '',
     ctaColor: '#D97706',
@@ -80,7 +80,7 @@ const CONTENT: Record<PopupMode, {
     title: (name) => `Cher(e) ${name},`,
     subtitle: 'Une demande de votre association',
     body: ({ lateMonths, regularAmount, currency }) =>
-      `Nous espérons que vous vous portez bien. En tant que membre actif de notre communauté Lelouma, votre soutien est précieux et fondamental pour la réalisation de nos projets communs.\n\nNous constatons que vous avez ${lateMonths} mois de cotisation${lateMonths && lateMonths > 1 ? 's' : ''} en attente${regularAmount ? ` (${regularAmount} ${currency} / mois)` : ''}. Nous vous prions humblement de régulariser votre situation dès que possible.\n\nChaque contribution, aussi modeste soit-elle, contribue à bâtir un avenir meilleur pour notre terre natale. Votre engagement fait la force de Lelouma.`,
+      `Nous espérons que vous vous portez bien. En tant que membre actif de notre communauté LCD, votre soutien est précieux et fondamental pour la réalisation de nos projets communs.\n\nNous constatons que vous avez ${lateMonths} mois de cotisation${lateMonths && lateMonths > 1 ? 's' : ''} en attente${regularAmount ? ` (${regularAmount} ${currency} / mois)` : ''}. Nous vous prions humblement de régulariser votre situation dès que possible.\n\nChaque contribution, aussi modeste soit-elle, contribue à bâtir un avenir meilleur pour notre terre natale. Votre engagement fait la force de Lelouma.`,
     ctaLabel: '💳 Régulariser mes cotisations',
     ctaHref: '/member/contributions/new',
     ctaColor: '#DC2626',
@@ -96,7 +96,7 @@ const CONTENT: Record<PopupMode, {
     title: (name) => `Merci ${name} !`,
     subtitle: 'Cotisation en cours de validation',
     body: () =>
-      `Nous avons bien reçu votre cotisation mensuelle et nous vous en remercions chaleureusement.\n\nVotre paiement est actuellement en attente de validation par l'administration de Lelouma. Vous serez notifié(e) dès que votre cotisation sera confirmée et enregistrée.\n\nVotre ponctualité est une marque de respect envers tous les membres de la communauté. Continuez ainsi !`,
+      `Nous avons bien reçu votre cotisation mensuelle et nous vous en remercions chaleureusement.\n\nVotre paiement est actuellement en attente de validation par l'administration de LCD. Vous serez notifié(e) dès que votre cotisation sera confirmée et enregistrée.\n\nVotre ponctualité est une marque de respect envers tous les membres de la communauté. Continuez ainsi !`,
     ctaLabel: '🏠 Retour à mon espace',
     ctaHref: '',
     ctaColor: '#D97706',
@@ -129,7 +129,7 @@ const CONTENT: Record<PopupMode, {
     title: (name) => `Merci ${name} !`,
     subtitle: 'Carte membre en cours de validation',
     body: () =>
-      `Votre demande de carte de membre annuelle a bien été reçue. Merci pour cette démarche importante !\n\nVotre paiement est en cours d'examen par l'administration de Lelouma. Une fois validée, votre carte sera activée et vous aurez accès à tous les droits et privilèges des membres en règle.\n\nVous recevrez une notification dès que votre carte sera confirmée. Merci de votre confiance et de votre engagement !`,
+      `Votre demande de carte de membre annuelle a bien été reçue. Merci pour cette démarche importante !\n\nVotre paiement est en cours d'examen par l'administration de LCD. Une fois validée, votre carte sera activée et vous aurez accès à tous les droits et privilèges des membres en règle.\n\nVous recevrez une notification dès que votre carte sera confirmée. Merci de votre confiance et de votre engagement !`,
     ctaLabel: '🏠 Retour à mon espace',
     ctaHref: '',
     ctaColor: '#2563EB',
@@ -569,7 +569,7 @@ export function WelcomePopup({
                 <span className="wp-flag-stripe" style={{ background: '#FCD116' }} />
                 <span className="wp-flag-stripe" style={{ background: '#009460' }} />
               </span>
-              Association Lelouma — Espace membre
+              Association LCD — Espace membre
             </div>
           </div>
 
