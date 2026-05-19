@@ -5,31 +5,28 @@ import * as bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Début du seeding pour le compte client...');
+  console.log('🌱 Début du seeding...');
 
-  // 1. Création ou mise à jour de l'Association du client
-  // Ajout du "www." pour correspondre à l'URL de ton navigateur
+  // 1. Association
   const association = await prisma.association.upsert({
-    where: { code: 'LCD26DONIKO' }, 
+    where: { code: 'LCD26DONIKO' },
     update: {
       name: 'Lelouma Community',
-      domainName: 'www.leloumacommunity.com', 
+      domainName: 'www.leloumacommunity.com',
       isActive: true,
     },
     create: {
       code: 'LCD26DONIKO',
       name: 'Lelouma Community',
-      domainName: 'www.leloumacommunity.com', 
+      domainName: 'www.leloumacommunity.com',
       isActive: true,
     },
   });
-  console.log('🏢 Association "Lelouma Community" configurée avec le domaine www.');
+  console.log('🏢 Association "Lelouma Community" OK');
 
-  // Hachage du mot de passe sécurisé
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
-  // 2. Création du compte SUPER_ADMIN du client
-  console.log('👤 Mise à jour du compte Super Admin...');
+  // 2. Super Admin existant (inchangé)
   await prisma.user.upsert({
     where: { email: 'lelouma.community@gmail.com' },
     update: {
@@ -48,8 +45,30 @@ async function main() {
       status: UserStatus.ACTIVE,
     },
   });
+  console.log('👤 Super Admin "lelouma.community@gmail.com" OK');
 
-  console.log('🎉 Seeding terminé ! Essaye de te connecter sur www.leloumacommunity.com');
+  // 3. Nouveau Super Admin — contactlcd26@gmail.com
+  await prisma.user.upsert({
+    where: { email: 'contactlcd26@gmail.com' },
+    update: {
+      role: UserRole.SUPER_ADMIN,
+      associationId: association.id,
+      passwordHash: hashedPwd,
+      status: UserStatus.ACTIVE,
+    },
+    create: {
+      associationId: association.id,
+      email: 'contactlcd26@gmail.com',
+      passwordHash: hashedPwd,
+      firstName: 'Contact',
+      lastName: 'LCD',
+      role: UserRole.SUPER_ADMIN,
+      status: UserStatus.ACTIVE,
+    },
+  });
+  console.log('👤 Super Admin "contactlcd26@gmail.com" OK');
+
+  console.log('🎉 Seeding terminé !');
 }
 
 main()
@@ -60,4 +79,5 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-  //npx prisma db seed
+
+// npx prisma db seed
