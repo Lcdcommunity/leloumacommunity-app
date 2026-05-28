@@ -42,8 +42,7 @@ export class SuperAdminController {
     return this.service.updatePricingConfig(actor.associationId, pricingData, actor.id);
   }
 
-  /* ────────────────────────────────────────────────── */
-
+  /* ── MEMBRES ── */
   @Get('members')
   listMembers(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listUsersByRole(
@@ -56,6 +55,7 @@ export class SuperAdminController {
     );
   }
 
+  /* ── ADMINS ── */
   @Get('admins')
   listAdmins(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listUsersByRole(
@@ -66,6 +66,11 @@ export class SuperAdminController {
       query.q,
       query.status,
     );
+  }
+
+  @Get('admins/:id')
+  getAdmin(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.getAntennaAdminById(id, actor.associationId);
   }
 
   @Post('admins')
@@ -200,7 +205,7 @@ export class SuperAdminController {
       actor.associationId,
       Number(page) || 1,
       Number(pageSize) || 100,
-      status
+      status,
     );
   }
 

@@ -17,17 +17,30 @@ export interface UserDetail extends UserSummary {
   addressLine2?: string;
   postalCode?: string;
   associationTitle?: string;
-  function?: string; // <-- AJOUT CHIRURGICAL ICI
+  function?: string;
+  adminAssignments?: Array<{
+    id: string;
+    isActive: boolean;
+    antenna: {
+      id: string;
+      name: string;
+      code: string;
+      defaultCurrency?: string | null;
+      city?: string | null;
+      country?: string | null;
+    };
+  }>;
 }
 
 export type SuperAdminAdminPayload = {
-  antennaId: string;
+  antennaId?: string;
+  antennaIds?: string[];
   firstName: string;
   lastName: string;
   email: string;
   phone?: string;
   associationTitle?: string;
-  function?: string; // <-- AJOUT CHIRURGICAL ICI
+  function?: string;
   addressLine1?: string;
   addressLine2?: string;
   postalCode?: string;

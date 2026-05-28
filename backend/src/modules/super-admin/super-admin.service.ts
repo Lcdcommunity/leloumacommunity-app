@@ -277,6 +277,23 @@ export class SuperAdminService {
     };
   }
 
+  /* ── ANTENNA ADMIN — DÉTAIL PAR ID ── */
+
+  async getAntennaAdminById(userId: string, associationId: string) {
+    const admin = await this.prisma.user.findFirst({
+      where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN },
+      include: {
+        adminAssignments: {
+          where: { isActive: true },
+          include: { antenna: true },
+        },
+      },
+    });
+
+    if (!admin) throw new NotFoundException('Administrateur introuvable.');
+    return admin;
+  }
+
   async approveUser(userId: string, adminId: string, associationId: string) {
     const user = await this.prisma.user.update({
       where: { id: userId, associationId },
@@ -497,13 +514,11 @@ export class SuperAdminService {
       }
 
       await this.prisma.$transaction(async (tx) => {
-        // Désactiver les anciennes assignations
         await tx.antennaAdminAssignment.updateMany({
           where: { adminUserId: userId, associationId },
           data: { isActive: false, revokedAt: new Date(), revokedByUserId: actorId },
         });
 
-        // Créer les nouvelles assignations
         const newAssignments = data.antennaIds!.map(id => ({
           associationId,
           antennaId: id,
@@ -592,7 +607,7 @@ export class SuperAdminService {
 
   async listProjects(associationId: string, page: number, pageSize: number, q?: string) {
     const skip = (page - 1) * pageSize;
-    const where: Prisma.ProjectWhereInput = { 
+    const where: Prisma.ProjectWhereInput = {
       associationId,
       ...(q ? { title: { contains: q, mode: 'insensitive' } } : {})
     };
@@ -703,7 +718,8 @@ export class SuperAdminService {
     });
   }
 
-  /* ── GESTION DES ANNONCES (AJOUT CHIRURGICAL) ── */
+  /* ── GESTION DES ANNONCES ── */
+
   async listContents(associationId: string, page: number, pageSize: number, q?: string, status?: string) {
     const skip = (page - 1) * pageSize;
     const where: Prisma.NewsPostWhereInput = {
@@ -716,12 +732,12 @@ export class SuperAdminService {
     }
 
     const [items, total] = await Promise.all([
-      this.prisma.newsPost.findMany({ 
-        where, 
-        skip, 
-        take: pageSize, 
-        orderBy: { createdAt: 'desc' }, 
-        include: { coverImageFile: true, attachments: { include: { file: true } } } 
+      this.prisma.newsPost.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { createdAt: 'desc' },
+        include: { coverImageFile: true, attachments: { include: { file: true } } }
       }),
       this.prisma.newsPost.count({ where }),
     ]);
@@ -762,7 +778,7 @@ export class SuperAdminService {
     const imageId = data.coverImageFileId !== undefined ? data.coverImageFileId : data.coverFileAssetId;
 
     if (data.imageIds !== undefined) {
-      await this.prisma.newsPostAttachment.deleteMany({ where: { newsPostId: contentId }});
+      await this.prisma.newsPostAttachment.deleteMany({ where: { newsPostId: contentId } });
     }
 
     return this.prisma.newsPost.update({
