@@ -378,7 +378,7 @@ export default function AdminContributionsPage() {
         .acv-btn:disabled { opacity:.5; cursor:not-allowed; }
         .acv-action-form { background:#F8FAFC; border-radius:14px; padding:1rem; margin-top:.5rem; }
         .acv-form-lbl { display:block; font-size:.72rem; font-weight:800; color:#475569; text-transform:uppercase; letter-spacing:.05em; margin-bottom:.5rem; }
-        .acv-input { width:100%; padding:.7rem .9rem; border-radius:10px; border:1.5px solid #E2E8F0; font-family:'DM Sans',sans-serif; font-size:.9rem; font-weight:600; outline:none; resize:vertical; background:white; box-sizing:border-box; }
+        .acv-input { width:100%; padding:.7rem .9rem; border-radius:10px; border:1.5px solid #E2E8F0; font-family:'DM Sans',sans-serif; font-size:.9rem; font-weight:600; color:#111827; outline:none; resize:vertical; background:white; box-sizing:border-box; }
         .acv-input:focus { border-color:#3B82F6; box-shadow:0 0 0 3px rgba(59,130,246,.1); }
         .acv-spinner { width:18px; height:18px; border:2.5px solid rgba(255,255,255,.3); border-top-color:white; border-radius:50%; animation:spin .7s linear infinite; }
         .acv-empty { padding:3rem; text-align:center; color:#94A3B8; font-size:.9rem; }
