@@ -1,5 +1,4 @@
 // backend/src/modules/member/member.service.ts
-// backend/src/modules/member/member.service.ts
 import {
   BadRequestException,
   ForbiddenException,
@@ -35,8 +34,10 @@ import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PushSubscriptionDto } from './dto/push-subscription.dto';
 
-// ─── Helper : calcule les mois de retard d'un membre ─────────────────────────
-// Logique centralisée ici pour être réutilisée dans getDashboard ET listLateMembers
+// ─── Helper : calcule les mois de retard ─────────────────────────────────────
+// Ne compte QUE les mois passés (le mois courant est exclu).
+// Utilise monthReference/yearReference quand disponibles — seule façon fiable
+// de reconnaître les paiements anticipés (ex : 12 mois payés en janvier).
 function computeLateMonths(
   contributions: Array<{
     monthReference: number | null;
@@ -51,7 +52,6 @@ function computeLateMonths(
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-  // Construire l'ensemble des mois couverts par des contributions VALIDATED REGULAR/LATE
   const coveredMonths = new Set<string>();
   for (const c of contributions) {
     if (c.monthReference && c.yearReference) {
@@ -59,7 +59,6 @@ function computeLateMonths(
         `${c.yearReference}-${String(c.monthReference).padStart(2, '0')}`,
       );
     } else {
-      // Fallback : utiliser le mois de validation si pas de référence explicite
       const d = c.validatedAt ?? c.createdAt;
       const d2 = new Date(d);
       coveredMonths.add(
@@ -69,14 +68,10 @@ function computeLateMonths(
   }
 
   let lateMonths = 0;
-
-  // ✅ CORRECTION : on démarre au mois PRÉCÉDENT (currentMonth - 1).
-  // Le mois en cours n'est jamais compté en retard — le membre a jusqu'à
-  // la fin du mois pour payer. Seuls les mois passés non couverts sont du retard.
+  // Départ au mois PRÉCÉDENT : le mois en cours n'est jamais considéré en retard.
   let checkMonth = currentMonth - 1;
   let checkYear = currentYear;
 
-  // Si on est en janvier, le mois précédent est décembre de l'année précédente
   if (checkMonth < 1) {
     checkMonth = 12;
     checkYear--;
@@ -86,7 +81,6 @@ function computeLateMonths(
     const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
     const monthStart = new Date(checkYear, checkMonth - 1, 1);
 
-    // Ne pas compter les mois avant l'inscription
     if (monthStart < new Date(joinDate.getFullYear(), joinDate.getMonth(), 1)) break;
 
     if (!coveredMonths.has(key)) {
@@ -110,6 +104,8 @@ export class MemberService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  // ─── getMeOrThrow ─────────────────────────────────────────────────────────
+
   async getMeOrThrow(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -120,9 +116,7 @@ export class MemberService {
         associationId: true,
         memberships: {
           where: { isPrimary: true },
-          select: {
-            antennaId: true,
-          },
+          select: { antennaId: true },
         },
         email: true,
         firstName: true,
@@ -141,11 +135,7 @@ export class MemberService {
         countryOfBirth: true,
         createdAt: true,
         updatedAt: true,
-        profilePhoto: {
-          select: {
-            url: true,
-          },
-        },
+        profilePhoto: { select: { url: true } },
       },
     });
 
@@ -160,8 +150,28 @@ export class MemberService {
     };
   }
 
+  // ─── getDashboard ─────────────────────────────────────────────────────────
+  // ╔═══════════════════════════════════════════════════════════════════════╗
+  // ║  CORRECTION BUG AVANCES ANNUELLES                                    ║
+  // ║                                                                       ║
+  // ║  Deux nouvelles requêtes Prisma directes sur monthReference /         ║
+  // ║  yearReference retournent currentMonthCovered et                      ║
+  // ║  hasValidMembershipCard dans les stats.                               ║
+  // ║                                                                       ║
+  // ║  Ces flags sont la SOURCE DE VÉRITÉ absolue pour le WelcomePopup.    ║
+  // ║  Ils évitent le bug où le frontend calculait l'état depuis            ║
+  // ║  recentContributions (liste limitée, sans monthReference/             ║
+  // ║  yearReference), ce qui faisait croire à tort que le mois courant     ║
+  // ║  n'était pas couvert pour un membre ayant payé 12 mois d'avance.     ║
+  // ╚═══════════════════════════════════════════════════════════════════════╝
+
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
+
+    // Référence temporelle calculée une seule fois pour la cohérence de tous les checks.
+    const now = new Date();
+    const currentMonth = now.getMonth() + 1;
+    const currentYear = now.getFullYear();
 
     const [
       totalMyContributions,
@@ -170,6 +180,12 @@ export class MemberService {
       allAntennas,
       myRegularContributions,
       lastContribution,
+      // ── FLAG 1 : le mois courant est-il couvert par une contribution VALIDÉE ? ──
+      // Requête directe sur monthReference / yearReference → seule façon fiable
+      // de détecter qu'un membre a payé par avance (ex : 12 mois en janvier).
+      currentMonthContribution,
+      // ── FLAG 2 : carte membre VALIDÉE pour l'année en cours ? ─────────────────
+      currentYearCard,
     ] = await Promise.all([
       this.prisma.contribution.aggregate({
         where: {
@@ -190,11 +206,7 @@ export class MemberService {
         include: {
           user: {
             include: {
-              memberships: {
-                include: {
-                  antenna: true,
-                },
-              },
+              memberships: { include: { antenna: true } },
               profilePhoto: true,
             },
           },
@@ -204,14 +216,16 @@ export class MemberService {
         where: { associationId: me.associationId, isActive: true },
         select: { id: true, name: true, defaultCurrency: true },
       }),
-      // Toutes les contributions régulières/retard validées avec leurs références
-      // mensuelles — nécessaire pour computeLateMonths
+      // Toutes les cotisations VALIDATED REGULAR/LATE avec leurs références
+      // mensuelles pour computeLateMonths.
       this.prisma.contribution.findMany({
         where: {
           associationId: me.associationId,
           memberUserId: userId,
           status: ContributionStatus.VALIDATED,
-          purpose: { in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA] },
+          purpose: {
+            in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA],
+          },
         },
         select: {
           monthReference: true,
@@ -220,7 +234,7 @@ export class MemberService {
           createdAt: true,
         },
       }),
-      // Dernière contribution validée toutes purposes confondues
+      // Dernière contribution VALIDATED toutes purposes confondues.
       this.prisma.contribution.findFirst({
         where: {
           associationId: me.associationId,
@@ -230,9 +244,35 @@ export class MemberService {
         orderBy: { validatedAt: 'desc' },
         select: { validatedAt: true, createdAt: true },
       }),
+
+      // ── FLAG 1 ────────────────────────────────────────────────────────────────
+      this.prisma.contribution.findFirst({
+        where: {
+          associationId: me.associationId,
+          memberUserId: userId,
+          status: ContributionStatus.VALIDATED,
+          purpose: {
+            in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA],
+          },
+          monthReference: currentMonth,
+          yearReference: currentYear,
+        },
+        select: { id: true },
+      }),
+
+      // ── FLAG 2 ────────────────────────────────────────────────────────────────
+      this.prisma.contribution.findFirst({
+        where: {
+          associationId: me.associationId,
+          memberUserId: userId,
+          status: ContributionStatus.VALIDATED,
+          purpose: ContributionPurpose.MEMBERSHIP_CARD,
+          yearReference: currentYear,
+        },
+        select: { id: true },
+      }),
     ]);
 
-    // lateMonths : mois passés non couverts uniquement (mois courant exclu)
     const lateMonths = computeLateMonths(myRegularContributions, me.createdAt);
 
     const myLastContributionAt = lastContribution
@@ -270,14 +310,16 @@ export class MemberService {
     );
 
     let cardData = null;
-
     if (virtualCard && virtualCard.user.associationId === me.associationId) {
       cardData = {
         cardNumber: virtualCard.cardNumber,
         isLocked: virtualCard.isLocked,
-        expiresAt: virtualCard.expiresAt ? virtualCard.expiresAt.toISOString() : null,
+        expiresAt: virtualCard.expiresAt
+          ? virtualCard.expiresAt.toISOString()
+          : null,
         qrToken: virtualCard.qrToken,
-        antennaName: virtualCard.user.memberships[0]?.antenna?.name || 'Inconnue',
+        antennaName:
+          virtualCard.user.memberships[0]?.antenna?.name || 'Inconnue',
         user: {
           firstName: virtualCard.user.firstName,
           lastName: virtualCard.user.lastName,
@@ -302,17 +344,28 @@ export class MemberService {
         activeProjects,
         lateMonths,
         myLastContributionAt,
+        // ── SOURCE DE VÉRITÉ pour le WelcomePopup ─────────────────────────────
+        // Calculés par requête Prisma directe → corrects même pour les paiements
+        // anticipés sur toute l'année.
+        currentMonthCovered: !!currentMonthContribution,
+        hasValidMembershipCard: !!currentYearCard,
       },
       virtualCard: cardData,
       antennaBalances,
     };
   }
 
+  // ─── ensureMemberActiveEnough ─────────────────────────────────────────────
+
   private ensureMemberActiveEnough(status: UserStatus): void {
     if (status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('Compte non actif. Attendez la validation admin.');
+      throw new ForbiddenException(
+        'Compte non actif. Attendez la validation admin.',
+      );
     }
   }
+
+  // ─── updateProfile ────────────────────────────────────────────────────────
 
   async updateProfile(userId: string, dto: MemberProfileUpdateDto) {
     const me = await this.getMeOrThrow(userId);
@@ -323,22 +376,42 @@ export class MemberService {
         ...(dto.firstName !== undefined ? { firstName: dto.firstName.trim() } : {}),
         ...(dto.lastName !== undefined ? { lastName: dto.lastName.trim() } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone.trim() || null } : {}),
-        ...(dto.addressLine1 !== undefined ? { addressLine1: dto.addressLine1.trim() || null } : {}),
-        ...(dto.addressLine2 !== undefined ? { addressLine2: dto.addressLine2.trim() || null } : {}),
+        ...(dto.addressLine1 !== undefined
+          ? { addressLine1: dto.addressLine1.trim() || null }
+          : {}),
+        ...(dto.addressLine2 !== undefined
+          ? { addressLine2: dto.addressLine2.trim() || null }
+          : {}),
         ...(dto.city !== undefined ? { city: dto.city.trim() || null } : {}),
         ...(dto.country !== undefined ? { country: dto.country.trim() || null } : {}),
-        ...(dto.function !== undefined ? { function: dto.function.trim() || null } : {}),
-        ...(dto.professionalStatus !== undefined ? { professionalStatus: dto.professionalStatus.trim() || null } : {}),
-        ...(dto.originSubPrefecture !== undefined ? { originSubPrefecture: dto.originSubPrefecture.trim() || null } : {}),
-        ...(dto.placeOfBirth !== undefined ? { placeOfBirth: dto.placeOfBirth.trim() || null } : {}),
-        ...(dto.countryOfBirth !== undefined ? { countryOfBirth: dto.countryOfBirth.trim() || null } : {}),
-        ...(dto.postalCode !== undefined ? { postalCode: dto.postalCode.trim() || null } : {}),
-        ...(dto.birthDate !== undefined ? { birthDate: dto.birthDate ? new Date(dto.birthDate) : null } : {}),
+        ...(dto.function !== undefined
+          ? { function: dto.function.trim() || null }
+          : {}),
+        ...(dto.professionalStatus !== undefined
+          ? { professionalStatus: dto.professionalStatus.trim() || null }
+          : {}),
+        ...(dto.originSubPrefecture !== undefined
+          ? { originSubPrefecture: dto.originSubPrefecture.trim() || null }
+          : {}),
+        ...(dto.placeOfBirth !== undefined
+          ? { placeOfBirth: dto.placeOfBirth.trim() || null }
+          : {}),
+        ...(dto.countryOfBirth !== undefined
+          ? { countryOfBirth: dto.countryOfBirth.trim() || null }
+          : {}),
+        ...(dto.postalCode !== undefined
+          ? { postalCode: dto.postalCode.trim() || null }
+          : {}),
+        ...(dto.birthDate !== undefined
+          ? { birthDate: dto.birthDate ? new Date(dto.birthDate) : null }
+          : {}),
       },
     });
 
     return memberMapper.userSummary(updated as any);
   }
+
+  // ─── updatePreferences ────────────────────────────────────────────────────
 
   async updatePreferences(userId: string, dto: MemberPreferencesUpdateDto) {
     await this.getMeOrThrow(userId);
@@ -352,14 +425,22 @@ export class MemberService {
         pushEnabled: dto.pushNotifications ?? false,
       },
       update: {
-        ...(dto.emailNotifications !== undefined ? { emailEnabled: dto.emailNotifications } : {}),
-        ...(dto.smsNotifications !== undefined ? { smsEnabled: dto.smsNotifications } : {}),
-        ...(dto.pushNotifications !== undefined ? { pushEnabled: dto.pushNotifications } : {}),
+        ...(dto.emailNotifications !== undefined
+          ? { emailEnabled: dto.emailNotifications }
+          : {}),
+        ...(dto.smsNotifications !== undefined
+          ? { smsEnabled: dto.smsNotifications }
+          : {}),
+        ...(dto.pushNotifications !== undefined
+          ? { pushEnabled: dto.pushNotifications }
+          : {}),
       },
     });
 
     return { ok: true as const };
   }
+
+  // ─── subscribeToPushNotifications ────────────────────────────────────────
 
   async subscribeToPushNotifications(userId: string, dto: PushSubscriptionDto) {
     await this.prisma.pushSubscription.upsert({
@@ -379,11 +460,13 @@ export class MemberService {
     return { message: 'Abonnement push enregistré avec succès.' };
   }
 
+  // ─── searchMembers ────────────────────────────────────────────────────────
+
   async searchMembers(userId: string, q: string) {
     const me = await this.getMeOrThrow(userId);
     if (!q || q.trim().length < 2) return [];
 
-    const members = await this.prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: {
         associationId: me.associationId,
         role: 'MEMBER',
@@ -397,17 +480,26 @@ export class MemberService {
         ],
       },
       take: 10,
-      select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+      },
     });
-    return members;
   }
+
+  // ─── createContribution ───────────────────────────────────────────────────
 
   async createContribution(userId: string, dto: CreateMemberContributionDto) {
     const me = await this.getMeOrThrow(userId);
     this.ensureMemberActiveEnough(me.status);
 
     if (!me.associationId || !me.antennaId) {
-      throw new BadRequestException('Utilisateur non rattaché à une association / antenne.');
+      throw new BadRequestException(
+        'Utilisateur non rattaché à une association / antenne.',
+      );
     }
 
     let finalMemberId = me.id;
@@ -416,26 +508,41 @@ export class MemberService {
 
     if (dto.targetMemberId && dto.targetMemberId !== me.id) {
       const target = await this.prisma.user.findFirst({
-        where: { id: dto.targetMemberId, associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
+        where: {
+          id: dto.targetMemberId,
+          associationId: me.associationId,
+          role: 'MEMBER',
+          status: 'ACTIVE',
+        },
         include: { memberships: true },
       });
       if (!target) throw new NotFoundException('Membre tiers introuvable ou inactif.');
       finalMemberId = target.id;
       submitterId = me.id;
-      const primaryMembership = target.memberships.find(m => m.isPrimary) || target.memberships[0];
+      const primaryMembership =
+        target.memberships.find((m) => m.isPrimary) || target.memberships[0];
       if (primaryMembership?.antennaId) finalAntennaId = primaryMembership.antennaId;
     }
 
     const pricingSetting = await this.prisma.associationSetting.findUnique({
-      where: { associationId_key: { associationId: me.associationId, key: 'PRICING_CONFIG' } },
+      where: {
+        associationId_key: {
+          associationId: me.associationId,
+          key: 'PRICING_CONFIG',
+        },
+      },
     });
     const allPricing = (pricingSetting?.value as Record<string, any>) || {};
     const resolvedCurrency = dto.currency || 'EUR';
-    const localPricing = allPricing[resolvedCurrency] || { monthlyQuota: 0, membershipCard: 0 };
+    const localPricing = allPricing[resolvedCurrency] || {
+      monthlyQuota: 0,
+      membershipCard: 0,
+    };
     const monthlyPrice = Number(localPricing.monthlyQuota) || 0;
     const cardPrice = Number(localPricing.membershipCard) || 0;
 
-    const purpose = (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA;
+    const purpose =
+      (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA;
     const totalAmount = Number(dto.amount);
 
     if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
@@ -446,7 +553,13 @@ export class MemberService {
       }
     }
 
-    const autoReference = `TR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+    const autoReference = `TR-${new Date()
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, '')}-${Math.random()
+      .toString(36)
+      .substring(2, 6)
+      .toUpperCase()}`;
 
     const baseData = {
       associationId: me.associationId,
@@ -492,12 +605,13 @@ export class MemberService {
         }
       }
     } else if (
-      (purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA) &&
+      (purpose === ContributionPurpose.REGULAR_QUOTA ||
+        purpose === ContributionPurpose.LATE_QUOTA) &&
       monthlyPrice > 0 &&
       totalAmount >= monthlyPrice
     ) {
       let remaining = totalAmount;
-      let m = dto.monthReference ?? (new Date().getMonth() + 1);
+      let m = dto.monthReference ?? new Date().getMonth() + 1;
       let y = dto.yearReference ?? new Date().getFullYear();
 
       while (remaining >= monthlyPrice) {
@@ -506,9 +620,10 @@ export class MemberService {
           amount: new Prisma.Decimal(monthlyPrice),
           monthReference: m,
           yearReference: y,
-          memberComment: remaining !== totalAmount
-            ? `${dto.note?.trim() || ''} [Avance automatique]`.trim()
-            : dto.note?.trim() ?? null,
+          memberComment:
+            remaining !== totalAmount
+              ? `${dto.note?.trim() || ''} [Avance automatique]`.trim()
+              : dto.note?.trim() ?? null,
         });
         remaining -= monthlyPrice;
         m++;
@@ -524,10 +639,14 @@ export class MemberService {
     }
 
     const created = await this.prisma.$transaction(
-      contributionsToCreate.map(data => this.prisma.contribution.create({ data })),
+      contributionsToCreate.map((data) =>
+        this.prisma.contribution.create({ data }),
+      ),
     );
 
-    const targetName = submitterId ? 'un membre tiers' : `${me.firstName} ${me.lastName}`;
+    const targetName = submitterId
+      ? 'un membre tiers'
+      : `${me.firstName} ${me.lastName}`;
     await this.notifications.notifyAntennaAdminsWithPush(
       finalAntennaId,
       me.associationId,
@@ -540,6 +659,8 @@ export class MemberService {
     return memberMapper.contribution(created[0]);
   }
 
+  // ─── listMyContributions ──────────────────────────────────────────────────
+
   async listMyContributions(
     userId: string,
     query: MemberContributionsQueryDto,
@@ -551,10 +672,7 @@ export class MemberService {
 
     const where: Prisma.ContributionWhereInput = {
       associationId: me.associationId,
-      OR: [
-        { memberUserId: userId },
-        { submitterUserId: userId },
-      ],
+      OR: [{ memberUserId: userId }, { submitterUserId: userId }],
       ...(query.status ? { status: query.status as ContributionStatus } : {}),
     };
 
@@ -573,114 +691,188 @@ export class MemberService {
     ]);
 
     return {
-      items: items.map(c => ({
-        ...memberMapper.contribution(c),
-        currency: c.currency,
-        monthReference: c.monthReference,
-        yearReference: c.yearReference,
-      })),
+      items: items.map((c) => memberMapper.contribution(c)),
       total,
       page,
       pageSize,
     };
   }
 
+  // ─── updateMyContribution ─────────────────────────────────────────────────
+
+  async updateMyContribution(
+    userId: string,
+    contributionId: string,
+    newAmount: number,
+  ) {
+    const me = await this.getMeOrThrow(userId);
+
+    const contribution = await this.prisma.contribution.findFirst({
+      where: {
+        id: contributionId,
+        associationId: me.associationId,
+        OR: [{ memberUserId: userId }, { submitterUserId: userId }],
+      },
+    });
+
+    if (!contribution) throw new NotFoundException('Contribution introuvable.');
+
+    if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
+      throw new BadRequestException(
+        'Seules les contributions en attente de validation peuvent être modifiées.',
+      );
+    }
+
+    if (newAmount <= 0) {
+      throw new BadRequestException('Le montant doit être supérieur à 0.');
+    }
+
+    return this.prisma.contribution.update({
+      where: { id: contributionId },
+      data: { amount: new Prisma.Decimal(newAmount) },
+    });
+  }
+
+  // ─── deleteMyContribution ─────────────────────────────────────────────────
+
+  async deleteMyContribution(userId: string, contributionId: string) {
+    const me = await this.getMeOrThrow(userId);
+
+    const contribution = await this.prisma.contribution.findFirst({
+      where: {
+        id: contributionId,
+        associationId: me.associationId,
+        OR: [{ memberUserId: userId }, { submitterUserId: userId }],
+      },
+    });
+
+    if (!contribution) throw new NotFoundException('Contribution introuvable.');
+
+    if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
+      throw new BadRequestException(
+        'Seules les contributions en attente de validation peuvent être supprimées.',
+      );
+    }
+
+    await this.prisma.contribution.delete({ where: { id: contributionId } });
+    return { success: true };
+  }
+
+  // ─── getAssociationBalanceSummary ─────────────────────────────────────────
+
   async getAssociationBalanceSummary(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
-    const [association, agg] = await Promise.all([
-      this.prisma.association.findUnique({
-        where: { id: me.associationId },
-      }),
-      this.prisma.contribution.aggregate({
-        where: {
-          associationId: me.associationId,
-          status: ContributionStatus.VALIDATED,
-        },
-        _sum: { amount: true },
-      }),
-    ]);
+    const association = await this.prisma.association.findUnique({
+      where: { id: me.associationId },
+      select: { id: true, name: true, defaultCurrency: true },
+    });
 
-    if (!association) {
-      throw new NotFoundException('Association introuvable.');
-    }
+    const agg = await this.prisma.contribution.aggregate({
+      where: {
+        associationId: me.associationId,
+        status: ContributionStatus.VALIDATED,
+      },
+      _sum: { amount: true },
+    });
 
     return {
-      associationId: association.id,
-      associationName: association.name,
+      associationId: me.associationId,
+      associationName: association?.name ?? 'Association',
       totalValidatedContributionsAmount: Number(agg._sum.amount ?? 0),
-      currency: association.defaultCurrency || 'EUR',
+      currency: association?.defaultCurrency ?? 'EUR',
       lastUpdatedAt: new Date().toISOString(),
     };
   }
 
-  async getPricing(userId: string): Promise<Record<string, { monthlyQuota: number; membershipCard: number }>> {
+  // ─── getPricing ───────────────────────────────────────────────────────────
+
+  async getPricing(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
-    const pricings = await this.prisma.pricing.findMany({
-      where: { associationId: me.associationId },
-      select: { currency: true, monthlyQuota: true, membershipCard: true },
-    });
-
-    return pricings.reduce<Record<string, { monthlyQuota: number; membershipCard: number }>>(
-      (acc, p) => {
-        acc[p.currency] = {
-          monthlyQuota: Number(p.monthlyQuota),
-          membershipCard: Number(p.membershipCard),
-        };
-        return acc;
-      },
-      {},
-    );
-  }
-
-  async listLateMembers(userId: string, query: LateMembersQueryDto): Promise<PaginatedResponseDto<any>> {
-    const me = await this.getMeOrThrow(userId);
-    const page = query.page ?? 1;
-    const pageSize = query.pageSize ?? 50;
-
-    const members = await this.prisma.user.findMany({
-      where: { associationId: me.associationId, role: 'MEMBER', status: 'ACTIVE' },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        createdAt: true,
-        memberships: { include: { antenna: true } },
-        contributions: {
-          where: {
-            status: 'VALIDATED',
-            associationId: me.associationId,
-            purpose: { in: ['REGULAR_QUOTA', 'LATE_QUOTA'] },
-          },
-          select: {
-            amount: true,
-            currency: true,
-            monthReference: true,
-            yearReference: true,
-            validatedAt: true,
-            createdAt: true,
-          },
-          orderBy: { validatedAt: 'desc' },
+    const pricingSetting = await this.prisma.associationSetting.findUnique({
+      where: {
+        associationId_key: {
+          associationId: me.associationId,
+          key: 'PRICING_CONFIG',
         },
       },
     });
 
-    // Même fonction centralisée — le mois courant n'est pas compté en retard
-    const computed = members
-      .map(m => ({
-        id: m.id,
-        firstName: m.firstName,
-        lastName: m.lastName,
-        antennaName: m.memberships[0]?.antenna?.name ?? null,
-        lateMonths: computeLateMonths(m.contributions, m.createdAt),
+    return (
+      (pricingSetting?.value as Record<
+        string,
+        { monthlyQuota: number; membershipCard: number }
+      >) || {}
+    );
+  }
+
+  // ─── listLateMembers (visible aux membres) ────────────────────────────────
+
+  async listLateMembers(
+    userId: string,
+    query: LateMembersQueryDto,
+  ): Promise<PaginatedResponseDto<any>> {
+    const me = await this.getMeOrThrow(userId);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+    const thresholdMonths = 3;
+
+    const memberships = await this.prisma.membership.findMany({
+      where: {
+        associationId: me.associationId,
+        status: 'APPROVED',
+        isPrimary: true,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            createdAt: true,
+            contributions: {
+              where: {
+                associationId: me.associationId,
+                status: ContributionStatus.VALIDATED,
+                purpose: {
+                  in: [
+                    ContributionPurpose.REGULAR_QUOTA,
+                    ContributionPurpose.LATE_QUOTA,
+                  ],
+                },
+              },
+              select: {
+                monthReference: true,
+                yearReference: true,
+                validatedAt: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
+        antenna: { select: { id: true, name: true } },
+      },
+    });
+
+    const allLate = memberships
+      .map((m) => ({
+        id: m.user.id,
+        firstName: m.user.firstName,
+        lastName: m.user.lastName,
+        antennaName: m.antenna?.name ?? null,
+        lateMonths: computeLateMonths(m.user.contributions, m.user.createdAt),
       }))
-      .filter(x => x.lateMonths >= 3)
+      .filter((item) => item.lateMonths >= thresholdMonths)
       .sort((a, b) => b.lateMonths - a.lateMonths);
 
-    const start = (page - 1) * pageSize;
-    return { items: computed.slice(start, start + pageSize), total: computed.length, page, pageSize };
+    const total = allLate.length;
+    const items = allLate.slice((page - 1) * pageSize, page * pageSize);
+
+    return { items, total, page, pageSize };
   }
+
+  // ─── listProjectsForMembers ───────────────────────────────────────────────
 
   async listProjectsForMembers(
     userId: string,
@@ -750,6 +942,8 @@ export class MemberService {
     };
   }
 
+  // ─── createProjectProposal ────────────────────────────────────────────────
+
   async createProjectProposal(
     userId: string,
     dto: CreateProjectProposalDto & { attachmentFileAssetId?: string },
@@ -777,9 +971,7 @@ export class MemberService {
         ...(dto.attachmentFileAssetId
           ? {
               attachments: {
-                create: {
-                  fileId: dto.attachmentFileAssetId,
-                },
+                create: { fileId: dto.attachmentFileAssetId },
               },
             }
           : {}),
@@ -799,6 +991,8 @@ export class MemberService {
 
     return memberMapper.projectProposal(created);
   }
+
+  // ─── listMyProjectProposals ───────────────────────────────────────────────
 
   async listMyProjectProposals(
     userId: string,
@@ -851,6 +1045,8 @@ export class MemberService {
     };
   }
 
+  // ─── updateProjectProposal ────────────────────────────────────────────────
+
   async updateProjectProposal(
     userId: string,
     proposalId: string,
@@ -874,7 +1070,9 @@ export class MemberService {
       proposal.status !== ProposalStatus.SUBMITTED &&
       proposal.status !== ProposalStatus.UNDER_REVIEW
     ) {
-      throw new BadRequestException('Cette proposition ne peut plus être modifiée.');
+      throw new BadRequestException(
+        'Cette proposition ne peut plus être modifiée.',
+      );
     }
 
     const isSubmitting =
@@ -890,7 +1088,11 @@ export class MemberService {
         ...(dto.title ? { title: dto.title.trim() } : {}),
         ...(dto.description ? { description: dto.description.trim() } : {}),
         ...(dto.expectedBudget !== undefined
-          ? { estimatedBudget: dto.expectedBudget ? new Prisma.Decimal(dto.expectedBudget) : null }
+          ? {
+              estimatedBudget: dto.expectedBudget
+                ? new Prisma.Decimal(dto.expectedBudget)
+                : null,
+            }
           : {}),
         ...(dto.currency ? { currency: dto.currency as CurrencyCode } : {}),
         ...(newStatus !== undefined ? { status: newStatus } : {}),
@@ -921,6 +1123,8 @@ export class MemberService {
     return memberMapper.projectProposal(updated);
   }
 
+  // ─── deleteProjectProposal ────────────────────────────────────────────────
+
   async deleteProjectProposal(userId: string, proposalId: string) {
     const me = await this.getMeOrThrow(userId);
 
@@ -937,15 +1141,16 @@ export class MemberService {
       proposal.status !== ProposalStatus.SUBMITTED &&
       proposal.status !== ProposalStatus.UNDER_REVIEW
     ) {
-      throw new BadRequestException('Cette proposition ne peut plus être supprimée.');
+      throw new BadRequestException(
+        'Cette proposition ne peut plus être supprimée.',
+      );
     }
 
-    await this.prisma.projectProposal.delete({
-      where: { id: proposalId },
-    });
-
+    await this.prisma.projectProposal.delete({ where: { id: proposalId } });
     return { success: true };
   }
+
+  // ─── listDocuments ────────────────────────────────────────────────────────
 
   async listDocuments(
     userId: string,
@@ -981,9 +1186,7 @@ export class MemberService {
       });
     }
 
-    const where: Prisma.DocumentWhereInput = {
-      AND: andFilters,
-    };
+    const where: Prisma.DocumentWhereInput = { AND: andFilters };
 
     const [total, items] = await Promise.all([
       this.prisma.document.count({ where }),
@@ -1014,6 +1217,8 @@ export class MemberService {
       pageSize,
     };
   }
+
+  // ─── listContents ─────────────────────────────────────────────────────────
 
   async listContents(
     userId: string,
@@ -1059,68 +1264,5 @@ export class MemberService {
       page,
       pageSize,
     };
-  }
-
-  async updateMyContribution(userId: string, contributionId: string, newAmount: number) {
-    const me = await this.getMeOrThrow(userId);
-
-    const contribution = await this.prisma.contribution.findFirst({
-      where: {
-        id: contributionId,
-        associationId: me.associationId,
-        OR: [
-          { memberUserId: userId },
-          { submitterUserId: userId },
-        ],
-      },
-    });
-
-    if (!contribution) {
-      throw new NotFoundException('Contribution introuvable.');
-    }
-
-    if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
-      throw new BadRequestException(
-        'Seules les contributions en attente de validation peuvent être modifiées.',
-      );
-    }
-
-    if (newAmount <= 0) {
-      throw new BadRequestException('Le montant doit être supérieur à 0.');
-    }
-
-    return this.prisma.contribution.update({
-      where: { id: contributionId },
-      data: { amount: new Prisma.Decimal(newAmount) },
-    });
-  }
-
-  async deleteMyContribution(userId: string, contributionId: string) {
-    const me = await this.getMeOrThrow(userId);
-
-    const contribution = await this.prisma.contribution.findFirst({
-      where: {
-        id: contributionId,
-        associationId: me.associationId,
-        OR: [
-          { memberUserId: userId },
-          { submitterUserId: userId },
-        ],
-      },
-    });
-
-    if (!contribution) {
-      throw new NotFoundException('Contribution introuvable.');
-    }
-
-    if (contribution.status !== ContributionStatus.PENDING_VALIDATION) {
-      throw new BadRequestException(
-        'Seules les contributions en attente de validation peuvent être supprimées.',
-      );
-    }
-
-    await this.prisma.contribution.delete({ where: { id: contributionId } });
-
-    return { success: true };
   }
 }

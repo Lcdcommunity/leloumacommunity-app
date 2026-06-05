@@ -91,7 +91,7 @@ export const memberMapper = {
       antennaId: u.antennaId ?? null,
       associationId: u.associationId ?? null,
       isActive: u.isActive ?? null,
-      
+
       birthDate: toIso(u.birthDate),
       placeOfBirth: u.placeOfBirth ?? null,
       birthCountry: u.birthCountry ?? null,
@@ -114,6 +114,12 @@ export const memberMapper = {
     };
   },
 
+  // ─── contribution ──────────────────────────────────────────────────────────
+  // CORRECTION : monthReference et yearReference sont désormais inclus dans
+  // la réponse. Sans eux, le fallback côté frontend utilise depositedAt
+  // (= date du dépôt en janvier pour un paiement anticipé) au lieu du mois
+  // de référence réel, ce qui fait croire à tort que le mois courant n'est
+  // pas couvert.
   contribution(c: any) {
     return {
       id: c.id,
@@ -127,14 +133,22 @@ export const memberMapper = {
       validatedAt: toIso(c.validatedAt),
       note: c.memberComment ?? null,
       purpose: c.purpose ?? 'REGULAR_QUOTA',
-      submitter: c.submitter ? {
-        firstName: c.submitter.firstName,
-        lastName: c.submitter.lastName,
-      } : null,
-      beneficiary: c.member ? {
-        firstName: c.member.firstName,
-        lastName: c.member.lastName,
-      } : null,
+      // ── AJOUTS pour détecter correctement les mois couverts ──────────────
+      monthReference: c.monthReference ?? null,
+      yearReference: c.yearReference ?? null,
+      // ─────────────────────────────────────────────────────────────────────
+      submitter: c.submitter
+        ? {
+            firstName: c.submitter.firstName,
+            lastName: c.submitter.lastName,
+          }
+        : null,
+      beneficiary: c.member
+        ? {
+            firstName: c.member.firstName,
+            lastName: c.member.lastName,
+          }
+        : null,
     };
   },
 
@@ -218,13 +232,15 @@ export const memberMapper = {
 
   projectProposal(x: any) {
     const firstAttachment = x.attachments?.[0]?.file;
-    const attachedFile = firstAttachment ? {
-      id: firstAttachment.id,
-      url: firstAttachment.url,
-      mimeType: firstAttachment.mimeType,
-      fileName: firstAttachment.originalFilename,
-      sizeBytes: toNumberOrNull(firstAttachment.sizeBytes),
-    } : null;
+    const attachedFile = firstAttachment
+      ? {
+          id: firstAttachment.id,
+          url: firstAttachment.url,
+          mimeType: firstAttachment.mimeType,
+          fileName: firstAttachment.originalFilename,
+          sizeBytes: toNumberOrNull(firstAttachment.sizeBytes),
+        }
+      : null;
 
     return {
       id: x.id,
