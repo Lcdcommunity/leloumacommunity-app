@@ -5,10 +5,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
-
 /// =========================
 /// ENUMS
 /// =========================
@@ -271,6 +271,15 @@ enum LedgerEntryType {
   PROJECT_EXPENSE_OUT
   OPERATING_EXPENSE_OUT
   MANUAL_ADJUSTMENT_OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum TransferStatus {
+  PENDING_VALIDATION
+  VALIDATED
+  REJECTED
+  CANCELLED
 }
 
 enum ProjectionPeriodType {
@@ -420,6 +429,7 @@ model Association {
   Session                          Session[]
   Contribution                     Contribution[]
   expenses                         Expense[]
+  antennaTransfers                 AntennaTransfer[]
   events                           Event[]
   sponsors                         Sponsor[]
   BalanceSnapshot                  BalanceSnapshot[]
@@ -483,6 +493,8 @@ model Antenna {
   FinancialProjection          FinancialProjection[]
   videoPosts                   VideoPost[]
   carouselImages               CarouselImage[]
+  transfersSent     AntennaTransfer[] @relation("TransferSender")
+  transfersReceived AntennaTransfer[] @relation("TransferReceiver")
 
   @@unique([associationId, code])
   @@unique([associationId, name])
@@ -637,6 +649,9 @@ model User {
 
   electionCandidates             ElectionCandidate[]
   electionVotes                  ElectionVote[]
+  transfersInitiated             AntennaTransfer[] @relation("TransferInitiatedBy")
+  transfersValidated             AntennaTransfer[] @relation("TransferValidatedBy")
+  transfersRejected              AntennaTransfer[] @relation("TransferRejectedBy")
 
   @@index([associationId, role, status])
   @@index([associationId, lastName, firstName])
@@ -974,6 +989,8 @@ model LedgerEntry {
   expense         Expense?        @relation("ExpenseLedgerEntry", fields: [expenseId], references: [id], onDelete: SetNull)
   project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   document        Document?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  senderTransferFor   AntennaTransfer? @relation("TransferSenderLedger")
+  receiverTransferFor AntennaTransfer? @relation("TransferReceiverLedger")
 
   @@index([associationId, effectiveDate])
   @@index([antennaId, effectiveDate])
@@ -1859,5 +1876,51 @@ model ElectionVote {
   @@unique([positionId, voterUserId]) 
   @@map("election_votes")
 }
+
+/// =========================
+/// VIREMENTS INTER-ANTENNES
+/// =========================
+
+model AntennaTransfer {
+  id                    String         @id @default(cuid())
+  associationId         String
+
+  senderAntennaId       String
+  initiatedByUserId     String
+  sendAmount            Decimal        @db.Decimal(14, 2)
+  sendCurrency          CurrencyCode
+
+  receiverAntennaId     String
+  receiveAmount         Decimal        @db.Decimal(14, 2)
+  receiveCurrency       CurrencyCode
+
+  status                TransferStatus @default(PENDING_VALIDATION)
+  notes                 String?
+
+  validatedByUserId     String?
+  validatedAt           DateTime?
+  rejectedByUserId      String?
+  rejectedAt            DateTime?
+  rejectionReason       String?
+
+  senderLedgerEntryId   String?        @unique
+  receiverLedgerEntryId String?        @unique
+
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  association         Association  @relation(fields: [associationId],    references: [id], onDelete: Cascade)
+  senderAntenna       Antenna      @relation("TransferSender",           fields: [senderAntennaId],   references: [id], onDelete: Restrict)
+  receiverAntenna     Antenna      @relation("TransferReceiver",         fields: [receiverAntennaId], references: [id], onDelete: Restrict)
+  initiatedByUser     User         @relation("TransferInitiatedBy",      fields: [initiatedByUserId],  references: [id], onDelete: Restrict)
+  validatedByUser     User?        @relation("TransferValidatedBy",      fields: [validatedByUserId],  references: [id], onDelete: SetNull)
+  rejectedByUser      User?        @relation("TransferRejectedBy",       fields: [rejectedByUserId],   references: [id], onDelete: SetNull)
+  senderLedgerEntry   LedgerEntry? @relation("TransferSenderLedger",    fields: [senderLedgerEntryId],   references: [id], onDelete: SetNull)
+  receiverLedgerEntry LedgerEntry? @relation("TransferReceiverLedger",  fields: [receiverLedgerEntryId], references: [id], onDelete: SetNull)
+
+  @@index([associationId, status, createdAt])
+  @@index([senderAntennaId, status, createdAt])
+  @@index([receiverAntennaId, status, createdAt])
+  @@map("antenna_transfers")
+}
 //npx prisma generate
-//npx prisma db push

@@ -1,4 +1,4 @@
-/////// backend/src/app.module.ts
+// backend/src/app.module.ts
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -27,13 +27,14 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { FileAssetsModule } from './modules/file-assets/file-assets.module';
-import { LedgerModule } from './modules/ledger/ledger.module';          
-import { ContributionsModule } from './modules/contributions/contributions.module'; 
-import { ProjectsModule } from './modules/projects/projects.module';      
+import { LedgerModule } from './modules/ledger/ledger.module';
+import { ContributionsModule } from './modules/contributions/contributions.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 import { ExpensesModule } from './modules/expenses/expenses.module';
 import { EventsModule } from './modules/events/events.module';
 import { SponsorsModule } from './modules/sponsors/sponsors.module';
-import { SystemAdminModule } from './modules/system-admin/system-admin.module'; 
+import { TransfersModule } from './modules/transfers/transfers.module';
+import { SystemAdminModule } from './modules/system-admin/system-admin.module';
 import { PublicModule } from './modules/public/public.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { MemberModule } from './modules/member/member.module';
@@ -41,7 +42,7 @@ import { SuperAdminModule } from './modules/super-admin/super-admin.module';
 import { AssociationsModule } from './modules/associations/associations.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { UsersModule } from './modules/users/users.module';
-import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ AJOUT CHIRURGICAL
+import { ElectionsModule } from './modules/elections/elections.module';
 
 @Module({
   imports: [
@@ -53,13 +54,16 @@ import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ A
     ServeStaticModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
-        const configuredUploadDir = config.get<string>('storage.local.uploadDir') || './uploads';
-        const rootPath = isAbsolute(configuredUploadDir) ? configuredUploadDir : join(process.cwd(), configuredUploadDir);
+        const configuredUploadDir =
+          config.get<string>('storage.local.uploadDir') || './uploads';
+        const rootPath = isAbsolute(configuredUploadDir)
+          ? configuredUploadDir
+          : join(process.cwd(), configuredUploadDir);
         return [{ rootPath, serveRoot: '/static' }];
       },
     }),
     ThrottlerModule.forRoot([{
-      ttl: Number(process.env.THROTTLE_TTL ?? 60) * 1000,
+      ttl:   Number(process.env.THROTTLE_TTL   ?? 60)  * 1000,
       limit: Number(process.env.THROTTLE_LIMIT ?? 120),
     }]),
     ScheduleModule.forRoot(),
@@ -68,18 +72,19 @@ import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ A
     // --- MODULES MÉTIER ---
     PermissionsModule,
     PreferencesModule,
-    AuthModule, 
+    AuthModule,
     UploadsModule,
     SchedulerModule,
     NotificationsModule,
     JobsModule,
     FileAssetsModule,
-    LedgerModule,        
-    ContributionsModule, 
-    ProjectsModule,      
+    LedgerModule,
+    ContributionsModule,
+    ProjectsModule,
     ExpensesModule,
     EventsModule,
     SponsorsModule,
+    TransfersModule,
     SystemAdminModule,
     PublicModule,
     DashboardModule,
@@ -88,9 +93,9 @@ import { ElectionsModule } from './modules/elections/elections.module'; // ⚡ A
     AssociationsModule,
     AdminModule,
     UsersModule,
-    ElectionsModule, // ⚡ AJOUT CHIRURGICAL
+    ElectionsModule,
   ],
-  controllers: [], 
+  controllers: [],
   providers: [
     {
       provide: APP_GUARD,

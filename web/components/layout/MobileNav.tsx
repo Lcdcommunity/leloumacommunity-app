@@ -98,6 +98,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/projects',                  label: 'Projets',                ico: ICO.clipboard,   section: 'Contenu'   },
   // 🔥 NOUVEAU : Propositions de projets reçues des membres
   { href: '/admin/project-proposals',         label: 'Propositions membres',   ico: ICO.lightbulb,   section: 'Contenu'   },
+  { href: '/admin/transfers',                 label: 'Virements',              ico: ICO.send,        section: 'Finances' },
   { href: '/admin/elections',                 label: 'Élections',              ico: ICO.vote,        section: 'Contenu'   },
   { href: '/admin/events',                    label: 'Événements',             ico: ICO.calendar,    section: 'Contenu'   },
   { href: '/admin/documents',                 label: 'Documents & photos',     ico: ICO.fileText,    section: 'Contenu'   },

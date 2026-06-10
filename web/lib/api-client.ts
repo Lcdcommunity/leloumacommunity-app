@@ -1,4 +1,4 @@
-/////// web/lib/api-client.ts
+// web/lib/api-client.ts
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
@@ -31,13 +31,13 @@ export interface VirtualCardData {
     firstName: string;
     lastName: string;
     function?: string | null;
-    professionalStatus?: string | null; 
+    professionalStatus?: string | null;
     birthDate?: string | null;
     placeOfBirth?: string | null;
     birthCountry?: string | null;
     originSubPrefecture?: string | null;
     originCommune?: string | null;
-    originVillage?: string | null; 
+    originVillage?: string | null;
     country?: string | null;
     city?: string | null;
     postalCode?: string | null;
@@ -61,7 +61,7 @@ export interface FullUserProfile extends UserSummary {
   originSubPrefecture?: string | null;
   originVillage?: string | null;
   function?: string | null;
-  professionalStatus?: string | null; 
+  professionalStatus?: string | null;
   cardNumber?: string | null;
   isCardLocked?: boolean;
   cardExpiresAt?: string | null;
@@ -112,7 +112,7 @@ export interface Expense {
   createdAt: string;
   engagedByUser?: { firstName: string; lastName: string; email: string };
   proofFile?: { url: string; originalFilename: string } | null;
-  antenna?: { name: string }; 
+  antenna?: { name: string };
 }
 
 export interface EventItem {
@@ -151,6 +151,36 @@ export interface PushSubscriptionPayload {
   };
 }
 
+export interface AntennaTransfer {
+  id: string;
+  status: string;
+  sendAmount: number;
+  sendCurrency: string;
+  receiveAmount: number;
+  receiveCurrency: string;
+  notes?: string | null;
+  rejectionReason?: string | null;
+  createdAt: string;
+  validatedAt?: string | null;
+  senderAntenna?: { name: string; city?: string } | null;
+  receiverAntenna?: { name: string; city?: string } | null;
+  initiatedBy?: string | null;
+}
+
+export interface TransferDestination {
+  id: string;
+  name: string;
+  defaultCurrency: string;
+  city?: string | null;
+  country?: string | null;
+}
+
+export interface TransferSenderInfo {
+  antennaId: string;
+  antennaName: string;
+  currency: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,15 +190,11 @@ export const api = {
   // ==========================================
   getPublicTheme: (domain?: string, code?: string) => {
     const params = new URLSearchParams();
-    
-    // 🔥 FIX FRONTEND : Nettoyage du domaine pour retirer "www."
     if (domain) {
       const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
       params.append('domain', cleanDomain);
     }
-    
     if (code) params.append('code', code);
-
     return http<{
       id: string;
       name: string;
@@ -227,23 +253,21 @@ export const api = {
     const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
     const res = await fetch(`${baseUrl}/public/signup`, {
       method: 'POST',
-      body: formData, 
+      body: formData,
     });
-
     if (!res.ok) {
       const err = await res.json().catch(() => ({})) as { message?: string };
       throw new Error(err.message ?? 'Erreur lors de l\'inscription.');
     }
-
     return res.json();
   },
 
   verifyEmailToken: (body: { token: string }) =>
     http<{ emailVerified: boolean }, typeof body>('/public/verify-email-token', {
-  method: 'POST',
-  body,
-  auth: false,
-  }),
+      method: 'POST',
+      body,
+      auth: false,
+    }),
 
   listPublicAntennasForSignup: () =>
     http<Array<{ id: string; code: string; name: string; city?: string; country?: string }>>('/public/antennas', { auth: false }),
@@ -264,7 +288,8 @@ export const api = {
   updateMemberProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
 
-  updateMyPassword: (password: string) =>    http<{ message: string }, { password: string }>('/users/me/password', { method: 'PATCH', body: { password } }),
+  updateMyPassword: (password: string) =>
+    http<{ message: string }, { password: string }>('/users/me/password', { method: 'PATCH', body: { password } }),
 
   uploadAvatar: async (formData: FormData): Promise<{
     message: string;
@@ -274,7 +299,6 @@ export const api = {
   }> => {
     const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
     const accessToken = getAccessToken();
-
     const headers: Record<string, string> = {};
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
 
@@ -299,10 +323,11 @@ export const api = {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${data.accessToken}` },
             body: formData,
-            });
+          });
           if (!retryRes.ok) {
             const err = await retryRes.json().catch(() => ({})) as { message?: string };
-            throw new Error(err.message ?? 'Erreur lors du téléchargement de la photo.');          }
+            throw new Error(err.message ?? 'Erreur lors du téléchargement de la photo.');
+          }
           return retryRes.json();
         } else {
           clearAuthState();
@@ -360,7 +385,7 @@ export const api = {
   sendCustomCommunication: (body: {
     targetType: 'ALL' | 'ANTENNA' | 'MEMBER';
     targetId?: string;
-    targetIds?: string[]; 
+    targetIds?: string[];
     channels: { inApp: boolean; push: boolean; email: boolean; sms: boolean };
     title: string;
     message: string;
@@ -370,128 +395,106 @@ export const api = {
       body,
     }),
 
-// ==========================================
-// ÉLECTIONS
-// ==========================================
-
-getActiveElection: async () => {
-  try {
-    return await http<Election | null>('/elections/active');
-  } catch (err) {
-    console.error('getActiveElection error:', err);
-    return null; // ⚡ évite le crash du frontend
-  }
-},
-
-castVote: async (body: { positionId: string; candidateId: string }) => {
-  return http<{ id: string }, typeof body>('/elections/vote', {
-    method: 'POST',
-    body,
-  });
-},
-
-getElectionLiveResults: async (electionId: string) => {
-  return http<PositionResult[]>(`/elections/${electionId}/live-results`);
-},
-
-listElectionsSuperAdmin: async () => {
-  return http<Election[]>('/super-admin/elections');
-},
-
-createElection: async (body: {
-  title: string;
-  description?: string;
-  startsAt?: string;
-  endsAt?: string;
-}) => {
-  return http<Election, typeof body>('/super-admin/elections', {
-    method: 'POST',
-    body,
-  });
-},
-
-updateElectionStatus: async (
-  id: string,
-  status: 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED'
-) => {
-  return http<Election, { status: string }>(
-    `/super-admin/elections/${id}/status`,
-    {
-      method: 'PATCH',
-      body: { status },
+  // ==========================================
+  // ÉLECTIONS
+  // ==========================================
+  getActiveElection: async () => {
+    try {
+      return await http<Election | null>('/elections/active');
+    } catch (err) {
+      console.error('getActiveElection error:', err);
+      return null;
     }
-  );
-},
+  },
 
-deleteElectionSuperAdmin: async (id: string) => {
-  return http<void>(`/super-admin/elections/${id}`, {
-    method: 'DELETE',
-  });
-},
-
-addElectionPosition: async (
-  electionId: string,
-  body: { title: string; order: number }
-) => {
-  return http<ElectionPosition, typeof body>(
-    `/super-admin/elections/${electionId}/positions`,
-    {
+  castVote: async (body: { positionId: string; candidateId: string }) => {
+    return http<{ id: string }, typeof body>('/elections/vote', {
       method: 'POST',
       body,
-    }
-  );
-},
+    });
+  },
 
-updateElectionPosition: async (
-  positionId: string,
-  body: { title: string }
-) => {
-  return http<ElectionPosition, typeof body>(
-    `/super-admin/elections/positions/${positionId}`,
-    {
-      method: 'PATCH',
-      body,
-    }
-  );
-},
+  getElectionLiveResults: async (electionId: string) => {
+    return http<PositionResult[]>(`/elections/${electionId}/live-results`);
+  },
 
-deleteElectionPosition: async (positionId: string) => {
-  return http<void>(
-    `/super-admin/elections/positions/${positionId}`,
-    {
-      method: 'DELETE',
-    }
-  );
-},
+  listElectionsSuperAdmin: async () => {
+    return http<Election[]>('/super-admin/elections');
+  },
 
-addElectionCandidate: async (
-  positionId: string,
-  body: { userId: string; bio?: string }
-) => {
-  return http<ElectionCandidate, typeof body>(
-    `/super-admin/elections/positions/${positionId}/candidates`,
-    {
+  createElection: async (body: {
+    title: string;
+    description?: string;
+    startsAt?: string;
+    endsAt?: string;
+  }) => {
+    return http<Election, typeof body>('/super-admin/elections', {
       method: 'POST',
       body,
-    }
-  );
-},
+    });
+  },
 
-deleteElectionCandidate: async (candidateId: string) => {
-  return http<void>(
-    `/super-admin/elections/candidates/${candidateId}`,
-    {
-      method: 'DELETE',
-    }
-  );
-},
+  updateElectionStatus: async (
+    id: string,
+    status: 'DRAFT' | 'OPEN' | 'CLOSED' | 'ARCHIVED'
+  ) => {
+    return http<Election, { status: string }>(
+      `/super-admin/elections/${id}/status`,
+      { method: 'PATCH', body: { status } }
+    );
+  },
 
-listElectionsAdmin: async () => {
-  return http<Election[]>('/admin/elections');
-},
+  deleteElectionSuperAdmin: async (id: string) => {
+    return http<void>(`/super-admin/elections/${id}`, { method: 'DELETE' });
+  },
+
+  addElectionPosition: async (
+    electionId: string,
+    body: { title: string; order: number }
+  ) => {
+    return http<ElectionPosition, typeof body>(
+      `/super-admin/elections/${electionId}/positions`,
+      { method: 'POST', body }
+    );
+  },
+
+  updateElectionPosition: async (positionId: string, body: { title: string }) => {
+    return http<ElectionPosition, typeof body>(
+      `/super-admin/elections/positions/${positionId}`,
+      { method: 'PATCH', body }
+    );
+  },
+
+  deleteElectionPosition: async (positionId: string) => {
+    return http<void>(
+      `/super-admin/elections/positions/${positionId}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  addElectionCandidate: async (
+    positionId: string,
+    body: { userId: string; bio?: string }
+  ) => {
+    return http<ElectionCandidate, typeof body>(
+      `/super-admin/elections/positions/${positionId}/candidates`,
+      { method: 'POST', body }
+    );
+  },
+
+  deleteElectionCandidate: async (candidateId: string) => {
+    return http<void>(
+      `/super-admin/elections/candidates/${candidateId}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  listElectionsAdmin: async () => {
+    return http<Election[]>('/admin/elections');
+  },
 
   // ==========================================
-  // TARIFICATION & SAAS 
+  // TARIFICATION & SAAS
   // ==========================================
   getPricingSuperAdmin: () =>
     http<Record<string, { monthlyQuota: number; membershipCard: number; expenseValidationThreshold?: number | null }>>('/super-admin/settings/pricing'),
@@ -502,7 +505,7 @@ listElectionsAdmin: async () => {
   getAssociationPricing: () =>
     http<Record<string, { monthlyQuota: number; membershipCard: number }>>('/member/pricing'),
 
-  getSaaSPlanInfo: () => 
+  getSaaSPlanInfo: () =>
     http<{ subscriptionPlan: string; stripeCustomerId?: string; subscriptionExpiresAt?: string }>('/super-admin/billing/info'),
 
   // ==========================================
@@ -516,7 +519,8 @@ listElectionsAdmin: async () => {
         members: number;
         pendingAccounts: number;
         pendingContributions: number;
-        activeProjects: number;        totalValidatedContributionsAmount: number;
+        activeProjects: number;
+        totalValidatedContributionsAmount: number;
       };
       recentPendingAccounts: UserSummary[];
       recentContributions: Contribution[];
@@ -526,7 +530,7 @@ listElectionsAdmin: async () => {
   dashboardAntennaAdmin: () =>
     http<{
       stats: AntennaDashboardStats;
-      recentPendingAccounts: UserSummary[];      
+      recentPendingAccounts: UserSummary[];
       recentPendingContributions: Contribution[];
       recentProjects: Project[];
       lateMembers: Array<UserSummary & { lastValidatedContributionAt?: string | null; lateMonths?: number }>;
@@ -563,7 +567,7 @@ listElectionsAdmin: async () => {
       lastUpdatedAt?: string | null;
     }>('/member/association-balance'),
 
- // ==========================================
+  // ==========================================
   // ASSOCIATION & ANTENNES
   // ==========================================
   getAssociation: () => http<Association>('/associations/current'),
@@ -597,6 +601,7 @@ listElectionsAdmin: async () => {
 
   updateAntenna: (id: string, body: Partial<Antenna> & { defaultCurrency?: string | null }) =>
     http<Antenna, typeof body>(`/super-admin/antennas/${id}`, { method: 'PATCH', body }),
+
   deleteAntenna: (id: string) => http(`/super-admin/antennas/${id}`, { method: 'DELETE' }),
 
   listAntennaAdmins: (params?: { page?: number; pageSize?: number; antennaId?: string; q?: string }) =>
@@ -699,7 +704,9 @@ listElectionsAdmin: async () => {
     addressLine2?: string;
     postalCode?: string;
   }) =>
-    http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),  updateAntennaMember: (id: string, body: Partial<{
+    http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),
+
+  updateAntennaMember: (id: string, body: Partial<{
     firstName: string;
     lastName: string;
     phone: string;
@@ -781,7 +788,7 @@ listElectionsAdmin: async () => {
     note?: string;
     purpose?: string;
     receiptFileAssetId?: string | null;
-    targetMemberId?: string; 
+    targetMemberId?: string;
   }) =>
     http<Contribution, typeof body>('/member/contributions', { method: 'POST', body }),
 
@@ -790,17 +797,13 @@ listElectionsAdmin: async () => {
       `/member/contributions?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
-    ), 
-    // 🔥 NOUVEAU : Modifier le montant d'une contribution PENDING (membre uniquement)
-  // Route : PATCH /member/contributions/:id
+    ),
+
   updateMyContribution: (id: string, amount: number) =>
     http(`/member/contributions/${id}`, { method: 'PATCH', body: { amount } }),
- 
-  // 🔥 NOUVEAU : Supprimer une contribution PENDING (membre uniquement)
-  // Route : DELETE /member/contributions/:id
+
   deleteMyContribution: (id: string) =>
     http(`/member/contributions/${id}`, { method: 'DELETE' }),
- 
 
   runContributionProjection: (body: {
     expectedMembersPaying: number;
@@ -810,7 +813,8 @@ listElectionsAdmin: async () => {
   }) =>
     http<ProjectionResult, typeof body>('/admin/projections/contributions', { method: 'POST', body }),
 
-  // ==========================================// DÉPENSES (EXPENSES)
+  // ==========================================
+  // DÉPENSES (EXPENSES)
   // ==========================================
   listAntennaExpenses: (params?: { page?: number; pageSize?: number; status?: string; category?: string; q?: string }) =>
     http<ApiListResponse<Expense>>(
@@ -843,18 +847,18 @@ listElectionsAdmin: async () => {
     proofFileId: string | null;
   }>) =>
     http<Expense, typeof body>(`/admin/expenses/${id}`, { method: 'PATCH', body }),
+
   deleteAntennaExpense: (id: string) =>
     http(`/admin/expenses/${id}`, { method: 'DELETE' }),
 
   listSuperAdminExpenses: (params?: { page?: number; pageSize?: number; status?: string; startDate?: string; endDate?: string; antennaId?: string }) => {
     const p = new URLSearchParams();
-    if (params?.page) p.append('page', String(params.page));
-    if (params?.pageSize) p.append('pageSize', String(params.pageSize));
-    if (params?.status) p.append('status', params.status);
+    if (params?.page)      p.append('page',      String(params.page));
+    if (params?.pageSize)  p.append('pageSize',  String(params.pageSize));
+    if (params?.status)    p.append('status',    params.status);
     if (params?.startDate) p.append('startDate', params.startDate);
-    if (params?.endDate) p.append('endDate', params.endDate);
+    if (params?.endDate)   p.append('endDate',   params.endDate);
     if (params?.antennaId) p.append('antennaId', params.antennaId);
-
     return http<ApiListResponse<Expense>>(`/super-admin/expenses?${p.toString()}`);
   },
 
@@ -873,6 +877,7 @@ listElectionsAdmin: async () => {
 
   validateExpenseSuperAdmin: (id: string) =>
     http<{ message: string; expense: Expense }>(`/super-admin/expenses/${id}/validate`, { method: 'PATCH' }),
+
   rejectExpenseSuperAdmin: (id: string, body?: { rejectionReason?: string }) =>
     http<{ message: string; expense: Expense }, typeof body>(`/super-admin/expenses/${id}/reject`, { method: 'PATCH', body: body ?? {} }),
 
@@ -993,7 +998,7 @@ listElectionsAdmin: async () => {
       `/admin/project-proposals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }`
-    ),  
+    ),
 
   approveProjectProposal: (id: string, body?: { reviewComment?: string }) =>
     http<ProjectProposal, { reviewComment?: string }>(`/admin/project-proposals/${id}/approve`, {
@@ -1007,8 +1012,8 @@ listElectionsAdmin: async () => {
       body: body ?? {},
     }),
 
-// ==========================================
-  // ÉVÉNEMENTS 
+  // ==========================================
+  // ÉVÉNEMENTS
   // ==========================================
   listEvents: (params?: { page?: number; pageSize?: number; status?: string; type?: string; antennaId?: string }) =>
     http<ApiListResponse<EventItem>>(
@@ -1042,7 +1047,7 @@ listElectionsAdmin: async () => {
     http<{ message: string }, typeof body>(`/member/events/${id}/attendance`, { method: 'POST', body }),
 
   // ==========================================
-  // PARTENAIRES & SPONSORS 
+  // PARTENAIRES & SPONSORS
   // ==========================================
   listSponsors: () =>
     http<ApiListResponse<Sponsor>>('/super-admin/sponsors'),
@@ -1086,7 +1091,9 @@ listElectionsAdmin: async () => {
     http<DocumentItem, Partial<DocumentItem>>(`/admin/documents/${id}`, { method: 'PATCH', body }),
 
   deleteAntennaDocument: (id: string) =>
-    http(`/admin/documents/${id}`, { method: 'DELETE' }),  listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
+    http(`/admin/documents/${id}`, { method: 'DELETE' }),
+
+  listDocumentsForMembers: (params?: { page?: number; pageSize?: number; q?: string }) =>
     http<ApiListResponse<DocumentItem>>(
       `/member/documents?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}${
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
@@ -1123,122 +1130,63 @@ listElectionsAdmin: async () => {
     ),
 
   // ==========================================
-  // SYSTEME
-  // ==========================================  
+  // SYSTÈME (UPLOADS / NOTIFICATIONS / AUDIT)
+  // ==========================================
   uploadFile: async (
-  file: File,
-  body?: {
-    category?: string;
-    folder?: string;
-    description?: string;
-  }
-): Promise<{
-  id: string;
-  url: string;
-  fileName: string;
-}> => {
-  const form = new FormData();
-  form.append('file', file);
+    file: File,
+    body?: { category?: string; folder?: string; description?: string }
+  ): Promise<{ id: string; url: string; fileName: string }> => {
+    const form = new FormData();
+    form.append('file', file);
+    if (body?.category)    form.append('category',    body.category);
+    if (body?.folder)      form.append('folder',      body.folder);
+    if (body?.description) form.append('description', body.description);
 
-  if (body?.category) {
-    form.append('category', body.category);
-  }
+    const baseUrl    = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
+    const accessToken = getAccessToken();
+    const headers: Record<string, string> = {};
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
-  if (body?.folder) {
-    form.append('folder', body.folder);
-  }
+    const res = await fetch(`${baseUrl}/uploads/single`, {
+      method: 'POST',
+      headers,
+      body: form,
+    });
 
-  if (body?.description) {
-    form.append('description', body.description);
-  }
-
-  const baseUrl = (env.apiUrl?.trim() ?? '').replace(/\/+$/, '');
-  const accessToken = getAccessToken();
-
-  const headers: Record<string, string> = {};
-
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  const res = await fetch(`${baseUrl}/uploads/single`, {
-    method: 'POST',
-    headers,
-    body: form,
-  });
-
-  if (res.status === 401) {
-    const refreshToken = getRefreshToken();
-
-    if (refreshToken) {
-      const refreshRes = await fetch(`${baseUrl}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      if (refreshRes.ok) {
-        const tokens = (await refreshRes.json()) as {
-          accessToken: string;
-          refreshToken: string;
-          refreshTokenExpiresAt: string;
-        };
-
-        setTokens({
-          accessToken: tokens.accessToken,
-          refreshToken: tokens.refreshToken,
-          refreshTokenExpiresAt:
-            tokens.refreshTokenExpiresAt ?? '',
+    if (res.status === 401) {
+      const refreshToken = getRefreshToken();
+      if (refreshToken) {
+        const refreshRes = await fetch(`${baseUrl}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken }),
         });
-
-        const retryRes = await fetch(
-          `${baseUrl}/uploads/single`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${tokens.accessToken}`,
-            },
-            body: form,
-          }
-        );
-
-        if (!retryRes.ok) {
-          const err = (await retryRes
-            .json()
-            .catch(() => ({}))) as {
-            message?: string;
+        if (refreshRes.ok) {
+          const tokens = (await refreshRes.json()) as {
+            accessToken: string; refreshToken: string; refreshTokenExpiresAt: string;
           };
-
-          throw new Error(
-            err.message ??
-              'Erreur lors du téléchargement du fichier.'
-          );
+          setTokens({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken, refreshTokenExpiresAt: tokens.refreshTokenExpiresAt ?? '' });
+          const retryRes = await fetch(`${baseUrl}/uploads/single`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${tokens.accessToken}` },
+            body: form,
+          });
+          if (!retryRes.ok) {
+            const err = (await retryRes.json().catch(() => ({}))) as { message?: string };
+            throw new Error(err.message ?? 'Erreur lors du téléchargement du fichier.');
+          }
+          return retryRes.json();
         }
-
-        return retryRes.json();
+        clearAuthState();
       }
-
-      clearAuthState();
     }
-  }
 
-  if (!res.ok) {
-    const err = (await res
-      .json()
-      .catch(() => ({}))) as {
-      message?: string;
-    };
-
-    throw new Error(
-      err.message ??
-        'Erreur lors du téléchargement du fichier.'
-    );
-  }
-
-  return res.json();
-},
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { message?: string };
+      throw new Error(err.message ?? 'Erreur lors du téléchargement du fichier.');
+    }
+    return res.json();
+  },
 
   listNotifications: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<NotificationItem>>(
@@ -1251,10 +1199,10 @@ listElectionsAdmin: async () => {
     ),
 
   markNotificationRead: (id: string) =>
-  http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
+    http<{ ok: boolean }>(`/notifications/${id}/read`, { method: 'PATCH' }),
 
   deleteNotification: (id: string) =>
-  http<{ ok: boolean }>(`/notifications/${id}`, { method: 'DELETE' }),
+    http<{ ok: boolean }>(`/notifications/${id}`, { method: 'DELETE' }),
 
   listAudit: (params?: { page?: number; pageSize?: number; action?: string }) =>
     http<ApiListResponse<AuditItem>>(
@@ -1263,7 +1211,7 @@ listElectionsAdmin: async () => {
       }`
     ),
 
-// ==========================================
+  // ==========================================
   // SYSTEM ADMIN (GRAND CHEF)
   // ==========================================
   createAssociationSystemAdmin: (body: {
@@ -1298,12 +1246,12 @@ listElectionsAdmin: async () => {
     }>('/system-admin/dashboard'),
 
   getSystemAuditLogs: () =>
-    http<Array<{ 
-      id: string; 
-      action: string; 
-      userName: string; 
-      associationName: string; 
-      createdAt: string; 
+    http<Array<{
+      id: string;
+      action: string;
+      userName: string;
+      associationName: string;
+      createdAt: string;
       entity: string;
       ipAddress?: string;
     }>>('/system-admin/audit-logs'),
@@ -1319,23 +1267,70 @@ listElectionsAdmin: async () => {
       country?: string | null;
       createdAt: string;
       updatedAt: string;
-      _count: {
-        users: number;
-        antennas: number;
-      };
+      _count: { users: number; antennas: number };
     }>(`/system-admin/associations/${id}`),
 
   deleteAssociationSystemAdmin: (id: string) =>
-    http<{ message: string }>(`/system-admin/associations/${id}`, {
-      method: 'DELETE',
-    }),
+    http<{ message: string }>(`/system-admin/associations/${id}`, { method: 'DELETE' }),
 
   updateAssociationDetailsSystemAdmin: (id: string, body: { name?: string; code?: string; domainName?: string }) =>
-    http<{ id: string; name: string; code: string; domainName: string | null }, typeof body>(`/system-admin/associations/${id}`, { method: 'PATCH', body }),
+    http<{ id: string; name: string; code: string; domainName: string | null }, typeof body>(
+      `/system-admin/associations/${id}`, { method: 'PATCH', body }
+    ),
 
   updateAssociationStatusSystemAdmin: (id: string, isActive: boolean) =>
     http<{ message: string }>(`/system-admin/associations/${id}/status`, {
       method: 'PATCH',
       body: { isActive },
     }),
+
+  // ==========================================
+  // VIREMENTS INTER-ANTENNES
+  // ==========================================
+
+  /** Infos de l'antenne expéditrice (nom + devise) — pré-remplissage formulaire */
+  getTransferSenderInfo: () =>
+    http<TransferSenderInfo>('/transfers/sender-info'),
+
+  /** Liste des antennes disponibles comme destinations */
+  getTransferDestinations: () =>
+    http<TransferDestination[]>('/transfers/destinations'),
+
+  /** Créer un nouveau virement (statut PENDING_VALIDATION) */
+  createTransfer: (body: {
+    receiverAntennaId: string;
+    sendAmount: number;
+    receiveAmount: number;
+    notes?: string;
+  }) =>
+    http<AntennaTransfer, typeof body>('/transfers', { method: 'POST', body }),
+
+  /** Virements envoyés par mon antenne */
+  getTransfersSent: (params?: { page?: number; pageSize?: number }) =>
+    http<ApiListResponse<AntennaTransfer>>(
+      `/transfers/sent?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`
+    ),
+
+  /** Virements reçus par mon antenne */
+  getTransfersReceived: (params?: { page?: number; pageSize?: number; status?: string }) =>
+    http<ApiListResponse<AntennaTransfer>>(
+      `/transfers/received?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }`
+    ),
+
+  /** Valider un virement reçu (crée les 2 entrées ledger) */
+  validateTransfer: (id: string) =>
+    http<{ success: boolean }>(`/transfers/${id}/validate`, { method: 'PATCH' }),
+
+  /** Refuser un virement reçu */
+  rejectTransfer: (id: string, reason: string) =>
+    http<{ success: boolean }, { reason: string }>(`/transfers/${id}/reject`, {
+      method: 'PATCH',
+      body: { reason },
+    }),
+
+  /** Annuler un virement envoyé (avant validation) */
+  cancelTransfer: (id: string) =>
+    http<{ success: boolean }>(`/transfers/${id}/cancel`, { method: 'PATCH' }),
 };
