@@ -51,7 +51,6 @@ const ICO = {
   history:     ['M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8', 'M3 3v5h5', 'M12 7v5l4 2'],
   close:       ['M18 6L6 18M6 6l12 12'],
   vote:        ['M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
-  // 🔥 NOUVEAUX ICÔNES pour les pages créées
   lightbulb:   ['M9 21h6', 'M12 3a6 6 0 016 6c0 2.22-1.2 4.16-3 5.2V17a1 1 0 01-1 1H10a1 1 0 01-1-1v-2.8C7.2 13.16 6 11.22 6 9a6 6 0 016-6z'],
   trendingUp:  ['M23 6l-9.5 9.5-5-5L1 18', 'M17 6h6v6'],
 };
@@ -95,16 +94,14 @@ const adminItems: NavItem[] = [
   { href: '/admin/contributions/history',     label: 'Historique cotisations', ico: ICO.history,     section: 'Finances'  },
   { href: '/admin/expenses',                  label: 'Dépenses',               ico: ICO.creditCard,  section: 'Finances'  },
   { href: '/admin/projections',               label: 'Projections',            ico: ICO.chartBar,    section: 'Finances'  },
+  { href: '/admin/transfers',                 label: 'Virements',              ico: ICO.send,        section: 'Finances'  },
   { href: '/admin/projects',                  label: 'Projets',                ico: ICO.clipboard,   section: 'Contenu'   },
-  // 🔥 NOUVEAU : Propositions de projets reçues des membres
   { href: '/admin/project-proposals',         label: 'Propositions membres',   ico: ICO.lightbulb,   section: 'Contenu'   },
-  { href: '/admin/transfers',                 label: 'Virements',              ico: ICO.send,        section: 'Finances' },
   { href: '/admin/elections',                 label: 'Élections',              ico: ICO.vote,        section: 'Contenu'   },
   { href: '/admin/events',                    label: 'Événements',             ico: ICO.calendar,    section: 'Contenu'   },
   { href: '/admin/documents',                 label: 'Documents & photos',     ico: ICO.fileText,    section: 'Contenu'   },
   { href: '/admin/contents',                  label: 'Informations',           ico: ICO.newspaper,   section: 'Contenu'   },
   { href: '/admin/late-members',              label: 'Retardataires +3 mois',  ico: ICO.clock,       section: 'Contenu'   },
-  // 🔥 NOUVEAU : Partenaires en lecture seule
   { href: '/admin/sponsors',                  label: 'Partenaires',            ico: ICO.star,        section: 'Contenu'   },
   { href: '/admin/communication',             label: 'Envoi SMS & Push',       ico: ICO.send,        section: 'Outils'    },
   { href: '/admin/notifications',             label: 'Notifications',          ico: ICO.bell,        section: 'Outils'    },
@@ -120,14 +117,12 @@ const memberItems: NavItem[] = [
   { href: '/member/expenses',                  label: 'Dépenses',               ico: ICO.creditCard, section: 'Principal'  },
   { href: '/member/projects',                  label: 'Projets',                ico: ICO.clipboard,  section: 'Communauté' },
   { href: '/member/projects/propose',          label: 'Proposer un projet',     ico: ICO.penLine,    section: 'Communauté' },
-  // 🔥 NOUVEAU : Simulation financière (ProjectionForm identique à l'admin)
   { href: '/member/projects/projection',       label: 'Simulation financière',  ico: ICO.trendingUp, section: 'Communauté' },
   { href: '/member/elections',                 label: 'Espace Élections',       ico: ICO.vote,       section: 'Communauté' },
   { href: '/member/events',                    label: 'Événements',             ico: ICO.calendar,   section: 'Communauté' },
   { href: '/member/documents',                 label: 'Documents & photos',     ico: ICO.fileText,   section: 'Communauté' },
   { href: '/member/contents',                  label: 'Informations',           ico: ICO.newspaper,  section: 'Communauté' },
   { href: '/member/late-members',              label: 'Retardataires +3 mois',  ico: ICO.clock,      section: 'Communauté' },
-  // 🔥 NOUVEAU : Partenaires en lecture seule
   { href: '/member/sponsors',                  label: 'Partenaires',            ico: ICO.star,       section: 'Communauté' },
   { href: '/member/notifications',             label: 'Notifications',          ico: ICO.bell,       section: 'Compte'     },
   { href: '/member/profile',                   label: 'Mon profil',             ico: ICO.user,       section: 'Compte'     },
@@ -148,16 +143,16 @@ const quickTabs: Record<string, { href: string; label: string; ico: string | str
     { href: '/super-admin/profile',   label: 'Profil',  ico: ICO.user        },
   ],
   ANTENNA_ADMIN: [
-    { href: '/admin',                       label: 'Accueil',     ico: ICO.home        },
-    { href: '/admin/contributions',         label: 'Cotis.',      ico: ICO.coin        },
-    { href: '/admin/project-proposals',     label: 'Propositions',ico: ICO.lightbulb   },
-    { href: '/admin/profile',               label: 'Profil',      ico: ICO.user        },
+    { href: '/admin',                       label: 'Accueil',      ico: ICO.home       },
+    { href: '/admin/contributions',         label: 'Cotis.',       ico: ICO.coin       },
+    { href: '/admin/project-proposals',     label: 'Propositions', ico: ICO.lightbulb  },
+    { href: '/admin/profile',               label: 'Profil',       ico: ICO.user       },
   ],
   MEMBER: [
-    { href: '/member',                       label: 'Accueil', ico: ICO.home      },
-    { href: '/member/contributions/new',     label: 'Dépôt',   ico: ICO.plus      },
-    { href: '/member/projects/propose',      label: 'Proposer',ico: ICO.penLine   },
-    { href: '/member/profile',               label: 'Profil',  ico: ICO.user      },
+    { href: '/member',                       label: 'Accueil', ico: ICO.home    },
+    { href: '/member/contributions/new',     label: 'Dépôt',   ico: ICO.plus    },
+    { href: '/member/projects/propose',      label: 'Proposer',ico: ICO.penLine },
+    { href: '/member/profile',               label: 'Profil',  ico: ICO.user    },
   ],
 };
 
@@ -171,11 +166,16 @@ type RoleColorEntry = {
 };
 
 const ROLE_COLORS: Record<string, RoleColorEntry> = {
-  SYSTEM_ADMIN:  { accent: '#8B5CF6', dim: 'rgba(139,92,246,0.15)',  pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef',   shadow: 'rgba(139,92,246,0.4)'  },
-  SUPER_ADMIN:   { accent: '#EF4444', dim: 'rgba(239,68,68,0.15)',   pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin',  shadow: 'rgba(239,68,68,0.4)'   },
-  ANTENNA_ADMIN: { accent: '#3B82F6', dim: 'rgba(59,130,246,0.15)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne',shadow: 'rgba(59,130,246,0.4)'  },
-  MEMBER:        { accent: '#10B981', dim: 'rgba(16,185,129,0.15)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre',       shadow: 'rgba(16,185,129,0.4)'  },
+  SYSTEM_ADMIN:  { accent: '#8B5CF6', dim: 'rgba(139,92,246,0.15)',  pillBg: '#F5F3FF', pillText: '#7C3AED', label: 'Grand Chef',    shadow: 'rgba(139,92,246,0.4)'  },
+  SUPER_ADMIN:   { accent: '#EF4444', dim: 'rgba(239,68,68,0.15)',   pillBg: '#FEF2F2', pillText: '#B91C1C', label: 'Super Admin',   shadow: 'rgba(239,68,68,0.4)'   },
+  ANTENNA_ADMIN: { accent: '#3B82F6', dim: 'rgba(59,130,246,0.15)',  pillBg: '#EFF6FF', pillText: '#1D4ED8', label: 'Admin antenne', shadow: 'rgba(59,130,246,0.4)'  },
+  MEMBER:        { accent: '#10B981', dim: 'rgba(16,185,129,0.15)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre',        shadow: 'rgba(16,185,129,0.4)'  },
 };
+
+// ── Couleur verte Cardif / BNP Paribas ──
+const FAB_GREEN = '#2A7A3F';
+const FAB_GREEN_DARK = '#1F5C30';
+const FAB_SHADOW = 'rgba(42,122,63,0.45)';
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -277,7 +277,6 @@ export function MobileNav() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;500;600;700;800&display=swap');
 
-        /* ════ MASQUER SUR DESKTOP ════ */
         @media (min-width: 769px) {
           .mn-safe-area, .mn-container, .mn-overlay, .mn-drawer { display: none !important; }
         }
@@ -317,16 +316,9 @@ export function MobileNav() {
           font-family: 'DM Sans', sans-serif;
           overflow: hidden;
         }
-        .mn-drawer.closed {
-          transform: translateY(16px) scale(0.97);
-          opacity: 0; pointer-events: none;
-        }
-        .mn-drawer.opened {
-          transform: translateY(0) scale(1);
-          opacity: 1;
-        }
+        .mn-drawer.closed { transform: translateY(16px) scale(0.97); opacity: 0; pointer-events: none; }
+        .mn-drawer.opened { transform: translateY(0) scale(1); opacity: 1; }
 
-        /* Header du drawer */
         .mn-drawer-head {
           display: flex; align-items: center; gap: 0.85rem;
           padding: 1.25rem 1.25rem 1rem;
@@ -352,14 +344,12 @@ export function MobileNav() {
           border: 1px solid currentColor; opacity: 0.85;
         }
 
-        /* Scroll */
         .mn-drawer-scroll {
           flex: 1; overflow-y: auto; padding: 0.5rem 0.85rem 1.25rem;
           scrollbar-width: none;
         }
         .mn-drawer-scroll::-webkit-scrollbar { display: none; }
 
-        /* Sections */
         .mn-section-label {
           font-size: 0.6rem; font-weight: 700;
           letter-spacing: 0.1em; text-transform: uppercase;
@@ -372,10 +362,7 @@ export function MobileNav() {
           background: rgba(148,163,184,0.2);
         }
 
-        .mn-group {
-          display: flex; flex-direction: column; gap: 1px;
-          margin-bottom: 0.25rem;
-        }
+        .mn-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 0.25rem; }
 
         .mn-link {
           display: flex; align-items: center; gap: 0.75rem;
@@ -388,31 +375,22 @@ export function MobileNav() {
           position: relative;
         }
         .mn-link:active { background: rgba(0,0,0,0.04); }
-        .mn-link.active {
-          color: var(--mn-accent);
-          background: var(--mn-dim);
-          font-weight: 650;
-        }
+        .mn-link.active { color: var(--mn-accent); background: var(--mn-dim); font-weight: 650; }
         .mn-link.active::before {
           content: '';
           position: absolute; left: 0; top: 25%; bottom: 25%;
           width: 3px; border-radius: 0 3px 3px 0;
           background: var(--mn-accent);
         }
-
         .mn-link-ico {
           width: 32px; height: 32px; border-radius: 9px;
           display: flex; align-items: center; justify-content: center;
           flex-shrink: 0; color: #94A3B8;
           transition: background 0.15s, color 0.15s;
         }
-        .mn-link.active .mn-link-ico {
-          background: var(--mn-dim);
-          color: var(--mn-accent);
-        }
+        .mn-link.active .mn-link-ico { background: var(--mn-dim); color: var(--mn-accent); }
         .mn-link-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        /* Bouton déconnexion */
         .mn-logout-wrap { padding: 0.75rem 0 0; border-top: 1px solid rgba(0,0,0,0.055); margin-top: 0.5rem; }
         .mn-logout {
           display: flex; align-items: center; gap: 0.75rem;
@@ -428,13 +406,11 @@ export function MobileNav() {
         .mn-badge-dot {
           position: absolute; top: 0; right: 0;
           width: 8px; height: 8px;
-          background: #EF4444; border: 2px solid #FFFFFF;
-          border-radius: 50%;
+          background: #EF4444; border: 2px solid #FFFFFF; border-radius: 50%;
         }
         .mn-badge-count {
           background: #EF4444; color: white; font-size: 0.65rem; font-weight: 800;
-          padding: 0.12rem 0.4rem; border-radius: 99px; line-height: 1.2;
-          margin-left: auto;
+          padding: 0.12rem 0.4rem; border-radius: 99px; line-height: 1.2; margin-left: auto;
         }
 
         /* ════ FLOATING PILL ════ */
@@ -443,7 +419,6 @@ export function MobileNav() {
           bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
           left: 0.75rem; right: 0.75rem;
           z-index: 50; height: 60px;
-
           background: rgba(255,255,255,0.92);
           backdrop-filter: blur(20px) saturate(180%);
           -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -453,7 +428,6 @@ export function MobileNav() {
             0 8px 32px rgba(0,0,0,0.12),
             0 2px 8px rgba(0,0,0,0.06),
             0 0 0 1px rgba(0,0,0,0.04);
-
           padding: 0 0.4rem;
           display: flex; align-items: center; justify-content: space-between;
         }
@@ -477,20 +451,13 @@ export function MobileNav() {
         .mn-tab-label {
           font-family: 'DM Sans', sans-serif;
           font-size: 0.58rem; font-weight: 700; letter-spacing: 0.03em;
-          opacity: 0;
-          transform: translateY(6px);
+          opacity: 0; transform: translateY(6px);
           transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-          pointer-events: none;
-          max-height: 0;
+          pointer-events: none; max-height: 0;
         }
         .mn-tab.active { color: var(--mn-accent); }
         .mn-tab.active .mn-tab-ico-wrap { transform: translateY(-4px); }
-        .mn-tab.active .mn-tab-label {
-          opacity: 1;
-          transform: translateY(0);
-          max-height: 14px;
-        }
-        /* Indicateur actif */
+        .mn-tab.active .mn-tab-label { opacity: 1; transform: translateY(0); max-height: 14px; }
         .mn-tab-dot {
           position: absolute; bottom: 3px;
           width: 16px; height: 2px; border-radius: 2px;
@@ -500,64 +467,55 @@ export function MobileNav() {
         }
         .mn-tab.active .mn-tab-dot { opacity: 1; transform: scaleX(1); }
 
-        /* ════ FAB CENTER — Drapeau de Guinée ════ */
+        /* ════ FAB CENTRAL — Style Cardif/BNP ════ */
         .mn-fab-wrap {
-          position: relative; width: 54px; height: 54px;
+          position: relative; width: 56px; height: 56px;
           display: flex; align-items: center; justify-content: center;
-          margin-top: -20px;
+          margin-top: -22px;
         }
         .mn-fab {
-          width: 50px; height: 50px; border-radius: 50%;
+          width: 52px; height: 52px; border-radius: 50%;
           border: none; cursor: pointer;
           -webkit-tap-highlight-color: transparent;
-          transition: all 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
           display: flex; align-items: center; justify-content: center;
-          padding: 0; overflow: hidden; position: relative;
+          background: ${FAB_GREEN};
           box-shadow:
-            0 4px 16px rgba(0,0,0,0.18),
-            0 1px 4px rgba(0,0,0,0.1),
-            0 0 0 2px rgba(255,255,255,0.9);
-          background: #fff;
+            0 6px 20px ${FAB_SHADOW},
+            0 2px 6px rgba(0,0,0,0.15),
+            0 0 0 3px rgba(255,255,255,0.95);
+          transition: all 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+          position: relative;
+          overflow: visible;
         }
         .mn-fab:active { transform: scale(0.9); }
-        .mn-fab.open    { transform: rotate(90deg); }
 
-        /* 🇬🇳 Drapeau Guinée */
-        .mn-guinea-flag {
-          width: 100%; height: 100%; border-radius: 50%;
-          display: flex; overflow: hidden;
-          transition: opacity 0.2s, transform 0.2s;
-        }
-        .mn-fab.open .mn-guinea-flag { opacity: 0; transform: scale(0.6); position: absolute; }
-
-        .mn-flag-stripe { flex: 1; height: 100%; }
-        .mn-flag-red    { background: #CE1126; }
-        .mn-flag-yellow { background: #FCD116; }
-        .mn-flag-green  { background: #009460; }
-
-        /* Icône ✕ quand ouvert */
-        .mn-fab-close {
-          position: absolute; z-index: 2;
+        /* Icône + (fermé) */
+        .mn-fab-plus {
+          color: white;
           display: flex; align-items: center; justify-content: center;
-          color: #0F172A;
+          transition: opacity 0.2s, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+          position: absolute;
+        }
+        .mn-fab.open .mn-fab-plus {
+          opacity: 0; transform: rotate(45deg) scale(0.5);
+        }
+
+        /* Icône × (ouvert) */
+        .mn-fab-close {
+          color: white;
+          display: flex; align-items: center; justify-content: center;
           opacity: 0; transform: scale(0.4) rotate(-90deg);
           transition: opacity 0.2s, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+          position: absolute;
         }
-        .mn-fab.open .mn-fab-close { opacity: 1; transform: scale(1) rotate(0deg); }
+        .mn-fab.open .mn-fab-close {
+          opacity: 1; transform: scale(1) rotate(0deg);
+        }
 
-        /* Halo du drapeau */
-        .mn-fab-halo {
-          position: absolute; inset: -5px; border-radius: 50%; z-index: -1;
-          background: conic-gradient(
-            #CE1126 0deg 120deg,
-            #FCD116 120deg 240deg,
-            #009460 240deg 360deg
-          );
-          opacity: 0.25; filter: blur(6px);
-          transition: opacity 0.25s;
+        /* Fond légèrement plus sombre quand ouvert */
+        .mn-fab.open {
+          background: ${FAB_GREEN_DARK};
         }
-        .mn-fab:hover .mn-fab-halo { opacity: 0.45; }
-        .mn-fab.open .mn-fab-halo  { opacity: 0.1; }
 
         /* Badge sur FAB */
         .mn-fab-badge {
@@ -576,16 +534,10 @@ export function MobileNav() {
         onClick={() => setOpen(false)}
       />
 
-      {/* Drawer — menu complet */}
-      <div
-        className={`mn-drawer ${open ? 'opened' : 'closed'}`}
-        style={cssVars}
-      >
-        {/* Header */}
+      {/* Drawer */}
+      <div className={`mn-drawer ${open ? 'opened' : 'closed'}`} style={cssVars}>
         <div className="mn-drawer-head">
-          <div className="mn-drawer-logo">
-            {associationName.charAt(0)}
-          </div>
+          <div className="mn-drawer-logo">{associationName.charAt(0)}</div>
           <div>
             <div className="mn-drawer-appname">
               {role === 'SYSTEM_ADMIN' ? 'LCD Platform' : associationName}
@@ -599,7 +551,6 @@ export function MobileNav() {
           </div>
         </div>
 
-        {/* Sections */}
         <div className="mn-drawer-scroll">
           {sections.map(([section, items]) => (
             <div key={section}>
@@ -627,7 +578,6 @@ export function MobileNav() {
             </div>
           ))}
 
-          {/* Logout */}
           <div className="mn-logout-wrap">
             <button className="mn-logout" onClick={handleLogout}>
               <span className="mn-link-ico" style={{ color: '#F43F5E' }}>
@@ -639,7 +589,7 @@ export function MobileNav() {
         </div>
       </div>
 
-      {/* Pilule flottante principale */}
+      {/* Pilule flottante */}
       <nav className="mn-container" style={cssVars}>
         {tabs.map((tab, index) => {
           const active = isActive(tab.href);
@@ -648,17 +598,19 @@ export function MobileNav() {
               {/* FAB central — inséré avant le 3e onglet */}
               {index === 2 && (
                 <div className="mn-fab-wrap">
-                  <div className="mn-fab-halo" />
                   <button
                     className={`mn-fab ${open ? 'open' : ''}`}
                     onClick={() => setOpen(v => !v)}
                     aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
                   >
-                    <div className="mn-guinea-flag" aria-hidden="true">
-                      <div className="mn-flag-stripe mn-flag-red"    />
-                      <div className="mn-flag-stripe mn-flag-yellow" />
-                      <div className="mn-flag-stripe mn-flag-green"  />
-                    </div>
+                    {/* + */}
+                    <span className="mn-fab-plus" aria-hidden="true">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+                        stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    </span>
+                    {/* × */}
                     <span className="mn-fab-close" aria-hidden="true">
                       <Ico d={ICO.close} size={20} />
                     </span>
