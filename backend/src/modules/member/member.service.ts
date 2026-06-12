@@ -34,38 +34,69 @@ import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PushSubscriptionDto } from './dto/push-subscription.dto';
 
-// ─── Helper : calcule les mois de retard ─────────────────────────────────────
-// Ne compte QUE les mois passés (le mois courant est exclu).
-// Utilise monthReference/yearReference quand disponibles — seule façon fiable
-// de reconnaître les paiements anticipés (ex : 12 mois payés en janvier).
-function computeLateMonths(
+// ─── Helper 1 : construit l'ensemble des mois couverts ────────────────────────
+// CORRECTION BUG PAIEMENTS GROUPÉS :
+// Un admin peut valider un unique versement de 24 € avec monthReference = 3.
+// Sans ce helper, computeLateMonths ne voyait qu'un seul mois couvert (mars).
+// Avec ce helper : 24 € / 2 € = 12 mois → on peuple mars à février de l'année suivante.
+// Pour les contributions déjà splittées (12 × 2 €), Math.floor(2/2) = 1 → comportement inchangé.
+function buildCoveredMonths(
   contributions: Array<{
     monthReference: number | null;
     yearReference: number | null;
     validatedAt: Date | null;
     createdAt: Date;
+    amount?: unknown;
   }>,
+  monthlyPrice: number,
+): Set<string> {
+  const covered = new Set<string>();
+
+  for (const c of contributions) {
+    const amt = c.amount != null ? Number(c.amount) : 0;
+
+    // Nombre de mois couverts — calculé avant le branchement,
+    // s'applique dans les deux cas (avec ou sans monthReference).
+    const numMonths =
+      monthlyPrice > 0 && amt > 0
+        ? Math.min(48, Math.max(1, Math.floor(amt / monthlyPrice)))
+        : 1;
+
+    // Point de départ : monthReference si renseigné, sinon mois du paiement.
+    let m: number;
+    let y: number;
+
+    if (c.monthReference && c.yearReference) {
+      m = c.monthReference;
+      y = c.yearReference;
+    } else {
+      const d = new Date(c.validatedAt ?? c.createdAt);
+      m = d.getMonth() + 1;
+      y = d.getFullYear();
+    }
+
+    // Peupler N mois consécutifs à partir du point de départ.
+    for (let i = 0; i < numMonths; i++) {
+      covered.add(`${y}-${String(m).padStart(2, '0')}`);
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+  }
+
+  return covered;
+}
+
+// ─── Helper 2 : calcule les mois de retard ────────────────────────────────────
+// Ne compte QUE les mois passés (le mois courant est toujours exclu).
+// Accepte un Set<string> pré-construit par buildCoveredMonths.
+function computeLateMonths(
+  coveredMonths: Set<string>,
   joinDate: Date,
   maxLookback = 24,
 ): number {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-
-  const coveredMonths = new Set<string>();
-  for (const c of contributions) {
-    if (c.monthReference && c.yearReference) {
-      coveredMonths.add(
-        `${c.yearReference}-${String(c.monthReference).padStart(2, '0')}`,
-      );
-    } else {
-      const d = c.validatedAt ?? c.createdAt;
-      const d2 = new Date(d);
-      coveredMonths.add(
-        `${d2.getFullYear()}-${String(d2.getMonth() + 1).padStart(2, '0')}`,
-      );
-    }
-  }
 
   let lateMonths = 0;
   // Départ au mois PRÉCÉDENT : le mois en cours n'est jamais considéré en retard.
@@ -81,17 +112,13 @@ function computeLateMonths(
     const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
     const monthStart = new Date(checkYear, checkMonth - 1, 1);
 
-    if (monthStart < new Date(joinDate.getFullYear(), joinDate.getMonth(), 1)) break;
+    if (monthStart < new Date(joinDate.getFullYear(), joinDate.getMonth(), 1))
+      break;
 
-    if (!coveredMonths.has(key)) {
-      lateMonths++;
-    }
+    if (!coveredMonths.has(key)) lateMonths++;
 
     checkMonth--;
-    if (checkMonth < 1) {
-      checkMonth = 12;
-      checkYear--;
-    }
+    if (checkMonth < 1) { checkMonth = 12; checkYear--; }
   }
 
   return lateMonths;
@@ -152,17 +179,13 @@ export class MemberService {
 
   // ─── getDashboard ─────────────────────────────────────────────────────────
   // ╔═══════════════════════════════════════════════════════════════════════╗
-  // ║  CORRECTION BUG AVANCES ANNUELLES                                    ║
+  // ║  CORRECTION BUG PAIEMENTS GROUPÉS                                    ║
   // ║                                                                       ║
-  // ║  Deux nouvelles requêtes Prisma directes sur monthReference /         ║
-  // ║  yearReference retournent currentMonthCovered et                      ║
-  // ║  hasValidMembershipCard dans les stats.                               ║
+  // ║  buildCoveredMonths éclate virtuellement un paiement groupé           ║
+  // ║  (ex : 24 € / 2 € = 12 mois) pour que computeLateMonths retrouve     ║
+  // ║  les bons mois couverts, sans toucher aux données existantes en BDD.  ║
   // ║                                                                       ║
-  // ║  Ces flags sont la SOURCE DE VÉRITÉ absolue pour le WelcomePopup.    ║
-  // ║  Ils évitent le bug où le frontend calculait l'état depuis            ║
-  // ║  recentContributions (liste limitée, sans monthReference/             ║
-  // ║  yearReference), ce qui faisait croire à tort que le mois courant     ║
-  // ║  n'était pas couvert pour un membre ayant payé 12 mois d'avance.     ║
+  // ║  currentMonthCovered est dérivé du même Set → cohérence garantie.    ║
   // ╚═══════════════════════════════════════════════════════════════════════╝
 
   async getDashboard(userId: string) {
@@ -180,12 +203,10 @@ export class MemberService {
       allAntennas,
       myRegularContributions,
       lastContribution,
-      // ── FLAG 1 : le mois courant est-il couvert par une contribution VALIDÉE ? ──
-      // Requête directe sur monthReference / yearReference → seule façon fiable
-      // de détecter qu'un membre a payé par avance (ex : 12 mois en janvier).
-      currentMonthContribution,
-      // ── FLAG 2 : carte membre VALIDÉE pour l'année en cours ? ─────────────────
+      // ── FLAG : carte membre VALIDÉE pour l'année en cours ? ───────────────
       currentYearCard,
+      // ── PRICING : nécessaire pour buildCoveredMonths ──────────────────────
+      pricingSetting,
     ] = await Promise.all([
       this.prisma.contribution.aggregate({
         where: {
@@ -216,8 +237,8 @@ export class MemberService {
         where: { associationId: me.associationId, isActive: true },
         select: { id: true, name: true, defaultCurrency: true },
       }),
-      // Toutes les cotisations VALIDATED REGULAR/LATE avec leurs références
-      // mensuelles pour computeLateMonths.
+      // Toutes les cotisations VALIDATED REGULAR/LATE.
+      // amount est nécessaire pour détecter les paiements groupés dans buildCoveredMonths.
       this.prisma.contribution.findMany({
         where: {
           associationId: me.associationId,
@@ -232,6 +253,7 @@ export class MemberService {
           yearReference: true,
           validatedAt: true,
           createdAt: true,
+          amount: true,
         },
       }),
       // Dernière contribution VALIDATED toutes purposes confondues.
@@ -244,23 +266,7 @@ export class MemberService {
         orderBy: { validatedAt: 'desc' },
         select: { validatedAt: true, createdAt: true },
       }),
-
-      // ── FLAG 1 ────────────────────────────────────────────────────────────────
-      this.prisma.contribution.findFirst({
-        where: {
-          associationId: me.associationId,
-          memberUserId: userId,
-          status: ContributionStatus.VALIDATED,
-          purpose: {
-            in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA],
-          },
-          monthReference: currentMonth,
-          yearReference: currentYear,
-        },
-        select: { id: true },
-      }),
-
-      // ── FLAG 2 ────────────────────────────────────────────────────────────────
+      // Carte membre VALIDÉE pour l'année en cours.
       this.prisma.contribution.findFirst({
         where: {
           associationId: me.associationId,
@@ -271,9 +277,31 @@ export class MemberService {
         },
         select: { id: true },
       }),
+      // Tarification de l'association — pour déduire le nombre de mois
+      // couverts par un versement groupé.
+      this.prisma.associationSetting.findUnique({
+        where: {
+          associationId_key: {
+            associationId: me.associationId,
+            key: 'PRICING_CONFIG',
+          },
+        },
+      }),
     ]);
 
-    const lateMonths = computeLateMonths(myRegularContributions, me.createdAt);
+    // ── Prix mensuel du membre ────────────────────────────────────────────────
+    const allPricing = (pricingSetting?.value as Record<string, any>) ?? {};
+    const myAntenna  = allAntennas.find((a) => a.id === me.antennaId);
+    const myCurrency = myAntenna?.defaultCurrency ?? 'EUR';
+    const monthlyPrice =
+      Number(allPricing[myCurrency]?.monthlyQuota) ||
+      Number(allPricing['EUR']?.monthlyQuota)       ||
+      0;
+
+    // ── Calcul retard & couverture du mois courant ────────────────────────────
+    const coveredMonths   = buildCoveredMonths(myRegularContributions, monthlyPrice);
+    const lateMonths      = computeLateMonths(coveredMonths, me.createdAt);
+    const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
 
     const myLastContributionAt = lastContribution
       ? (lastContribution.validatedAt ?? lastContribution.createdAt).toISOString()
@@ -344,10 +372,8 @@ export class MemberService {
         activeProjects,
         lateMonths,
         myLastContributionAt,
-        // ── SOURCE DE VÉRITÉ pour le WelcomePopup ─────────────────────────────
-        // Calculés par requête Prisma directe → corrects même pour les paiements
-        // anticipés sur toute l'année.
-        currentMonthCovered: !!currentMonthContribution,
+        // SOURCE DE VÉRITÉ pour le WelcomePopup — dérivés du même Set, cohérents.
+        currentMonthCovered: coveredMonths.has(currentMonthKey),
         hasValidMembershipCard: !!currentYearCard,
       },
       virtualCard: cardData,
@@ -818,51 +844,73 @@ export class MemberService {
     const pageSize = query.pageSize ?? 50;
     const thresholdMonths = 3;
 
-    const memberships = await this.prisma.membership.findMany({
-      where: {
-        associationId: me.associationId,
-        status: 'APPROVED',
-        isPrimary: true,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            createdAt: true,
-            contributions: {
-              where: {
-                associationId: me.associationId,
-                status: ContributionStatus.VALIDATED,
-                purpose: {
-                  in: [
-                    ContributionPurpose.REGULAR_QUOTA,
-                    ContributionPurpose.LATE_QUOTA,
-                  ],
+    // Récupération des memberships et de la tarification en parallèle.
+    const [memberships, pricingSettingLate] = await Promise.all([
+      this.prisma.membership.findMany({
+        where: {
+          associationId: me.associationId,
+          status: 'APPROVED',
+          isPrimary: true,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              createdAt: true,
+              contributions: {
+                where: {
+                  associationId: me.associationId,
+                  status: ContributionStatus.VALIDATED,
+                  purpose: {
+                    in: [
+                      ContributionPurpose.REGULAR_QUOTA,
+                      ContributionPurpose.LATE_QUOTA,
+                    ],
+                  },
                 },
-              },
-              select: {
-                monthReference: true,
-                yearReference: true,
-                validatedAt: true,
-                createdAt: true,
+                select: {
+                  monthReference: true,
+                  yearReference: true,
+                  validatedAt: true,
+                  createdAt: true,
+                  amount: true,
+                },
               },
             },
           },
+          antenna: { select: { id: true, name: true, defaultCurrency: true } },
         },
-        antenna: { select: { id: true, name: true } },
-      },
-    });
+      }),
+      this.prisma.associationSetting.findUnique({
+        where: {
+          associationId_key: {
+            associationId: me.associationId,
+            key: 'PRICING_CONFIG',
+          },
+        },
+      }),
+    ]);
+
+    const allPricingLate = (pricingSettingLate?.value as Record<string, any>) ?? {};
 
     const allLate = memberships
-      .map((m) => ({
-        id: m.user.id,
-        firstName: m.user.firstName,
-        lastName: m.user.lastName,
-        antennaName: m.antenna?.name ?? null,
-        lateMonths: computeLateMonths(m.user.contributions, m.user.createdAt),
-      }))
+      .map((m) => {
+        const antCurrency = m.antenna?.defaultCurrency ?? 'EUR';
+        const mPrice =
+          Number(allPricingLate[antCurrency]?.monthlyQuota) ||
+          Number(allPricingLate['EUR']?.monthlyQuota)        ||
+          0;
+        const covered = buildCoveredMonths(m.user.contributions, mPrice);
+        return {
+          id: m.user.id,
+          firstName: m.user.firstName,
+          lastName: m.user.lastName,
+          antennaName: m.antenna?.name ?? null,
+          lateMonths: computeLateMonths(covered, m.user.createdAt),
+        };
+      })
       .filter((item) => item.lateMonths >= thresholdMonths)
       .sort((a, b) => b.lateMonths - a.lateMonths);
 
