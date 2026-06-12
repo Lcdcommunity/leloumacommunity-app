@@ -123,21 +123,27 @@ export default function StatutsPage() {
         .doc-root { font-family: 'DM Sans', sans-serif; background: var(--cream); min-height: 100svh; color: var(--ink); }
 
         /* HEADER */
-        .doc-header { position: sticky; top: 0; z-index: 100; background: var(--navy); border-bottom: 2px solid var(--gold); padding: 0 1.5rem; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
-        .doc-header-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; }
-        .doc-header-logo { width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; border: 2px solid var(--gold); overflow: hidden; background: white; position: relative; }
-        .doc-header-title { font-family: 'Cormorant Garamond', serif; font-size: 1.1rem; font-weight: 700; color: white; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .doc-header-sub { font-size: 0.65rem; font-weight: 500; color: var(--gold-l); letter-spacing: .08em; text-transform: uppercase; margin-top: 1px; }
-        .doc-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(200,168,75,.15); border: 1px solid rgba(200,168,75,.4); color: var(--gold-l); font-size: .68rem; font-weight: 700; padding: .3rem .7rem; border-radius: 99px; white-space: nowrap; flex-shrink: 0; letter-spacing: .04em; }
-        .doc-back { display: inline-flex; align-items: center; gap: 6px; color: var(--gold-l); font-size: .8rem; font-weight: 600; text-decoration: none; flex-shrink: 0; transition: color .15s; }
+        .doc-header { position: sticky; top: 0; z-index: 100; background: var(--navy); border-bottom: 2px solid var(--gold); padding: 0.625rem 1.25rem; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+        .doc-header-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; overflow: hidden; }
+        .doc-header-logo { width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; border: 2px solid var(--gold); overflow: hidden; background: white; position: relative; }
+        .doc-header-title { font-family: 'Cormorant Garamond', serif; font-size: 1rem; font-weight: 700; color: white; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .doc-header-sub { font-size: 0.6rem; font-weight: 500; color: var(--gold-l); letter-spacing: .06em; text-transform: uppercase; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .doc-badge { display: inline-flex; align-items: center; gap: 5px; background: rgba(200,168,75,.15); border: 1px solid rgba(200,168,75,.4); color: var(--gold-l); font-size: .65rem; font-weight: 700; padding: .25rem .6rem; border-radius: 99px; white-space: nowrap; flex-shrink: 0; letter-spacing: .04em; }
+        .doc-back { display: inline-flex; align-items: center; gap: 5px; color: var(--gold-l); font-size: .78rem; font-weight: 600; text-decoration: none; flex-shrink: 0; transition: color .15s; white-space: nowrap; }
         .doc-back:hover { color: white; }
+        /* Mobile : masquer le sous-titre pour éviter le débordement */
+        @media (max-width: 600px) {
+          .doc-header-sub { display: none; }
+          .doc-badge-text { display: none; }
+          .doc-badge { padding: .25rem .4rem; gap: 0; }
+        }
 
         /* LAYOUT */
-        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1100px; margin: 0 auto; min-height: calc(100svh - 64px); }
+        .doc-layout { display: grid; grid-template-columns: 260px 1fr; max-width: 1100px; margin: 0 auto; min-height: calc(100svh - 56px); }
         @media (max-width: 768px) { .doc-layout { grid-template-columns: 1fr; } .doc-toc-desktop { display: none !important; } }
 
         /* TOC SIDEBAR */
-        .doc-toc-desktop { position: sticky; top: 64px; height: calc(100svh - 64px); overflow-y: auto; padding: 1.5rem 0; border-right: 1px solid var(--rule); scrollbar-width: none; }
+        .doc-toc-desktop { position: sticky; top: 56px; height: calc(100svh - 56px); overflow-y: auto; padding: 1.5rem 0; border-right: 1px solid var(--rule); scrollbar-width: none; }
         .doc-toc-desktop::-webkit-scrollbar { display: none; }
         .doc-toc-header { padding: 0 1.25rem 1rem; font-size: .65rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--rule); margin-bottom: .75rem; }
         .doc-toc-item { display: flex; align-items: center; gap: 10px; padding: .55rem 1.25rem; cursor: pointer; transition: background .15s; border: none; background: none; width: 100%; text-align: left; font-family: 'DM Sans', sans-serif; }
@@ -182,7 +188,7 @@ export default function StatutsPage() {
         .doc-article-body { font-size: .875rem; color: #374151; line-height: 1.75; white-space: pre-line; }
 
         /* MOBILE TOC */
-        .doc-toc-mobile-bar { display: none; position: sticky; top: 64px; z-index: 90; background: white; border-bottom: 1px solid var(--rule); padding: .75rem 1.25rem; }
+        .doc-toc-mobile-bar { display: none; position: sticky; top: 56px; z-index: 90; background: white; border-bottom: 1px solid var(--rule); padding: .75rem 1.25rem; }
         @media (max-width: 768px) { .doc-toc-mobile-bar { display: block; } }
         .doc-toc-toggle { display: flex; align-items: center; gap: 8px; background: none; border: 1px solid var(--rule); border-radius: 10px; padding: .5rem .9rem; font-family: 'DM Sans', sans-serif; font-size: .8rem; font-weight: 600; color: var(--ink); cursor: pointer; width: 100%; }
         .doc-toc-mobile-panel { background: white; border-bottom: 1px solid var(--rule); overflow: hidden; transition: max-height .3s ease; }
@@ -216,7 +222,7 @@ export default function StatutsPage() {
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                 <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0110 0v4" />
               </svg>
-              Lecture seule
+              <span className="doc-badge-text">Lecture seule</span>
             </span>
             <Link href="/login" className="doc-back">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

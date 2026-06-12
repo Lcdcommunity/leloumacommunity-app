@@ -7,66 +7,37 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Début du seeding...');
 
-  // 1. Association
-  const association = await prisma.association.upsert({
-    where: { code: 'LCD26DONIKO' },
-    update: {
-      name: 'Lelouma Community',
-      domainName: 'www.leloumacommunity.com',
-      isActive: true,
-    },
-    create: {
-      code: 'LCD26DONIKO',
-      name: 'Lelouma Community',
-      domainName: 'www.leloumacommunity.com',
-      isActive: true,
-    },
-  });
-  console.log('🏢 Association "Lelouma Community" OK');
-
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
-  // 2. Super Admin existant (inchangé)
+  // ── SYSTEM ADMIN — jallowdoniko@gmail.com ──
+  // Rôle : crée et gère les associations sur la plateforme
   await prisma.user.upsert({
-    where: { email: 'lelouma.community@gmail.com' },
+    where: { email: 'jallowdoniko@gmail.com' },
     update: {
-      role: UserRole.SUPER_ADMIN,
-      associationId: association.id,
+      role: UserRole.SYSTEM_ADMIN,
       passwordHash: hashedPwd,
       status: UserStatus.ACTIVE,
     },
     create: {
-      associationId: association.id,
-      email: 'lelouma.community@gmail.com',
+      email: 'jallowdoniko@gmail.com',
       passwordHash: hashedPwd,
-      firstName: 'Thierno',
-      lastName: 'DIALLO',
-      role: UserRole.SUPER_ADMIN,
+      firstName: 'Doniko',
+      lastName: 'JALLOW',
+      role: UserRole.SYSTEM_ADMIN,
       status: UserStatus.ACTIVE,
     },
   });
-  console.log('👤 Super Admin "lelouma.community@gmail.com" OK');
+  console.log('👤 System Admin "jallowdoniko@gmail.com" OK');
 
-  // 3. Nouveau Super Admin — contactlcd26@gmail.com
-  await prisma.user.upsert({
-    where: { email: 'contactlcd26@gmail.com' },
-    update: {
-      role: UserRole.SUPER_ADMIN,
-      associationId: association.id,
-      passwordHash: hashedPwd,
-      status: UserStatus.ACTIVE,
-    },
-    create: {
-      associationId: association.id,
-      email: 'contactlcd26@gmail.com',
-      passwordHash: hashedPwd,
-      firstName: 'Contact',
-      lastName: 'LCD',
-      role: UserRole.SUPER_ADMIN,
-      status: UserStatus.ACTIVE,
-    },
-  });
-  console.log('👤 Super Admin "contactlcd26@gmail.com" OK');
+  // ────────────────────────────────────────────────────────────
+  // Les comptes ci-dessous sont déjà en base — ne pas retoucher
+  // ────────────────────────────────────────────────────────────
+  //
+  // await prisma.association.upsert({ where: { code: 'LCD26DONIKO' }, ... });
+  //
+  // await prisma.user.upsert({ where: { email: 'lelouma.community@gmail.com' }, ... });
+  //
+  // await prisma.user.upsert({ where: { email: 'contactlcd26@gmail.com' }, ... });
 
   console.log('🎉 Seeding terminé !');
 }
@@ -80,4 +51,5 @@ main()
     await prisma.$disconnect();
   });
 
+// npx prisma db seed
 // npx prisma db seed
