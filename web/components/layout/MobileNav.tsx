@@ -7,8 +7,25 @@ import { usePathname, useRouter } from 'next/navigation';
 import { api } from '../../lib/api-client';
 import type { UserRole } from '../../types/user';
 
+// ── Renders either an emoji (single string) or SVG paths (string[]) ──
 function Ico({ d, size = 20 }: { d: string | string[]; size?: number }) {
-  const paths = Array.isArray(d) ? d : [d];
+  if (typeof d === 'string') {
+    return (
+      <span
+        style={{
+          fontSize: size,
+          lineHeight: 1,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          userSelect: 'none',
+        }}
+        aria-hidden="true"
+      >
+        {d}
+      </span>
+    );
+  }
   return (
     <svg
       width={size}
@@ -20,139 +37,139 @@ function Ico({ d, size = 20 }: { d: string | string[]; size?: number }) {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      {paths.map((p, i) => <path key={i} d={p} />)}
+      {d.map((p, i) => <path key={i} d={p} />)}
     </svg>
   );
 }
 
-const ICO = {
-  home:        ['M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z', 'M9 22V12h6v10'],
-  pin:         ['M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z', 'M12 13a3 3 0 100-6 3 3 0 000 6z'],
-  users:       ['M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2', 'M9 11a4 4 0 100-8 4 4 0 000 8z', 'M23 21v-2a4 4 0 00-3-3.87', 'M16 3.13a4 4 0 010 7.75'],
-  group:       ['M12 11a4 4 0 100-8 4 4 0 000 8z', 'M6 21v-1a6 6 0 0112 0v1'],
-  shieldCheck: ['M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z', 'M9 12l2 2 4-4'],
-  coin:        ['M12 1v22', 'M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6'],
-  creditCard:  ['M21 4H3a2 2 0 00-2 2v12a2 2 0 002 2h18a2 2 0 002-2V6a2 2 0 00-2-2z', 'M1 10h22'],
-  clipboard:   ['M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2', 'M9 5a2 2 0 012-2h2a2 2 0 012 2', 'M9 12h6', 'M9 16h4'],
-  fileText:    ['M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z', 'M14 2v6h6', 'M16 13H8', 'M16 17H8', 'M10 9H8'],
-  bell:        ['M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9', 'M13.73 21a2 2 0 01-3.46 0'],
-  settings:    ['M12 15a3 3 0 100-6 3 3 0 000 6z', 'M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z'],
-  clock:       ['M12 22a10 10 0 100-20 10 10 0 000 20z', 'M12 6v6l4 2'],
-  chartBar:    ['M18 20V10', 'M12 20V4', 'M6 20v-6'],
-  newspaper:   ['M4 22h16a2 2 0 002-2V4a2 2 0 00-2-2H8a2 2 0 00-2 2v16a4 4 0 01-4-4V6a2 2 0 012-2', 'M10 7h8', 'M10 11h8', 'M10 15h4'],
-  plus:        ['M12 5v14', 'M5 12h14'],
-  penLine:     ['M12 20h9', 'M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4z'],
-  user:        ['M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2', 'M12 11a4 4 0 100-8 4 4 0 000 8z'],
-  logout:      ['M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4', 'M16 17l5-5-5-5', 'M21 12H9'],
-  calendar:    ['M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z'],
-  star:        ['M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z'],
-  send:        ['M22 2L11 13', 'M22 2l-7 20-4-9-9-4z'],
-  auditLog:    ['M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2', 'M9 5a2 2 0 012-2h2a2 2 0 012 2', 'M10 12h4', 'M10 16h2'],
-  history:     ['M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8', 'M3 3v5h5', 'M12 7v5l4 2'],
-  close:       ['M18 6L6 18M6 6l12 12'],
-  vote:        ['M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z'],
-  lightbulb:   ['M9 21h6', 'M12 3a6 6 0 016 6c0 2.22-1.2 4.16-3 5.2V17a1 1 0 01-1 1H10a1 1 0 01-1-1v-2.8C7.2 13.16 6 11.22 6 9a6 6 0 016-6z'],
-  trendingUp:  ['M23 6l-9.5 9.5-5-5L1 18', 'M17 6h6v6'],
-};
+// ── Seul chemin SVG conservé : le × du FAB quand ouvert ──
+const CLOSE_PATH = ['M18 6L6 18M6 6l12 12'];
+
+// ── Palette emoji ──
+const E = {
+  home:         '🏠',
+  project:      '🚰',
+  contribution: '💰',
+  members:      '🧑‍🧑‍🧒‍🧒',
+  profile:      '🚹',
+  bell:         '🔔',
+  settings:     '⚙️',
+  creditCard:   '💳',
+  calendar:     '📅',
+  vote:         '🗳️',
+  document:     '📄',
+  news:         '📰',
+  star:         '⭐',
+  send:         '📨',
+  audit:        '📋',
+  clock:        '⏰',
+  chart:        '📊',
+  shield:       '🛡️',
+  pin:          '📍',
+  plus:         '➕',
+  trending:     '📈',
+  history:      '📜',
+  logout:       '🚪',
+} as const;
 
 type NavItem = { href: string; label: string; ico: string | string[]; section?: string };
 
 const systemAdminItems: NavItem[] = [
-  { href: '/system-admin',                  label: 'Dashboard SaaS',      ico: ICO.home,       section: 'Plateforme' },
-  { href: '/system-admin/associations/new', label: 'Nouvelle Instance',   ico: ICO.plus,       section: 'Plateforme' },
-  { href: '/system-admin/audit',            label: 'Logs Système',        ico: ICO.auditLog,   section: 'Sécurité'   },
-  { href: '/system-admin/profile',          label: 'Mon profil',          ico: ICO.user,       section: 'Compte'     },
-  { href: '/system-admin/settings',         label: 'Paramètres SaaS',     ico: ICO.settings,   section: 'Compte'     },
+  { href: '/system-admin',                  label: 'Dashboard SaaS',    ico: E.home,         section: 'Plateforme' },
+  { href: '/system-admin/associations/new', label: 'Nouvelle Instance', ico: E.plus,         section: 'Plateforme' },
+  { href: '/system-admin/audit',            label: 'Logs Système',      ico: E.audit,        section: 'Sécurité'   },
+  { href: '/system-admin/profile',          label: 'Mon profil',        ico: E.profile,      section: 'Compte'     },
+  { href: '/system-admin/settings',         label: 'Paramètres SaaS',   ico: E.settings,     section: 'Compte'     },
 ];
 
 const superAdminItems: NavItem[] = [
-  { href: '/super-admin',                 label: 'Dashboard',              ico: ICO.home,        section: 'Principal' },
-  { href: '/super-admin/antennas',        label: 'Antennes',               ico: ICO.pin,         section: 'Principal' },
-  { href: '/super-admin/admins',          label: 'Admins antenne',         ico: ICO.users,       section: 'Principal' },
-  { href: '/super-admin/members',         label: 'Membres',                ico: ICO.group,       section: 'Principal' },
-  { href: '/super-admin/approvals',       label: 'Validations comptes',    ico: ICO.shieldCheck, section: 'Gestion'   },
-  { href: '/super-admin/contributions',   label: 'Cotisations',            ico: ICO.coin,        section: 'Gestion'   },
-  { href: '/super-admin/expenses',        label: 'Dépenses',               ico: ICO.creditCard,  section: 'Gestion'   },
-  { href: '/super-admin/projects',        label: 'Projets',                ico: ICO.clipboard,   section: 'Gestion'   },
-  { href: '/super-admin/elections',       label: 'Élections',              ico: ICO.vote,        section: 'Gestion'   },
-  { href: '/super-admin/events',          label: 'Événements',             ico: ICO.calendar,    section: 'Gestion'   },
-  { href: '/super-admin/sponsors',        label: 'Partenaires',            ico: ICO.star,        section: 'Gestion'   },
-  { href: '/super-admin/documents',       label: 'Documents',              ico: ICO.fileText,    section: 'Gestion'   },
-  { href: '/super-admin/contents',        label: 'Informations',           ico: ICO.newspaper,   section: 'Gestion'   },
-  { href: '/super-admin/communication',   label: 'Envoi SMS & Push',       ico: ICO.send,        section: 'Outils'    },
-  { href: '/super-admin/notifications',   label: 'Notifications',          ico: ICO.bell,        section: 'Outils'    },
-  { href: '/super-admin/audit',           label: 'Audit',                  ico: ICO.auditLog,    section: 'Outils'    },
-  { href: '/super-admin/profile',         label: 'Mon profil',             ico: ICO.user,        section: 'Outils'    },
-  { href: '/super-admin/settings',        label: 'Paramètres',             ico: ICO.settings,    section: 'Outils'    },
+  { href: '/super-admin',               label: 'Dashboard',           ico: E.home,         section: 'Principal' },
+  { href: '/super-admin/antennas',      label: 'Antennes',            ico: E.pin,          section: 'Principal' },
+  { href: '/super-admin/admins',        label: 'Admins antenne',      ico: E.members,      section: 'Principal' },
+  { href: '/super-admin/members',       label: 'Membres',             ico: E.members,      section: 'Principal' },
+  { href: '/super-admin/approvals',     label: 'Validations comptes', ico: E.shield,       section: 'Gestion'   },
+  { href: '/super-admin/contributions', label: 'Cotisations',         ico: E.contribution, section: 'Gestion'   },
+  { href: '/super-admin/expenses',      label: 'Dépenses',            ico: E.creditCard,   section: 'Gestion'   },
+  { href: '/super-admin/projects',      label: 'Projets',             ico: E.project,      section: 'Gestion'   },
+  { href: '/super-admin/elections',     label: 'Élections',           ico: E.vote,         section: 'Gestion'   },
+  { href: '/super-admin/events',        label: 'Événements',          ico: E.calendar,     section: 'Gestion'   },
+  { href: '/super-admin/sponsors',      label: 'Partenaires',         ico: E.star,         section: 'Gestion'   },
+  { href: '/super-admin/documents',     label: 'Documents',           ico: E.document,     section: 'Gestion'   },
+  { href: '/super-admin/contents',      label: 'Informations',        ico: E.news,         section: 'Gestion'   },
+  { href: '/super-admin/communication', label: 'Envoi SMS & Push',    ico: E.send,         section: 'Outils'    },
+  { href: '/super-admin/notifications', label: 'Notifications',       ico: E.bell,         section: 'Outils'    },
+  { href: '/super-admin/audit',         label: 'Audit',               ico: E.audit,        section: 'Outils'    },
+  { href: '/super-admin/profile',       label: 'Mon profil',          ico: E.profile,      section: 'Outils'    },
+  { href: '/super-admin/settings',      label: 'Paramètres',          ico: E.settings,     section: 'Outils'    },
 ];
 
 const adminItems: NavItem[] = [
-  { href: '/admin',                           label: 'Dashboard',              ico: ICO.home,        section: 'Principal' },
-  { href: '/admin/approvals',                 label: 'Validations comptes',    ico: ICO.shieldCheck, section: 'Principal' },
-  { href: '/admin/members',                   label: 'Membres',                ico: ICO.group,       section: 'Principal' },
-  { href: '/admin/contributions',             label: 'Cotisations',            ico: ICO.coin,        section: 'Finances'  },
-  { href: '/admin/contributions/history',     label: 'Historique cotisations', ico: ICO.history,     section: 'Finances'  },
-  { href: '/admin/expenses',                  label: 'Dépenses',               ico: ICO.creditCard,  section: 'Finances'  },
-  { href: '/admin/projections',               label: 'Projections',            ico: ICO.chartBar,    section: 'Finances'  },
-  { href: '/admin/transfers',                 label: 'Virements',              ico: ICO.send,        section: 'Finances'  },
-  { href: '/admin/projects',                  label: 'Projets',                ico: ICO.clipboard,   section: 'Contenu'   },
-  { href: '/admin/project-proposals',         label: 'Propositions membres',   ico: ICO.lightbulb,   section: 'Contenu'   },
-  { href: '/admin/elections',                 label: 'Élections',              ico: ICO.vote,        section: 'Contenu'   },
-  { href: '/admin/events',                    label: 'Événements',             ico: ICO.calendar,    section: 'Contenu'   },
-  { href: '/admin/documents',                 label: 'Documents & photos',     ico: ICO.fileText,    section: 'Contenu'   },
-  { href: '/admin/contents',                  label: 'Informations',           ico: ICO.newspaper,   section: 'Contenu'   },
-  { href: '/admin/late-members',              label: 'Retardataires +3 mois',  ico: ICO.clock,       section: 'Contenu'   },
-  { href: '/admin/sponsors',                  label: 'Partenaires',            ico: ICO.star,        section: 'Contenu'   },
-  { href: '/admin/communication',             label: 'Envoi SMS & Push',       ico: ICO.send,        section: 'Outils'    },
-  { href: '/admin/notifications',             label: 'Notifications',          ico: ICO.bell,        section: 'Outils'    },
-  { href: '/admin/audit',                     label: 'Audit',                  ico: ICO.auditLog,    section: 'Outils'    },
-  { href: '/admin/settings',                  label: 'Paramètres',             ico: ICO.settings,    section: 'Outils'    },
-  { href: '/admin/profile',                   label: 'Mon profil',             ico: ICO.user,        section: 'Outils'    },
+  { href: '/admin',                       label: 'Dashboard',              ico: E.home,         section: 'Principal' },
+  { href: '/admin/approvals',             label: 'Validations comptes',    ico: E.shield,       section: 'Principal' },
+  { href: '/admin/members',               label: 'Membres',                ico: E.members,      section: 'Principal' },
+  { href: '/admin/contributions',         label: 'Cotisations',            ico: E.contribution, section: 'Finances'  },
+  { href: '/admin/contributions/history', label: 'Historique cotisations', ico: E.history,      section: 'Finances'  },
+  { href: '/admin/expenses',              label: 'Dépenses',               ico: E.creditCard,   section: 'Finances'  },
+  { href: '/admin/projections',           label: 'Projections',            ico: E.chart,        section: 'Finances'  },
+  { href: '/admin/transfers',             label: 'Virements',              ico: E.send,         section: 'Finances'  },
+  { href: '/admin/projects',              label: 'Projets',                ico: E.project,      section: 'Contenu'   },
+  { href: '/admin/project-proposals',     label: 'Propositions membres',   ico: E.project,      section: 'Contenu'   },
+  { href: '/admin/elections',             label: 'Élections',              ico: E.vote,         section: 'Contenu'   },
+  { href: '/admin/events',                label: 'Événements',             ico: E.calendar,     section: 'Contenu'   },
+  { href: '/admin/documents',             label: 'Documents & photos',     ico: E.document,     section: 'Contenu'   },
+  { href: '/admin/contents',              label: 'Informations',           ico: E.news,         section: 'Contenu'   },
+  { href: '/admin/late-members',          label: 'Retardataires +3 mois',  ico: E.clock,        section: 'Contenu'   },
+  { href: '/admin/sponsors',              label: 'Partenaires',            ico: E.star,         section: 'Contenu'   },
+  { href: '/admin/communication',         label: 'Envoi SMS & Push',       ico: E.send,         section: 'Outils'    },
+  { href: '/admin/notifications',         label: 'Notifications',          ico: E.bell,         section: 'Outils'    },
+  { href: '/admin/audit',                 label: 'Audit',                  ico: E.audit,        section: 'Outils'    },
+  { href: '/admin/settings',              label: 'Paramètres',             ico: E.settings,     section: 'Outils'    },
+  { href: '/admin/profile',               label: 'Mon profil',             ico: E.profile,      section: 'Outils'    },
 ];
 
 const memberItems: NavItem[] = [
-  { href: '/member',                           label: 'Dashboard',              ico: ICO.home,       section: 'Principal'  },
-  { href: '/member/contributions/new',         label: 'Faire un dépôt',         ico: ICO.plus,       section: 'Principal'  },
-  { href: '/member/contributions/history',     label: 'Mes cotisations',        ico: ICO.coin,       section: 'Principal'  },
-  { href: '/member/expenses',                  label: 'Dépenses',               ico: ICO.creditCard, section: 'Principal'  },
-  { href: '/member/projects',                  label: 'Projets',                ico: ICO.clipboard,  section: 'Communauté' },
-  { href: '/member/projects/propose',          label: 'Proposer un projet',     ico: ICO.penLine,    section: 'Communauté' },
-  { href: '/member/projects/projection',       label: 'Simulation financière',  ico: ICO.trendingUp, section: 'Communauté' },
-  { href: '/member/elections',                 label: 'Espace Élections',       ico: ICO.vote,       section: 'Communauté' },
-  { href: '/member/events',                    label: 'Événements',             ico: ICO.calendar,   section: 'Communauté' },
-  { href: '/member/documents',                 label: 'Documents & photos',     ico: ICO.fileText,   section: 'Communauté' },
-  { href: '/member/contents',                  label: 'Informations',           ico: ICO.newspaper,  section: 'Communauté' },
-  { href: '/member/late-members',              label: 'Retardataires +3 mois',  ico: ICO.clock,      section: 'Communauté' },
-  { href: '/member/sponsors',                  label: 'Partenaires',            ico: ICO.star,       section: 'Communauté' },
-  { href: '/member/notifications',             label: 'Notifications',          ico: ICO.bell,       section: 'Compte'     },
-  { href: '/member/profile',                   label: 'Mon profil',             ico: ICO.user,       section: 'Compte'     },
-  { href: '/member/settings',                  label: 'Paramètres',             ico: ICO.settings,   section: 'Compte'     },
+  { href: '/member',                       label: 'Dashboard',             ico: E.home,         section: 'Principal'  },
+  { href: '/member/contributions/new',     label: 'Faire un dépôt',        ico: E.contribution, section: 'Principal'  },
+  { href: '/member/contributions/history', label: 'Mes cotisations',       ico: E.contribution, section: 'Principal'  },
+  { href: '/member/expenses',              label: 'Dépenses',              ico: E.creditCard,   section: 'Principal'  },
+  { href: '/member/projects',              label: 'Projets',               ico: E.project,      section: 'Communauté' },
+  { href: '/member/projects/propose',      label: 'Proposer un projet',    ico: E.project,      section: 'Communauté' },
+  { href: '/member/projects/projection',   label: 'Simulation financière', ico: E.trending,     section: 'Communauté' },
+  { href: '/member/elections',             label: 'Espace Élections',      ico: E.vote,         section: 'Communauté' },
+  { href: '/member/events',                label: 'Événements',            ico: E.calendar,     section: 'Communauté' },
+  { href: '/member/documents',             label: 'Documents & photos',    ico: E.document,     section: 'Communauté' },
+  { href: '/member/contents',              label: 'Informations',          ico: E.news,         section: 'Communauté' },
+  { href: '/member/late-members',          label: 'Retardataires +3 mois', ico: E.clock,        section: 'Communauté' },
+  { href: '/member/sponsors',              label: 'Partenaires',           ico: E.star,         section: 'Communauté' },
+  { href: '/member/notifications',         label: 'Notifications',         ico: E.bell,         section: 'Compte'     },
+  { href: '/member/profile',               label: 'Mon profil',            ico: E.profile,      section: 'Compte'     },
+  { href: '/member/settings',              label: 'Paramètres',            ico: E.settings,     section: 'Compte'     },
 ];
 
 const quickTabs: Record<string, { href: string; label: string; ico: string | string[] }[]> = {
   SYSTEM_ADMIN: [
-    { href: '/system-admin',                  label: 'SaaS',     ico: ICO.home     },
-    { href: '/system-admin/associations/new', label: 'Instance', ico: ICO.plus     },
-    { href: '/system-admin/audit',            label: 'Logs',     ico: ICO.auditLog },
-    { href: '/system-admin/profile',          label: 'Profil',   ico: ICO.user     },
+    { href: '/system-admin',                  label: 'SaaS',     ico: E.home    },
+    { href: '/system-admin/associations/new', label: 'Instance', ico: E.plus    },
+    { href: '/system-admin/audit',            label: 'Logs',     ico: E.audit   },
+    { href: '/system-admin/profile',          label: 'Profil',   ico: E.profile },
   ],
   SUPER_ADMIN: [
-    { href: '/super-admin',           label: 'Accueil', ico: ICO.home        },
-    { href: '/super-admin/members',   label: 'Membres', ico: ICO.group       },
-    { href: '/super-admin/approvals', label: 'Comptes', ico: ICO.shieldCheck },
-    { href: '/super-admin/profile',   label: 'Profil',  ico: ICO.user        },
+    { href: '/super-admin',           label: 'Accueil', ico: E.home    },
+    { href: '/super-admin/members',   label: 'Membres', ico: E.members },
+    { href: '/super-admin/approvals', label: 'Comptes', ico: E.shield  },
+    { href: '/super-admin/profile',   label: 'Profil',  ico: E.profile },
   ],
   ANTENNA_ADMIN: [
-    { href: '/admin',                       label: 'Accueil',      ico: ICO.home       },
-    { href: '/admin/contributions',         label: 'Cotis.',       ico: ICO.coin       },
-    { href: '/admin/project-proposals',     label: 'Propositions', ico: ICO.lightbulb  },
-    { href: '/admin/profile',               label: 'Profil',       ico: ICO.user       },
+    { href: '/admin',                   label: 'Accueil',      ico: E.home         },
+    { href: '/admin/contributions',     label: 'Cotis.',       ico: E.contribution },
+    { href: '/admin/project-proposals', label: 'Propositions', ico: E.project      },
+    { href: '/admin/profile',           label: 'Profil',       ico: E.profile      },
   ],
   MEMBER: [
-    { href: '/member',                       label: 'Accueil', ico: ICO.home    },
-    { href: '/member/contributions/new',     label: 'Dépôt',   ico: ICO.plus    },
-    { href: '/member/projects/propose',      label: 'Proposer',ico: ICO.penLine },
-    { href: '/member/profile',               label: 'Profil',  ico: ICO.user    },
+    { href: '/member',                   label: 'Accueil',  ico: E.home         },
+    { href: '/member/contributions/new', label: 'Dépôt',    ico: E.contribution },
+    { href: '/member/projects/propose',  label: 'Proposer', ico: E.project      },
+    { href: '/member/profile',           label: 'Profil',   ico: E.profile      },
   ],
 };
 
@@ -172,10 +189,10 @@ const ROLE_COLORS: Record<string, RoleColorEntry> = {
   MEMBER:        { accent: '#10B981', dim: 'rgba(16,185,129,0.15)',  pillBg: '#ECFDF5', pillText: '#047857', label: 'Membre',        shadow: 'rgba(16,185,129,0.4)'  },
 };
 
-// ── Couleur verte Cardif / BNP Paribas ──
-const FAB_GREEN = '#2A7A3F';
-const FAB_GREEN_DARK = '#1F5C30';
-const FAB_SHADOW = 'rgba(42,122,63,0.45)';
+// ── FAB : bouton central — gris moyen pour que l'ombre soit visible (effet flottant) ──
+const FAB_BG      = '#64748B'; // Slate-500 — gris bleuté, assez clair pour que l'ombre ressorte
+const FAB_BG_DARK = '#475569'; // Slate-600 — légèrement plus sombre quand ouvert
+const FAB_SHADOW  = 'rgba(0, 0, 0, 0.28)';
 
 export function MobileNav() {
   const pathname = usePathname();
@@ -344,92 +361,78 @@ export function MobileNav() {
           border: 1px solid currentColor; opacity: 0.85;
         }
 
+        /* ════ DRAWER SCROLL ════ */
         .mn-drawer-scroll {
-          flex: 1; overflow-y: auto; padding: 0.5rem 0.85rem 1.25rem;
-          scrollbar-width: none;
+          flex: 1; overflow-y: auto;
+          padding: 0.5rem 0.75rem 1rem;
+          -ms-overflow-style: none; scrollbar-width: none;
         }
         .mn-drawer-scroll::-webkit-scrollbar { display: none; }
 
         .mn-section-label {
-          font-size: 0.6rem; font-weight: 700;
-          letter-spacing: 0.1em; text-transform: uppercase;
-          color: #94A3B8;
-          padding: 0.9rem 0.25rem 0.4rem;
-          display: flex; align-items: center; gap: 0.5rem;
-        }
-        .mn-section-label::after {
-          content: ''; flex: 1; height: 1px;
-          background: rgba(148,163,184,0.2);
+          font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em;
+          text-transform: uppercase; color: #94A3B8;
+          padding: 0.85rem 0.5rem 0.3rem;
         }
 
-        .mn-group { display: flex; flex-direction: column; gap: 1px; margin-bottom: 0.25rem; }
+        .mn-group {
+          display: flex; flex-direction: column; gap: 2px;
+        }
 
         .mn-link {
           display: flex; align-items: center; gap: 0.75rem;
-          padding: 0.75rem 0.85rem;
-          text-decoration: none; color: #475569;
-          font-size: 0.85rem; font-weight: 500;
-          border-radius: 12px;
+          padding: 0.65rem 0.75rem; border-radius: 12px;
+          text-decoration: none; color: #334155;
+          font-size: 0.875rem; font-weight: 500;
           transition: background 0.15s, color 0.15s;
           -webkit-tap-highlight-color: transparent;
           position: relative;
         }
-        .mn-link:active { background: rgba(0,0,0,0.04); }
-        .mn-link.active { color: var(--mn-accent); background: var(--mn-dim); font-weight: 650; }
-        .mn-link.active::before {
-          content: '';
-          position: absolute; left: 0; top: 25%; bottom: 25%;
-          width: 3px; border-radius: 0 3px 3px 0;
-          background: var(--mn-accent);
+        .mn-link:active, .mn-link.active {
+          background: var(--mn-dim); color: var(--mn-accent);
         }
+        .mn-link.active { font-weight: 700; }
+
         .mn-link-ico {
-          width: 32px; height: 32px; border-radius: 9px;
+          width: 30px; height: 30px; border-radius: 8px;
           display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; color: #94A3B8;
-          transition: background 0.15s, color 0.15s;
+          flex-shrink: 0;
         }
-        .mn-link.active .mn-link-ico { background: var(--mn-dim); color: var(--mn-accent); }
-        .mn-link-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        .mn-logout-wrap { padding: 0.75rem 0 0; border-top: 1px solid rgba(0,0,0,0.055); margin-top: 0.5rem; }
-        .mn-logout {
-          display: flex; align-items: center; gap: 0.75rem;
-          width: 100%; padding: 0.8rem 0.85rem;
-          background: rgba(244,63,94,0.06); border-radius: 12px;
-          border: none; cursor: pointer;
-          font-family: 'DM Sans', sans-serif; font-size: 0.85rem; font-weight: 700; color: #F43F5E;
-          -webkit-tap-highlight-color: transparent; text-align: left;
-        }
-        .mn-logout:active { background: rgba(244,63,94,0.1); }
+        .mn-link-text { flex: 1; }
 
-        /* ════ BADGE ════ */
-        .mn-badge-dot {
-          position: absolute; top: 0; right: 0;
-          width: 8px; height: 8px;
-          background: #EF4444; border: 2px solid #FFFFFF; border-radius: 50%;
-        }
         .mn-badge-count {
-          background: #EF4444; color: white; font-size: 0.65rem; font-weight: 800;
-          padding: 0.12rem 0.4rem; border-radius: 99px; line-height: 1.2; margin-left: auto;
+          background: #EF4444; color: white;
+          font-size: 0.6rem; font-weight: 800;
+          padding: 0.1rem 0.4rem; border-radius: 99px;
+          min-width: 18px; text-align: center; line-height: 1.6;
         }
 
-        /* ════ FLOATING PILL ════ */
+        .mn-logout-wrap {
+          margin-top: 0.75rem; padding-top: 0.75rem;
+          border-top: 1px solid rgba(0,0,0,0.06);
+        }
+        .mn-logout {
+          display: flex; align-items: center; gap: 0.75rem; width: 100%;
+          padding: 0.65rem 0.75rem; border-radius: 12px;
+          background: none; border: none; cursor: pointer;
+          color: #F43F5E; font-size: 0.875rem; font-weight: 600;
+          transition: background 0.15s;
+          -webkit-tap-highlight-color: transparent;
+          font-family: 'DM Sans', sans-serif;
+        }
+        .mn-logout:active { background: rgba(244,63,94,0.08); }
+
+        /* ════ CONTAINER (barre inférieure) ════ */
         .mn-container {
-          position: fixed;
-          bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-          left: 0.75rem; right: 0.75rem;
-          z-index: 50; height: 60px;
-          background: rgba(255,255,255,0.92);
-          backdrop-filter: blur(20px) saturate(180%);
-          -webkit-backdrop-filter: blur(20px) saturate(180%);
-          border-radius: 30px;
-          border: 1px solid rgba(255,255,255,0.8);
-          box-shadow:
-            0 8px 32px rgba(0,0,0,0.12),
-            0 2px 8px rgba(0,0,0,0.06),
-            0 0 0 1px rgba(0,0,0,0.04);
-          padding: 0 0.4rem;
-          display: flex; align-items: center; justify-content: space-between;
+          position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+          display: flex; align-items: center; justify-content: space-around;
+          height: calc(72px + env(safe-area-inset-bottom, 0px));
+          padding: 0 0.5rem calc(env(safe-area-inset-bottom, 0px) + 8px);
+          background: rgba(255, 255, 255, 0.95);
+          backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+          border-top: 1px solid rgba(0,0,0,0.06);
+          box-shadow: 0 -4px 24px rgba(0,0,0,0.07);
         }
 
         /* ════ TABS ════ */
@@ -467,7 +470,14 @@ export function MobileNav() {
         }
         .mn-tab.active .mn-tab-dot { opacity: 1; transform: scaleX(1); }
 
-        /* ════ FAB CENTRAL — Style Cardif/BNP ════ */
+        /* Badge dot sur tab */
+        .mn-badge-dot {
+          position: absolute; top: 0; right: 0;
+          width: 7px; height: 7px; border-radius: 50%;
+          background: #EF4444; border: 1.5px solid white;
+        }
+
+        /* ════ FAB CENTRAL — discret & rond ════ */
         .mn-fab-wrap {
           position: relative; width: 56px; height: 56px;
           display: flex; align-items: center; justify-content: center;
@@ -478,29 +488,30 @@ export function MobileNav() {
           border: none; cursor: pointer;
           -webkit-tap-highlight-color: transparent;
           display: flex; align-items: center; justify-content: center;
-          background: ${FAB_GREEN};
+          background: ${FAB_BG};
           box-shadow:
-            0 6px 20px ${FAB_SHADOW},
-            0 2px 6px rgba(0,0,0,0.15),
-            0 0 0 3px rgba(255,255,255,0.95);
+            0 10px 30px ${FAB_SHADOW},
+            0 4px 10px rgba(0,0,0,0.18),
+            0 1px 3px rgba(0,0,0,0.12),
+            0 0 0 3px rgba(255,255,255,1);
           transition: all 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
           position: relative;
           overflow: visible;
         }
         .mn-fab:active { transform: scale(0.9); }
 
-        /* Icône + (fermé) */
-        .mn-fab-plus {
-          color: white;
+        /* 🇬🇳 (fermé) */
+        .mn-fab-flag {
           display: flex; align-items: center; justify-content: center;
-          transition: opacity 0.2s, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+          font-size: 26px; line-height: 1; user-select: none;
           position: absolute;
+          transition: opacity 0.2s, transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
         }
-        .mn-fab.open .mn-fab-plus {
-          opacity: 0; transform: rotate(45deg) scale(0.5);
+        .mn-fab.open .mn-fab-flag {
+          opacity: 0; transform: scale(0.4) rotate(-30deg);
         }
 
-        /* Icône × (ouvert) */
+        /* × (ouvert) */
         .mn-fab-close {
           color: white;
           display: flex; align-items: center; justify-content: center;
@@ -513,9 +524,7 @@ export function MobileNav() {
         }
 
         /* Fond légèrement plus sombre quand ouvert */
-        .mn-fab.open {
-          background: ${FAB_GREEN_DARK};
-        }
+        .mn-fab.open { background: ${FAB_BG_DARK}; }
 
         /* Badge sur FAB */
         .mn-fab-badge {
@@ -580,8 +589,8 @@ export function MobileNav() {
 
           <div className="mn-logout-wrap">
             <button className="mn-logout" onClick={handleLogout}>
-              <span className="mn-link-ico" style={{ color: '#F43F5E' }}>
-                <Ico d={ICO.logout} size={17} />
+              <span className="mn-link-ico">
+                <Ico d={E.logout} size={17} />
               </span>
               <span className="mn-link-text">Déconnexion</span>
             </button>
@@ -603,16 +612,11 @@ export function MobileNav() {
                     onClick={() => setOpen(v => !v)}
                     aria-label={open ? 'Fermer le menu' : 'Ouvrir le menu'}
                   >
-                    {/* + */}
-                    <span className="mn-fab-plus" aria-hidden="true">
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-                        stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                    </span>
+                    {/* 🇬🇳 */}
+                    <span className="mn-fab-flag" aria-hidden="true">🇬🇳</span>
                     {/* × */}
                     <span className="mn-fab-close" aria-hidden="true">
-                      <Ico d={ICO.close} size={20} />
+                      <Ico d={CLOSE_PATH} size={20} />
                     </span>
                     {unreadCount > 0 && !open && (
                       <div className="mn-fab-badge" aria-label={`${unreadCount} notifications non lues`} />

@@ -1,5 +1,5 @@
 {
-  "name": "association-community-backend",
+  "name": "@lcd/backend",
   "version": "1.0.0",
   "private": true,
   "scripts": {

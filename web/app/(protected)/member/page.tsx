@@ -545,20 +545,37 @@ export default function MemberHomePage() {
           setPricing(pricingRes);
         } catch { /* ignore */ }
 
-        // Popup 2x/jour : slot 'am' (avant midi) + slot 'pm' (après midi)
+        // ── Popup uniquement après une cotisation soumise ← CHANGÉ ──────────
+        // Logique : une seule fois par contribution (clé = userId + contributionId).
+        // Le popup NE s'affiche PAS si la personne est en retard sans avoir rien soumis.
+        // Il s'affiche une unique fois lorsqu'une contribution passe en PENDING_VALIDATION.
         const popupUserId = (dashRes.status === 'fulfilled'
           ? (dashRes.value as DashboardData)?.me?.id
           : null) ?? 'anon';
 
-        setTimeout(() => {
-          const dateStr = new Date().toISOString().slice(0, 10);
-          const slot = new Date().getHours() < 12 ? 'am' : 'pm';
-          const popupKey = `wp_seen_${popupUserId}_${dateStr}_${slot}`;
-          if (!sessionStorage.getItem(popupKey)) {
-            sessionStorage.setItem(popupKey, '1');
-            setShowWelcomePopup(true);
-          }
-        }, 500);
+        const allContribs: ExtendedContribution[] = [
+          ...(contribRes.status === 'fulfilled'
+            ? ((contribRes.value?.items ?? []) as ExtendedContribution[])
+            : []),
+          ...(dashRes.status === 'fulfilled'
+            ? ((dashRes.value?.recentContributions ?? []) as ExtendedContribution[])
+            : []),
+        ];
+        const seen = new Set<string>();
+        const latestPending = allContribs
+          .filter(c => { if (seen.has(c.id)) return false; seen.add(c.id); return true; })
+          .filter(c => c.status === 'PENDING_VALIDATION')
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+        if (latestPending) {
+          setTimeout(() => {
+            const popupKey = `wp_seen_${popupUserId}_${latestPending.id}`;
+            if (!sessionStorage.getItem(popupKey)) {
+              sessionStorage.setItem(popupKey, '1');
+              setShowWelcomePopup(true);
+            }
+          }, 500);
+        }
 
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur inattendue');
@@ -594,60 +611,18 @@ export default function MemberHomePage() {
     return null;
   }, [data?.stats?.myLastContributionAt, recentContribs]);
 
-  const currentMonth = new Date().getMonth() + 1;
-  const currentYear  = new Date().getFullYear();
-
-  // ── hasRegularThisMonth ────────────────────────────────────────────────────
-  // Court-circuit principal : si lateMonths === 0, le backend confirme que le
-  // membre est à jour (y compris s'il a anticipé plusieurs mois).
-  // Sinon, on vérifie finement dans les contributions chargées via
-  // monthReference/yearReference (jamais via depositedAt qui est une date de saisie).
-  const hasRegularThisMonth = useMemo(() => {
-    if (lateMonths === 0 && data !== null) return true;
-
-    return recentContribs.some(c => {
-      if (c.purpose !== 'REGULAR_QUOTA' && c.purpose !== 'LATE_QUOTA') return false;
-      if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
-
-      // Priorité absolue à monthReference/yearReference (logique métier)
-      if (c.monthReference != null && c.yearReference != null) {
-        return c.monthReference === currentMonth && c.yearReference === currentYear;
-      }
-
-      // Fallback uniquement pour les anciennes contributions sans référence
-      const cDate = new Date(c.depositedAt || c.createdAt);
-      return cDate.getMonth() + 1 === currentMonth && cDate.getFullYear() === currentYear;
-    });
-  }, [recentContribs, currentMonth, currentYear, lateMonths, data]);
-
-  // ── hasActiveCard ──────────────────────────────────────────────────────────
-  // Une carte VALIDÉE cette année = membre couvert.
-  // Une carte PENDING_VALIDATION cette année = démarche engagée → on considère
-  // que la carte est "en cours" pour ne pas redemander le paiement.
-  const hasActiveCard = useMemo(() => {
-    return recentContribs.some(c => {
-      if (c.purpose !== 'MEMBERSHIP_CARD') return false;
-      // VALIDATED = carte active | PENDING_VALIDATION = soumise, pas encore activée
-      if (c.status !== 'VALIDATED' && c.status !== 'PENDING_VALIDATION') return false;
-      const cDate = new Date(c.depositedAt || c.createdAt);
-      return cDate.getFullYear() === currentYear;
-    });
-  }, [recentContribs, currentYear]);
-
-  // ── hasPendingContribution ─────────────────────────────────────────────────
-  // Détecte si une cotisation régulière ou de retard a été soumise
-  // mais n'est pas encore validée par l'admin.
-  // → Permet d'afficher le mode latePending ou regularPending dans le popup.
+  // ── hasPendingContribution ← CHANGÉ (DONATION inclus) ────────────────────
+  // Détecte si une cotisation (régulière, retard) OU un don a été soumis
+  // mais n'est pas encore validé par l'admin.
   const hasPendingContribution = useMemo(() => {
     return recentContribs.some(c =>
-      (c.purpose === 'REGULAR_QUOTA' || c.purpose === 'LATE_QUOTA') &&
+      (c.purpose === 'REGULAR_QUOTA' || c.purpose === 'LATE_QUOTA' || c.purpose === 'DONATION') &&
       c.status === 'PENDING_VALIDATION',
     );
   }, [recentContribs]);
 
   // ── hasPendingCard ─────────────────────────────────────────────────────────
   // Détecte si une carte membre a été soumise mais n'est pas encore validée.
-  // → Permet d'afficher le mode cardPending dans le popup.
   const hasPendingCard = useMemo(() => {
     return recentContribs.some(c =>
       c.purpose === 'MEMBERSHIP_CARD' &&
@@ -1082,8 +1057,6 @@ export default function MemberHomePage() {
                     {recentContribs.length === 0 && (
                       <EmptyRow cols={3} label="Aucune cotisation enregistrée"/>
                     )}
-                    {/* Afficher les 10 plus récentes dans le tableau
-                        (on charge 120 pour les calculs métier, on n'affiche pas tout) */}
                     {recentContribs.slice(0, 10).map(c => {
                       const pc = getPurposeConfig(c.purpose);
                       return (
@@ -1298,20 +1271,15 @@ export default function MemberHomePage() {
         />
       )}
 
+      {/* ── WelcomePopup ← CHANGÉ : props simplifiées, plus de retard ── */}
       {showWelcomePopup && data && (
         <WelcomePopup
           firstName={firstName}
-          lateMonths={lateMonths}
-          // true si le mois courant n'est pas couvert (pas de contribution validée ou en attente)
-          hasRegularPending={!hasRegularThisMonth}
-          // true si pas de carte validée NI en attente pour cette année
-          hasCardPending={!hasActiveCard}
+          hasPendingContribution={hasPendingContribution}
+          hasPendingCard={hasPendingCard}
           currency={popupCurrency}
           regularAmount={popupPricing?.monthlyQuota ?? null}
           cardAmount={popupPricing?.membershipCard ?? null}
-          // ✅ CÂBLAGE CORRECT : ces deux props déclenchent les modes *Pending
-          hasPendingContribution={hasPendingContribution}
-          hasPendingCard={hasPendingCard}
           onClose={() => setShowWelcomePopup(false)}
         />
       )}
