@@ -40,7 +40,7 @@ export class UploadsService {
       stored = {
         url: res.secure_url,
         storageKey: res.public_id,
-        mimeType: `${res.resource_type}/${res.format}`,
+        mimeType: params.file.mimetype, // ← Fix : mimetype original au lieu de "raw/pdf"
         sizeBytes: BigInt(res.bytes),
       };
     } else if (driver === 's3') {
