@@ -165,10 +165,10 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
 
   const cardNum = card?.cardNumber ? card.cardNumber.replace(/[\s-]/g, '') : 'EN ATTENTE';
   const residence = [card?.user?.city, card?.user?.country].filter(Boolean).join(', ') || 'Non renseignée';
-  
+
   // Utilisation de `originVillage` ou `originCommune`
   const origin = card?.user?.originVillage || card?.user?.originCommune || 'Non renseignée';
-  
+
   const antenna = card?.antennaName || 'Non assignée';
 
   // Prise en compte chirurgicale du poste occupé (function) puis du statut pro (professionalStatus)
@@ -405,7 +405,6 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           mix-blend-mode: overlay;
           transition: opacity 0.25s ease;
         }
-
         .vcw-top, .vcw-mid, .vcw-bottom {
           position: relative;
           z-index: 3;
@@ -839,7 +838,6 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           .vcw-controls {
             padding: 0 0.25rem 0.45rem 0.25rem;
           }
-
           .vcw-drag-handle {
             font-size: 0.64rem;
             letter-spacing: 0.11em;
@@ -1102,10 +1100,13 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                         />
                       </div>
 
+                      {/* ── MODIFIÉ : ajout de la 3ᵉ ligne "pour le DÉVELOPPEMENT" ── */}
                       <span className="vcw-org">
                         Lélouma
                         <br />
                         Communauté
+                        <br />
+                        <span style={{ textTransform: 'none', fontWeight: 600, fontSize: '0.88em' }}>pour le </span>Développement
                       </span>
                     </div>
 
@@ -1176,7 +1177,12 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                             style={{ objectFit: 'cover', borderRadius: '50%' }}
                           />
                         </div>
-                        <div className="vcw-back-org">LELOUMA COMMUNAUTE</div>
+                        {/* ── MODIFIÉ : ajout de la 3ᵉ ligne "pour le DÉVELOPPEMENT" ── */}
+                        <div className="vcw-back-org">
+                          LÉLOUMA<br />
+                          COMMUNAUTÉ<br />
+                          <span style={{ textTransform: 'none', fontWeight: 600, fontSize: '0.88em' }}>pour le </span>DÉVELOPPEMENT
+                        </div>
                       </div>
 
                       <div className="vcw-guinea-flag">
