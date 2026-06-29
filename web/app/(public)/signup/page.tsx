@@ -1,7 +1,39 @@
-//web/app/(public)/signup/page.tsx
+// web/app/(public)/signup/page.tsx
+// v2.0.0 — Refonte complète : formulaire pas-à-pas (1 question par écran, style conversationnel)
+//
+// CHANGELOG v2.0.0 (vs v1.x — formulaire en 4 macro-étapes) :
+// - [STRUCTURE] Remplacement des 4 macro-étapes par 23 écrans individuels (1 champ = 1 écran),
+//        définis dans STEP_KEYS, dans le même ordre que l'ancien formulaire.
+// - [NAV] Ajout de shouldSkip() + goToStep() pour gérer automatiquement les écrans conditionnels
+//        ("Précisez votre commune / pays / poste" n'apparaît que si "Autre" a été choisi juste avant).
+// - [UI] Remplacement du stepper à puces (4 points) par une barre de progression dynamique
+//        ("Question X sur Y"), seule option lisible avec 23 écrans.
+// - [UI] Ajout d'un bloc d'explication très visible (sp-explain, fond coloré) avec un exemple concret
+//        sur CHAQUE écran, rédigé en français simple, sans jargon, pour des membres n'ayant pas
+//        forcément fait d'études.
+// - [UX] Étape photo : ajout d'un bouton "Passer cette étape" distinct du bouton "Continuer"
+//        (visible uniquement si aucune photo n'a encore été choisie), comme demandé.
+// - [UX] Ajout de l'avance au clavier : la touche Entrée dans un champ texte/liste déclenche
+//        "Continuer" au lieu de risquer une soumission prématurée du formulaire.
+// - [UX] Petite animation d'apparition (fondu + glissement) à chaque changement d'écran.
+// - [VALIDATION] validateStep() éclatée en validateField(key) — validation déclenchée à chaque
+//        clic sur "Continuer", champ par champ, au lieu d'un bloc de 5 à 10 champs à la fois.
+//        Tous les messages d'erreur et clés i18n d'origine sont conservés à l'identique.
+// - [SUPPRIMÉ] STEPS (labels du stepper à 4 puces) et le composant <Req/> (astérisque) ne sont
+//        plus utilisés avec ce nouveau design — remplacés par la barre de progression et un tag
+//        "Facultatif" sur les 2 seuls champs non obligatoires (code postal, photo).
+// - [DONNÉES] Aucun changement de modèle de données ni du payload envoyé à l'API (FormData
+//        identique). Aucun changement côté backend nécessaire.
+// - [PERSISTANCE] sessionStorage conservé (clé "signupFormState", mêmes champs sauvegardés,
+//        mot de passe et photo toujours exclus pour des raisons de sécurité comme avant).
+//        Ajout d'une vérification de sécurité : si l'écran restauré ne correspond plus à un écran
+//        valide (ex. une étape "Précisez" devenue obsolète), on avance automatiquement.
+// - [INTACT] Logique de thème dynamique, i18n/RTL, auto-remplissage de l'indicatif téléphonique,
+//        calcul de force du mot de passe, et écran de succès final : strictement inchangés.
+
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useRef, useState, useCallback } from 'react';
+import { ChangeEvent, FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { api } from '../../../lib/api-client';
@@ -75,18 +107,65 @@ export const COUNTRIES = [
   { name: 'Autre', code: 'OTHER', dial: '+', phoneLength: 0 }
 ].sort((a, b) => a.name.localeCompare(b.name));
 
+// ── Liste ordonnée des écrans (1 champ = 1 écran) ──────────────────────────
+type StepKey =
+  | 'firstName' | 'lastName' | 'antenna'
+  | 'associationRole' | 'associationRoleOther'
+  | 'originSubPrefecture' | 'originSubPrefectureOther'
+  | 'birthDate' | 'placeOfBirth'
+  | 'birthCountry' | 'birthCountryOther'
+  | 'country' | 'countryOther'
+  | 'email' | 'phone'
+  | 'profession'
+  | 'city' | 'postalCode' | 'addressLine1'
+  | 'photo'
+  | 'password' | 'passwordConfirm' | 'terms';
+
+const STEP_KEYS: StepKey[] = [
+  'firstName', 'lastName', 'antenna',
+  'associationRole', 'associationRoleOther',
+  'originSubPrefecture', 'originSubPrefectureOther',
+  'birthDate', 'placeOfBirth',
+  'birthCountry', 'birthCountryOther',
+  'country', 'countryOther',
+  'email', 'phone',
+  'profession',
+  'city', 'postalCode', 'addressLine1',
+  'photo',
+  'password', 'passwordConfirm', 'terms',
+];
+
+// ── Petits composants réutilisés sur chaque écran-question ─────────────────
+function QuestionHeader({ title, optional }: { title: string; optional?: string }) {
+  return (
+    <h2 className="sp-question-title">
+      {title}
+      {optional && <span className="sp-opt-tag">{optional}</span>}
+    </h2>
+  );
+}
+
+function Explain({ children }: { children: ReactNode }) {
+  return (
+    <div className="sp-explain">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="sp-explain-icon">
+        <circle cx="12" cy="12" r="10" />
+        <path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+      </svg>
+      <div className="sp-explain-text">{children}</div>
+    </div>
+  );
+}
+
+function Example({ children }: { children: ReactNode }) {
+  return <span className="sp-explain-example">{children}</span>;
+}
+
 export default function MemberSignupPage() {
   const { t } = useTranslation();
 
   const [currentLang, setCurrentLang] = useState('fr');
   const isRTL = currentLang === 'ar';
-
-  const STEPS = [
-    t('signup.step0', 'Identité'), 
-    t('signup.step1', 'Contact'), 
-    t('signup.step2', 'Photo'), 
-    t('signup.step3', 'Sécurité')
-  ];
 
   const [antennas, setAntennas] = useState<PublicAntenna[]>([]);
   const [loadingAntennas, setLoadingAntennas] = useState(true);
@@ -279,6 +358,17 @@ export default function MemberSignupPage() {
     }
   }, [country]);
 
+  // ── Garde-fou : si l'écran restauré depuis sessionStorage ne correspond plus
+  //    à un écran valide (ex. la sous-question "Précisez" n'est plus applicable
+  //    car la réponse "Autre" a changé entre-temps), on avance automatiquement. ──
+  useEffect(() => {
+    if (!mounted) return;
+    if (shouldSkip(STEP_KEYS[step])) {
+      goToStep(1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, step, associationRole, originSubPrefecture, birthCountry, country]);
+
   const handleBirthDateChange = (e: ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
     if (value.length > 8) value = value.slice(0, 8);
@@ -321,92 +411,164 @@ export default function MemberSignupPage() {
     if (photoInputRef.current) photoInputRef.current.value = '';
   }
 
-  function validateStep(s: number): string | null {
-    if (s === 0) {
-      if (!firstName.trim()) return t('signup.errFirstName', 'Le prénom est requis.');
-      if (!lastName.trim()) return t('signup.errLastName', 'Le nom est requis.');
-      if (!antennaId) return t('signup.errAntenna', 'Veuillez sélectionner une antenne.');
-    }
-    if (s === 1) {
-      if (!associationRole) return t('signup.errRole', 'Le poste occupé est requis.');
-      if (associationRole === 'Autre' && !customAssociationRole.trim()) return t('signup.errRoleOther', 'Veuillez préciser le poste occupé.');
-
-      if (!originSubPrefecture) return t('signup.errCommune', 'La commune d\'origine est requise.');
-      if (originSubPrefecture === 'Autre' && !customOriginSubPrefecture.trim()) return t('signup.errCommuneOther', 'Veuillez préciser la commune d\'origine.');
-
-      if (!birthDate || birthDate.length < 10) return t('signup.errBirthdateReq', 'La date de naissance est requise (JJ/MM/AAAA).');
-      const parts = birthDate.split('/');
-      if (parts.length === 3) {
-        const day = parseInt(parts[0], 10);
-        const month = parseInt(parts[1], 10) - 1;
-        const year = parseInt(parts[2], 10);
-        const bDate = new Date(year, month, day);
-        const today = new Date();
-        let age = today.getFullYear() - bDate.getFullYear();
-        const m = today.getMonth() - bDate.getMonth();
-        if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
-          age--;
-        }
-        if (age < 16) return t('signup.errAgeMin', 'Vous devez avoir au moins 16 ans pour vous inscrire.');
-        if (age > 80) return t('signup.errAgeMax', 'L\'âge maximum autorisé est de 80 ans.');
-      } else {
-        return t('signup.errBirthdateFmt', 'Format de date de naissance invalide.');
-      }
-
-      if (!placeOfBirth.trim()) return t('signup.errBirthplace', 'Le lieu de naissance est requis.');
-      if (!birthCountry) return t('signup.errBirthCountry', 'Le pays de naissance est requis.');
-      if (birthCountry === 'Autre' && !customBirthCountry.trim()) return t('signup.errBirthCountryOther', 'Veuillez préciser votre pays de naissance.');
-
-      if (!country) return t('signup.errCountry', 'Le pays de résidence est requis.');
-      if (country === 'Autre' && !customCountry.trim()) return t('signup.errCountryOther', 'Veuillez préciser votre pays de résidence.');
-
-      if (!email.trim()) return t('signup.errEmailReq', 'L\'email est requis.');
-      if (!/\S+@\S+\.\S+/.test(email)) return t('signup.errEmailFmt', 'Format d\'email invalide.');
-
-      if (!phone.trim()) return t('signup.errPhoneReq', 'Le téléphone est requis.');
-      if (phone && country && country !== 'Autre') {
-        const selectedCountry = COUNTRIES.find(c => c.name === country);
-        if (selectedCountry) {
-          let phoneWithoutDial = phone;
-          if (phone.startsWith(selectedCountry.dial)) {
-            phoneWithoutDial = phone.substring(selectedCountry.dial.length);
+  // ── Validation déclenchée champ par champ (un seul champ à la fois) ────────
+  function validateField(key: StepKey): string | null {
+    switch (key) {
+      case 'firstName':
+        if (!firstName.trim()) return t('signup.errFirstName', 'Le prénom est requis.');
+        return null;
+      case 'lastName':
+        if (!lastName.trim()) return t('signup.errLastName', 'Le nom est requis.');
+        return null;
+      case 'antenna':
+        if (!antennaId) return t('signup.errAntenna', 'Veuillez sélectionner une antenne.');
+        return null;
+      case 'associationRole':
+        if (!associationRole) return t('signup.errRole', 'Le poste occupé est requis.');
+        return null;
+      case 'associationRoleOther':
+        if (!customAssociationRole.trim()) return t('signup.errRoleOther', 'Veuillez préciser le poste occupé.');
+        return null;
+      case 'originSubPrefecture':
+        if (!originSubPrefecture) return t('signup.errCommune', 'La commune d\'origine est requise.');
+        return null;
+      case 'originSubPrefectureOther':
+        if (!customOriginSubPrefecture.trim()) return t('signup.errCommuneOther', 'Veuillez préciser la commune d\'origine.');
+        return null;
+      case 'birthDate': {
+        if (!birthDate || birthDate.length < 10) return t('signup.errBirthdateReq', 'La date de naissance est requise (JJ/MM/AAAA).');
+        const parts = birthDate.split('/');
+        if (parts.length === 3) {
+          const day = parseInt(parts[0], 10);
+          const month = parseInt(parts[1], 10) - 1;
+          const year = parseInt(parts[2], 10);
+          const bDate = new Date(year, month, day);
+          const today = new Date();
+          let age = today.getFullYear() - bDate.getFullYear();
+          const m = today.getMonth() - bDate.getMonth();
+          if (m < 0 || (m === 0 && today.getDate() < bDate.getDate())) {
+            age--;
           }
-          const numberPart = phoneWithoutDial.replace(/\D/g, '');
-          if (numberPart.length < 7 || numberPart.length > 11) {
-             return t('signup.errPhoneLen', 'Le numéro de téléphone (sans l\'indicatif) doit faire entre 7 et 11 chiffres.');
+          if (age < 16) return t('signup.errAgeMin', 'Vous devez avoir au moins 16 ans pour vous inscrire.');
+          if (age > 80) return t('signup.errAgeMax', 'L\'âge maximum autorisé est de 80 ans.');
+        } else {
+          return t('signup.errBirthdateFmt', 'Format de date de naissance invalide.');
+        }
+        return null;
+      }
+      case 'placeOfBirth':
+        if (!placeOfBirth.trim()) return t('signup.errBirthplace', 'Le lieu de naissance est requis.');
+        return null;
+      case 'birthCountry':
+        if (!birthCountry) return t('signup.errBirthCountry', 'Le pays de naissance est requis.');
+        return null;
+      case 'birthCountryOther':
+        if (!customBirthCountry.trim()) return t('signup.errBirthCountryOther', 'Veuillez préciser votre pays de naissance.');
+        return null;
+      case 'country':
+        if (!country) return t('signup.errCountry', 'Le pays de résidence est requis.');
+        return null;
+      case 'countryOther':
+        if (!customCountry.trim()) return t('signup.errCountryOther', 'Veuillez préciser votre pays de résidence.');
+        return null;
+      case 'email':
+        if (!email.trim()) return t('signup.errEmailReq', 'L\'email est requis.');
+        if (!/\S+@\S+\.\S+/.test(email)) return t('signup.errEmailFmt', 'Format d\'email invalide.');
+        return null;
+      case 'phone': {
+        if (!phone.trim()) return t('signup.errPhoneReq', 'Le téléphone est requis.');
+        if (phone && country && country !== 'Autre') {
+          const selectedCountry = COUNTRIES.find(c => c.name === country);
+          if (selectedCountry) {
+            let phoneWithoutDial = phone;
+            if (phone.startsWith(selectedCountry.dial)) {
+              phoneWithoutDial = phone.substring(selectedCountry.dial.length);
+            }
+            const numberPart = phoneWithoutDial.replace(/\D/g, '');
+            if (numberPart.length < 7 || numberPart.length > 11) {
+              return t('signup.errPhoneLen', 'Le numéro de téléphone (sans l\'indicatif) doit faire entre 7 et 11 chiffres.');
+            }
           }
         }
+        return null;
       }
+      case 'profession':
+        if (!profession) return t('signup.errProfession', 'La profession / situation est requise.');
+        return null;
+      case 'city':
+        if (!city.trim()) return t('signup.errCity', 'La ville de résidence est requise.');
+        return null;
+      case 'postalCode':
+        return null; // facultatif
+      case 'addressLine1':
+        if (!addressLine1.trim()) return t('signup.errAddress', 'L\'adresse de résidence est requise.');
+        return null;
+      case 'photo':
+        return null; // facultatif — les erreurs de format/taille sont gérées via photoError
+      case 'password':
+        if (!password) return t('signup.errPwdReq', 'Le mot de passe est requis.');
+        if (password.length < 8) return t('signup.errPwdLen', 'Le mot de passe doit contenir au moins 8 caractères.');
+        return null;
+      case 'passwordConfirm':
+        if (!passwordConfirm) return t('signup.errPwdConfirmReq', 'Veuillez confirmer votre mot de passe.');
+        if (password !== passwordConfirm) return t('signup.errPwdMatch', 'Les mots de passe ne correspondent pas.');
+        return null;
+      case 'terms':
+        if (!termsAccepted) return t('signup.errTerms', 'Vous devez accepter les Mentions Légales et la Politique de Confidentialité pour continuer.');
+        return null;
+      default:
+        return null;
+    }
+  }
 
-      if (!profession) return t('signup.errProfession', 'La profession / situation est requise.');
-      if (!city.trim()) return t('signup.errCity', 'La ville de résidence est requise.');
-      if (!addressLine1.trim()) return t('signup.errAddress', 'L\'adresse de résidence est requise.');
+  // ── Navigation entre écrans, avec saut automatique des questions "Autre" non applicables ──
+  function shouldSkip(key: StepKey): boolean {
+    if (key === 'associationRoleOther') return associationRole !== 'Autre';
+    if (key === 'originSubPrefectureOther') return originSubPrefecture !== 'Autre';
+    if (key === 'birthCountryOther') return birthCountry !== 'Autre';
+    if (key === 'countryOther') return country !== 'Autre';
+    return false;
+  }
+
+  function goToStep(direction: 1 | -1) {
+    let next = step + direction;
+    while (next >= 0 && next < STEP_KEYS.length && shouldSkip(STEP_KEYS[next])) {
+      next += direction;
     }
-    if (s === 3) {
-      if (!password) return t('signup.errPwdReq', 'Le mot de passe est requis.');
-      if (password.length < 8) return t('signup.errPwdLen', 'Le mot de passe doit contenir au moins 8 caractères.');
-      if (password !== passwordConfirm) return t('signup.errPwdMatch', 'Les mots de passe ne correspondent pas.');
-      if (!termsAccepted) return t('signup.errTerms', 'Vous devez accepter les Mentions Légales et la Politique de Confidentialité pour continuer.');
+    if (next >= 0 && next < STEP_KEYS.length) {
+      setStep(next);
     }
-    return null;
   }
 
   function nextStep() {
-    const err = validateStep(step);
+    const key = STEP_KEYS[step];
+    const err = validateField(key);
     if (err) { setError(err); return; }
     setError(null);
-    setStep(s => Math.min(s + 1, STEPS.length - 1));
+    goToStep(1);
   }
 
   function prevStep() {
     setError(null);
-    setStep(s => Math.max(s - 1, 0));
+    goToStep(-1);
+  }
+
+  function skipPhotoStep() {
+    setError(null);
+    goToStep(1);
+  }
+
+  function handleEnterAdvance(e: KeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      nextStep();
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const err = validateStep(3);
-    if (err) { setError(err); return; }
+    const finalErr = validateField('password') || validateField('passwordConfirm') || validateField('terms');
+    if (finalErr) { setError(finalErr); return; }
     setError(null);
     setSubmitting(true);
 
@@ -473,12 +635,14 @@ export default function MemberSignupPage() {
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
 
-  if (!mounted) return null;
+  // ── Progression dynamique (tient compte des écrans "Autre" sautés) ─────────
+  const currentKey = STEP_KEYS[step];
+  const visibleStepKeys = STEP_KEYS.filter(k => !shouldSkip(k));
+  const progressTotal = visibleStepKeys.length;
+  const progressIndex = Math.max(1, visibleStepKeys.indexOf(currentKey) + 1);
+  const progressPercent = progressTotal > 0 ? Math.round((progressIndex / progressTotal) * 100) : 0;
 
-  // ── Required star component ──────────────────────────────────────────────
-  const Req = () => (
-    <span style={{ color: '#DC2626', marginLeft: '0.2rem', fontWeight: 900, fontSize: '0.75rem' }} aria-label="Champ obligatoire">*</span>
-  );
+  if (!mounted) return null;
 
   return (
     <>
@@ -523,35 +687,28 @@ export default function MemberSignupPage() {
 
         .sp-subtitle { font-size: 0.82rem; color: #64748B; margin-top: 0.45rem; line-height: 1.6; font-weight: 500; }
 
-        .sp-stepper { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.75rem; }
-        .sp-step-item { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; position: relative; flex: 1; }
-        .sp-step-item:not(:last-child)::after { content: ''; position: absolute; top: 13px; left: calc(50% + 14px); width: calc(100% - 28px); height: 1px; background: #E2E8F0; transition: background 0.4s; }
-        .sp-step-item.done:not(:last-child)::after { background: ${theme.secondary}; }
-        .sp-step-circle { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #CBD5E1; background: white; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; color: #94A3B8; transition: all 0.3s cubic-bezier(.22,1,.36,1); position: relative; z-index: 1; }
-        .sp-step-item.active .sp-step-circle { border-color: ${theme.primary}; background: ${theme.primary}; color: white; box-shadow: 0 0 0 4px ${getLightColor(theme.primary, 0.15)}; }
-        .sp-step-item.done .sp-step-circle { border-color: ${theme.secondary}; background: ${getLightColor(theme.secondary, 0.1)}; color: ${theme.secondary}; }
+        /* ── Barre de progression (remplace le stepper à 4 puces) ── */
+        .sp-progress-wrap { margin-bottom: 2rem; }
+        .sp-progress-track { width: 100%; height: 8px; background: #E2E8F0; border-radius: 99px; overflow: hidden; }
+        .sp-progress-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, ${theme.primary}, ${theme.secondary}); transition: width 0.4s cubic-bezier(.22,1,.36,1); }
+        .sp-progress-label { margin-top: 0.5rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #64748B; text-align: center; }
 
-        .sp-step-label { font-size: 0.6rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #94A3B8; transition: color 0.3s; }
-        .sp-step-item.active .sp-step-label { color: #1E40AF; }
-        .sp-step-item.done .sp-step-label { color: #047857; }
+        /* ── Titre de question (grande question posée à l'utilisateur) ── */
+        .sp-question-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(1.3rem, 4vw, 1.7rem); font-weight: 600; color: #1E293B; line-height: 1.3; margin-bottom: 1.1rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .sp-opt-tag { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 99px; padding: 0.18rem 0.6rem; vertical-align: middle; }
 
-        .sp-section-title { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #475569; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-        .sp-section-title::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, #CBD5E1, transparent); }
+        /* ── Bloc d'explication en surbrillance, avec exemple concret ── */
+        .sp-explain { display: flex; gap: 0.65rem; align-items: flex-start; background: ${getLightColor(theme.secondary, 0.08)}; border: 1.5px solid ${getLightColor(theme.secondary, 0.25)}; border-radius: 14px; padding: 0.95rem 1.05rem; font-size: 0.83rem; color: #134E4A; font-weight: 600; line-height: 1.6; margin-bottom: 1.4rem; }
+        .sp-explain-icon { flex-shrink: 0; margin-top: 2px; color: ${theme.secondary}; }
+        .sp-explain-text { flex: 1; }
+        .sp-explain-example { display: block; margin-top: 0.5rem; font-weight: 700; color: #047857; background: rgba(255,255,255,0.65); border-radius: 8px; padding: 0.45rem 0.65rem; }
 
-        .sp-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem; }
         .sp-stack { display: flex; flex-direction: column; gap: 0.2rem; }
         .sp-field { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
 
-        .sp-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #475569; }
-        .sp-label .sp-opt { font-weight: 500; color: #94A3B8; text-transform: none; letter-spacing: 0; font-size: 0.65rem; margin-left: 0.3rem; }
-
-        /* ── Helper hint text under fields ── */
+        /* ── Helper hint text (retour temps réel, ex : correspondance mots de passe) ── */
         .sp-hint { font-size: 0.67rem; font-weight: 500; color: #94A3B8; margin-top: 0.2rem; line-height: 1.45; display: flex; align-items: flex-start; gap: 0.3rem; }
         .sp-hint svg { flex-shrink: 0; margin-top: 1px; }
-
-        /* ── Required legend ── */
-        .sp-required-legend { font-size: 0.68rem; color: #94A3B8; font-weight: 500; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.3rem; }
-        .sp-required-legend span { color: #DC2626; font-weight: 900; font-size: 0.75rem; }
 
         .sp-input-wrap { position: relative; }
         .sp-input, .sp-select { width: 100%; min-height: 48px; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #FFFFFF; padding: 0 1rem; color: #111827; font-weight: 500; font-family: var(--font-main); font-size: 0.88rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
@@ -563,6 +720,11 @@ export default function MemberSignupPage() {
         .sp-pwd-bar { flex: 1; height: 4px; border-radius: 99px; background: #E2E8F0; overflow: hidden; }
         .sp-pwd-bar-fill { height: 100%; border-radius: 99px; transition: width 0.4s, background 0.4s; }
         .sp-pwd-label { font-size: 0.65rem; font-weight: 700; margin-left: 0.4rem; min-width: 36px; }
+
+        /* ── Champs "grand format" : un seul champ par écran, on lui donne plus de place ── */
+        .sp-input-big, .sp-select-big { min-height: 56px; font-size: 1rem; padding: 0 1.1rem; }
+        .sp-select-big { padding-right: 2.2rem; }
+
         .sp-notice { background: ${getLightColor(theme.primary, 0.07)}; border: 1px solid ${getLightColor(theme.primary, 0.15)}; border-radius: 12px; padding: 0.85rem 1rem; font-size: 0.78rem; color: #1E40AF; font-weight: 500; line-height: 1.5; margin-bottom: 1.2rem; display: flex; gap: 0.6rem; align-items: flex-start; }
         .sp-error { display: flex; align-items: center; gap: 0.55rem; padding: 0.8rem 1rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; color: var(--err); font-size: 0.8rem; font-weight: 600; }
         .sp-toast-ok { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.45rem 1rem; border-radius: 99px; font-size: 0.75rem; font-weight: 700; background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
@@ -579,6 +741,10 @@ export default function MemberSignupPage() {
         .sp-btn-next, .sp-btn-submit { flex: 1; min-height: 48px; background: linear-gradient(135deg, #047857, #059669); border: none; border-radius: 12px; color: white; font-family: var(--font-main); font-size: 0.85rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.45rem; box-shadow: 0 4px 14px rgba(5,150,105,0.28); transition: opacity 0.2s, box-shadow 0.2s; }
         .sp-btn-next:hover, .sp-btn-submit:hover { box-shadow: 0 6px 20px rgba(5,150,105,0.38); }
         .sp-btn-next:disabled, .sp-btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* ── Bouton "Passer cette étape" (uniquement écran photo, tant qu'aucune photo n'est choisie) ── */
+        .sp-btn-skip { flex: 1; min-height: 48px; background: white; border: 1.5px dashed #CBD5E1; border-radius: 12px; color: #64748B; font-family: var(--font-main); font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.45rem; transition: border-color 0.2s, background 0.2s, color 0.2s; }
+        .sp-btn-skip:hover { border-color: #94A3B8; background: #F8FAFC; color: #475569; }
 
         .sp-spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -609,12 +775,6 @@ export default function MemberSignupPage() {
           border-color: ${theme.secondary};
           box-shadow: 0 0 0 3px ${getLightColor(theme.secondary, 0.15)};
         }
-
-        .sp-role-label {
-          font-size: 0.7rem; font-weight: 800; letter-spacing: 0.08em;
-          text-transform: uppercase; color: #047857;
-          display: flex; align-items: center; gap: 0.4rem;
-        }
         
         .sp-checkbox-wrapper {
           display: flex; align-items: flex-start; gap: 0.75rem;
@@ -644,10 +804,14 @@ export default function MemberSignupPage() {
           color: ${theme.primary}; font-weight: 700; text-decoration: underline;
         }
 
+        /* ── Animation d'apparition à chaque changement d'écran ── */
+        .sp-question-anim { animation: spQuestionIn 0.4s cubic-bezier(.22,1,.36,1); }
+        @keyframes spQuestionIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
         @media (max-width: 540px) {
-          .sp-grid-2 { grid-template-columns: 1fr; gap: 0.85rem; }
           .sp-root { padding: 1rem 0.5rem 2rem; }
           .sp-card { border-radius: 20px; padding: 1.5rem; }
+          .sp-question-title { font-size: 1.25rem; }
         }
       `}</style>
 
@@ -670,27 +834,21 @@ export default function MemberSignupPage() {
               {t('signup.newMember', 'Nouveau membre')}
             </div>
             <h1 className="sp-title">{t('signup.join', 'Rejoindre')} <span>{theme.name}</span></h1>
-            <p className="sp-subtitle">{t('signup.subtitle', 'Créez votre compte en 4 étapes · Validation par votre antenne')}</p>
+            <p className="sp-subtitle">{t('signup.subtitleStepByStep', 'Répondez aux questions une par une · Validation par votre antenne')}</p>
           </div>
 
-          {/* Stepper */}
+          {/* Barre de progression */}
           {!success && (
-            <div className="sp-stepper">
-              {STEPS.map((label, i) => (
-                <div key={label} className={`sp-step-item ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
-                  <div className="sp-step-circle">
-                    {i < step ? (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    ) : (i + 1)}
-                  </div>
-                  <span className="sp-step-label">{label}</span>
-                </div>
-              ))}
+            <div className="sp-progress-wrap">
+              <div className="sp-progress-track">
+                <div className="sp-progress-fill" style={{ width: `${progressPercent}%` }} />
+              </div>
+              <div className="sp-progress-label">
+                {t('signup.questionLabel', 'Question')} {progressIndex} {t('signup.ofLabel', 'sur')} {progressTotal}
+              </div>
             </div>
-          )}          
-          
+          )}
+
           {/* ── SUCCESS ── */}
           {success ? (
             <div className="sp-success sp-panel">
@@ -721,64 +879,71 @@ export default function MemberSignupPage() {
           ) : (
             <form onSubmit={handleSubmit}>
 
-              {/* ── STEP 0 : Identité ── */}
-              {step === 0 && (
-                <div className="sp-panel sp-stack">
+              {/* ── ÉCRAN 1 : Prénom ── */}
+              {currentKey === 'firstName' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
                   <div className="sp-notice">
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0, marginTop: '1px' }}>
                       <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
                     </svg>
                     {t('signup.activationNotice', 'Le compte sera activé après vérification email et validation par l\'administrateur de votre antenne.')}
                   </div>
-
-                  {/* Required legend */}
-                  <p className="sp-required-legend">
-                    <span>*</span> Les champs marqués d&apos;une étoile sont obligatoires.
-                  </p>
-
-                  <p className="sp-section-title">{t('signup.personalInfo', 'Informations personnelles')}</p>
-                  <div className="sp-grid-2">
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        {t('signup.firstName', 'Prénom')}<Req />
-                      </label>
-                      <input
-                        className="sp-input"
-                        value={firstName}
-                        onChange={e => setFirstName(e.target.value)}
-                        placeholder="Ex : Mamadou"
-                        required
-                      />
-                      <span className="sp-hint">
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                        Tel qu&apos;il apparaîtra sur votre carte membre.
-                      </span>
-                    </div>
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        {t('signup.lastName', 'Nom')}<Req />
-                      </label>
-                      <input
-                        className="sp-input"
-                        value={lastName}
-                        onChange={e => setLastName(e.target.value)}
-                        placeholder="Ex : Diallo"
-                        required
-                      />
-                      <span className="sp-hint">
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                        Votre nom de famille officiel.
-                      </span>
-                    </div>
-                  </div>
+                  <QuestionHeader title={t('signup.q.firstName.title', 'Comment vous appelez-vous ?')} />
+                  <Explain>
+                    {t('signup.q.firstName.explain', "Écrivez votre prénom. C'est le premier nom qu'on vous a donné à la naissance, avant le nom de famille.")}
+                    <Example>{t('signup.q.firstName.example', 'Exemple : si vous vous appelez Mamadou Diallo, écrivez seulement « Mamadou ».')}</Example>
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.antenna', 'Antenne de rattachement')}<Req />
-                    </label>
+                    <input
+                      className="sp-input sp-input-big"
+                      value={firstName}
+                      onChange={e => setFirstName(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="Ex : Mamadou"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 2 : Nom de famille ── */}
+              {currentKey === 'lastName' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.lastName.title', 'Quel est votre nom de famille ?')} />
+                  <Explain>
+                    {t('signup.q.lastName.explain', "C'est le nom que vous partagez avec votre famille, celui de votre père.")}
+                    <Example>{t('signup.q.lastName.example', 'Exemple : si vous vous appelez Mamadou Diallo, écrivez « Diallo ».')}</Example>
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      value={lastName}
+                      onChange={e => setLastName(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="Ex : Diallo"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 3 : Antenne ── */}
+              {currentKey === 'antenna' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.antenna.title', 'À quelle antenne voulez-vous vous inscrire ?')} />
+                  <Explain>
+                    {t('signup.q.antenna.explain', "Une antenne est le groupe local de l'association le plus proche de chez vous. C'est elle qui validera votre inscription.")}
+                    <Example>{t('signup.q.antenna.example', 'Si vous ne savez pas laquelle choisir, demandez à un responsable de l\'association près de chez vous.')}</Example>
+                  </Explain>
+                  <div className="sp-field">
                     <select
-                      className="sp-select"
+                      className="sp-select sp-select-big"
                       value={antennaId}
                       onChange={e => setAntennaId(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      autoFocus
                       required
                     >
                       <option value="">{loadingAntennas ? t('signup.loading', 'Chargement...') : t('signup.selectAntenna', 'Sélectionnez une antenne')}</option>
@@ -786,67 +951,24 @@ export default function MemberSignupPage() {
                         <option key={a.id} value={a.id}>{a.name}{a.city ? ` (${a.city})` : ''}</option>
                       ))}
                     </select>
-                    <span className="sp-hint">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                      Choisissez l&apos;antenne la plus proche de votre lieu de résidence.
-                    </span>
                   </div>
                 </div>
               )}
 
-              {/* ── STEP 1 : Contact, Origine & Naissance ── */}
-              {step === 1 && (
-                <div className="sp-panel sp-stack">
-
-                  {/* Required legend */}
-                  <p className="sp-required-legend">
-                    <span>*</span> Les champs marqués d&apos;une étoile sont obligatoires.
-                  </p>
-
-                  <p className="sp-section-title">{t('signup.communityIdentity', 'Identité communautaire')}</p>
-
+              {/* ── ÉCRAN 4 : Poste dans l'association ── */}
+              {currentKey === 'associationRole' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.associationRole.title', "Quel poste occupez-vous dans l'association ?")} />
+                  <Explain>
+                    {t('signup.q.associationRole.explain', 'Si vous n\'avez pas de responsabilité particulière, choisissez « Membre (simple) ». C\'est le cas de la plupart des membres.')}
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.originCommune', 'Commune d\'origine')}<Req />
-                    </label>
                     <select
-                      className="sp-select"
-                      value={originSubPrefecture}
-                      onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}
-                      required
-                    >
-                      <option value="">{t('signup.selectCommune', 'Sélectionnez votre commune...')}</option>
-                      {COMMUNES_ORIGINE.map(commune => (
-                        <option key={commune} value={commune}>{commune}</option>
-                      ))}
-                    </select>
-                    {originSubPrefecture === 'Autre' && (
-                      <input
-                        className="sp-input"
-                        value={customOriginSubPrefecture}
-                        onChange={e => setCustomOriginSubPrefecture(e.target.value)}
-                        placeholder={t('signup.specifyCommune', 'Précisez votre commune')}
-                        required
-                        style={{ marginTop: '0.4rem' }}
-                      />
-                    )}
-                    <span className="sp-hint">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                      La commune de votre famille ou de votre village d&apos;origine en Guinée.
-                    </span>
-                  </div>
-
-                  <div className="sp-field">
-                    <label className="sp-role-label">
-                      <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                      </svg>
-                      {t('signup.associationRole', 'Poste occupé dans l\'association')}<Req />
-                    </label>
-                    <select
-                      className="sp-role-select"
+                      className="sp-role-select sp-select-big"
                       value={associationRole}
-                      onChange={e => { setAssociationRole(e.target.value); if(e.target.value !== 'Autre') setCustomAssociationRole(''); }}
+                      onChange={e => { setAssociationRole(e.target.value); if (e.target.value !== 'Autre') setCustomAssociationRole(''); }}
+                      onKeyDown={handleEnterAdvance}
+                      autoFocus
                       required
                     >
                       <option value="">{t('signup.selectRole', 'Sélectionnez un poste…')}</option>
@@ -854,76 +976,146 @@ export default function MemberSignupPage() {
                         <option key={r} value={r}>{r}</option>
                       ))}
                     </select>
-                    {associationRole === 'Autre' && (
-                      <input
-                        className="sp-input"
-                        value={customAssociationRole}
-                        onChange={e => setCustomAssociationRole(e.target.value)}
-                        placeholder={t('signup.specifyRole', 'Précisez le poste occupé')}
-                        required
-                        style={{ marginTop: '0.4rem' }}
-                      />
-                    )}
                     {associationRole && associationRole !== 'Membre (simple)' && associationRole !== 'Autre' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.3rem', fontSize: '.68rem', fontWeight: 700, color: '#047857' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '.35rem', marginTop: '.5rem', fontSize: '.72rem', fontWeight: 700, color: '#047857' }}>
                         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                         </svg>
                         {associationRole} {t('signup.selected', 'sélectionné(e)')}
                       </div>
                     )}
-                    <span className="sp-hint">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                      Si vous n&apos;avez pas de poste particulier, choisissez &quot;Membre (simple)&quot;.
-                    </span>
                   </div>
+                </div>
+              )}
 
-                  <p className="sp-section-title" style={{ marginTop: '0.25rem' }}>{t('signup.birthOrigin', 'Naissance & Origine')}</p>
-                  <div className="sp-grid-2">
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        {t('signup.birthDate', 'Date de naissance')}<Req />
-                        <span className="sp-opt">(JJ/MM/AAAA)</span>
-                      </label>
-                      <input
-                        className="sp-input"
-                        type="text"
-                        value={birthDate}
-                        onChange={handleBirthDateChange}
-                        placeholder="12/05/1990"
-                        required
-                      />
-                      <span className="sp-hint">
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                        Format : jour/mois/année. Âge minimum requis : 16 ans.
-                      </span>
-                    </div>
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        {t('signup.birthPlace', 'Lieu de naissance')}<Req />
-                      </label>
-                      <input
-                        className="sp-input"
-                        value={placeOfBirth}
-                        onChange={e => setPlaceOfBirth(e.target.value)}
-                        placeholder="Ex : Pita, Lélouma"
-                        required
-                      />
-                      <span className="sp-hint">
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                        Ville ou préfecture de naissance.
-                      </span>
-                    </div>
-                  </div>
-
+              {/* ── ÉCRAN 4b (conditionnel) : Précisez le poste ── */}
+              {currentKey === 'associationRoleOther' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.associationRoleOther.title', 'Précisez votre poste')} />
+                  <Explain>
+                    {t('signup.q.associationRoleOther.explain', "Écrivez en quelques mots le poste que vous occupez dans l'association.")}
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.birthCountry', 'Pays de naissance')}<Req />
-                    </label>
+                    <input
+                      className="sp-input sp-input-big"
+                      value={customAssociationRole}
+                      onChange={e => setCustomAssociationRole(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder={t('signup.specifyRole', 'Précisez le poste occupé')}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 5 : Commune d'origine ── */}
+              {currentKey === 'originSubPrefecture' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.originCommune.title', 'Quelle est votre commune d\'origine ?')} />
+                  <Explain>
+                    {t('signup.q.originCommune.explain', "C'est la commune ou le village d'où vient votre famille en Guinée, même si vous n'y avez jamais habité vous-même.")}
+                    <Example>{t('signup.q.originCommune.example', 'Exemple : Lafou, Manda, Korbé.')}</Example>
+                  </Explain>
+                  <div className="sp-field">
                     <select
-                      className="sp-select"
+                      className="sp-select sp-select-big"
+                      value={originSubPrefecture}
+                      onChange={e => { setOriginSubPrefecture(e.target.value); if (e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}
+                      onKeyDown={handleEnterAdvance}
+                      autoFocus
+                      required
+                    >
+                      <option value="">{t('signup.selectCommune', 'Sélectionnez votre commune...')}</option>
+                      {COMMUNES_ORIGINE.map(commune => (
+                        <option key={commune} value={commune}>{commune}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 5b (conditionnel) : Précisez la commune ── */}
+              {currentKey === 'originSubPrefectureOther' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.originCommuneOther.title', 'Précisez votre commune d\'origine')} />
+                  <Explain>
+                    {t('signup.q.originCommuneOther.explain', 'Écrivez le nom de votre commune ou village d\'origine.')}
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      value={customOriginSubPrefecture}
+                      onChange={e => setCustomOriginSubPrefecture(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder={t('signup.specifyCommune', 'Précisez votre commune')}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 6 : Date de naissance ── */}
+              {currentKey === 'birthDate' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.birthDate.title', 'Quelle est votre date de naissance ?')} />
+                  <Explain>
+                    {t('signup.q.birthDate.explain', "Écrivez le jour, puis le mois, puis l'année, séparés par une barre ( / ).")}
+                    <Example>{t('signup.q.birthDate.example', 'Exemple : né le 12 mai 1990 → écrivez 12/05/1990. Il faut avoir au moins 16 ans pour vous inscrire.')}</Example>
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      type="text"
+                      inputMode="numeric"
+                      value={birthDate}
+                      onChange={handleBirthDateChange}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="12/05/1990"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 7 : Lieu de naissance ── */}
+              {currentKey === 'placeOfBirth' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.birthPlace.title', 'Où êtes-vous né(e) ?')} />
+                  <Explain>
+                    {t('signup.q.birthPlace.explain', "Écrivez le nom de la ville ou de la préfecture où vous êtes né(e).")}
+                    <Example>{t('signup.q.birthPlace.example', 'Exemple : Pita, Conakry, Lélouma.')}</Example>
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      value={placeOfBirth}
+                      onChange={e => setPlaceOfBirth(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="Ex : Pita, Lélouma"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 8 : Pays de naissance ── */}
+              {currentKey === 'birthCountry' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.birthCountry.title', 'Dans quel pays êtes-vous né(e) ?')} />
+                  <Explain>
+                    {t('signup.q.birthCountry.explain', 'Choisissez le pays où vous êtes né(e) dans la liste. S\'il n\'y figure pas, choisissez « Autre » à la fin de la liste.')}
+                  </Explain>
+                  <div className="sp-field">
+                    <select
+                      className="sp-select sp-select-big"
                       value={birthCountry}
                       onChange={e => { setBirthCountry(e.target.value); if (e.target.value !== 'Autre') setCustomBirthCountry(''); }}
+                      onKeyDown={handleEnterAdvance}
+                      autoFocus
                       required
                     >
                       <option value="">{t('signup.selectCountry', 'Sélectionnez un pays...')}</option>
@@ -931,28 +1123,46 @@ export default function MemberSignupPage() {
                         <option key={`birth-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
-                    {birthCountry === 'Autre' && (
-                      <input
-                        className="sp-input"
-                        value={customBirthCountry}
-                        onChange={e => setCustomBirthCountry(e.target.value)}
-                        placeholder={t('signup.specifyCountry', 'Précisez votre pays')}
-                        required
-                        style={{ marginTop: '0.4rem' }}
-                      />
-                    )}
                   </div>
+                </div>
+              )}
 
-                  <p className="sp-section-title">{t('signup.contactProfession', 'Coordonnées & Profession')}</p>
-
+              {/* ── ÉCRAN 8b (conditionnel) : Précisez le pays de naissance ── */}
+              {currentKey === 'birthCountryOther' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.birthCountryOther.title', 'Précisez votre pays de naissance')} />
+                  <Explain>
+                    {t('signup.q.birthCountryOther.explain', 'Écrivez le nom du pays où vous êtes né(e).')}
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.residenceCountry', 'Pays de résidence')}<Req />
-                    </label>
+                    <input
+                      className="sp-input sp-input-big"
+                      value={customBirthCountry}
+                      onChange={e => setCustomBirthCountry(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder={t('signup.specifyCountry', 'Précisez votre pays')}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 9 : Pays de résidence ── */}
+              {currentKey === 'country' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.residenceCountry.title', 'Dans quel pays habitez-vous actuellement ?')} />
+                  <Explain>
+                    {t('signup.q.residenceCountry.explain', "C'est le pays où vous vivez aujourd'hui, pas forcément celui où vous êtes né(e).")}
+                    <Example>{t('signup.q.residenceCountry.example', "L'indicatif téléphonique de votre numéro sera rempli automatiquement selon ce choix.")}</Example>
+                  </Explain>
+                  <div className="sp-field">
                     <select
-                      className="sp-select"
+                      className="sp-select sp-select-big"
                       value={country}
                       onChange={e => { setCountry(e.target.value); if (e.target.value !== 'Autre') setCustomCountry(''); }}
+                      onKeyDown={handleEnterAdvance}
+                      autoFocus
                       required
                     >
                       <option value="">{t('signup.selectCountry', 'Sélectionnez votre pays...')}</option>
@@ -960,66 +1170,91 @@ export default function MemberSignupPage() {
                         <option key={`res-${c.code}`} value={c.name}>{c.name}</option>
                       ))}
                     </select>
-                    {country === 'Autre' && (
-                      <input
-                        className="sp-input"
-                        value={customCountry}
-                        onChange={e => setCustomCountry(e.target.value)}
-                        placeholder={t('signup.specifyCountry', 'Précisez votre pays')}
-                        required
-                        style={{ marginTop: '0.4rem' }}
-                      />
-                    )}
-                    <span className="sp-hint">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                      Sélectionnez d&apos;abord votre pays pour que l&apos;indicatif téléphonique se mette à jour automatiquement.
-                    </span>
                   </div>
+                </div>
+              )}
 
-                  <div className="sp-grid-2">
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        Email<Req />
-                      </label>
-                      <input
-                        className="sp-input"
-                        type="email"
-                        value={email}
-                        onChange={e => setEmail(e.target.value)}
-                        placeholder="vous@exemple.com"
-                        required
-                      />
-                      <span className="sp-hint">
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                        Un email de vérification vous sera envoyé ici.
-                      </span>
-                    </div>
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        {t('signup.phone', 'Téléphone')}<Req />
-                      </label>
-                      <input
-                        className="sp-input"
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
-                        placeholder={country ? t('signup.enterPhone', "Entrez le numéro") : t('signup.phoneHint', "Sélectionnez un pays d'abord")}
-                        required
-                      />
-                      <span className="sp-hint">
-                        <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                        Indicatif + numéro. Ex : +224 621 00 00 00
-                      </span>
-                    </div>
-                  </div>
-
+              {/* ── ÉCRAN 9b (conditionnel) : Précisez le pays de résidence ── */}
+              {currentKey === 'countryOther' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.residenceCountryOther.title', 'Précisez votre pays de résidence')} />
+                  <Explain>
+                    {t('signup.q.residenceCountryOther.explain', 'Écrivez le nom du pays où vous vivez actuellement.')}
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.profession', 'Profession / Situation')}<Req />
-                    </label>
+                    <input
+                      className="sp-input sp-input-big"
+                      value={customCountry}
+                      onChange={e => setCustomCountry(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder={t('signup.specifyCountry', 'Précisez votre pays')}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 10 : Email ── */}
+              {currentKey === 'email' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.email.title', 'Quelle est votre adresse email ?')} />
+                  <Explain>
+                    {t('signup.q.email.explain', 'Une adresse email ressemble à ceci : nom@gmail.com. Si vous n\'en avez pas, demandez à une personne de confiance de vous aider à en créer une avant de continuer.')}
+                    <Example>{t('signup.q.email.example', 'Nous vous enverrons un message à cette adresse pour vérifier votre compte.')}</Example>
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      type="email"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="vous@exemple.com"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 11 : Téléphone ── */}
+              {currentKey === 'phone' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.phone.title', 'Quel est votre numéro de téléphone ?')} />
+                  <Explain>
+                    {t('signup.q.phone.explain', "L'indicatif de votre pays a déjà été ajouté automatiquement. Écrivez la suite : votre numéro, sans espace inutile.")}
+                    <Example>{t('signup.q.phone.example', 'Exemple : +224 621 00 00 00')}</Example>
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      type="tel"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder={country ? t('signup.enterPhone', 'Entrez le numéro') : t('signup.phoneHint', "Sélectionnez d'abord votre pays de résidence")}
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 12 : Profession ── */}
+              {currentKey === 'profession' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.profession.title', 'Quelle est votre profession ou votre situation actuelle ?')} />
+                  <Explain>
+                    {t('signup.q.profession.explain', 'Choisissez ce qui décrit le mieux votre situation aujourd\'hui.')}
+                  </Explain>
+                  <div className="sp-field">
                     <select
-                      className="sp-select"
+                      className="sp-select sp-select-big"
                       value={profession}
                       onChange={e => setProfession(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      autoFocus
                       required
                     >
                       <option value="">{t('signup.selectProfession', 'Sélectionnez une profession')}</option>
@@ -1028,67 +1263,83 @@ export default function MemberSignupPage() {
                       ))}
                     </select>
                   </div>
+                </div>
+              )}
 
-                  <p className="sp-section-title">{t('signup.residenceAddress', 'Adresse de résidence')}</p>
-                  
-                  <div className="sp-grid-2">
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        {t('signup.city', 'Ville')}<Req />
-                      </label>
-                      <input
-                        className="sp-input"
-                        value={city}
-                        onChange={e => setCity(e.target.value)}
-                        placeholder="Ex : Paris, Conakry"
-                        required
-                      />
-                    </div>
-                    <div className="sp-field">
-                      <label className="sp-label">
-                        {t('signup.postalCode', 'Code postal')}
-                        <span className="sp-opt">({t('signup.optional', 'optionnel')})</span>
-                      </label>
-                      <input
-                        className="sp-input"
-                        value={postalCode}
-                        onChange={e => setPostalCode(e.target.value)}
-                        placeholder="Ex : 75001"
-                        maxLength={5}
-                      />
-                    </div>
-                  </div>
-
+              {/* ── ÉCRAN 13 : Ville ── */}
+              {currentKey === 'city' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.city.title', 'Dans quelle ville habitez-vous ?')} />
+                  <Explain>
+                    {t('signup.q.city.explain', 'Écrivez le nom de la ville où vous vivez actuellement.')}
+                    <Example>{t('signup.q.city.example', 'Exemple : Paris, Conakry, Dakar.')}</Example>
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.address1', 'Adresse de résidence')}<Req />
-                    </label>
                     <input
-                      className="sp-input"
-                      value={addressLine1}
-                      onChange={e => setAddressLine1(e.target.value)}
-                      placeholder="Ex : 12 rue des Fleurs, Apt 3"
+                      className="sp-input sp-input-big"
+                      value={city}
+                      onChange={e => setCity(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="Ex : Paris, Conakry"
+                      autoFocus
                       required
                     />
-                    <span className="sp-hint">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                      Numéro, rue, bâtiment ou quartier.
-                    </span>
                   </div>
                 </div>
               )}
 
-              {/* ── STEP 2 : Photo ── */}
-              {step === 2 && (
-                <div className="sp-panel sp-stack">
-                  <p className="sp-section-title">{t('signup.profilePhoto', 'Photo de profil')}</p>
-
-                  <div className="sp-notice">
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2" style={{ flexShrink: 0, marginTop: '1px' }}>
-                      <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
-                    </svg>
-                    La photo est <strong>facultative</strong> mais recommandée — elle apparaîtra sur votre carte membre et facilitera votre identification par l&apos;administrateur.
+              {/* ── ÉCRAN 14 : Code postal (facultatif) ── */}
+              {currentKey === 'postalCode' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.postalCode.title', 'Quel est votre code postal ?')} optional={t('signup.optional', 'Facultatif')} />
+                  <Explain>
+                    {t('signup.q.postalCode.explain', "C'est une suite de chiffres qui correspond à votre quartier ou votre ville.")}
+                    <Example>{t('signup.q.postalCode.example', 'Si vous ne le connaissez pas, laissez cette question vide et appuyez sur « Continuer ».')}</Example>
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      value={postalCode}
+                      onChange={e => setPostalCode(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="Ex : 75001"
+                      maxLength={5}
+                      autoFocus
+                    />
                   </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 15 : Adresse exacte ── */}
+              {currentKey === 'addressLine1' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.address.title', 'Quelle est votre adresse exacte ?')} />
+                  <Explain>
+                    {t('signup.q.address.explain', 'Écrivez le numéro de la maison, le nom de la rue, ou le nom de votre quartier.')}
+                    <Example>{t('signup.q.address.example', 'Exemple : 12 rue des Fleurs, ou Quartier Madina.')}</Example>
+                  </Explain>
+                  <div className="sp-field">
+                    <input
+                      className="sp-input sp-input-big"
+                      value={addressLine1}
+                      onChange={e => setAddressLine1(e.target.value)}
+                      onKeyDown={handleEnterAdvance}
+                      placeholder="Ex : 12 rue des Fleurs, Apt 3"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 16 : Photo (facultative, bouton Passer dédié) ── */}
+              {currentKey === 'photo' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.photo.title', 'Voulez-vous ajouter une photo de vous ?')} optional={t('signup.optional', 'Facultatif')} />
+                  <Explain>
+                    {t('signup.q.photo.explain', 'Cette photo apparaîtra sur votre carte de membre et aidera les responsables à vous reconnaître.')}
+                    <Example>{t('signup.q.photo.example', 'Si vous n\'avez pas de photo sous la main, appuyez sur « Passer cette étape » plus bas.')}</Example>
+                  </Explain>
 
                   <div className="sp-photo-box">
                     <div className="sp-photo-avatar">
@@ -1129,32 +1380,30 @@ export default function MemberSignupPage() {
                     </div>
 
                     <p style={{ marginTop: '0.85rem', fontSize: '0.7rem', color: '#94A3B8', fontWeight: 500 }}>
-                      Formats acceptés : JPG, PNG, WEBP · Taille max : 5 Mo
+                      {t('signup.photoFormats', 'Formats acceptés : JPG, PNG, WEBP · Taille max : 5 Mo')}
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* ── STEP 3 : Sécurité ── */}
-              {step === 3 && (
-                <div className="sp-panel sp-stack">
-                  {/* Required legend */}
-                  <p className="sp-required-legend">
-                    <span>*</span> Les champs marqués d&apos;une étoile sont obligatoires.
-                  </p>
-
-                  <p className="sp-section-title">{t('signup.passwordTitle', 'Mot de passe')}</p>
+              {/* ── ÉCRAN 17 : Mot de passe ── */}
+              {currentKey === 'password' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.password.title', 'Choisissez un mot de passe')} />
+                  <Explain>
+                    {t('signup.q.password.explain', 'Le mot de passe protège votre compte, comme une clé. Il doit contenir au moins 8 caractères.')}
+                    <Example>{t('signup.q.password.example', "Pour qu'il soit plus difficile à deviner, mélangez des lettres et des chiffres. Ne le donnez à personne et gardez-le en lieu sûr.")}</Example>
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.passwordTitle', 'Mot de passe')}<Req />
-                    </label>
                     <div className="sp-input-wrap">
                       <input
-                        className="sp-input has-icon"
+                        className="sp-input sp-input-big has-icon"
                         type={showPwd ? 'text' : 'password'}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
+                        onKeyDown={handleEnterAdvance}
                         placeholder={t('signup.pwdMin', '8 caractères minimum')}
+                        autoFocus
                         required
                       />
                       <button type="button" className="sp-eye-btn" onClick={() => setShowPwd(v => !v)}>
@@ -1175,22 +1424,27 @@ export default function MemberSignupPage() {
                         <span className="sp-pwd-label" style={{ color: strengthColor }}>{strengthLabel}</span>
                       </div>
                     )}
-                    <span className="sp-hint">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                      Pour un mot de passe fort : mélangez majuscules, chiffres et symboles.
-                    </span>
                   </div>
+                </div>
+              )}
+
+              {/* ── ÉCRAN 18 : Confirmation du mot de passe ── */}
+              {currentKey === 'passwordConfirm' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.passwordConfirm.title', 'Écrivez à nouveau le même mot de passe')} />
+                  <Explain>
+                    {t('signup.q.passwordConfirm.explain', "C'est juste pour vérifier que vous n'avez pas fait d'erreur en le tapant la première fois.")}
+                  </Explain>
                   <div className="sp-field">
-                    <label className="sp-label">
-                      {t('signup.confirmPwd', 'Confirmer le mot de passe')}<Req />
-                    </label>
                     <div className="sp-input-wrap">
                       <input
-                        className="sp-input has-icon"
+                        className="sp-input sp-input-big has-icon"
                         type={showPwd2 ? 'text' : 'password'}
                         value={passwordConfirm}
                         onChange={e => setPasswordConfirm(e.target.value)}
+                        onKeyDown={handleEnterAdvance}
                         placeholder={t('signup.retypePwd', 'Répétez le mot de passe')}
+                        autoFocus
                         required
                       />
                       <button type="button" className="sp-eye-btn" onClick={() => setShowPwd2(v => !v)}>
@@ -1204,17 +1458,26 @@ export default function MemberSignupPage() {
                     {passwordConfirm && password !== passwordConfirm && (
                       <span className="sp-hint" style={{ color: '#DC2626' }}>
                         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/></svg>
-                        Les mots de passe ne correspondent pas encore.
+                        {t('signup.pwdNoMatchYet', 'Les mots de passe ne correspondent pas encore.')}
                       </span>
                     )}
                     {passwordConfirm && password === passwordConfirm && (
                       <span className="sp-hint" style={{ color: '#047857' }}>
                         <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
-                        Les mots de passe correspondent.
+                        {t('signup.pwdMatch', 'Les mots de passe correspondent.')}
                       </span>
                     )}
                   </div>
+                </div>
+              )}
 
+              {/* ── ÉCRAN 19 : Mentions légales + soumission finale ── */}
+              {currentKey === 'terms' && (
+                <div className="sp-panel sp-stack sp-question-anim" key={step}>
+                  <QuestionHeader title={t('signup.q.terms.title', 'Dernière étape !')} />
+                  <Explain>
+                    {t('signup.q.terms.explain', "Pour terminer votre inscription, merci de lire et d'accepter les règles de l'association.")}
+                  </Explain>
                   <div className="sp-checkbox-wrapper">
                     <input 
                       type="checkbox" 
@@ -1229,7 +1492,6 @@ export default function MemberSignupPage() {
                       <span style={{ color: '#DC2626', marginLeft: '0.2rem', fontWeight: 900 }}>*</span>
                     </label>
                   </div>
-
                 </div>
               )}
 
@@ -1253,20 +1515,37 @@ export default function MemberSignupPage() {
                     {t('signup.back', 'Retour')}
                   </button>
                 )}
-                {step < STEPS.length - 1 ? (
-                  <button type="button" className="sp-btn-next" onClick={nextStep} disabled={step === 2 && !!photoError}>
-                    {t('signup.continue', 'Continuer')}
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                ) : (
+
+                {currentKey === 'photo' ? (
+                  photoPreviewUrl ? (
+                    <button type="button" className="sp-btn-next" onClick={nextStep}>
+                      {t('signup.continue', 'Continuer')}
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <button type="button" className="sp-btn-skip" onClick={skipPhotoStep}>
+                      {t('signup.skipStep', 'Passer cette étape')}
+                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )
+                ) : currentKey === 'terms' ? (
                   <button type="submit" className="sp-btn-submit" disabled={submitting || !termsAccepted}>
                     {submitting ? (
                       <><div className="sp-spinner" /> {t('signup.submitting', 'Envoi en cours…')}</>
                     ) : (
                       <>{t('signup.createAccount', 'Créer mon compte')}</>
                     )}
+                  </button>
+                ) : (
+                  <button type="button" className="sp-btn-next" onClick={nextStep}>
+                    {t('signup.continue', 'Continuer')}
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5" style={{ transform: isRTL ? 'rotate(180deg)' : 'none' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
                   </button>
                 )}
               </div>
