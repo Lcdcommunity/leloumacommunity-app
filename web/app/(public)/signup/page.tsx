@@ -242,33 +242,35 @@ export default function MemberSignupPage() {
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        if (parsed.step !== undefined) setStep(parsed.step);
-        if (parsed.firstName) setFirstName(parsed.firstName);
-        if (parsed.lastName) setLastName(parsed.lastName);
-        if (parsed.antennaId) setAntennaId(parsed.antennaId);
-        if (parsed.email) setEmail(parsed.email);
-        if (parsed.phone) setPhone(parsed.phone);
-        if (parsed.originSubPrefecture) setOriginSubPrefecture(parsed.originSubPrefecture);
-        if (parsed.customOriginSubPrefecture) setCustomOriginSubPrefecture(parsed.customOriginSubPrefecture);
-        if (parsed.birthDate) setBirthDate(parsed.birthDate);
-        if (parsed.placeOfBirth) setPlaceOfBirth(parsed.placeOfBirth);
-        if (parsed.birthCountry) setBirthCountry(parsed.birthCountry);
-        if (parsed.customBirthCountry) setCustomBirthCountry(parsed.customBirthCountry);
-        if (parsed.city) setCity(parsed.city);
-        if (parsed.country) setCountry(parsed.country);
-        if (parsed.customCountry) setCustomCountry(parsed.customCountry);
-        if (parsed.postalCode) setPostalCode(parsed.postalCode);
-        if (parsed.addressLine1) setAddressLine1(parsed.addressLine1);
-        if (parsed.profession) setProfession(parsed.profession);
-        if (parsed.associationRole) setAssociationRole(parsed.associationRole);
-        if (parsed.customAssociationRole) setCustomAssociationRole(parsed.customAssociationRole);
-        if (parsed.termsAccepted) setTermsAccepted(parsed.termsAccepted);
+        queueMicrotask(() => {
+          if (parsed.step !== undefined) setStep(parsed.step);
+          if (parsed.firstName) setFirstName(parsed.firstName);
+          if (parsed.lastName) setLastName(parsed.lastName);
+          if (parsed.antennaId) setAntennaId(parsed.antennaId);
+          if (parsed.email) setEmail(parsed.email);
+          if (parsed.phone) setPhone(parsed.phone);
+          if (parsed.originSubPrefecture) setOriginSubPrefecture(parsed.originSubPrefecture);
+          if (parsed.customOriginSubPrefecture) setCustomOriginSubPrefecture(parsed.customOriginSubPrefecture);
+          if (parsed.birthDate) setBirthDate(parsed.birthDate);
+          if (parsed.placeOfBirth) setPlaceOfBirth(parsed.placeOfBirth);
+          if (parsed.birthCountry) setBirthCountry(parsed.birthCountry);
+          if (parsed.customBirthCountry) setCustomBirthCountry(parsed.customBirthCountry);
+          if (parsed.city) setCity(parsed.city);
+          if (parsed.country) setCountry(parsed.country);
+          if (parsed.customCountry) setCustomCountry(parsed.customCountry);
+          if (parsed.postalCode) setPostalCode(parsed.postalCode);
+          if (parsed.addressLine1) setAddressLine1(parsed.addressLine1);
+          if (parsed.profession) setProfession(parsed.profession);
+          if (parsed.associationRole) setAssociationRole(parsed.associationRole);
+          if (parsed.customAssociationRole) setCustomAssociationRole(parsed.customAssociationRole);
+          if (parsed.termsAccepted) setTermsAccepted(parsed.termsAccepted);
+        });
       } catch (e) {
         console.error("Erreur lors de la restauration du formulaire", e);
       }
     }
 
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
     void (async () => {
       try {
         const items = await api.listPublicAntennasForSignup();
@@ -282,7 +284,7 @@ export default function MemberSignupPage() {
 
     if (i18n.isInitialized) {
       const detectedLang = i18n.language || localStorage.getItem('i18nextLng') || 'fr';
-      setCurrentLang(detectedLang);
+      queueMicrotask(() => setCurrentLang(detectedLang));
     }
     i18n.on('languageChanged', handleLanguageChanged);
 
@@ -342,17 +344,19 @@ export default function MemberSignupPage() {
     if (country && country !== 'Autre') {
       const selectedCountry = COUNTRIES.find(c => c.name === country);
       if (selectedCountry) {
-        setPhone(prevPhone => {
-          if (!prevPhone || prevPhone.trim() === '' || !prevPhone.includes(' ')) {
-            return `${selectedCountry.dial} `;
-          } else {
-            const phoneParts = prevPhone.split(' ');
-            if (phoneParts.length > 1) {
-              phoneParts[0] = selectedCountry.dial;
-              return phoneParts.join(' ');            
+        queueMicrotask(() => {
+          setPhone(prevPhone => {
+            if (!prevPhone || prevPhone.trim() === '' || !prevPhone.includes(' ')) {
+              return `${selectedCountry.dial} `;
+            } else {
+              const phoneParts = prevPhone.split(' ');
+              if (phoneParts.length > 1) {
+                phoneParts[0] = selectedCountry.dial;
+                return phoneParts.join(' ');            
+              }
+              return prevPhone;
             }
-            return prevPhone;
-          }
+          });
         });
       }
     }
