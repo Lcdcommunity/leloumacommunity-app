@@ -180,6 +180,25 @@ export interface TransferSenderInfo {
   antennaName: string;
   currency: string;
 }
+export interface SuperAdminTransferItem extends AntennaTransfer {
+  validatedBy?: string | null;
+  rejectedBy?: string | null;
+  rejectedAt?: string | null;
+}
+
+export interface SuperAdminTransfersResponse {
+  items: SuperAdminTransferItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  stats: {
+    pending: number;
+    validated: number;
+    rejected: number;
+    total: number;
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT
@@ -1333,4 +1352,11 @@ export const api = {
   /** Annuler un virement envoyé (avant validation) */
   cancelTransfer: (id: string) =>
     http<{ success: boolean }>(`/transfers/${id}/cancel`, { method: 'PATCH' }),
+  /** [SUPER_ADMIN] Vue globale en lecture seule de tous les virements, toutes antennes confondues */
+  getAllTransfersSuperAdmin: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string }) =>
+    http<SuperAdminTransfersResponse>(
+      `/super-admin/transfers?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
+      }${params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''}`
+    ),
 };

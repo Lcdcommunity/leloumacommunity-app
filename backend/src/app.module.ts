@@ -34,6 +34,8 @@ import { ExpensesModule } from './modules/expenses/expenses.module';
 import { EventsModule } from './modules/events/events.module';
 import { SponsorsModule } from './modules/sponsors/sponsors.module';
 import { TransfersModule } from './modules/transfers/transfers.module';
+// 🔥 NOUVEAU : vue lecture seule des virements pour SUPER_ADMIN (toutes antennes)
+import { SuperAdminTransfersModule } from './modules/transfers/super-admin-transfers.module';
 import { SystemAdminModule } from './modules/system-admin/system-admin.module';
 import { PublicModule } from './modules/public/public.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
@@ -85,6 +87,7 @@ import { ElectionsModule } from './modules/elections/elections.module';
     EventsModule,
     SponsorsModule,
     TransfersModule,
+    SuperAdminTransfersModule, // 🔥 NOUVEAU
     SystemAdminModule,
     PublicModule,
     DashboardModule,

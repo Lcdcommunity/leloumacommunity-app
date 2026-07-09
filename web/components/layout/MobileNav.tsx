@@ -90,6 +90,8 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/approvals',     label: 'Validations comptes', ico: E.shield,       section: 'Gestion'   },
   { href: '/super-admin/contributions', label: 'Cotisations',         ico: E.contribution, section: 'Gestion'   },
   { href: '/super-admin/expenses',      label: 'Dépenses',            ico: E.creditCard,   section: 'Gestion'   },
+  // 🔥 NOUVEAU : Vue lecture seule des virements inter-antennes (toutes antennes)
+  { href: '/super-admin/transfers',     label: 'Virements',           ico: E.send,         section: 'Gestion'   },
   { href: '/super-admin/projects',      label: 'Projets',             ico: E.project,      section: 'Gestion'   },
   { href: '/super-admin/elections',     label: 'Élections',           ico: E.vote,         section: 'Gestion'   },
   { href: '/super-admin/events',        label: 'Événements',          ico: E.calendar,     section: 'Gestion'   },
