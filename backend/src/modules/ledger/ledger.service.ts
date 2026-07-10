@@ -21,18 +21,26 @@ export class LedgerService {
       select: { type: true, amount: true, currency: true },
     });
 
-    const signByType: Record<string, number> = {
+    // 🔥 CORRECTION CRITIQUE : Record<LedgerEntryType, number> au lieu de
+    // Record<string, number>. TypeScript exige maintenant TOUS les membres
+    // de l'enum — impossible qu'un type oublié retombe silencieusement sur
+    // +1 via un `?? 1`. C'est exactement ce qui s'est passé pour
+    // TRANSFER_OUT : il gonflait le solde de l'antenne expéditrice au lieu
+    // de le réduire.
+    const signByType: Record<LedgerEntryType, number> = {
       CONTRIBUTION_IN: 1,
       DONATION_IN: 1,
       MANUAL_ADJUSTMENT_IN: 1,
-      ANTENNA_EXPENSE_OUT: -1, // 🔥 CORRECTION CRITIQUE : Les dépenses d'antenne sont bien déduites !
+      TRANSFER_IN: 1,
+      ANTENNA_EXPENSE_OUT: -1,
       PROJECT_EXPENSE_OUT: -1,
       OPERATING_EXPENSE_OUT: -1,
       MANUAL_ADJUSTMENT_OUT: -1,
+      TRANSFER_OUT: -1,
     };
 
     const totalByCurrency = rows.reduce<Record<string, number>>((acc, row) => {
-      const sign = signByType[row.type] ?? 1;
+      const sign = signByType[row.type];
       const amount = toNumberDecimal(row.amount);
       acc[row.currency] = (acc[row.currency] ?? 0) + sign * amount;
       return acc;
@@ -52,7 +60,7 @@ export class LedgerService {
     const sensitiveTypes: LedgerEntryType[] = [
       LedgerEntryType.MANUAL_ADJUSTMENT_IN,
       LedgerEntryType.MANUAL_ADJUSTMENT_OUT,
-      LedgerEntryType.ANTENNA_EXPENSE_OUT, // 🔥 CORRECTION : Notifier aussi les dépenses d'antenne
+      LedgerEntryType.ANTENNA_EXPENSE_OUT,
       LedgerEntryType.PROJECT_EXPENSE_OUT,
       LedgerEntryType.OPERATING_EXPENSE_OUT,
     ];

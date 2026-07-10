@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { api, type SuperAdminTransferItem } from '@/lib/api-client';
 
 const STATUS: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -32,13 +33,34 @@ const fmtDateTime = (iso: string) =>
 
 const PAGE_SIZE = 20;
 
+const inputStyle: React.CSSProperties = {
+  width: '100%', border: '1px solid #E2E8F0', borderRadius: 10,
+  padding: '.65rem .85rem', fontSize: '.875rem', color: '#0F172A',
+  boxSizing: 'border-box', fontFamily: 'inherit', background: '#fff', outline: 'none',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '.72rem', fontWeight: 700, color: '#374151',
+  display: 'block', marginBottom: 5, marginTop: 12, letterSpacing: '.03em',
+};
+
 export default function SuperAdminTransfersPage() {
+  const router = useRouter();
+
   const [status, setStatus]         = useState('');
   const [page, setPage]             = useState(1);
   const [items, setItems]           = useState<SuperAdminTransferItem[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats]           = useState({ pending: 0, validated: 0, rejected: 0, total: 0 });
   const [loading, setLoading]       = useState(true);
+  const [refresh, setRefresh]       = useState(0);
+
+  const [editingTransfer, setEditingTransfer]     = useState<SuperAdminTransferItem | null>(null);
+  const [editSendAmount, setEditSendAmount]       = useState('');
+  const [editReceiveAmount, setEditReceiveAmount] = useState('');
+  const [editNotes, setEditNotes]                 = useState('');
+  const [editSubmitting, setEditSubmitting]       = useState(false);
+  const [editError, setEditError]                 = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -58,12 +80,75 @@ export default function SuperAdminTransfersPage() {
     };
     void load();
     return () => { cancelled = true; };
-  }, [status, page]);
+  }, [status, page, refresh]);
 
   const changeStatus = (k: string) => { setStatus(k); setPage(1); };
+  const triggerRefresh = () => setRefresh(v => v + 1);
+
+  const openEdit = (t: SuperAdminTransferItem) => {
+    setEditingTransfer(t);
+    setEditSendAmount(String(t.sendAmount));
+    setEditReceiveAmount(String(t.receiveAmount));
+    setEditNotes(t.notes ?? '');
+    setEditError('');
+  };
+
+  const closeEdit = () => {
+    setEditingTransfer(null);
+    setEditSendAmount('');
+    setEditReceiveAmount('');
+    setEditNotes('');
+    setEditError('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTransfer) return;
+    if (!editSendAmount || !editReceiveAmount || +editSendAmount <= 0 || +editReceiveAmount <= 0) {
+      setEditError('Les 2 montants doivent être des nombres positifs.');
+      return;
+    }
+    setEditSubmitting(true);
+    setEditError('');
+    try {
+      await api.updateTransferSuperAdmin(editingTransfer.id, {
+        sendAmount: +editSendAmount,
+        receiveAmount: +editReceiveAmount,
+        notes: editNotes.trim() || undefined,
+      });
+      closeEdit();
+      triggerRefresh();
+    } catch (e: unknown) {
+      setEditError(e instanceof Error ? e.message : 'Une erreur est survenue.');
+    } finally {
+      setEditSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (t: SuperAdminTransferItem) => {
+    const amountsLabel = `${fmt(t.sendAmount, t.sendCurrency)} → ${fmt(t.receiveAmount, t.receiveCurrency)}`;
+    const message = t.status === 'VALIDATED'
+      ? `Ce virement est VALIDÉ. Le supprimer annulera aussi son effet sur le solde des 2 antennes (${amountsLabel}). Cette action est irréversible. Continuer ?`
+      : `Supprimer ce virement (${amountsLabel}) ? Cette action est irréversible.`;
+    if (!confirm(message)) return;
+    await api.deleteTransferSuperAdmin(t.id);
+    if (items.length === 1 && page > 1) setPage(p => p - 1);
+    else triggerRefresh();
+  };
+
+  const editBtnEnabled = !editSubmitting && !!editSendAmount && !!editReceiveAmount && +editSendAmount > 0 && +editReceiveAmount > 0;
 
   return (
     <div style={{ padding: '1.5rem', maxWidth: 960, margin: '0 auto', fontFamily: 'DM Sans, sans-serif' }}>
+
+      {/* ── Retour ── */}
+      <button
+        onClick={() => router.back()}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748B',
+                 fontSize: '.875rem', padding: 0, marginBottom: 16, fontFamily: 'inherit',
+                 display: 'flex', alignItems: 'center', gap: 4 }}
+      >
+        ← Retour
+      </button>
 
       {/* ── En-tête ── */}
       <div style={{ marginBottom: '1.5rem' }}>
@@ -73,7 +158,7 @@ export default function SuperAdminTransfersPage() {
           Virements <span style={{ color: '#DC2626' }}>Inter-antennes</span>
         </h1>
         <p style={{ fontSize: '.82rem', color: '#64748B', margin: '4px 0 0' }}>
-          Lecture seule — toutes les antennes de l&apos;association
+          Toutes les antennes — modification et suppression possibles à tout moment
         </p>
       </div>
 
@@ -212,12 +297,32 @@ export default function SuperAdminTransfersPage() {
                         )}
                       </div>
 
-                      {/* Badge statut */}
-                      <span style={{ fontSize: '.68rem', fontWeight: 700, padding: '.2rem .65rem',
-                                     borderRadius: 99, background: st.bg, color: st.color,
-                                     border: `1px solid ${st.border}`, flexShrink: 0 }}>
-                        {st.label}
-                      </span>
+                      {/* Badge statut + actions */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
+                        <span style={{ fontSize: '.68rem', fontWeight: 700, padding: '.2rem .65rem',
+                                       borderRadius: 99, background: st.bg, color: st.color,
+                                       border: `1px solid ${st.border}` }}>
+                          {st.label}
+                        </span>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button
+                            onClick={() => openEdit(t)}
+                            style={{ padding: '.3rem .65rem', borderRadius: 8, border: 'none',
+                                     background: '#F1F5F9', color: '#334155',
+                                     fontSize: '.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                          >
+                            Modifier
+                          </button>
+                          <button
+                            onClick={() => handleDelete(t)}
+                            style={{ padding: '.3rem .65rem', borderRadius: 8, border: 'none',
+                                     background: '#FEF2F2', color: '#991B1B',
+                                     fontSize: '.72rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                          >
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );
@@ -255,6 +360,96 @@ export default function SuperAdminTransfersPage() {
           )}
         </div>
       </div>
+
+      {/* Modal Modifier */}
+      {editingTransfer && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      zIndex: 100, padding: '1rem' }}>
+          <div style={{ background: '#fff', borderRadius: 20, padding: '1.5rem',
+                        width: '100%', maxWidth: 420, boxShadow: '0 25px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FEF2F2',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>
+                  Modifier le virement
+                </h3>
+                {editingTransfer.status === 'VALIDATED' && (
+                  <p style={{ margin: '2px 0 0', fontSize: '.72rem', color: '#B45309', fontWeight: 600 }}>
+                    ⚠️ Déjà validé — le solde des 2 antennes sera réajusté automatiquement
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <p style={{ fontSize: '.78rem', color: '#64748B', margin: '0 0 4px' }}>
+              {editingTransfer.senderAntenna?.name ?? '—'} → {editingTransfer.receiverAntenna?.name ?? '—'}
+            </p>
+
+            <label style={labelStyle}>
+              MONTANT ENVOYÉ ({editingTransfer.sendCurrency}) <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              type="number" min="0.01" step="0.01"
+              value={editSendAmount}
+              onChange={e => setEditSendAmount(e.target.value)}
+              style={inputStyle}
+            />
+
+            <label style={labelStyle}>
+              MONTANT REÇU ({editingTransfer.receiveCurrency}) <span style={{ color: '#EF4444' }}>*</span>
+            </label>
+            <input
+              type="number" min="0.01" step="0.01"
+              value={editReceiveAmount}
+              onChange={e => setEditReceiveAmount(e.target.value)}
+              style={inputStyle}
+            />
+
+            <label style={labelStyle}>NOTE</label>
+            <textarea
+              value={editNotes}
+              onChange={e => setEditNotes(e.target.value)}
+              rows={3}
+              style={{ ...inputStyle, resize: 'vertical' }}
+            />
+
+            {editError && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 10,
+                            padding: '.6rem .85rem', fontSize: '.8rem', color: '#DC2626', marginTop: 10 }}>
+                {editError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+              <button
+                onClick={closeEdit}
+                style={{ padding: '.55rem 1.2rem', borderRadius: 10, border: '1px solid #E2E8F0',
+                         background: '#fff', color: '#374151', fontSize: '.875rem',
+                         cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
+              >
+                Annuler
+              </button>
+              <button
+                disabled={!editBtnEnabled}
+                onClick={handleSaveEdit}
+                style={{ padding: '.55rem 1.2rem', borderRadius: 10, border: 'none',
+                         color: '#fff', fontSize: '.875rem', fontWeight: 700,
+                         fontFamily: 'inherit', cursor: editBtnEnabled ? 'pointer' : 'not-allowed',
+                         background: editBtnEnabled ? '#DC2626' : '#FCA5A5',
+                         transition: 'background .15s' }}
+              >
+                {editSubmitting ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

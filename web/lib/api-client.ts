@@ -1359,4 +1359,11 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''}`
     ),
+    /** [SUPER_ADMIN] Modifier un virement (montants / notes), même déjà validé */
+  updateTransferSuperAdmin: (id: string, body: { sendAmount?: number; receiveAmount?: number; notes?: string }) =>
+    http<{ success: boolean }, typeof body>(`/super-admin/transfers/${id}`, { method: 'PATCH', body }),
+
+  /** [SUPER_ADMIN] Supprimer un virement, même déjà validé (nettoie le ledger associé) */
+  deleteTransferSuperAdmin: (id: string) =>
+    http<{ success: boolean }>(`/super-admin/transfers/${id}`, { method: 'DELETE' }),
 };

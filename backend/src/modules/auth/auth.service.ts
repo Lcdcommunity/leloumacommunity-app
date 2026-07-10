@@ -161,7 +161,7 @@ export class AuthService {
 
       if (userAssociation?.domainName) {
         const dbDomain = this.normalizeUrl(userAssociation.domainName);
-        
+
         // Autorisation si on est en local ou si les domaines normalisés correspondent
         const isLocal = requestDomain === 'localhost' || requestDomain === '127.0.0.1';
 
@@ -205,6 +205,11 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token requis');
     }
 
+    // rotateRefreshToken() relit l'utilisateur en base à CHAQUE appel (via
+    // `include: { user: true }` sur la session, requête live sans cache) et
+    // rejette déjà les comptes non ACTIVE. rotated.user.role / .status sont
+    // donc toujours à jour — une démotion ou une suspension est reflétée dès
+    // le prochain refresh, pas besoin de relire l'utilisateur une 2e fois ici.
     const rotated = await this.tokens.rotateRefreshToken(dto.refreshToken, meta);
     const accessToken = await this.tokens.signAccessToken(rotated.user);
 
