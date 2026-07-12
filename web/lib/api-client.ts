@@ -180,6 +180,12 @@ export interface TransferSenderInfo {
   antennaName: string;
   currency: string;
 }
+export interface MyTransferAntenna {
+  id: string;
+  name: string;
+  defaultCurrency: string;
+  city?: string | null;
+}
 export interface SuperAdminTransferItem extends AntennaTransfer {
   validatedBy?: string | null;
   rejectedBy?: string | null;
@@ -1303,20 +1309,25 @@ export const api = {
       body: { isActive },
     }),
 
-  // ==========================================
+// ==========================================
   // VIREMENTS INTER-ANTENNES
   // ==========================================
 
+  /** Antennes que l'admin gère — pour le sélecteur d'antenne expéditrice */
+  getMyTransferAntennas: () =>
+    http<MyTransferAntenna[]>('/transfers/my-antennas'),
+
   /** Infos de l'antenne expéditrice (nom + devise) — pré-remplissage formulaire */
-  getTransferSenderInfo: () =>
-    http<TransferSenderInfo>('/transfers/sender-info'),
+  getTransferSenderInfo: (antennaId?: string) =>
+    http<TransferSenderInfo>(`/transfers/sender-info${antennaId ? `?antennaId=${antennaId}` : ''}`),
 
   /** Liste des antennes disponibles comme destinations */
-  getTransferDestinations: () =>
-    http<TransferDestination[]>('/transfers/destinations'),
+  getTransferDestinations: (antennaId?: string) =>
+    http<TransferDestination[]>(`/transfers/destinations${antennaId ? `?antennaId=${antennaId}` : ''}`),
 
   /** Créer un nouveau virement (statut PENDING_VALIDATION) */
   createTransfer: (body: {
+    senderAntennaId?: string;
     receiverAntennaId: string;
     sendAmount: number;
     receiveAmount: number;
@@ -1324,18 +1335,20 @@ export const api = {
   }) =>
     http<AntennaTransfer, typeof body>('/transfers', { method: 'POST', body }),
 
-  /** Virements envoyés par mon antenne */
-  getTransfersSent: (params?: { page?: number; pageSize?: number }) =>
+  /** Virements envoyés (toutes mes antennes, filtrable par antennaId) */
+  getTransfersSent: (params?: { page?: number; pageSize?: number; antennaId?: string }) =>
     http<ApiListResponse<AntennaTransfer>>(
-      `/transfers/sent?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`
+      `/transfers/sent?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
+        params?.antennaId ? `&antennaId=${params.antennaId}` : ''
+      }`
     ),
 
-  /** Virements reçus par mon antenne */
-  getTransfersReceived: (params?: { page?: number; pageSize?: number; status?: string }) =>
+  /** Virements reçus (toutes mes antennes, filtrable par antennaId) */
+  getTransfersReceived: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string }) =>
     http<ApiListResponse<AntennaTransfer>>(
       `/transfers/received?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
-      }`
+      }${params?.antennaId ? `&antennaId=${params.antennaId}` : ''}`
     ),
 
   /** Valider un virement reçu (crée les 2 entrées ledger) */
@@ -1352,6 +1365,7 @@ export const api = {
   /** Annuler un virement envoyé (avant validation) */
   cancelTransfer: (id: string) =>
     http<{ success: boolean }>(`/transfers/${id}/cancel`, { method: 'PATCH' }),
+
   /** [SUPER_ADMIN] Vue globale en lecture seule de tous les virements, toutes antennes confondues */
   getAllTransfersSuperAdmin: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string }) =>
     http<SuperAdminTransfersResponse>(
@@ -1359,7 +1373,8 @@ export const api = {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''}`
     ),
-    /** [SUPER_ADMIN] Modifier un virement (montants / notes), même déjà validé */
+
+  /** [SUPER_ADMIN] Modifier un virement (montants / notes), même déjà validé */
   updateTransferSuperAdmin: (id: string, body: { sendAmount?: number; receiveAmount?: number; notes?: string }) =>
     http<{ success: boolean }, typeof body>(`/super-admin/transfers/${id}`, { method: 'PATCH', body }),
 

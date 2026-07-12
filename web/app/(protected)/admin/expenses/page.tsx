@@ -286,7 +286,10 @@ export default function AntennaAdminExpensesPage() {
     }
   }, [q, status, category]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement initial des données au montage : setLoading/setError sont déclenchés de façon synchrone au début de load() avant le premier "await" ; pattern standard de data-fetching, faux positif connu de la règle (cf. react/react#34743).
+    void load();
+  }, [load]);
 
   const totalAmount = items.reduce((acc, curr) => acc + (curr.status === 'VALIDATED' ? Number(curr.amount) : 0), 0);
   const pendingCount = items.filter(i => i.status === 'PENDING_VALIDATION').length;

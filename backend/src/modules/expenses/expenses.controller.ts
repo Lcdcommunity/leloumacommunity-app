@@ -20,15 +20,19 @@ export class ExpensesController {
     return this.expensesService.createAntennaExpense(user.id, dto);
   }
 
+  /** 🔥 CORRECTIF : category et q ajoutés — le frontend les envoyait déjà,
+   *  mais rien ici ne les lisait. */
   @Get('admin/expenses')
   @Roles(UserRole.ANTENNA_ADMIN, UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   listAdminExpenses(
     @CurrentUser() user: AuthUser,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
-    @Query('status') status?: string
+    @Query('status') status?: string,
+    @Query('category') category?: string,
+    @Query('q') q?: string,
   ) {
-    return this.expensesService.listAntennaExpenses(user.id, Number(page || 1), Number(pageSize || 20), status);
+    return this.expensesService.listAntennaExpenses(user.id, Number(page || 1), Number(pageSize || 20), status, category, q);
   }
 
   @Delete('admin/expenses/:id')
@@ -38,7 +42,7 @@ export class ExpensesController {
   }
 
   @Get('super-admin/expenses')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN) // 🔥 AJOUT SYSTEM_ADMIN
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   listSuperAdminExpenses(
     @CurrentUser() user: AuthUser,
     @Query('page') page?: string,
@@ -49,12 +53,12 @@ export class ExpensesController {
     @Query('endDate') endDate?: string
   ) {
     return this.expensesService.listSuperAdminExpenses(
-      user.associationId, 
-      Number(page || 1), 
-      Number(pageSize || 20), 
-      status, 
-      antennaId, 
-      startDate, 
+      user.associationId,
+      Number(page || 1),
+      Number(pageSize || 20),
+      status,
+      antennaId,
+      startDate,
       endDate
     );
   }
@@ -62,8 +66,8 @@ export class ExpensesController {
   @Patch('super-admin/expenses/:id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   updateSuperAdminExpense(
-    @CurrentUser() user: AuthUser, 
-    @Param('id') id: string, 
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
     @Body() dto: any
   ) {
     return this.expensesService.updateSuperAdminExpense(id, user.associationId, dto);
@@ -72,20 +76,20 @@ export class ExpensesController {
   @Delete('super-admin/expenses/:id')
   @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   deleteSuperAdminExpense(
-    @CurrentUser() user: AuthUser, 
+    @CurrentUser() user: AuthUser,
     @Param('id') id: string
   ) {
     return this.expensesService.deleteSuperAdminExpense(id, user.associationId);
   }
 
   @Patch('super-admin/expenses/:id/validate')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN) // 🔥 AJOUT SYSTEM_ADMIN
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   validateExpense(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.expensesService.validateExpense(user.id, user.associationId, id);
   }
 
   @Patch('super-admin/expenses/:id/reject')
-  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN) // 🔥 AJOUT SYSTEM_ADMIN
+  @Roles(UserRole.SUPER_ADMIN, UserRole.SYSTEM_ADMIN)
   rejectExpense(@CurrentUser() user: AuthUser, @Param('id') id: string, @Body() dto: RejectExpenseDto) {
     return this.expensesService.rejectExpense(user.id, user.associationId, id, dto.rejectionReason);
   }

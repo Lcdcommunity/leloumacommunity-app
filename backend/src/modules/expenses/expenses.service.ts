@@ -1,7 +1,7 @@
 // backend/src/modules/expenses/expenses.service.ts
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ExpenseStatus, LedgerEntryType, UserRole, ExpenseCategory, CurrencyCode, Prisma, NotificationType } from '@prisma/client';
+import { ExpenseStatus, LedgerEntryType, ExpenseCategory, CurrencyCode, PaymentMethod, Prisma, NotificationType } from '@prisma/client';
 import { CreateExpenseDto, RejectExpenseDto } from './dto/expense.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -9,7 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 export class ExpensesService {
   constructor(
     private prisma: PrismaService,
-    private notifications: NotificationsService, // 🔥 AJOUT CHIRURGICAL : Injection du service de notifications
+    private notifications: NotificationsService,
   ) {}
 
   // ==========================================
@@ -29,7 +29,14 @@ export class ExpensesService {
     const { antenna, association } = assignment;
     const currencyToUse = (dto.currency || antenna.defaultCurrency || 'EUR') as CurrencyCode;
 
-    // 1. Tenter de récupérer le seuil configuré par devise (Table Pricing)
+    // 🔒 Seuil décidé par devise (SUPER_ADMIN, table Pricing) uniquement.
+    // Le fallback historique sur Association.expenseValidationThreshold a
+    // été retiré : ce champ global était écrasé de façon incohérente selon
+    // l'onglet de devise actif au moment de la sauvegarde des réglages, ce
+    // qui produisait un seuil "au hasard" pour toute devise non explicitement
+    // configurée dans Pricing. Le seuil par devise doit être une décision
+    // explicite du SUPER_ADMIN pour CETTE devise (ex : France = 150€,
+    // Guinée = 1 000 000 GNF).
     const pricing = await this.prisma.pricing.findFirst({
       where: {
         associationId: association.id,
@@ -37,23 +44,10 @@ export class ExpensesService {
       }
     });
 
-    let threshold: number | null = null;
-
-    if (pricing && pricing.expenseValidationThreshold !== null && pricing.expenseValidationThreshold !== undefined) {
-      threshold = Number(pricing.expenseValidationThreshold);
-    } 
-    // 2. FALLBACK CRUCIAL : Si non trouvé dans Pricing, on cherche sur la table Association
-    else if (association.expenseValidationThreshold !== null && association.expenseValidationThreshold !== undefined) {
-      threshold = Number(association.expenseValidationThreshold);
-    }
-
-    // 🔥 LOGS DE DEBUGGING POUR LE TERMINAL DU BACKEND 🔥
-    console.log('\n--- DEBUG VALIDATION DÉPENSE ---');
-    console.log('1. Montant demandé :', dto.amount);
-    console.log('2. Seuil Pricing trouvé en BDD :', pricing?.expenseValidationThreshold);
-    console.log('3. Seuil Association trouvé en BDD :', association.expenseValidationThreshold);
-    console.log('4. Seuil final appliqué pour le test :', threshold);
-    console.log('--------------------------------\n');
+    const threshold: number | null =
+      pricing && pricing.expenseValidationThreshold !== null && pricing.expenseValidationThreshold !== undefined
+        ? Number(pricing.expenseValidationThreshold)
+        : null;
 
     // Dès que le montant est supérieur OU ÉGAL au seuil, on bloque en attente de validation
     const isAboveThreshold = threshold !== null && Number(dto.amount) >= threshold;
@@ -85,7 +79,7 @@ export class ExpensesService {
           antennaId: antenna.id,
           type: LedgerEntryType.ANTENNA_EXPENSE_OUT,
           amount: dto.amount,
-          currency: expense.currency, 
+          currency: expense.currency,
           title: `Dépense: ${expense.title}`,
           effectiveDate: expense.expenseDate,
           expenseId: expense.id,
@@ -93,7 +87,6 @@ export class ExpensesService {
         }
       });
     } else {
-      // 🔥 AJOUT CHIRURGICAL : Si au-dessus du seuil, on notifie les Super Admins (In-App + Push)
       await this.notifications.notifySuperAdminsWithPush(
         association.id,
         `Une dépense de ${expense.amount} ${expense.currency} pour l'antenne "${antenna.name}" nécessite votre validation.`,
@@ -105,7 +98,11 @@ export class ExpensesService {
     return expense;
   }
 
-  async listAntennaExpenses(adminUserId: string, page = 1, pageSize = 20, status?: string) {
+  // 🔥 CORRECTIF : ajout des filtres category et q (recherche par titre),
+  // déjà envoyés par le frontend (admin/expenses/page.tsx) mais jamais lus
+  // ici — les filtres "Recherche" et "Catégorie" de cette page n'avaient
+  // donc strictement aucun effet.
+  async listAntennaExpenses(adminUserId: string, page = 1, pageSize = 20, status?: string, category?: string, q?: string) {
     const assignment = await this.prisma.antennaAdminAssignment.findFirst({
       where: { adminUserId, isActive: true },
     });
@@ -114,7 +111,9 @@ export class ExpensesService {
     const where: Prisma.ExpenseWhereInput = {
       antennaId: assignment.antennaId,
       associationId: assignment.associationId, // 🔥 CLOISONNEMENT
-      ...(status ? { status: status as ExpenseStatus } : {})
+      ...(status ? { status: status as ExpenseStatus } : {}),
+      ...(category ? { category: category as ExpenseCategory } : {}),
+      ...(q ? { title: { contains: q, mode: 'insensitive' } } : {}),
     };
 
     const [total, items] = await Promise.all([
@@ -145,6 +144,8 @@ export class ExpensesService {
       throw new BadRequestException("Impossible de supprimer une dépense déjà validée.");
     }
 
+    // Pas de LedgerEntry à nettoyer ici : seule une dépense VALIDATED en
+    // possède une, et le garde ci-dessus exclut déjà ce cas de ce chemin.
     return this.prisma.expense.delete({ where: { id: expenseId } });
   }
 
@@ -160,7 +161,6 @@ export class ExpensesService {
       ...(antennaId ? { antennaId } : {})
     };
 
-    // Gestion du filtre par période de date
     if (startDate || endDate) {
       where.expenseDate = {};
       if (startDate) {
@@ -180,9 +180,9 @@ export class ExpensesService {
         orderBy: { expenseDate: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { 
+        include: {
           antenna: { select: { name: true } },
-          engagedByUser: { select: { firstName: true, lastName: true, email: true } } 
+          engagedByUser: { select: { firstName: true, lastName: true, email: true } }
         }
       })
     ]);
@@ -191,7 +191,6 @@ export class ExpensesService {
   }
 
   async validateExpense(superAdminId: string, associationId: string, expenseId: string) {
-    // 🔥 CLOISONNEMENT : On vérifie que la dépense appartient à l'asso du Super Admin
     const expense = await this.prisma.expense.findFirst({ 
       where: { id: expenseId, associationId } 
     });
@@ -217,7 +216,7 @@ export class ExpensesService {
           antennaId: expense.antennaId,
           type: LedgerEntryType.ANTENNA_EXPENSE_OUT,
           amount: expense.amount,
-          currency: expense.currency, 
+          currency: expense.currency,
           title: `Dépense validée: ${expense.title}`,
           effectiveDate: expense.expenseDate,
           expenseId: expense.id,
@@ -226,7 +225,6 @@ export class ExpensesService {
       })
     ]);
 
-    // 🔥 AJOUT CHIRURGICAL : Notifie l'admin d'antenne que sa dépense est validée (In-App + Push)
     await this.notifications.createForUserWithPush({
       associationId: updatedExpense.associationId,
       userId: updatedExpense.engagedByUserId,
@@ -241,7 +239,6 @@ export class ExpensesService {
   }
 
   async rejectExpense(superAdminId: string, associationId: string, expenseId: string, reason: string) {
-    // 🔥 CLOISONNEMENT
     const expense = await this.prisma.expense.findFirst({ 
       where: { id: expenseId, associationId } 
     });
@@ -262,7 +259,6 @@ export class ExpensesService {
       }
     });
 
-    // 🔥 AJOUT CHIRURGICAL : Notifie l'admin d'antenne du rejet (In-App + Push)
     await this.notifications.createForUserWithPush({
       associationId: updated.associationId,
       userId: updated.engagedByUserId,
@@ -276,30 +272,68 @@ export class ExpensesService {
     return { message: "Dépense rejetée.", expense: updated };
   }
 
-  async updateSuperAdminExpense(expenseId: string, associationId: string, dto: any) {
+  // 🔒 CORRECTIF : si la dépense est déjà VALIDATED (donc possède une
+  // LedgerEntry) et que le montant change, la LedgerEntry est resynchronisée
+  // dans la même transaction — sinon le solde de l'antenne divergeait
+  // silencieusement du montant réellement affiché sur la dépense.
+  async updateSuperAdminExpense(expenseId: string, associationId: string, dto: {
+    title?: string;
+    amount?: number;
+    category?: ExpenseCategory;
+    expenseDate?: string;
+    paymentMethod?: PaymentMethod;
+    description?: string;
+  }) {
     const expense = await this.prisma.expense.findFirst({ where: { id: expenseId, associationId } });
     if (!expense) throw new NotFoundException("Dépense introuvable.");
 
-    return this.prisma.expense.update({
-      where: { id: expenseId },
-      data: {
-        title: dto.title,
-        amount: dto.amount,
-        category: dto.category,
-        expenseDate: dto.expenseDate ? new Date(dto.expenseDate) : undefined,
-        paymentMethod: dto.paymentMethod,
-        description: dto.description
+    const newAmount = dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : expense.amount;
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.expense.update({
+        where: { id: expenseId },
+        data: {
+          title: dto.title,
+          amount: newAmount,
+          category: dto.category,
+          expenseDate: dto.expenseDate ? new Date(dto.expenseDate) : undefined,
+          paymentMethod: dto.paymentMethod,
+          description: dto.description,
+        }
+      });
+
+      if (expense.status === ExpenseStatus.VALIDATED && dto.amount !== undefined) {
+        const linkedEntry = await tx.ledgerEntry.findFirst({ where: { expenseId: expense.id } });
+        if (linkedEntry) {
+          await tx.ledgerEntry.update({
+            where: { id: linkedEntry.id },
+            data: { amount: newAmount, title: `Dépense: ${updated.title}` },
+          });
+        }
       }
+
+      return updated;
     });
   }
 
+  // 🔒 CORRECTIF : suppression explicite de la LedgerEntry associée avant
+  // celle de la dépense, dans une transaction — indépendant de la config
+  // onDelete réellement appliquée sur la relation (jamais confirmée dans le
+  // schema fourni), pour garantir que le solde de l'antenne ne garde jamais
+  // une déduction fantôme après suppression d'une dépense déjà validée.
   async deleteSuperAdminExpense(expenseId: string, associationId: string) {
     const expense = await this.prisma.expense.findFirst({ where: { id: expenseId, associationId } });
     if (!expense) throw new NotFoundException("Dépense introuvable.");
 
-    // Note : Prisma se chargera de supprimer la LedgerEntry associée si la relation onDelete Cascade est bien paramétrée. 
-    // Sinon, on supprime explicitement la dépense.
-    return this.prisma.expense.delete({ where: { id: expenseId } });
+    await this.prisma.$transaction(async (tx) => {
+      const linkedEntry = await tx.ledgerEntry.findFirst({ where: { expenseId: expense.id } });
+      if (linkedEntry) {
+        await tx.ledgerEntry.delete({ where: { id: linkedEntry.id } });
+      }
+      await tx.expense.delete({ where: { id: expenseId } });
+    });
+
+    return { message: 'Dépense supprimée avec succès.' };
   }
 
   // ==========================================

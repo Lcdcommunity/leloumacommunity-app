@@ -3,9 +3,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api-client';
+import { api, type MyTransferAntenna } from '@/lib/api-client';
 
-type SenderInfo  = { antennaId: string; antennaName: string; currency: string };
 type DestAntenna = { id: string; name: string; defaultCurrency: string; city?: string | null };
 
 const SYM: Record<string, string> = {
@@ -27,7 +26,10 @@ const labelStyle: React.CSSProperties = {
 export default function NewTransferPage() {
   const router = useRouter();
 
-  const [sender, setSender]         = useState<SenderInfo | null>(null);
+  const [myAntennas, setMyAntennas]       = useState<MyTransferAntenna[]>([]);
+  const [loadingAntennas, setLoadingAntennas] = useState(true);
+  const [senderAntennaId, setSenderAntennaId] = useState('');
+
   const [dests, setDests]           = useState<DestAntenna[]>([]);
   const [destId, setDestId]         = useState('');
   const [sendAmt, setSendAmt]       = useState('');
@@ -36,27 +38,48 @@ export default function NewTransferPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState('');
 
+  // Charge les antennes que l'admin gère
   useEffect(() => {
     void (async () => {
-      const [s, d] = await Promise.all([
-        api.getTransferSenderInfo(),
-        api.getTransferDestinations(),
-      ]);
-      setSender(s as SenderInfo);
-      setDests(d as DestAntenna[]);
+      const antennas = await api.getMyTransferAntennas();
+      setMyAntennas(antennas);
+      if (antennas.length > 0) setSenderAntennaId(antennas[0].id);
+      setLoadingAntennas(false);
     })();
   }, []);
 
-  const dest       = dests.find(d => d.id === destId);
-  const btnEnabled = !submitting && !!destId && !!sendAmt && !!recvAmt && +sendAmt > 0 && +recvAmt > 0;
+  // Recharge les destinations à chaque changement d'antenne expéditrice
+  // Recharge les destinations à chaque changement d'antenne expéditrice
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!senderAntennaId) {
+        if (!cancelled) setDests([]);
+        return;
+      }
+      const d = await api.getTransferDestinations(senderAntennaId);
+      if (cancelled) return;
+      setDests(d);
+      setDestId('');
+      setRecvAmt('');
+    })();
+    return () => { cancelled = true; };
+  }, [senderAntennaId]);
+
+  const sender      = myAntennas.find(a => a.id === senderAntennaId);
+  const dest         = dests.find(d => d.id === destId);
+  const hasMultiple  = myAntennas.length > 1;
+  const btnEnabled   = !submitting && !!senderAntennaId && !!destId && !!sendAmt && !!recvAmt && +sendAmt > 0 && +recvAmt > 0;
 
   const handleSubmit = async () => {
+    if (!senderAntennaId) { setError('Sélectionnez une antenne expéditrice.'); return; }
     if (!destId || !sendAmt || !recvAmt) { setError('Tous les champs sont obligatoires.'); return; }
     if (+sendAmt <= 0 || +recvAmt <= 0)  { setError('Les montants doivent être positifs.'); return; }
     setError('');
     setSubmitting(true);
     try {
       await api.createTransfer({
+        senderAntennaId,
         receiverAntennaId: destId,
         sendAmount: +sendAmt,
         receiveAmount: +recvAmt,
@@ -115,17 +138,48 @@ export default function NewTransferPage() {
 
         <div style={{ padding: '1.5rem' }}>
 
-          {/* Antenne expéditrice — readonly */}
+          {/* Antenne expéditrice */}
           <div style={{ marginBottom: '1.25rem' }}>
-            <span style={labelStyle}>ANTENNE EXPÉDITRICE</span>
-            <div style={{ ...inputStyle, background: '#F8FAFC', display: 'flex',
-                          justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 600, color: '#0F172A' }}>{sender?.antennaName ?? '—'}</span>
-              <span style={{ fontSize: '.72rem', fontWeight: 700, padding: '.18rem .55rem',
-                             borderRadius: 99, background: '#EFF6FF', color: '#1D4ED8' }}>
-                {sender?.currency ?? '—'}
-              </span>
-            </div>
+            <span style={labelStyle}>
+              ANTENNE EXPÉDITRICE {hasMultiple && <span style={{ color: '#EF4444' }}>*</span>}
+            </span>
+
+            {loadingAntennas ? (
+              <div style={{ ...inputStyle, background: '#F8FAFC', color: '#94A3B8' }}>
+                Chargement de vos antennes…
+              </div>
+            ) : myAntennas.length === 0 ? (
+              <div style={{ ...inputStyle, background: '#FEF2F2', color: '#991B1B' }}>
+                Aucune antenne active ne vous est assignée.
+              </div>
+            ) : hasMultiple ? (
+              <select
+                value={senderAntennaId}
+                onChange={e => setSenderAntennaId(e.target.value)}
+                style={{ ...inputStyle, cursor: 'pointer', fontWeight: 600, color: '#0F172A' }}
+              >
+                {myAntennas.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}{a.city ? ` — ${a.city}` : ''} ({a.defaultCurrency})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ ...inputStyle, background: '#F8FAFC', display: 'flex',
+                            justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 600, color: '#0F172A' }}>{sender?.name ?? '—'}</span>
+                <span style={{ fontSize: '.72rem', fontWeight: 700, padding: '.18rem .55rem',
+                               borderRadius: 99, background: '#EFF6FF', color: '#1D4ED8' }}>
+                  {sender?.defaultCurrency ?? '—'}
+                </span>
+              </div>
+            )}
+
+            {hasMultiple && (
+              <p style={{ fontSize: '.72rem', color: '#94A3B8', margin: '6px 0 0' }}>
+                Vous gérez {myAntennas.length} antennes — choisissez celle qui sera débitée.
+              </p>
+            )}
           </div>
 
           {/* Grille 2 colonnes : Montant envoi + Antenne destination */}
@@ -140,11 +194,12 @@ export default function NewTransferPage() {
                   value={sendAmt}
                   onChange={e => setSendAmt(e.target.value)}
                   placeholder="0"
+                  disabled={!senderAntennaId}
                   style={{ ...inputStyle, paddingRight: '2.5rem', fontWeight: 700, fontSize: '1rem' }}
                 />
                 <span style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)',
                                color: '#94A3B8', fontWeight: 700, fontSize: '.85rem', pointerEvents: 'none' }}>
-                  {sender ? (SYM[sender.currency] ?? sender.currency) : ''}
+                  {sender ? (SYM[sender.defaultCurrency] ?? sender.defaultCurrency) : ''}
                 </span>
               </div>
             </div>
@@ -156,6 +211,7 @@ export default function NewTransferPage() {
               <select
                 value={destId}
                 onChange={e => { setDestId(e.target.value); setRecvAmt(''); }}
+                disabled={!senderAntennaId}
                 style={{ ...inputStyle, cursor: 'pointer', color: destId ? '#0F172A' : '#94A3B8' }}
               >
                 <option value="">Sélectionner…</option>
@@ -225,16 +281,16 @@ export default function NewTransferPage() {
           </div>
 
           {/* Récapitulatif */}
-          {sendAmt && recvAmt && dest && +sendAmt > 0 && +recvAmt > 0 && (
+          {sendAmt && recvAmt && dest && sender && +sendAmt > 0 && +recvAmt > 0 && (
             <div style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 12,
                           padding: '1rem', marginBottom: '1.25rem' }}>
               <p style={{ margin: '0 0 6px', fontWeight: 700, fontSize: '.85rem', color: '#1D4ED8' }}>
                 Récapitulatif
               </p>
               <p style={{ margin: 0, fontSize: '.875rem', color: '#374151', lineHeight: 1.6 }}>
-                Envoi de{' '}
+                <strong>{sender.name}</strong> enverra{' '}
                 <strong style={{ color: '#1D4ED8' }}>
-                  {(+sendAmt).toLocaleString('fr-FR')} {sender?.currency}
+                  {(+sendAmt).toLocaleString('fr-FR')} {sender.defaultCurrency}
                 </strong>
                 {' '}→ <strong>{dest.name}</strong> recevra{' '}
                 <strong style={{ color: '#1D4ED8' }}>

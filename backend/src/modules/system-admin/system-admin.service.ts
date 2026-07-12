@@ -1,7 +1,8 @@
-/////// backend/src/modules/system-admin/system-admin.service.ts
+// backend/src/modules/system-admin/system-admin.service.ts
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/services/mail.service';
+import { normalizeDomain } from '../../common/utils/domain.util';
 import * as bcrypt from 'bcryptjs';
 import { UserRole, UserStatus } from '@prisma/client';
 
@@ -33,6 +34,15 @@ export class SystemAdminService {
     const existingUser = await this.prisma.user.findUnique({ where: { email: data.adminEmail } });
     if (existingUser) throw new ConflictException("Cet email est déjà utilisé.");
 
+    // 🔒 CORRECTIF : normalisation avant stockage (plus de casse/www/slash
+    // qui traînent), + détection explicite de doublon avec message clair
+    // plutôt que de laisser remonter l'erreur brute de la contrainte @unique.
+    const domainName = normalizeDomain(data.domain);
+    if (domainName) {
+      const existingDomain = await this.prisma.association.findUnique({ where: { domainName } });
+      if (existingDomain) throw new ConflictException('Ce domaine est déjà utilisé par une autre instance.');
+    }
+
     const temporaryPassword = Math.random().toString(36).slice(-8) + 'A1!';
     const passwordHash = await bcrypt.hash(temporaryPassword, 12);
 
@@ -41,7 +51,7 @@ export class SystemAdminService {
         data: {
           name: data.associationName,
           code: data.code,
-          domainName: data.domain,
+          domainName,
           country: data.country,
           themeColors: data.themeColors ? (data.themeColors as any) : undefined,
           fontFamily: data.fontFamily,
@@ -74,9 +84,9 @@ export class SystemAdminService {
       temporaryPassword,
     });
 
-    return { 
-      message: "Association et Super Admin créés avec succès.",
-      associationId: result.association.id 
+    return {
+      message: 'Association et Super Admin créés avec succès.',
+      associationId: result.association.id
     };
   }
 
@@ -119,11 +129,25 @@ export class SystemAdminService {
 
   async updateAssociationDetails(id: string, data: { name?: string; code?: string; domainName?: string }) {
     const assoc = await this.prisma.association.findUnique({ where: { id } });
-    if (!assoc) throw new NotFoundException("Association introuvable.");
+    if (!assoc) throw new NotFoundException('Association introuvable.');
 
     if (data.code && data.code !== assoc.code) {
       const existing = await this.prisma.association.findUnique({ where: { code: data.code } });
       if (existing) throw new ConflictException("Ce code d'association est déjà utilisé par une autre instance.");
+    }
+
+    // 🔒 CORRECTIF : même normalisation qu'à la création, + exclusion de
+    // soi-même dans la détection de doublon (findUnique ne permet pas
+    // d'exclure un id, donc findFirst ici).
+    let domainName: string | null | undefined;
+    if (data.domainName !== undefined) {
+      domainName = normalizeDomain(data.domainName);
+      if (domainName) {
+        const existingDomain = await this.prisma.association.findFirst({
+          where: { domainName, id: { not: id } },
+        });
+        if (existingDomain) throw new ConflictException('Ce domaine est déjà utilisé par une autre instance.');
+      }
     }
 
     return this.prisma.association.update({
@@ -131,7 +155,7 @@ export class SystemAdminService {
       data: {
         ...(data.name ? { name: data.name } : {}),
         ...(data.code ? { code: data.code.toUpperCase().replace(/\s/g, '') } : {}),
-        ...(data.domainName !== undefined ? { domainName: data.domainName } : {}),
+        ...(domainName !== undefined ? { domainName } : {}),
       }
     });
   }
@@ -149,11 +173,11 @@ export class SystemAdminService {
       take: 100,
       orderBy: { createdAt: 'desc' },
       include: {
-        actorUser: { 
-          select: { firstName: true, lastName: true } 
+        actorUser: {
+          select: { firstName: true, lastName: true }
         },
-        association: { 
-          select: { name: true } 
+        association: {
+          select: { name: true }
         }
       }
     });
@@ -174,7 +198,7 @@ export class SystemAdminService {
 
   async deleteAssociation(id: string) {
     const association = await this.prisma.association.findUnique({ where: { id } });
-    if (!association) throw new NotFoundException("Association introuvable.");
+    if (!association) throw new NotFoundException('Association introuvable.');
 
     await this.prisma.association.delete({
       where: { id }

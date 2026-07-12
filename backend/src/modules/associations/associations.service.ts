@@ -1,5 +1,5 @@
-/////// backend/src/modules/associations/associations.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+// backend/src/modules/associations/associations.service.ts
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType, CurrencyCode } from '@prisma/client';
@@ -12,16 +12,20 @@ export class AssociationsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  async getCurrent() {
-    const assoc = await this.prisma.association.findFirst({
+  async getCurrent(associationId: string | null) {
+    if (!associationId) {
+      throw new ForbiddenException("Ce compte n'est rattaché à aucune association.");
+    }
+    const assoc = await this.prisma.association.findUnique({
+      where: { id: associationId },
       include: { logoFile: true },
     });
-    if (!assoc) throw new NotFoundException("Association non configurée.");
+    if (!assoc) throw new NotFoundException('Association introuvable.');
     return assoc;
   }
 
-  async updateCurrent(data: UpdateAssociationDto) {
-    const assoc = await this.getCurrent();
+  async updateCurrent(associationId: string | null, data: UpdateAssociationDto) {
+    const assoc = await this.getCurrent(associationId);
 
     const updated = await this.prisma.association.update({
       where: { id: assoc.id },
@@ -39,8 +43,12 @@ export class AssociationsService {
         ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
         ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
         ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency as CurrencyCode } : {}),
-        ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
-        ...(data.expenseValidationThreshold !== undefined ? { expenseValidationThreshold: data.expenseValidationThreshold } : {}),
+        // 🔒 isActive : volontairement absent (SYSTEM_ADMIN uniquement).
+        // 🔒 expenseValidationThreshold : volontairement absent — concept
+        // exclusivement par devise désormais (table Pricing), voir
+        // expenses.service.ts. La colonne reste en base mais n'est plus
+        // jamais écrite ni lue par l'application.
+        ...(data.logoFileId !== undefined ? { logoFileId: data.logoFileId } : {}),
       },
     });
 

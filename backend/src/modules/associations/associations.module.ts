@@ -1,17 +1,17 @@
-/////// backend/src/modules/associations/associations.module.ts
+// backend/src/modules/associations/associations.module.ts
 import { Module } from '@nestjs/common';
 import { AssociationsController } from './associations.controller';
 import { AssociationsService } from './associations.service';
-import { PrismaService } from '../../prisma/prisma.service';
+import { PrismaModule } from '../../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
-import { PublicThemeController } from './public-theme.controller'; 
+import { PublicThemeController } from './public-theme.controller';
 
 @Module({
-  imports: [NotificationsModule], 
+  imports: [PrismaModule, NotificationsModule],
   controllers: [
     AssociationsController,
-    PublicThemeController 
+    PublicThemeController,
   ],
-  providers: [AssociationsService, PrismaService],
+  providers: [AssociationsService],
 })
 export class AssociationsModule {}

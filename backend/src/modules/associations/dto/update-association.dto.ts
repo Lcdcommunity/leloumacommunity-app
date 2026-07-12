@@ -1,5 +1,5 @@
-/////// backend/src/modules/associations/dto/update-association.dto.ts
-import { IsBoolean, IsDateString, IsOptional, IsString, MaxLength, IsNumber, ValidateIf } from 'class-validator';
+// backend/src/modules/associations/dto/update-association.dto.ts
+import { IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateAssociationDto {
   @IsOptional()
@@ -72,9 +72,7 @@ export class UpdateAssociationDto {
   @MaxLength(10)
   defaultCurrency?: string;
 
-  @IsOptional()
-  @IsBoolean()
-  isActive?: boolean;
+  // 🔒 RETIRÉ : isActive (SYSTEM_ADMIN uniquement)
 
   @IsOptional()
   @IsString()
@@ -84,8 +82,6 @@ export class UpdateAssociationDto {
   @IsDateString({}, { message: 'La date de fondation doit être valide (YYYY-MM-DD)' })
   foundedAt?: string;
 
-  @IsOptional()
-  @ValidateIf((object, value) => value !== null)
-  @IsNumber()
-  expenseValidationThreshold?: number | null;
+  // 🔒 RETIRÉ : expenseValidationThreshold — exclusivement par devise
+  // désormais (table Pricing), voir expenses.service.ts.
 }

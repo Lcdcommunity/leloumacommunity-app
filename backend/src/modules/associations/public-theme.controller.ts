@@ -1,6 +1,7 @@
-/////// backend/src/modules/associations/public-theme.controller.ts
+// backend/src/modules/associations/public-theme.controller.ts
 import { Controller, Get, Query, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { normalizeDomain } from '../../common/utils/domain.util';
 
 @Controller('public/theme')
 export class PublicThemeController {
@@ -12,10 +13,8 @@ export class PublicThemeController {
       throw new NotFoundException("Veuillez fournir un domaine ou un code d'association.");
     }
 
-    // 🔥 FIX BACKEND : Nettoyage du domaine pour ignorer le "www."
-    const cleanDomain = domain ? domain.toLowerCase().replace(/^www\./, '').trim() : undefined;
+    const cleanDomain = normalizeDomain(domain);
 
-    // On cherche l'association par son domaine (ex: ajvk.lcd.com) ou son code (ASCOK)
     const association = await this.prisma.association.findFirst({
       where: {
         isActive: true,
@@ -25,15 +24,14 @@ export class PublicThemeController {
         ].filter(Boolean) as any,
       },
       include: {
-        logoFile: true, // On inclut la relation pour récupérer l'URL du logo
+        logoFile: true,
       },
     });
 
     if (!association) {
-      throw new NotFoundException("Association introuvable ou inactive.");
+      throw new NotFoundException('Association introuvable ou inactive.');
     }
 
-    // On ne renvoie QUE les infos visuelles non-sensibles
     return {
       id: association.id,
       name: association.name,

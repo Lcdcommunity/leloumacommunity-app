@@ -4,6 +4,10 @@ import { IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
 
 export class CreateTransferDto {
   @IsString()
+  @IsOptional()
+  senderAntennaId?: string;
+
+  @IsString()
   receiverAntennaId: string;
 
   @IsNumber()

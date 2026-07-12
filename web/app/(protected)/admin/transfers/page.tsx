@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api-client';
+import { api, type MyTransferAntenna } from '@/lib/api-client';
 
 type Transfer = {
   id: string;
@@ -44,6 +44,19 @@ export default function TransfersPage() {
   const [rejectReason, setReason]  = useState('');
   const [refresh, setRefresh]      = useState(0);
 
+  // Antennes gérées — active le filtre uniquement si l'admin en a plusieurs
+  const [myAntennas, setMyAntennas]       = useState<MyTransferAntenna[]>([]);
+  const [antennaFilter, setAntennaFilter] = useState('');
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const antennas = await api.getMyTransferAntennas();
+        setMyAntennas(antennas);
+      } catch { /* silence */ }
+    })();
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     const fetch = async () => {
@@ -52,8 +65,8 @@ export default function TransfersPage() {
       setLoading(true);
       try {
         const res = tab === 'sent'
-          ? await api.getTransfersSent()
-          : await api.getTransfersReceived();
+          ? await api.getTransfersSent({ antennaId: antennaFilter || undefined })
+          : await api.getTransfersReceived({ antennaId: antennaFilter || undefined });
         if (!cancelled) setItems((res.items ?? []) as Transfer[]);
       } finally {
         if (!cancelled) setLoading(false);
@@ -61,7 +74,7 @@ export default function TransfersPage() {
     };
     void fetch();
     return () => { cancelled = true; };
-  }, [tab, refresh]);
+  }, [tab, refresh, antennaFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,8 +83,8 @@ export default function TransfersPage() {
       if (cancelled) return;
       try {
         const [pending, validated] = await Promise.all([
-          api.getTransfersReceived({ status: 'PENDING_VALIDATION' }),
-          api.getTransfersReceived({ status: 'VALIDATED' }),
+          api.getTransfersReceived({ status: 'PENDING_VALIDATION', antennaId: antennaFilter || undefined }),
+          api.getTransfersReceived({ status: 'VALIDATED', antennaId: antennaFilter || undefined }),
         ]);
         if (!cancelled) {
           setPending(pending.total ?? 0);
@@ -81,9 +94,10 @@ export default function TransfersPage() {
     };
     void fetchStats();
     return () => { cancelled = true; };
-  }, [refresh]);
+  }, [refresh, antennaFilter]);
 
   const triggerRefresh = () => setRefresh(v => v + 1);
+  const hasMultipleAntennas = myAntennas.length > 1;
 
   const handleValidate = async (id: string) => {
     await api.validateTransfer(id);
@@ -107,7 +121,7 @@ export default function TransfersPage() {
     <div style={{ padding: '1.5rem', maxWidth: 860, margin: '0 auto', fontFamily: 'DM Sans, sans-serif' }}>
 
       {/* ── En-tête ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: 10 }}>
         <div>
           <p style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase',
                       color: '#2563EB', marginBottom: 4 }}>ADMIN ANTENNE</p>
@@ -126,6 +140,28 @@ export default function TransfersPage() {
           <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>+</span> Nouveau virement
         </Link>
       </div>
+
+      {/* ── Filtre antenne (uniquement si plusieurs antennes gérées) ── */}
+      {hasMultipleAntennas && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <label style={{ fontSize: '.72rem', fontWeight: 700, color: '#374151',
+                          display: 'block', marginBottom: 6, letterSpacing: '.03em' }}>
+            ANTENNE
+          </label>
+          <select
+            value={antennaFilter}
+            onChange={e => setAntennaFilter(e.target.value)}
+            style={{ width: '100%', border: '1px solid #E2E8F0', borderRadius: 10,
+                     padding: '.6rem .85rem', fontSize: '.875rem', fontWeight: 600, color: '#0F172A',
+                     background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}
+          >
+            <option value="">Toutes mes antennes ({myAntennas.length})</option>
+            {myAntennas.map(a => (
+              <option key={a.id} value={a.id}>{a.name}{a.city ? ` — ${a.city}` : ''}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* ── Stats ── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: '1.5rem' }}>
@@ -151,7 +187,7 @@ export default function TransfersPage() {
 
         {/* Header section */}
         <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #F1F5F9',
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 32, height: 32, borderRadius: 9, background: '#EFF6FF',
                           display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -226,9 +262,13 @@ export default function TransfersPage() {
                         </div>
                         {/* Meta */}
                         <p style={{ fontSize: '.78rem', color: '#64748B', margin: '0 0 2px' }}>
-                          {tab === 'sent'
-                            ? `Vers : ${t.receiverAntenna?.name ?? '—'}`
-                            : `De : ${t.senderAntenna?.name ?? '—'}`}
+                          {hasMultipleAntennas
+                            ? (tab === 'sent'
+                                ? <>De <strong>{t.senderAntenna?.name ?? 'mon antenne'}</strong> vers : {t.receiverAntenna?.name ?? '—'}</>
+                                : <>De : {t.senderAntenna?.name ?? '—'} vers <strong>{t.receiverAntenna?.name ?? 'mon antenne'}</strong></>)
+                            : (tab === 'sent'
+                                ? `Vers : ${t.receiverAntenna?.name ?? '—'}`
+                                : `De : ${t.senderAntenna?.name ?? '—'}`)}
                           {t.initiatedBy ? ` · ${t.initiatedBy}` : ''}
                         </p>
                         {t.notes && (

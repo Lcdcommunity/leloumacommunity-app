@@ -312,7 +312,8 @@ export default function SuperAdminExpensesPage() {
     }
   }, [status, startDate, endDate]);
 
-  useEffect(() => { 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement initial des données au montage : setLoading est déclenché de façon synchrone au début de load() avant le premier "await" ; pattern standard de data-fetching, faux positif connu de la règle (cf. react/react#34743).
     void load();
     const initAntennas = async () => {
       try {

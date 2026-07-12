@@ -12,34 +12,29 @@ import {
 } from '@nestjs/common';
 import { TransfersService } from './transfers.service';
 import { CreateTransferDto, RejectTransferDto } from './dto/create-transfer.dto';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ⚠️  CHOIX DU GUARD — décommente la ligne qui correspond à ton projet
-// Lance : find src -name "*.guard.ts" | grep -i jwt   pour trouver le bon chemin
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Option A — le plus courant dans ce type de projet NestJS
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-
-// Option D — si ton projet utilise un AuthGuard Passport
-// import { AuthGuard } from '@nestjs/passport';
-// const JwtAuthGuard = AuthGuard('jwt');
 
 @Controller('transfers')
 @UseGuards(JwtAuthGuard)
 export class TransfersController {
   constructor(private readonly service: TransfersService) {}
 
+  /** Antennes que l'admin gère — pour le sélecteur d'antenne expéditrice */
+  @Get('my-antennas')
+  listMyAntennas(@Req() req: any) {
+    return this.service.listMyAntennas(req.user.id);
+  }
+
   /** Infos sur l'antenne expéditrice (devise, nom) */
   @Get('sender-info')
-  getSenderInfo(@Req() req: any) {
-    return this.service.getSenderInfo(req.user.id);
+  getSenderInfo(@Req() req: any, @Query('antennaId') antennaId?: string) {
+    return this.service.getSenderInfo(req.user.id, antennaId);
   }
 
   /** Liste des antennes disponibles comme destinations */
   @Get('destinations')
-  listDestinations(@Req() req: any) {
-    return this.service.listDestinations(req.user.id);
+  listDestinations(@Req() req: any, @Query('antennaId') antennaId?: string) {
+    return this.service.listDestinations(req.user.id, antennaId);
   }
 
   /** Créer un virement */
@@ -48,25 +43,27 @@ export class TransfersController {
     return this.service.createTransfer(req.user.id, dto);
   }
 
-  /** Virements envoyés par mon antenne */
+  /** Virements envoyés (toutes mes antennes, ou une seule si antennaId fourni) */
   @Get('sent')
   listSent(
     @Req() req: any,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
+    @Query('antennaId') antennaId?: string,
   ) {
-    return this.service.listSent(req.user.id, +page, +pageSize);
+    return this.service.listSent(req.user.id, +page, +pageSize, antennaId);
   }
 
-  /** Virements reçus par mon antenne */
+  /** Virements reçus (toutes mes antennes, ou une seule si antennaId fourni) */
   @Get('received')
   listReceived(
     @Req() req: any,
     @Query('page') page = '1',
     @Query('pageSize') pageSize = '10',
     @Query('status') status?: string,
+    @Query('antennaId') antennaId?: string,
   ) {
-    return this.service.listReceived(req.user.id, +page, +pageSize, status);
+    return this.service.listReceived(req.user.id, +page, +pageSize, status, antennaId);
   }
 
   /** Valider un virement reçu */
