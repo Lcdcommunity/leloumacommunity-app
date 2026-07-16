@@ -1,7 +1,7 @@
 // backend/src/modules/admin/admin.service.ts
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType } from '@prisma/client';
+import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType, LedgerEntryType } from '@prisma/client';
 import { memberMapper } from '../member/member.mapper';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
@@ -477,6 +477,13 @@ export class AdminService {
     };
   }
 
+  /**
+   * 🔥 CORRECTION : crée désormais une LedgerEntry (CONTRIBUTION_IN) dans la
+   * même transaction que le passage au statut VALIDATED, sur le modèle de
+   * contributions.service.ts::validateContribution. Sans ça, LedgerService.getBalances
+   * (qui ne lit QUE LedgerEntry) ignorait totalement les cotisations validées
+   * depuis ce panneau admin.
+   */
   async validateContribution(contributionId: string, adminId: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -490,9 +497,29 @@ export class AdminService {
 
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
 
-    const updated = await this.prisma.contribution.update({ 
-      where: { id: contributionId }, 
-      data: { status: ContributionStatus.VALIDATED, validatedAt: new Date(), validatedByUserId: adminId } 
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const ledger = await tx.ledgerEntry.create({
+        data: {
+          associationId: contribution.associationId,
+          antennaId: contribution.antennaId,
+          contributionId: contribution.id,
+          type: LedgerEntryType.CONTRIBUTION_IN,
+          amount: contribution.amount,
+          currency: contribution.currency,
+          title: `Cotisation validée (${contribution.purpose})`,
+          createdByUserId: adminId,
+        },
+      });
+
+      return tx.contribution.update({
+        where: { id: contributionId },
+        data: {
+          status: ContributionStatus.VALIDATED,
+          validatedAt: new Date(),
+          validatedByUserId: adminId,
+          ledgerEntryId: ledger.id,
+        },
+      });
     });
 
     await this.notifications.createForUser({
@@ -566,6 +593,12 @@ export class AdminService {
     return updated;
   }
 
+  /**
+   * 🔥 CORRECTION : si la cotisation était déjà VALIDATED (donc reliée à une
+   * LedgerEntry), on met à jour le montant de cette écriture dans la même
+   * transaction — sinon le solde continue d'afficher l'ancien montant après
+   * une correction manuelle.
+   */
   async updateContribution(contributionId: string, adminId: string, amount: number) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -577,12 +610,26 @@ export class AdminService {
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
 
-    return this.prisma.contribution.update({ 
-      where: { id: contributionId }, 
-      data: { amount: new Prisma.Decimal(amount) } 
+    return this.prisma.$transaction(async (tx) => {
+      if (contribution.status === ContributionStatus.VALIDATED && contribution.ledgerEntryId) {
+        await tx.ledgerEntry.update({
+          where: { id: contribution.ledgerEntryId },
+          data: { amount: new Prisma.Decimal(amount) },
+        });
+      }
+      return tx.contribution.update({ 
+        where: { id: contributionId }, 
+        data: { amount: new Prisma.Decimal(amount) } 
+      });
     });
   }
 
+  /**
+   * 🔥 CORRECTION : si la cotisation était VALIDATED, on supprime aussi sa
+   * LedgerEntry associée dans la même transaction, pour ne pas laisser une
+   * écriture comptable orpheline (ou pire, une contribution supprimée dont
+   * l'argent reste compté dans le solde).
+   */
   async deleteContribution(contributionId: string, adminId: string) {
     const { antennaId, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -594,7 +641,12 @@ export class AdminService {
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
 
-    await this.prisma.contribution.delete({ where: { id: contributionId } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.contribution.delete({ where: { id: contributionId } });
+      if (contribution.status === ContributionStatus.VALIDATED && contribution.ledgerEntryId) {
+        await tx.ledgerEntry.delete({ where: { id: contribution.ledgerEntryId } });
+      }
+    });
 
     // 🔥 Si c'était une carte membre validée, resynchroniser le verrou
     if (contribution.purpose === 'MEMBERSHIP_CARD') {
