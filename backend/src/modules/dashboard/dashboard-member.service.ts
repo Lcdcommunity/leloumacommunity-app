@@ -7,12 +7,23 @@ import {
   PostStatus, 
   UserRole, 
   UserStatus,
-  ExpenseStatus 
 } from '@prisma/client';
+import { LedgerService } from '../ledger/ledger.service';
 
 @Injectable()
 export class DashboardMemberService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledger: LedgerService,
+  ) {}
+
+  // 🔥 CORRECTION : solde recalculé via LedgerService.getBalances (source
+  // unique de vérité, incluant les virements inter-antennes TRANSFER_IN /
+  // TRANSFER_OUT), au lieu de Contribution - Expense qui les ignorait.
+  private async getAntennaBalance(associationId: string, antennaId: string, currency: string): Promise<number> {
+    const { totalByCurrency } = await this.ledger.getBalances(associationId, antennaId);
+    return totalByCurrency[currency] ?? 0;
+  }
 
   async getMemberDashboard(userId: string) {
     const me = await this.prisma.user.findUnique({
@@ -121,25 +132,15 @@ export class DashboardMemberService {
 
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        const [aggC, aggE] = await Promise.all([
-          this.prisma.contribution.aggregate({
-            where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
-            _sum: { amount: true }
-          }),
-          this.prisma.expense.aggregate({
-            where: { antennaId: ant.id, status: ExpenseStatus.VALIDATED },
-            _sum: { amount: true }
-          })
-        ]);
-        
-        const localBalance = Number(aggC._sum.amount ?? 0) - Number(aggE._sum.amount ?? 0);
+        const currency = ant.defaultCurrency || 'EUR';
+        const localBalance = await this.getAntennaBalance(me.associationId, ant.id, currency);
         totalAssociationBalance += localBalance;
 
         return {
           id: ant.id,
           name: ant.name,
           balance: localBalance,
-          currency: ant.defaultCurrency || 'EUR' 
+          currency,
         };
       })
     );
@@ -243,7 +244,7 @@ export class DashboardMemberService {
     });
 
     const now = new Date();
-    
+
     // Calcul du retard du membre connecté
     const myLastDate = lastValidContrib?.validatedAt ?? me.createdAt;
     const myLateMonths = monthDiff(myLastDate, now);

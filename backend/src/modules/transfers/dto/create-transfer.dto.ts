@@ -29,3 +29,22 @@ export class RejectTransferDto {
   @IsString()
   reason: string;
 }
+
+// 🔥 NOUVEAU : modification d'un virement encore PENDING_VALIDATION par l'antenne expéditrice
+export class UpdateTransferDto {
+  @IsNumber()
+  @IsPositive()
+  @Type(() => Number)
+  @IsOptional()
+  sendAmount?: number;
+
+  @IsNumber()
+  @IsPositive()
+  @Type(() => Number)
+  @IsOptional()
+  receiveAmount?: number;
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+}

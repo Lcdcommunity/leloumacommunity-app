@@ -1335,6 +1335,10 @@ export const api = {
   }) =>
     http<AntennaTransfer, typeof body>('/transfers', { method: 'POST', body }),
 
+  /** 🔥 NOUVEAU : Modifier un virement envoyé (montants), tant qu'il n'est pas validé */
+  updateTransfer: (id: string, body: { sendAmount?: number; receiveAmount?: number; notes?: string }) =>
+    http<AntennaTransfer, typeof body>(`/transfers/${id}`, { method: 'PATCH', body }),
+
   /** Virements envoyés (toutes mes antennes, filtrable par antennaId) */
   getTransfersSent: (params?: { page?: number; pageSize?: number; antennaId?: string }) =>
     http<ApiListResponse<AntennaTransfer>>(

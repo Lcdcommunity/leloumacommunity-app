@@ -1,21 +1,48 @@
 // backend/src/modules/dashboard/dashboard-antenna-admin.service.ts
+//
+// v1.1 — 🔥 CORRECTION CRITIQUE MULTI-TENANT :
+//   getDashboard() interrogeait antennaAdminAssignment.findFirst({ where: { adminUserId } })
+//   SANS filtrer sur isActive: true. Comme cette table conserve l'historique des
+//   affectations d'un admin (réaffectations d'antenne dans le temps), Prisma pouvait
+//   retourner n'importe quelle ligne (souvent la plus ancienne) au lieu de l'affectation
+//   active — ce qui faisait que TOUS les admins voyaient le nom/soldes de la même antenne
+//   (celle de la toute première ligne en base), indépendamment de leur vrai rattachement.
+//   Fix : ajout de isActive: true (même pattern que admin.service.ts::getAdminContext).
+//   ⚠️ Pas d'orderBy: { updatedAt } — ce champ n'existe pas sur AntennaAdminAssignment.
+//
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserStatus, ContributionStatus, ProjectStatus, ExpenseStatus } from '@prisma/client';
+import { UserStatus, ContributionStatus, ProjectStatus } from '@prisma/client';
+import { LedgerService } from '../ledger/ledger.service';
 
 @Injectable()
 export class DashboardAntennaAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledger: LedgerService,
+  ) {}
+
+  // 🔥 CORRECTION : solde recalculé via LedgerService.getBalances (source
+  // unique de vérité, incluant les virements inter-antennes TRANSFER_IN /
+  // TRANSFER_OUT), au lieu de Contribution - Expense qui les ignorait.
+  private async getAntennaBalance(associationId: string, antennaId: string, currency: string): Promise<number> {
+    const { totalByCurrency } = await this.ledger.getBalances(associationId, antennaId);
+    return totalByCurrency[currency] ?? 0;
+  }
 
   async getDashboard(adminUserId: string) {
+    // 🔥 CORRECTION : isActive: true ajouté — sans ce filtre, findFirst() pouvait
+    // retourner une ancienne affectation au lieu de l'affectation active de l'admin,
+    // causant un mélange des antennes entre différents comptes admin.
     const assignment = await this.prisma.antennaAdminAssignment.findFirst({
-      where: { adminUserId },
+      where: { adminUserId, isActive: true },
       include: { antenna: true },
     });
 
     if (!assignment) throw new NotFoundException("Aucune antenne assignée à ce compte.");
     const antennaId = assignment.antennaId;
     const associationId = assignment.antenna.associationId;
+    const antennaCurrency = assignment.antenna.defaultCurrency || 'GNF';
 
     const [members, pendingAcc, pendingCont, projects, totalExpectedContributions] = await Promise.all([
       this.prisma.membership.count({ where: { antennaId, user: { status: UserStatus.ACTIVE } } }),
@@ -28,25 +55,22 @@ export class DashboardAntennaAdminService {
       }),
     ]);
 
-    // Vrai solde de l'antenne locale (Cotisations - Dépenses)
+    // Taux de cotisation : cotisations validées / attendues — indicateur membre,
+    // volontairement distinct du solde réel de l'antenne (ne doit pas inclure les virements)
     const inAgg = await this.prisma.contribution.aggregate({
       where: { antennaId, status: ContributionStatus.VALIDATED },
       _sum: { amount: true }
     });
-    const outAgg = await this.prisma.expense.aggregate({
-      where: { antennaId, status: ExpenseStatus.VALIDATED },
-      _sum: { amount: true }
-    });
-
     const totalIn = Number(inAgg._sum.amount ?? 0);
-    const totalOut = Number(outAgg._sum.amount ?? 0);
-    const localBalance = totalIn - totalOut;
 
     const expected = Number(totalExpectedContributions._sum.amount ?? 0);
     let collectionRate = 0;
     if (expected > 0) {
       collectionRate = Math.min((totalIn / expected) * 100, 100);
     }
+
+    // Vrai solde de l'antenne locale (Cotisations - Dépenses +/- Virements)
+    const localBalance = await this.getAntennaBalance(associationId, antennaId, antennaCurrency);
 
     const allAntennas = await this.prisma.antenna.findMany({
       where: { associationId },
@@ -55,22 +79,12 @@ export class DashboardAntennaAdminService {
 
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        const [aggC, aggE] = await Promise.all([
-          this.prisma.contribution.aggregate({
-            where: { antennaId: ant.id, status: ContributionStatus.VALIDATED },
-            _sum: { amount: true }
-          }),
-          this.prisma.expense.aggregate({
-            where: { antennaId: ant.id, status: ExpenseStatus.VALIDATED },
-            _sum: { amount: true }
-          })
-        ]);
-        
+        const currency = ant.defaultCurrency || 'GNF';
         return {
           id: ant.id,
           name: ant.name,
-          balance: Number(aggC._sum.amount ?? 0) - Number(aggE._sum.amount ?? 0),
-          currency: ant.defaultCurrency || 'GNF'
+          balance: await this.getAntennaBalance(associationId, ant.id, currency),
+          currency,
         };
       })
     );
@@ -83,7 +97,7 @@ export class DashboardAntennaAdminService {
         pendingContributions: pendingCont,
         activeProjects: projects,
         totalValidatedAmount: localBalance,
-        currency: assignment.antenna.defaultCurrency || 'GNF',
+        currency: antennaCurrency,
         collectionRate: Math.round(collectionRate),
       },
       antennaBalances, 

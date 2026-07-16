@@ -34,15 +34,296 @@ const fmt = (n: number, c: string) =>
     minimumFractionDigits: 0, maximumFractionDigits: 2,
   }).format(n);
 
+const inputStyle: React.CSSProperties = {
+  width: '100%', border: '1px solid #E2E8F0', borderRadius: 10,
+  padding: '.7rem .9rem', fontSize: '.9rem', color: '#0F172A',
+  boxSizing: 'border-box', fontFamily: 'inherit',
+  background: '#fff', outline: 'none',
+};
+
+const labelStyle: React.CSSProperties = {
+  fontSize: '.72rem', fontWeight: 700, color: '#374151',
+  display: 'block', marginBottom: 6, letterSpacing: '.03em',
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// MODALE DE DÉTAILS / ACTIONS
+// Reçus : Valider / Refuser · Envoyés : Modifier le montant / Supprimer
+// ─────────────────────────────────────────────────────────────────────────
+function TransferDetailModal({
+  transfer,
+  tab,
+  hasMultipleAntennas,
+  onClose,
+  onValidate,
+  onReject,
+  onCancel,
+  onUpdate,
+}: {
+  transfer: Transfer;
+  tab: 'received' | 'sent';
+  hasMultipleAntennas: boolean;
+  onClose: () => void;
+  onValidate: (id: string) => Promise<void>;
+  onReject: (id: string, reason: string) => Promise<void>;
+  onCancel: (id: string) => Promise<void>;
+  onUpdate: (id: string, body: { sendAmount?: number; receiveAmount?: number }) => Promise<void>;
+}) {
+  const st = STATUS[transfer.status] ?? { label: transfer.status, color: '#374151', bg: '#F9FAFB', border: '#D1D5DB' };
+  const isPending = transfer.status === 'PENDING_VALIDATION';
+
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const [isRejecting, setIsRejecting] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editSendAmount, setEditSendAmount] = useState(String(transfer.sendAmount));
+  const [editReceiveAmount, setEditReceiveAmount] = useState(String(transfer.receiveAmount));
+
+  const runAction = async (fn: () => Promise<void>) => {
+    setError('');
+    setBusy(true);
+    try {
+      await fn();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Une erreur est survenue.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  zIndex: 100, padding: '1rem' }}
+         onClick={() => !busy && onClose()}>
+      <div style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 440,
+                    maxHeight: '90vh', overflowY: 'auto',
+                    boxShadow: '0 25px 60px rgba(0,0,0,.2)' }}
+           onClick={e => e.stopPropagation()}>
+
+        {/* En-tête */}
+        <div style={{ padding: '1.5rem', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+            <span style={{ fontSize: '.68rem', fontWeight: 700, padding: '.2rem .65rem',
+                           borderRadius: 99, background: st.bg, color: st.color,
+                           border: `1px solid ${st.border}` }}>
+              {st.label}
+            </span>
+            <button onClick={onClose} disabled={busy}
+                    style={{ background: '#F3F4F6', border: 'none', cursor: 'pointer', color: '#6B7280',
+                             width: 30, height: 30, borderRadius: '50%', display: 'flex',
+                             alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
+              {fmt(transfer.sendAmount, transfer.sendCurrency)}
+            </span>
+            <span style={{ color: '#CBD5E1' }}>→</span>
+            <span style={{ fontSize: '1.15rem', fontWeight: 800, color: '#2563EB' }}>
+              {fmt(transfer.receiveAmount, transfer.receiveCurrency)}
+            </span>
+          </div>
+          <p style={{ fontSize: '.8rem', color: '#64748B', margin: '6px 0 0' }}>
+            {hasMultipleAntennas
+              ? (tab === 'sent'
+                  ? <>De <strong>{transfer.senderAntenna?.name ?? 'mon antenne'}</strong> vers : {transfer.receiverAntenna?.name ?? '—'}</>
+                  : <>De : {transfer.senderAntenna?.name ?? '—'} vers <strong>{transfer.receiverAntenna?.name ?? 'mon antenne'}</strong></>)
+              : (tab === 'sent'
+                  ? `Vers : ${transfer.receiverAntenna?.name ?? '—'}`
+                  : `De : ${transfer.senderAntenna?.name ?? '—'}`)}
+            {transfer.initiatedBy ? ` · ${transfer.initiatedBy}` : ''}
+          </p>
+        </div>
+
+        {/* Corps */}
+        <div style={{ padding: '1.5rem' }}>
+          {transfer.notes && (
+            <div style={{ marginBottom: 12 }}>
+              <span style={{ ...labelStyle, marginBottom: 4 }}>NOTE</span>
+              <p style={{ margin: 0, fontSize: '.85rem', color: '#374151', lineHeight: 1.5 }}>{transfer.notes}</p>
+            </div>
+          )}
+          {transfer.rejectionReason && (
+            <div style={{ marginBottom: 12, background: '#FEF2F2', border: '1px solid #FECACA',
+                          borderRadius: 10, padding: '.75rem 1rem' }}>
+              <span style={{ ...labelStyle, color: '#991B1B', marginBottom: 4 }}>MOTIF DU REFUS</span>
+              <p style={{ margin: 0, fontSize: '.85rem', color: '#991B1B' }}>{transfer.rejectionReason}</p>
+            </div>
+          )}
+          <p style={{ fontSize: '.75rem', color: '#94A3B8', margin: '0 0 1.25rem' }}>
+            Créé le {new Date(transfer.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+          </p>
+
+          {error && (
+            <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 10,
+                          padding: '.75rem 1rem', fontSize: '.85rem', color: '#DC2626', marginBottom: 12 }}>
+              {error}
+            </div>
+          )}
+
+          {/* ── Reçus, en attente : Valider / Refuser ── */}
+          {tab === 'received' && isPending && !isRejecting && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => runAction(() => onValidate(transfer.id))}
+                disabled={busy}
+                style={{ flex: 1, padding: '.8rem', borderRadius: 12, border: 'none',
+                         background: '#059669', color: '#fff', fontSize: '.88rem', fontWeight: 700,
+                         cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? .7 : 1 }}
+              >
+                ✔ Valider
+              </button>
+              <button
+                onClick={() => setIsRejecting(true)}
+                disabled={busy}
+                style={{ flex: 1, padding: '.8rem', borderRadius: 12, border: '1px solid #FECACA',
+                         background: '#FEF2F2', color: '#991B1B', fontSize: '.88rem', fontWeight: 700,
+                         cursor: busy ? 'not-allowed' : 'pointer' }}
+              >
+                ✖ Refuser
+              </button>
+            </div>
+          )}
+
+          {tab === 'received' && isPending && isRejecting && (
+            <div>
+              <label style={labelStyle}>MOTIF DU REFUS <span style={{ color: '#EF4444' }}>*</span></label>
+              <textarea
+                value={rejectReason}
+                onChange={e => setRejectReason(e.target.value)}
+                placeholder="Expliquer la raison du refus…"
+                rows={3}
+                style={{ ...inputStyle, resize: 'vertical', marginBottom: 10 }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => { setIsRejecting(false); setRejectReason(''); }}
+                  disabled={busy}
+                  style={{ flex: 1, padding: '.7rem', borderRadius: 10, border: '1px solid #E2E8F0',
+                           background: '#fff', color: '#374151', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => rejectReason.trim() && runAction(() => onReject(transfer.id, rejectReason.trim()))}
+                  disabled={busy || !rejectReason.trim()}
+                  style={{ flex: 1, padding: '.7rem', borderRadius: 10, border: 'none',
+                           background: rejectReason.trim() ? '#DC2626' : '#FCA5A5', color: '#fff',
+                           fontSize: '.85rem', fontWeight: 700,
+                           cursor: rejectReason.trim() && !busy ? 'pointer' : 'not-allowed' }}
+                >
+                  Confirmer le refus
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Envoyés, en attente : Modifier le montant / Supprimer ── */}
+          {tab === 'sent' && isPending && !isEditing && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setIsEditing(true)}
+                disabled={busy}
+                style={{ flex: 1, padding: '.8rem', borderRadius: 12, border: '1px solid #BFDBFE',
+                         background: '#EFF6FF', color: '#1D4ED8', fontSize: '.88rem', fontWeight: 700,
+                         cursor: busy ? 'not-allowed' : 'pointer' }}
+              >
+                ✎ Modifier le montant
+              </button>
+              <button
+                onClick={() => {
+                  if (window.confirm('Supprimer ce virement ? Cette action est irréversible.')) {
+                    void runAction(() => onCancel(transfer.id));
+                  }
+                }}
+                disabled={busy}
+                style={{ flex: 1, padding: '.8rem', borderRadius: 12, border: '1px solid #FECACA',
+                         background: '#FEF2F2', color: '#991B1B', fontSize: '.88rem', fontWeight: 700,
+                         cursor: busy ? 'not-allowed' : 'pointer' }}
+              >
+                🗑 Supprimer
+              </button>
+            </div>
+          )}
+
+          {tab === 'sent' && isPending && isEditing && (
+            <div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div>
+                  <label style={labelStyle}>MONTANT D&apos;ENVOI ({transfer.sendCurrency})</label>
+                  <input
+                    type="number" min="0.01" step="0.01"
+                    value={editSendAmount}
+                    onChange={e => setEditSendAmount(e.target.value)}
+                    style={{ ...inputStyle, fontWeight: 700 }}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>MONTANT REÇU ({transfer.receiveCurrency})</label>
+                  <input
+                    type="number" min="0.01" step="0.01"
+                    value={editReceiveAmount}
+                    onChange={e => setEditReceiveAmount(e.target.value)}
+                    style={{ ...inputStyle, fontWeight: 700 }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setIsEditing(false);
+                    setEditSendAmount(String(transfer.sendAmount));
+                    setEditReceiveAmount(String(transfer.receiveAmount));
+                  }}
+                  disabled={busy}
+                  style={{ flex: 1, padding: '.7rem', borderRadius: 10, border: '1px solid #E2E8F0',
+                           background: '#fff', color: '#374151', fontSize: '.85rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={() => {
+                    const s = Number(editSendAmount);
+                    const r = Number(editReceiveAmount);
+                    if (!(s > 0) || !(r > 0)) { setError('Les montants doivent être positifs.'); return; }
+                    void runAction(() => onUpdate(transfer.id, { sendAmount: s, receiveAmount: r }));
+                  }}
+                  disabled={busy}
+                  style={{ flex: 1, padding: '.7rem', borderRadius: 10, border: 'none',
+                           background: '#2563EB', color: '#fff', fontSize: '.85rem', fontWeight: 700,
+                           cursor: busy ? 'not-allowed' : 'pointer' }}
+                >
+                  {busy ? 'Enregistrement…' : 'Enregistrer'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {!isPending && (
+            <p style={{ fontSize: '.8rem', color: '#94A3B8', margin: 0, textAlign: 'center' }}>
+              Ce virement a déjà été traité — aucune action possible.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TransfersPage() {
   const [tab, setTab]              = useState<'received' | 'sent'>('received');
   const [items, setItems]          = useState<Transfer[]>([]);
   const [loading, setLoading]      = useState(true);
   const [pendingCount, setPending] = useState(0);
   const [validatedCount, setValidated] = useState(0);
-  const [rejectId, setRejectId]    = useState<string | null>(null);
-  const [rejectReason, setReason]  = useState('');
   const [refresh, setRefresh]      = useState(0);
+  const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
 
   // Antennes gérées — active le filtre uniquement si l'admin en a plusieurs
   const [myAntennas, setMyAntennas]       = useState<MyTransferAntenna[]>([]);
@@ -101,19 +382,25 @@ export default function TransfersPage() {
 
   const handleValidate = async (id: string) => {
     await api.validateTransfer(id);
+    setSelectedTransfer(null);
     triggerRefresh();
   };
 
-  const handleReject = async () => {
-    if (!rejectId || !rejectReason.trim()) return;
-    await api.rejectTransfer(rejectId, rejectReason.trim());
-    setRejectId(null); setReason('');
+  const handleReject = async (id: string, reason: string) => {
+    await api.rejectTransfer(id, reason);
+    setSelectedTransfer(null);
     triggerRefresh();
   };
 
   const handleCancel = async (id: string) => {
-    if (!confirm('Annuler ce virement ?')) return;
     await api.cancelTransfer(id);
+    setSelectedTransfer(null);
+    triggerRefresh();
+  };
+
+  const handleUpdate = async (id: string, body: { sendAmount?: number; receiveAmount?: number }) => {
+    await api.updateTransfer(id, body);
+    setSelectedTransfer(null);
     triggerRefresh();
   };
 
@@ -246,8 +533,12 @@ export default function TransfersPage() {
               {items.map(t => {
                 const st = STATUS[t.status] ?? { label: t.status, color: '#374151', bg: '#F9FAFB', border: '#D1D5DB' };
                 return (
-                  <div key={t.id} style={{ background: '#FAFAFA', border: '1px solid #F1F5F9',
-                                           borderRadius: 12, padding: '1rem' }}>
+                  <div
+                    key={t.id}
+                    onClick={() => setSelectedTransfer(t)}
+                    style={{ background: '#FAFAFA', border: '1px solid #F1F5F9',
+                             borderRadius: 12, padding: '1rem', cursor: 'pointer' }}
+                  >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {/* Montants */}
@@ -288,42 +579,17 @@ export default function TransfersPage() {
                         </p>
                       </div>
 
-                      {/* Droite */}
+                      {/* Droite : statut, les actions sont désormais dans la modale */}
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8, flexShrink: 0 }}>
                         <span style={{ fontSize: '.68rem', fontWeight: 700, padding: '.2rem .65rem',
                                        borderRadius: 99, background: st.bg, color: st.color,
                                        border: `1px solid ${st.border}` }}>
                           {st.label}
                         </span>
-                        {tab === 'received' && t.status === 'PENDING_VALIDATION' && (
-                          <div style={{ display: 'flex', gap: 6 }}>
-                            <button
-                              onClick={() => handleValidate(t.id)}
-                              style={{ padding: '.3rem .75rem', borderRadius: 8, border: 'none',
-                                       background: '#ECFDF5', color: '#065F46',
-                                       fontSize: '.75rem', fontWeight: 700, cursor: 'pointer' }}
-                            >
-                              Valider
-                            </button>
-                            <button
-                              onClick={() => setRejectId(t.id)}
-                              style={{ padding: '.3rem .75rem', borderRadius: 8, border: 'none',
-                                       background: '#FEF2F2', color: '#991B1B',
-                                       fontSize: '.75rem', fontWeight: 700, cursor: 'pointer' }}
-                            >
-                              Refuser
-                            </button>
-                          </div>
-                        )}
-                        {tab === 'sent' && t.status === 'PENDING_VALIDATION' && (
-                          <button
-                            onClick={() => handleCancel(t.id)}
-                            style={{ padding: '.3rem .75rem', borderRadius: 8, border: 'none',
-                                     background: '#F1F5F9', color: '#64748B',
-                                     fontSize: '.75rem', fontWeight: 700, cursor: 'pointer' }}
-                          >
-                            Annuler
-                          </button>
+                        {t.status === 'PENDING_VALIDATION' && (
+                          <span style={{ fontSize: '.68rem', color: '#94A3B8', fontWeight: 600 }}>
+                            Voir les actions →
+                          </span>
                         )}
                       </div>
                     </div>
@@ -335,60 +601,17 @@ export default function TransfersPage() {
         </div>
       </div>
 
-      {/* Modal refus */}
-      {rejectId && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,.5)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      zIndex: 100, padding: '1rem' }}>
-          <div style={{ background: '#fff', borderRadius: 20, padding: '1.5rem',
-                        width: '100%', maxWidth: 420, boxShadow: '0 25px 60px rgba(0,0,0,.2)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1.25rem' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FEF2F2',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#DC2626" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>
-                Motif du refus
-              </h3>
-            </div>
-            <label style={{ fontSize: '.78rem', fontWeight: 700, color: '#374151',
-                            display: 'block', marginBottom: 6, letterSpacing: '.03em' }}>
-              EXPLICATION <span style={{ color: '#EF4444' }}>*</span>
-            </label>
-            <textarea
-              value={rejectReason}
-              onChange={e => setReason(e.target.value)}
-              placeholder="Expliquer la raison du refus…"
-              rows={4}
-              style={{ width: '100%', border: '1px solid #E2E8F0', borderRadius: 10,
-                       padding: '.75rem', fontSize: '.875rem', resize: 'vertical',
-                       boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
-            />
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: '1rem' }}>
-              <button
-                onClick={() => { setRejectId(null); setReason(''); }}
-                style={{ padding: '.55rem 1.2rem', borderRadius: 10, border: '1px solid #E2E8F0',
-                         background: '#fff', color: '#374151', fontSize: '.875rem',
-                         cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}
-              >
-                Annuler
-              </button>
-              <button
-                disabled={!rejectReason.trim()}
-                onClick={handleReject}
-                style={{ padding: '.55rem 1.2rem', borderRadius: 10, border: 'none',
-                         color: '#fff', fontSize: '.875rem', fontWeight: 700,
-                         fontFamily: 'inherit', cursor: rejectReason.trim() ? 'pointer' : 'not-allowed',
-                         background: rejectReason.trim() ? '#DC2626' : '#FCA5A5',
-                         transition: 'background .15s' }}
-              >
-                Confirmer le refus
-              </button>
-            </div>
-          </div>
-        </div>
+      {selectedTransfer && (
+        <TransferDetailModal
+          transfer={selectedTransfer}
+          tab={tab}
+          hasMultipleAntennas={hasMultipleAntennas}
+          onClose={() => setSelectedTransfer(null)}
+          onValidate={handleValidate}
+          onReject={handleReject}
+          onCancel={handleCancel}
+          onUpdate={handleUpdate}
+        />
       )}
     </div>
   );

@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { TransfersService } from './transfers.service';
-import { CreateTransferDto, RejectTransferDto } from './dto/create-transfer.dto';
+import { CreateTransferDto, RejectTransferDto, UpdateTransferDto } from './dto/create-transfer.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('transfers')
@@ -80,6 +80,12 @@ export class TransfersController {
     @Body() body: RejectTransferDto,
   ) {
     return this.service.rejectTransfer(id, req.user.id, body.reason);
+  }
+
+  /** 🔥 NOUVEAU : Modifier un virement envoyé (montants/notes), tant qu'il n'est pas validé */
+  @Patch(':id')
+  update(@Param('id') id: string, @Req() req: any, @Body() dto: UpdateTransferDto) {
+    return this.service.updateTransfer(id, req.user.id, dto);
   }
 
   /** Annuler un virement envoyé (avant validation) */

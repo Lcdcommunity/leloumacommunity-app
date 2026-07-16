@@ -1,11 +1,23 @@
 // backend/src/modules/dashboard/dashboard-super-admin.service.ts
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserRole, ContributionStatus, ProjectStatus, UserStatus, ExpenseStatus } from '@prisma/client';
+import { UserRole, ContributionStatus, ProjectStatus, UserStatus } from '@prisma/client';
+import { LedgerService } from '../ledger/ledger.service';
 
 @Injectable()
 export class DashboardSuperAdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ledger: LedgerService,
+  ) {}
+
+  // 🔥 CORRECTION : solde recalculé via LedgerService.getBalances (source
+  // unique de vérité, incluant les virements inter-antennes TRANSFER_IN /
+  // TRANSFER_OUT), au lieu de Contribution - Expense qui les ignorait.
+  private async getAntennaBalance(associationId: string, antennaId: string, currency: string): Promise<number> {
+    const { totalByCurrency } = await this.ledger.getBalances(associationId, antennaId);
+    return totalByCurrency[currency] ?? 0;
+  }
 
   // 💉 Le service exige maintenant l'associationId
   async getSuperAdminDashboard(associationId: string) {
@@ -39,26 +51,12 @@ export class DashboardSuperAdminService {
 
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        // 🔒 Cloisonnement des cotisations par antenne ET par association
-        const inAgg = await this.prisma.contribution.aggregate({
-          where: { antennaId: ant.id, associationId, status: ContributionStatus.VALIDATED },
-          _sum: { amount: true }
-        });
-        
-        // 🔒 Cloisonnement des dépenses par antenne ET par association
-        const outAgg = await this.prisma.expense.aggregate({
-          where: { antennaId: ant.id, associationId, status: ExpenseStatus.VALIDATED },
-          _sum: { amount: true }
-        });
-
-        const totalIn = Number(inAgg._sum.amount ?? 0);
-        const totalOut = Number(outAgg._sum.amount ?? 0);
-
+        const currency = ant.defaultCurrency || 'GNF';
         return {
           id: ant.id,
           name: ant.name,
-          balance: totalIn - totalOut,
-          currency: ant.defaultCurrency || 'GNF'
+          balance: await this.getAntennaBalance(associationId, ant.id, currency),
+          currency,
         };
       })
     );

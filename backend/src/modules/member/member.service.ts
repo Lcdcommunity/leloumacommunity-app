@@ -15,7 +15,6 @@ import {
   PaymentMethod,
   ContributionPurpose,
   NotificationType,
-  ExpenseStatus,
   CurrencyCode,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -33,6 +32,7 @@ import { MemberContentsQueryDto } from './dto/member-contents-query.dto';
 import { PaginatedResponseDto } from '../../common/dto/paginated-response.dto';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PushSubscriptionDto } from './dto/push-subscription.dto';
+import { LedgerService } from '../ledger/ledger.service';
 
 // ─── Helper 1 : construit l'ensemble des mois couverts ────────────────────────
 // CORRECTION BUG PAIEMENTS GROUPÉS :
@@ -129,6 +129,7 @@ export class MemberService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly ledger: LedgerService,
   ) {}
 
   // ─── getMeOrThrow ─────────────────────────────────────────────────────────
@@ -307,32 +308,20 @@ export class MemberService {
       ? (lastContribution.validatedAt ?? lastContribution.createdAt).toISOString()
       : null;
 
+    // après
+    // 🔥 CORRECTION : solde recalculé via LedgerService.getBalances (source
+    // unique de vérité, incluant les virements inter-antennes TRANSFER_IN /
+    // TRANSFER_OUT), au lieu de Contribution - Expense qui les ignorait.
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
-        const [aggC, aggE] = await Promise.all([
-          this.prisma.contribution.aggregate({
-            where: {
-              associationId: me.associationId,
-              antennaId: ant.id,
-              status: ContributionStatus.VALIDATED,
-            },
-            _sum: { amount: true },
-          }),
-          this.prisma.expense.aggregate({
-            where: {
-              associationId: me.associationId,
-              antennaId: ant.id,
-              status: ExpenseStatus.VALIDATED,
-            },
-            _sum: { amount: true },
-          }),
-        ]);
+        const currency = ant.defaultCurrency || 'EUR';
+        const { totalByCurrency } = await this.ledger.getBalances(me.associationId, ant.id);
 
         return {
           id: ant.id,
           name: ant.name,
-          balance: Number(aggC._sum.amount ?? 0) - Number(aggE._sum.amount ?? 0),
-          currency: ant.defaultCurrency || 'EUR',
+          balance: totalByCurrency[currency] ?? 0,
+          currency,
         };
       }),
     );

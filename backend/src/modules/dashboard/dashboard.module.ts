@@ -9,8 +9,10 @@ import { DashboardSuperAdminService } from './dashboard-super-admin.service';
 import { DashboardAntennaAdminController } from './dashboard-antenna-admin.controller';
 import { DashboardAntennaAdminService } from './dashboard-antenna-admin.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { LedgerModule } from '../ledger/ledger.module';
 
 @Module({
+  imports: [LedgerModule],
   controllers: [
     DashboardMemberController,
     SuperAdminController,

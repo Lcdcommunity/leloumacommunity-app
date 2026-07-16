@@ -14,7 +14,7 @@ import {
 } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateTransferDto } from './dto/create-transfer.dto';
+import { CreateTransferDto, UpdateTransferDto } from './dto/create-transfer.dto';
 
 @Injectable()
 export class TransfersService {
@@ -395,6 +395,46 @@ export class TransfersService {
     });
 
     return { success: true };
+  }
+
+  // ── Modifier un virement envoyé (expéditeur, avant validation) ────────────
+  // 🔥 NOUVEAU : permet à l'antenne expéditrice de corriger un montant saisi
+  // par erreur tant que le virement n'a pas encore été validé par le
+  // destinataire. Mêmes droits d'accès que cancelTransfer (assertManagesAntenna
+  // sur l'antenne EXPÉDITRICE, pas la destinataire).
+  async updateTransfer(transferId: string, adminId: string, dto: UpdateTransferDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      select: { role: true, associationId: true },
+    });
+    if (!user) throw new ForbiddenException('Utilisateur introuvable.');
+
+    const transfer = await this.prisma.antennaTransfer.findFirst({
+      where: { id: transferId, status: TransferStatus.PENDING_VALIDATION },
+    });
+    if (!transfer) throw new NotFoundException('Virement introuvable ou déjà traité.');
+
+    await this.assertManagesAntenna(adminId, user, transfer.senderAntennaId, transfer.associationId);
+
+    if (dto.sendAmount === undefined && dto.receiveAmount === undefined && dto.notes === undefined) {
+      throw new BadRequestException('Aucune modification fournie.');
+    }
+
+    const updated = await this.prisma.antennaTransfer.update({
+      where: { id: transferId },
+      data: {
+        ...(dto.sendAmount !== undefined ? { sendAmount: new Prisma.Decimal(dto.sendAmount) } : {}),
+        ...(dto.receiveAmount !== undefined ? { receiveAmount: new Prisma.Decimal(dto.receiveAmount) } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+      },
+      include: {
+        senderAntenna: { select: { name: true, city: true } },
+        receiverAntenna: { select: { name: true, city: true } },
+        initiatedByUser: { select: { firstName: true, lastName: true } },
+      },
+    });
+
+    return this.map(updated);
   }
 
   // ── Annuler un virement envoyé (expéditeur, avant validation) ─────────────
