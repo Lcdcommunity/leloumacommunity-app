@@ -9,17 +9,17 @@ async function main() {
 
   const hashedPwd = await bcrypt.hash('Lcd123456!', 10);
 
-  // ── SYSTEM ADMIN — jallowdoniko@gmail.com ──
+  // ── SYSTEM ADMIN — doniko.digital@gmail.com ──
   // Rôle : crée et gère les associations sur la plateforme
   await prisma.user.upsert({
-    where: { email: 'jallowdoniko@gmail.com' },
+    where: { email: 'doniko.digital@gmail.com' },
     update: {
       role: UserRole.SYSTEM_ADMIN,
       passwordHash: hashedPwd,
       status: UserStatus.ACTIVE,
     },
     create: {
-      email: 'jallowdoniko@gmail.com',
+      email: 'doniko.digital@gmail.com',
       passwordHash: hashedPwd,
       firstName: 'Doniko',
       lastName: 'JALLOW',
@@ -27,10 +27,12 @@ async function main() {
       status: UserStatus.ACTIVE,
     },
   });
-  console.log('👤 System Admin "jallowdoniko@gmail.com" OK');
+  console.log('👤 System Admin "doniko.digital@gmail.com" OK');
 
   // ────────────────────────────────────────────────────────────
-  // Les comptes ci-dessous sont déjà en base — ne pas retoucher
+  // Ces comptes ne sont PAS en base sur cette instance Grand Chef
+  // (base réinitialisée récemment) — ne décommente que si tu veux
+  // vraiment les recréer ici.
   // ────────────────────────────────────────────────────────────
   //
   // await prisma.association.upsert({ where: { code: 'LCD26DONIKO' }, ... });
@@ -52,4 +54,4 @@ main()
   });
 
 // npx prisma db seed
-// npx prisma db seed
+

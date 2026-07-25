@@ -1,0 +1,12 @@
+// backend/prisma/tsconfig.json
+{
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "ES2021",
+    "types": ["node"],
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": false
+  },
+  "include": ["**/*.ts"]
+}
