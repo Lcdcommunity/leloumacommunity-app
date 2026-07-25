@@ -10,26 +10,10 @@ export async function login(
   email: string,
   password: string,
 ): Promise<LoginResponse> {
-  // 🔥 IMPORTANT : récupération du domaine courant
-  const tenantDomain =
-    typeof window !== 'undefined'
-      ? window.location.hostname
-      : undefined;
-
-  const data = await http<
-    LoginResponse,
-    { email: string; password: string }
-  >('/auth/login', {
+  const data = await http<LoginResponse, { email: string; password: string }>('/auth/login', {
     method: 'POST',
     auth: false,
     body: { email, password },
-
-    // ✅ AJOUT CRITIQUE (sans casser le reste)
-    headers: tenantDomain
-      ? {
-          'x-tenant-domain': tenantDomain,
-        }
-      : undefined,
   });
 
   setTokens({

@@ -29,20 +29,17 @@ function getBaseUrl(): string {
   return url.replace(/\/+$/, '');
 }
 
-// 🔥 NOUVEAU : Fonction utilitaire pour déterminer le locataire (tenant)
-function getTenantDomain(): string {
-  const FALLBACK_DOMAIN = 'leloumacommunity.com'; // Ton domaine de prod officiel
-  
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    // Si on est sur l'URL temporaire Vercel ou en local, on simule le domaine de prod
-    if (host.includes('vercel.app') || host.includes('localhost')) {
-      return FALLBACK_DOMAIN;
-    }
-    // Sinon, on renvoie le domaine actuel nettoyé
-    return host.replace(/^www\./, '');
+// Sur une URL Vercel par défaut ou en local, il n'y a pas de "vrai" domaine
+// de tenant à vérifier — on laisse le backend ignorer la vérification (via
+// Origin, prioritaire côté serveur) plutôt que de prétendre qu'il s'agit
+// d'une association précise.
+function getTenantDomain(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const host = window.location.hostname;
+  if (host.endsWith('.vercel.app') || host === 'localhost' || host === '127.0.0.1') {
+    return undefined;
   }
-  return FALLBACK_DOMAIN;
+  return host.replace(/^www\./, '');
 }
 
 async function parseJsonSafe(res: Response): Promise<unknown> {
@@ -70,7 +67,7 @@ async function refreshTokenRequest(): Promise<boolean> {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-tenant-domain': tenantDomain, // 🔥 Sécurité : on l'injecte aussi lors du refresh
+      ...(tenantDomain ? { 'x-tenant-domain': tenantDomain } : {}),
     },
     body: JSON.stringify({ refreshToken }),
   });
@@ -99,12 +96,12 @@ export async function http<TResponse, TBody = unknown>(
   const useAuth = options?.auth ?? true;
   const retryOn401 = options?.retryOn401 ?? true;
   const baseUrl = getBaseUrl();
-  const tenantDomain = getTenantDomain(); // 🔥 Récupération du domaine calculé
+  const tenantDomain = getTenantDomain();
 
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
   const headers: Record<string, string> = {
-    'x-tenant-domain': tenantDomain, // 🔥 Injection systématique du header
+    ...(tenantDomain ? { 'x-tenant-domain': tenantDomain } : {}),
     ...(options?.headers ?? {}),
   };
 
@@ -130,7 +127,6 @@ export async function http<TResponse, TBody = unknown>(
     body,
   });
 
-  // 🔁 Retry automatique si 401
   if (res.status === 401 && useAuth && retryOn401) {
     const refreshed = await refreshTokenRequest();
 
@@ -142,7 +138,6 @@ export async function http<TResponse, TBody = unknown>(
     }
   }
 
-  // ❌ Gestion erreurs
   if (!res.ok) {
     const payload = (await parseJsonSafe(res)) as ApiErrorPayload | string | null;
 
@@ -156,12 +151,10 @@ export async function http<TResponse, TBody = unknown>(
     throw new Error(message);
   }
 
-  // ✅ No content
   if (res.status === 204) {
     return undefined as TResponse;
   }
 
-  // ✅ FIX CRITIQUE : parse sécurisé
   const data = await parseJsonSafe(res);
 
   return data as TResponse;
