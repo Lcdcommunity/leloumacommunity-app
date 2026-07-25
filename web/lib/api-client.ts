@@ -1265,6 +1265,7 @@ export const api = {
         name: string;
         code: string;
         domainName: string | null;
+        isActive?: boolean; // ⚠️ à confirmer que le backend le renvoie (voir note plus bas)
         createdAt: string;
         _count: { users: number; antennas: number };
       }>;
@@ -1308,6 +1309,12 @@ export const api = {
       method: 'PATCH',
       body: { isActive },
     }),
+
+    provisionDomainSystemAdmin: (body: { associationId: string; domain: string }) =>
+    http<{ nameServers: string[]; zoneStatus: string }, typeof body>(
+      '/domain-provisioning/provision',
+      { method: 'POST', body },
+    ),
 
 // ==========================================
   // VIREMENTS INTER-ANTENNES

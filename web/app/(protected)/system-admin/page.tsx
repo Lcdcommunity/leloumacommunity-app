@@ -34,7 +34,6 @@ export default function SystemAdminDashboard() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const fetchDashboardData = () => {
-    setLoading(true);
     api.getSystemDashboard()
       .then((res) => setData(res as unknown as SystemDashboardData))
       .catch(err => setError(err.message))
@@ -107,6 +106,7 @@ export default function SystemAdminDashboard() {
       
       setSelectedAsso(null);
       // On rafraîchit les données pour avoir les bons chiffres en haut de page
+      setLoading(true);
       fetchDashboardData();
       
     } catch (err: unknown) { 

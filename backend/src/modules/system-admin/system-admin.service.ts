@@ -10,6 +10,10 @@ export interface CreateAssociationPayload {
   associationName: string;
   code: string;
   domain?: string;
+  registrationNumber?: string;
+  addressLine1?: string;
+  postalCode?: string;
+  logoFileId?: string | null;
   themeColors?: Record<string, string>;
   fontFamily?: string;
   adminFirstName: string;
@@ -34,9 +38,6 @@ export class SystemAdminService {
     const existingUser = await this.prisma.user.findUnique({ where: { email: data.adminEmail } });
     if (existingUser) throw new ConflictException("Cet email est déjà utilisé.");
 
-    // 🔒 CORRECTIF : normalisation avant stockage (plus de casse/www/slash
-    // qui traînent), + détection explicite de doublon avec message clair
-    // plutôt que de laisser remonter l'erreur brute de la contrainte @unique.
     const domainName = normalizeDomain(data.domain);
     if (domainName) {
       const existingDomain = await this.prisma.association.findUnique({ where: { domainName } });
@@ -53,6 +54,11 @@ export class SystemAdminService {
           code: data.code,
           domainName,
           country: data.country,
+          city: data.city,
+          addressLine1: data.addressLine1,
+          postalCode: data.postalCode,
+          registrationNumber: data.registrationNumber,
+          logoFileId: data.logoFileId ?? undefined,
           themeColors: data.themeColors ? (data.themeColors as any) : undefined,
           fontFamily: data.fontFamily,
         }
@@ -76,13 +82,19 @@ export class SystemAdminService {
       return { association, superAdmin };
     });
 
-    await this.mailService.sendSuperAdminWelcome({
-      to: result.superAdmin.email,
-      firstName: result.superAdmin.firstName,
-      lastName: result.superAdmin.lastName,
-      associationName: result.association.name,
-      temporaryPassword,
-    });
+    // Non-bloquant : l'association et le compte existent déjà à ce stade.
+    // Un échec d'envoi ne doit pas ressembler à un échec de création.
+    try {
+      await this.mailService.sendSuperAdminWelcome({
+        to: result.superAdmin.email,
+        firstName: result.superAdmin.firstName,
+        lastName: result.superAdmin.lastName,
+        associationName: result.association.name,
+        temporaryPassword,
+      });
+    } catch (mailErr) {
+      console.error(`Échec de l'envoi de l'email de bienvenue à ${result.superAdmin.email}`, mailErr);
+    }
 
     return {
       message: 'Association et Super Admin créés avec succès.',
@@ -131,14 +143,18 @@ export class SystemAdminService {
     const assoc = await this.prisma.association.findUnique({ where: { id } });
     if (!assoc) throw new NotFoundException('Association introuvable.');
 
-    if (data.code && data.code !== assoc.code) {
-      const existing = await this.prisma.association.findUnique({ where: { code: data.code } });
-      if (existing) throw new ConflictException("Ce code d'association est déjà utilisé par une autre instance.");
+    // Normalisation AVANT le contrôle de doublon (et réutilisée pour l'écriture) :
+    // sinon un code qui ne diffère que par la casse/les espaces passe le test
+    // puis plante sur la contrainte @unique une fois normalisé.
+    let normalizedCode: string | undefined;
+    if (data.code) {
+      normalizedCode = data.code.toUpperCase().replace(/\s/g, '');
+      if (normalizedCode !== assoc.code) {
+        const existing = await this.prisma.association.findUnique({ where: { code: normalizedCode } });
+        if (existing) throw new ConflictException("Ce code d'association est déjà utilisé par une autre instance.");
+      }
     }
 
-    // 🔒 CORRECTIF : même normalisation qu'à la création, + exclusion de
-    // soi-même dans la détection de doublon (findUnique ne permet pas
-    // d'exclure un id, donc findFirst ici).
     let domainName: string | null | undefined;
     if (data.domainName !== undefined) {
       domainName = normalizeDomain(data.domainName);
@@ -154,7 +170,7 @@ export class SystemAdminService {
       where: { id },
       data: {
         ...(data.name ? { name: data.name } : {}),
-        ...(data.code ? { code: data.code.toUpperCase().replace(/\s/g, '') } : {}),
+        ...(normalizedCode ? { code: normalizedCode } : {}),
         ...(domainName !== undefined ? { domainName } : {}),
       }
     });
@@ -173,12 +189,8 @@ export class SystemAdminService {
       take: 100,
       orderBy: { createdAt: 'desc' },
       include: {
-        actorUser: {
-          select: { firstName: true, lastName: true }
-        },
-        association: {
-          select: { name: true }
-        }
+        actorUser: { select: { firstName: true, lastName: true } },
+        association: { select: { name: true } }
       }
     });
 
@@ -200,9 +212,7 @@ export class SystemAdminService {
     const association = await this.prisma.association.findUnique({ where: { id } });
     if (!association) throw new NotFoundException('Association introuvable.');
 
-    await this.prisma.association.delete({
-      where: { id }
-    });
+    await this.prisma.association.delete({ where: { id } });
 
     return { message: `L'association ${association.name} a été détruite définitivement.` };
   }

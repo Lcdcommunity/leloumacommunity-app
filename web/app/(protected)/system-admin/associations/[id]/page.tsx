@@ -30,29 +30,31 @@ export default function AssociationDetails() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // État pour l'édition des paramètres système
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editCode, setEditCode] = useState('');
   const [editDomain, setEditDomain] = useState('');
 
-  const loadData = useCallback(() => {
-    setLoading(true);
-    api.getAssociationByIdSystemAdmin(id as string)
-      .then((data) => {
-        const d = data as AssociationDetail;
-        setAsso(d);
-        setEditName(d.name);
-        setEditCode(d.code);
-        setEditDomain(d.domainName || '');
-      })
-      .catch(() => router.push('/system-admin/associations'))
-      .finally(() => setLoading(false));
-  }, [id, router]);
+  const [domainNameServers, setDomainNameServers] = useState<string[] | null>(null);
+  const [domainActionError, setDomainActionError] = useState<string | null>(null);
+
+  // .then() explicite (pas async/await) : c'est le pattern que la règle ESLint
+  // set-state-in-effect reconnaît de façon fiable comme "indirect", cf. sa doc.
+  const fetchAssociation = useCallback(() => {
+    return api.getAssociationByIdSystemAdmin(id as string).then((data) => {
+      const d = data as AssociationDetail;
+      setAsso(d);
+      setEditName(d.name);
+      setEditCode(d.code);
+      setEditDomain(d.domainName || '');
+    });
+  }, [id]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    fetchAssociation()
+      .catch(() => router.push('/system-admin/associations'))
+      .finally(() => setLoading(false));
+  }, [fetchAssociation, router]);
 
   const toggleStatus = async () => {
     if (!asso) return;
@@ -62,7 +64,7 @@ export default function AssociationDetails() {
     setActionLoading(true);
     try {
       await api.updateAssociationStatusSystemAdmin(id as string, !asso.isActive);
-      loadData();
+      await fetchAssociation();
     } catch {
       alert("Erreur lors du changement de statut");
     } finally {
@@ -73,14 +75,34 @@ export default function AssociationDetails() {
   const handleUpdateIdentity = async (e: React.FormEvent) => {
     e.preventDefault();
     setActionLoading(true);
+    setDomainActionError(null);
+    setDomainNameServers(null);
     try {
+      const trimmedDomain = editDomain.trim();
+      const domainChanged = trimmedDomain !== (asso?.domainName || '');
+
       await api.updateAssociationDetailsSystemAdmin(id as string, {
         name: editName,
         code: editCode,
-        domainName: editDomain
+        domainName: trimmedDomain, // ton backend normalise déjà '' -> null, pas besoin de le faire ici
       });
+
+      if (domainChanged && trimmedDomain) {
+        try {
+          const result = await api.provisionDomainSystemAdmin({
+            associationId: id as string,
+            domain: trimmedDomain,
+          });
+          setDomainNameServers(result.nameServers);
+        } catch (provErr: unknown) {
+          setDomainActionError(
+            provErr instanceof Error ? provErr.message : 'Erreur de provisioning du domaine.',
+          );
+        }
+      }
+
       setIsEditing(false);
-      loadData();
+      await fetchAssociation();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Erreur lors de la mise à jour");
     } finally {
@@ -134,6 +156,8 @@ export default function AssociationDetails() {
         .stat-box { background: #F5F3FF; border-radius: 16px; padding: 1.2rem; text-align: center; border: 1px solid #DDD6FE; }
         .stat-num { display: block; font-size: 1.8rem; font-weight: 800; color: #7C3AED; }
         .stat-label { font-size: 0.7rem; font-weight: 700; color: #6D28D9; text-transform: uppercase; }
+        .ns-banner { background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 12px; padding: 1rem; margin-top: 1rem; font-size: 0.8rem; }
+        .ns-banner code { display: block; font-weight: 700; color: #7C3AED; margin-top: 0.4rem; }
         @keyframes detIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
@@ -182,6 +206,18 @@ export default function AssociationDetails() {
                   <div className="info-row"><span className="info-label">Code Identifiant</span><span className="info-value" style={{ fontFamily: 'monospace', color: '#7C3AED' }}>{asso.code}</span></div>
                   <div className="info-row"><span className="info-label">Domaine Dédié</span><span className="info-value">{asso.domainName || 'Non configuré'}</span></div>
                 </>
+              )}
+
+              {domainNameServers && (
+                <div className="ns-banner">
+                  Nameservers à configurer chez le registrar pour activer le domaine :
+                  {domainNameServers.map(ns => <code key={ns}>{ns}</code>)}
+                </div>
+              )}
+              {domainActionError && (
+                <div className="ns-banner" style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#DC2626' }}>
+                  {domainActionError}
+                </div>
               )}
               
               <div className="info-row" style={{ marginTop: '1rem', border: 'none' }}><span className="info-label">Devise par défaut</span><span className="info-value">{asso.defaultCurrency}</span></div>

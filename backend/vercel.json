@@ -12,5 +12,8 @@
       "dest": "src/main.ts",
       "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
     }
+  ],
+  "crons": [
+    { "path": "/api/domain-provisioning/check", "schedule": "0 3 * * *" }
   ]
 }

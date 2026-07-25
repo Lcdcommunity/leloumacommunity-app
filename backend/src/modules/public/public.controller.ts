@@ -1,8 +1,10 @@
 // backend/src/modules/public/public.controller.ts
 import { Controller, Get, Post, Body, Query, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { PrismaService } from '../../prisma/prisma.service';
-import { PublicService, SignupDto } from './public.service';
+import { PublicService } from './public.service';
+import { MemberSignupDto } from '../auth/dto/member-signup.dto';
 
 interface PublicAntennaResponse {
   id: string;
@@ -20,10 +22,6 @@ export class PublicController {
     private readonly publicService: PublicService,
   ) {}
 
-  /**
-   * Liste des antennes actives.
-   * 🔥 AMÉLIORATION SaaS : Possibilité de filtrer par associationCode
-   */
   @Get('antennas')
   async listAntennas(@Query('associationCode') associationCode?: string): Promise<PublicAntennaResponse[]> {
     const items = await this.prisma.antenna.findMany({
@@ -33,41 +31,26 @@ export class PublicController {
       },
       orderBy: [{ name: 'asc' }],
       select: {
-        id: true,
-        code: true,
-        name: true,
-        city: true,
-        country: true,
+        id: true, code: true, name: true, city: true, country: true,
         association: { select: { name: true } }
       },
     });
 
     return items.map(item => ({
-      id: item.id,
-      code: item.code,
-      name: item.name,
-      city: item.city,
-      country: item.country,
-      associationName: item.association.name
+      id: item.id, code: item.code, name: item.name, city: item.city,
+      country: item.country, associationName: item.association.name
     }));
   }
 
-  /**
-   * Ajout du FileInterceptor pour parser le FormData (multipart/form-data)
-   * envoyé par le frontend avec l'image "avatar".
-   */
   @Post('signup')
-  @UseInterceptors(FileInterceptor('avatar'))
+  @UseInterceptors(FileInterceptor('avatar', { storage: memoryStorage() }))
   async signup(
-    @Body() dto: SignupDto,
+    @Body() dto: MemberSignupDto,
     @UploadedFile() avatar?: Express.Multer.File
   ) {
     return this.publicService.signup(dto, avatar);
   }
 
-  /**
-   * Route appelée par le lien contenu dans l'email de bienvenue
-   */
   @Post('verify-email-token')
   async verifyEmailToken(@Body() body: { token: string }) {
     return this.publicService.verifyEmailToken(body.token);

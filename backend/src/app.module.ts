@@ -45,6 +45,8 @@ import { AssociationsModule } from './modules/associations/associations.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { UsersModule } from './modules/users/users.module';
 import { ElectionsModule } from './modules/elections/elections.module';
+// 🔥 NOUVEAU : provisioning automatique des domaines custom (Cloudflare + Vercel)
+import { DomainProvisioningModule } from './domain-provisioning/domain-provisioning.module';
 
 @Module({
   imports: [
@@ -97,6 +99,7 @@ import { ElectionsModule } from './modules/elections/elections.module';
     AdminModule,
     UsersModule,
     ElectionsModule,
+    DomainProvisioningModule, // 🔥 NOUVEAU
   ],
   controllers: [],
   providers: [

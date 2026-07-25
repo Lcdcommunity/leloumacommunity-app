@@ -121,6 +121,13 @@ enum ProjectStatus {
   ARCHIVED
 }
 
+enum DomainStatus {
+  NONE
+  PENDING_VERIFICATION
+  ACTIVE
+  FAILED
+}
+
 enum ProposalStatus {
   DRAFT
   SUBMITTED
@@ -391,6 +398,7 @@ model Association {
   email                            String?
   websiteUrl                       String?
   logoFileId                       String?
+  domainStatus                     DomainStatus @default(NONE)
   defaultCurrency                  CurrencyCode @default(EUR)
   isActive                         Boolean      @default(true)
 

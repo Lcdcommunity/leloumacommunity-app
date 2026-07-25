@@ -4,11 +4,12 @@ import { PublicController } from './public.controller';
 import { PublicService } from './public.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthMailerService } from '../auth/auth.mailer.service';
-import { NotificationsModule } from '../notifications/notifications.module'; // <-- Ajouté
+import { NotificationsModule } from '../notifications/notifications.module';
+import { UploadsModule } from '../uploads/uploads.module';
 
 @Module({
-  imports: [NotificationsModule], // <-- Injection
+  imports: [NotificationsModule, UploadsModule],
   controllers: [PublicController],
-  providers: [PrismaService, PublicService, AuthMailerService], 
+  providers: [PrismaService, PublicService, AuthMailerService],
 })
 export class PublicModule {}

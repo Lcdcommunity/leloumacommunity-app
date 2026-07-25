@@ -149,17 +149,24 @@ export class AuthService {
       );
     }
 
-    // 4. 🔒 PILIER 3 : VÉRIFICATION DE DOMAINE (MULTI-TENANT)
-    if (user.role !== 'SYSTEM_ADMIN' && meta?.tenantDomain && user.associationId) {
-      // Normalisation du domaine reçu (ex: "www.leloumacommunity.com:3000" -> "leloumacommunity.com")
-      const requestDomain = this.normalizeUrl(meta.tenantDomain.split(':')[0]);
-
+    // 4. 🔒 Association active + verrouillage de domaine (multi-tenant).
+    // SYSTEM_ADMIN est exempté : il opère au niveau plateforme, pas rattaché
+    // à une seule instance.
+    if (user.role !== 'SYSTEM_ADMIN' && user.associationId) {
       const userAssociation = await this.prisma.association.findUnique({
         where: { id: user.associationId },
-        select: { domainName: true }
+        select: { isActive: true, domainName: true },
       });
 
-      if (userAssociation?.domainName) {
+      // La suspension d'une instance doit bloquer la connexion, qu'un header
+      // de domaine soit présent ou non — indépendant du contrôle ci-dessous.
+      if (userAssociation && !userAssociation.isActive) {
+        throw new UnauthorizedException('Cette instance a été suspendue.');
+      }
+
+      if (meta?.tenantDomain && userAssociation?.domainName) {
+        // Normalisation du domaine reçu (ex: "www.leloumacommunity.com:3000" -> "leloumacommunity.com")
+        const requestDomain = this.normalizeUrl(meta.tenantDomain.split(':')[0]);
         const dbDomain = this.normalizeUrl(userAssociation.domainName);
 
         // Autorisation si on est en local ou si les domaines normalisés correspondent
@@ -272,12 +279,19 @@ export class AuthService {
     const front = this.getFrontendBaseUrl();
     const resetUrl = `${front}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
-    await this.authMailer.sendPasswordResetEmail({
-      to: user.email,
-      resetUrl,
-      appName: user.association?.name || 'Lélouma Community',
-      logoUrl: user.association?.logoFile?.url,
-    });
+    // Le token existe déjà en base à ce stade. Un incident SMTP ne doit ni
+    // casser la réponse générique anti-énumération, ni la transformer en
+    // signal indirect — on log et on renvoie quand même `generic`.
+    try {
+      await this.authMailer.sendPasswordResetEmail({
+        to: user.email,
+        resetUrl,
+        appName: user.association?.name || 'Lélouma Community',
+        logoUrl: user.association?.logoFile?.url,
+      });
+    } catch (mailErr) {
+      console.error(`Échec de l'envoi de l'email de réinitialisation à ${user.email}`, mailErr);
+    }
 
     return generic;
   }
