@@ -35,7 +35,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showCurtain, setShowCurtain]   = useState(false);
   const [curtainOpen, setCurtainOpen]   = useState(false);
-  // ── NOUVEAU : toggle pour le panel aide ──
   const [helpOpen, setHelpOpen]     = useState(false);
   const timerRef = useRef<number | null>(null);
 
@@ -45,12 +44,16 @@ export default function LoginPage() {
   const [theme, setTheme] = useState<{
     name: string; logoUrl: string | null;
     primary: string; secondary: string; fontFamily: string;
+    phone: string | null; email: string | null; city: string | null; country: string | null;
   }>({
-    name: 'LELOUMA COMMUNAUTE POUR LE DEVELOPPEMENT',
-    logoUrl: '/assets/images/logolcd.jpg',
+    name: 'Console Grand Chef',
+    logoUrl: null,
     primary: '#1A56DB', secondary: '#1E40AF',
     fontFamily: "'DM Sans', sans-serif",
+    phone: null, email: null, city: null, country: null,
   });
+
+  const [docs, setDocs] = useState<Array<{ id: string; title: string; url: string }>>([]);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
@@ -76,25 +79,42 @@ export default function LoginPage() {
   }, [handleLanguageChanged]);
 
   useEffect(() => {
-    const fetchTheme = async () => {
+    const fetchThemeAndDocs = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const codeParam   = urlParams.get('code')   || undefined;
+      const domainParam = urlParams.get('domain') || undefined;
+      const currentDomain = !codeParam && !domainParam ? window.location.hostname : undefined;
+      if (currentDomain === 'localhost' || currentDomain === 'votre-domaine-principal.com') return;
+
       try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const codeParam   = urlParams.get('code')   || undefined;
-        const domainParam = urlParams.get('domain') || undefined;
-        const currentDomain = !codeParam && !domainParam ? window.location.hostname : undefined;
-        if (currentDomain === 'localhost' || currentDomain === 'votre-domaine-principal.com') return;
         const data = await api.getPublicTheme(domainParam || currentDomain, codeParam);
         if (data) {
           setTheme({
             name: data.name,
-            logoUrl: data.logoUrl || '/assets/images/logolcd.jpg',
-            primary: '#1A56DB', secondary: '#1E40AF',
+            logoUrl: data.logoUrl || null,
+            primary: data.themeColors?.primary || '#1A56DB',
+            secondary: data.themeColors?.secondary || '#1E40AF',
             fontFamily: data.fontFamily || "'DM Sans', sans-serif",
+            phone: data.phone,
+            email: data.email,
+            city: data.city,
+            country: data.country,
           });
         }
-      } catch (err) { console.warn('Thème personnalisé non trouvé.', err); }
+      } catch (err) {
+        // Aucune association ne correspond à ce domaine (Grand Chef, ou
+        // instance sans domaine configuré) — identité neutre conservée.
+        console.warn('Thème personnalisé non trouvé.', err);
+      }
+
+      try {
+        const publicDocs = await api.getPublicDocuments(domainParam || currentDomain, codeParam);
+        setDocs(publicDocs || []);
+      } catch (err) {
+        console.warn('Documents publics non trouvés.', err);
+      }
     };
-    fetchTheme();
+    fetchThemeAndDocs();
   }, []);
 
   useEffect(() => {
@@ -139,6 +159,9 @@ export default function LoginPage() {
     return { id: i, goLeft, openDelay: distCenter * 0.12 };
   });
 
+  const hasContactInfo = Boolean(theme.email || theme.phone || theme.city || theme.country);
+  const hasDocs = docs.length > 0;
+
   if (!mounted) return null;
 
   return (
@@ -149,12 +172,12 @@ export default function LoginPage() {
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
         :root {
-          --floa-sky:    #C5DCFF;
-          --floa-bg:     #D6E9FF;
-          --floa-blue:   #1A56DB;
-          --floa-dark:   #1E3A8A;
-          --floa-light:  #EFF6FF;
-          --floa-mid:    #3B82F6;
+          --floa-blue:   ${theme.primary};
+          --floa-dark:   ${theme.secondary};
+          --floa-mid:    color-mix(in srgb, ${theme.primary} 70%, white);
+          --floa-sky:    color-mix(in srgb, ${theme.primary} 25%, white);
+          --floa-bg:     color-mix(in srgb, ${theme.primary} 18%, white);
+          --floa-light:  color-mix(in srgb, ${theme.primary} 8%, white);
           --font-main:   ${theme.fontFamily};
           --text-deep:   #1E3A8A;
           --text-muted:  #64748B;
@@ -165,7 +188,7 @@ export default function LoginPage() {
         .lp-root {
           font-family: var(--font-main);
           min-height: 100svh;
-          background: linear-gradient(160deg, #C5DCFF 0%, #D6E9FF 35%, #BFDBFE 65%, #93C5FD 100%);
+          background: linear-gradient(160deg, var(--floa-sky) 0%, var(--floa-bg) 35%, #BFDBFE 65%, #93C5FD 100%);
           display: flex; align-items: center; justify-content: center;
           position: relative; overflow: hidden; padding: 1.5rem;
         }
@@ -252,14 +275,14 @@ export default function LoginPage() {
 
         .lp-btn {
           width: 100%; height: 54px;
-          background: linear-gradient(135deg, #1A56DB, #1E40AF);
+          background: linear-gradient(135deg, var(--floa-blue), var(--floa-dark));
           color: white; border: none; border-radius: 14px;
           font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 1.5rem;
           display: flex; align-items: center; justify-content: center;
           box-shadow: 0 6px 20px rgba(26,86,219,0.35);
           transition: all .2s; letter-spacing: 0.01em;
         }
-        .lp-btn:hover:not(:disabled) { background: linear-gradient(135deg, #1D4ED8, #1E3A8A); box-shadow: 0 8px 28px rgba(26,86,219,0.45); transform: translateY(-1px); }
+        .lp-btn:hover:not(:disabled) { filter: brightness(0.92); box-shadow: 0 8px 28px rgba(26,86,219,0.45); transform: translateY(-1px); }
         .lp-btn:active:not(:disabled) { transform: scale(0.99); }
         .lp-btn:disabled { opacity: 0.7; cursor: not-allowed; }
 
@@ -282,7 +305,6 @@ export default function LoginPage() {
         }
         .lp-signup-link:hover { color: var(--floa-dark); }
 
-        /* ════ SECTION AIDE ════ */
         .lp-help-section {
           margin-top: 1.5rem;
           padding-top: 1.25rem;
@@ -293,7 +315,6 @@ export default function LoginPage() {
           gap: 0.85rem;
         }
 
-        /* Bouton principal "Aide & Assistance" */
         .lp-help-toggle {
           display: inline-flex; align-items: center; gap: 7px;
           padding: 0.5rem 1rem; border-radius: 99px;
@@ -321,7 +342,6 @@ export default function LoginPage() {
           transform: rotate(180deg);
         }
 
-        /* Panel contacts (animé) */
         .lp-help-panel {
           width: 100%;
           overflow: hidden;
@@ -357,7 +377,6 @@ export default function LoginPage() {
         }
         .lp-contact-link:hover { color: var(--floa-blue); }
 
-        /* Boutons documents */
         .lp-help-docs {
           display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
         }
@@ -366,11 +385,9 @@ export default function LoginPage() {
           padding: 0.4rem 0.85rem; border-radius: 10px;
           font-family: var(--font-main); font-size: 0.72rem; font-weight: 700;
           text-decoration: none; transition: background .15s;
+          background: rgba(30,58,138,0.06); border: 1px solid rgba(30,58,138,0.15); color: #1E3A8A;
         }
-        .lp-doc-btn-navy { background: rgba(30,58,138,0.06); border: 1px solid rgba(30,58,138,0.15); color: #1E3A8A; }
-        .lp-doc-btn-navy:hover { background: rgba(30,58,138,0.1); }
-        .lp-doc-btn-green { background: rgba(27,94,55,0.06); border: 1px solid rgba(27,94,55,0.15); color: #1B5E37; }
-        .lp-doc-btn-green:hover { background: rgba(27,94,55,0.1); }
+        .lp-doc-btn:hover { background: rgba(30,58,138,0.1); }
 
         .spinner {
           width: 20px; height: 20px;
@@ -380,7 +397,6 @@ export default function LoginPage() {
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Rideau */
         .tc-container { position: fixed; inset: 0; z-index: 9999; pointer-events: none; overflow: hidden; }
         .tc-emblem {
           position: fixed; inset: 0; z-index: 10000;
@@ -413,7 +429,7 @@ export default function LoginPage() {
         }
         .tc-fabric {
           position: absolute; inset: 0;
-          background: linear-gradient(90deg, #1E3A8A 0%, #1A56DB 30%, #2563EB 65%, #1E40AF 100%);
+          background: linear-gradient(90deg, var(--floa-dark) 0%, var(--floa-blue) 30%, var(--floa-mid) 65%, var(--floa-dark) 100%);
           box-shadow: inset 5px 0 15px rgba(0,0,0,0.4), inset -5px 0 15px rgba(0,0,0,0.4);
           border-bottom: 15px solid var(--gold-accent);
         }
@@ -434,7 +450,7 @@ export default function LoginPage() {
         }
 
         @media (max-width: 480px) {
-          .lp-root { padding: 0; background: linear-gradient(160deg, #C5DCFF 0%, #BFDBFE 50%, #93C5FD 100%); }
+          .lp-root { padding: 0; background: linear-gradient(160deg, var(--floa-sky) 0%, #BFDBFE 50%, #93C5FD 100%); }
           .lp-card { border-radius: 28px; min-height: 100svh; background: rgba(255,255,255,0.95); box-shadow: none; display: flex; flex-direction: column; justify-content: center; margin: 0; }
           .lp-orb { display: none; }
           .tc-logo-wrap { width: 110px; height: 110px; }
@@ -442,7 +458,6 @@ export default function LoginPage() {
         }
       `}</style>
 
-      {/* ── RIDEAU ── */}
       {showCurtain && (
         <div className="tc-container" aria-hidden>
           <div className={`tc-emblem ${curtainOpen ? 'tc-emblem--fade' : ''}`}>
@@ -477,7 +492,6 @@ export default function LoginPage() {
 
         <div className={`lp-card ${mounted ? 'visible' : ''}`}>
 
-          {/* Sélecteur de langue */}
           <div className="lp-lang-corner">
             <select className="lp-lang-select" value={currentLang} onChange={(e) => handleLanguageChange(e.target.value)}>
               {LANGUAGES.map((lang) => (
@@ -486,7 +500,6 @@ export default function LoginPage() {
             </select>
           </div>
 
-          {/* Logo et titre */}
           <div className="lp-logo-wrap">
             <div className="lp-logo-box">
               <div className="lp-logo-inner">
@@ -504,7 +517,6 @@ export default function LoginPage() {
             </h1>
           </div>
 
-          {/* Erreur */}
           {error && (
             <div className="lp-error">
               <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
@@ -514,7 +526,6 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Formulaire */}
           <form onSubmit={onSubmit}>
             <div className="lp-field">
               <label className="lp-label">{t('login.emailLabel', 'Adresse email')}</label>
@@ -548,7 +559,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Footer inscription */}
           <footer className="lp-footer">
             <p>{t('login.notMember', 'Pas encore membre ?')}</p>
             <Link href="/signup" className="lp-signup-link">
@@ -556,84 +566,85 @@ export default function LoginPage() {
             </Link>
           </footer>
 
-          {/* ── Aide & Documents ── */}
-          <div className="lp-help-section">
+          {(hasContactInfo || hasDocs) && (
+            <div className="lp-help-section">
 
-            {/* ── Bouton toggle Aide ── */}
-            <button
-              className={`lp-help-toggle ${helpOpen ? 'open' : ''}`}
-              onClick={() => setHelpOpen(v => !v)}
-              aria-expanded={helpOpen}
-              aria-label="Aide et assistance"
-            >
-              {/* Icône casque / question */}
-              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
-              </svg>
-              {t('login.helpBtn', 'Aide & Assistance')}
-              {/* Chevron animé */}
-              <svg className="lp-help-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <path d="M19 9l-7 7-7-7"/>
-              </svg>
-            </button>
-
-            {/* ── Panel contacts (s'ouvre au clic) ── */}
-            <div className={`lp-help-panel ${helpOpen ? 'open' : ''}`} aria-hidden={!helpOpen}>
-              <div className="lp-help-panel-inner">
-
-                <div className="lp-contact-row">
-                  <span className="lp-contact-icon">
-                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+              {hasContactInfo && (
+                <>
+                  <button
+                    className={`lp-help-toggle ${helpOpen ? 'open' : ''}`}
+                    onClick={() => setHelpOpen(v => !v)}
+                    aria-expanded={helpOpen}
+                    aria-label="Aide et assistance"
+                  >
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
                     </svg>
-                  </span>
-                  <a href="mailto:lelouma.community@gmail.com" className="lp-contact-link">
-                    lelouma.community@gmail.com
-                  </a>
-                </div>
-
-                <div className="lp-contact-row">
-                  <span className="lp-contact-icon">
-                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498A1 1 0 0121 15.72V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                    {t('login.helpBtn', 'Aide & Assistance')}
+                    <svg className="lp-help-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M19 9l-7 7-7-7"/>
                     </svg>
-                  </span>
-                  <a href="tel:+33766766226" className="lp-contact-link">
-                    +33 7 66 76 62 26
-                  </a>
-                </div>
+                  </button>
 
-                <div className="lp-contact-row">
-                  <span className="lp-contact-icon">
-                    <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                  </span>
-                  <span style={{ color: 'var(--text-deep)', fontWeight: 500 }}>Paris, France</span>
-                </div>
+                  <div className={`lp-help-panel ${helpOpen ? 'open' : ''}`} aria-hidden={!helpOpen}>
+                    <div className="lp-help-panel-inner">
 
-              </div>
+                      {theme.email && (
+                        <div className="lp-contact-row">
+                          <span className="lp-contact-icon">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                          </span>
+                          <a href={`mailto:${theme.email}`} className="lp-contact-link">{theme.email}</a>
+                        </div>
+                      )}
+
+                      {theme.phone && (
+                        <div className="lp-contact-row">
+                          <span className="lp-contact-icon">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498A1 1 0 0121 15.72V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                            </svg>
+                          </span>
+                          <a href={`tel:${theme.phone}`} className="lp-contact-link">{theme.phone}</a>
+                        </div>
+                      )}
+
+                      {(theme.city || theme.country) && (
+                        <div className="lp-contact-row">
+                          <span className="lp-contact-icon">
+                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                          </span>
+                          <span style={{ color: 'var(--text-deep)', fontWeight: 500 }}>
+                            {[theme.city, theme.country].filter(Boolean).join(', ')}
+                          </span>
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {hasDocs && (
+                <div className="lp-help-docs">
+                  {docs.map((doc) => (
+                    <a key={doc.id} href={doc.url} target="_blank" rel="noopener noreferrer" className="lp-doc-btn">
+                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                      {doc.title}
+                    </a>
+                  ))}
+                </div>
+              )}
+
             </div>
-
-            {/* ── Boutons documents ── */}
-            <div className="lp-help-docs">
-              <Link href="/documents/statuts" className="lp-doc-btn lp-doc-btn-navy">
-                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                Statuts LCD
-              </Link>
-              <Link href="/documents/reglement" className="lp-doc-btn lp-doc-btn-green">
-                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                </svg>
-                {t('login.rulesLink', 'Règlement intérieur')}
-              </Link>
-            </div>
-
-          </div>
-          {/* ── Fin aide & documents ── */}
+          )}
 
         </div>
       </div>

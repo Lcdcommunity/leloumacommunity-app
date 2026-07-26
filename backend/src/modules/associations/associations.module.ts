@@ -5,12 +5,14 @@ import { AssociationsService } from './associations.service';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PublicThemeController } from './public-theme.controller';
+import { PublicDocumentsController } from './public-documents.controller';
 
 @Module({
   imports: [PrismaModule, NotificationsModule],
   controllers: [
     AssociationsController,
     PublicThemeController,
+    PublicDocumentsController,
   ],
   providers: [AssociationsService],
 })

@@ -38,6 +38,10 @@ export class PublicThemeController {
       logoUrl: association.logoFile?.url || null,
       themeColors: association.themeColors || { primary: '#111827', secondary: '#10B981' },
       fontFamily: association.fontFamily || "'DM Sans', sans-serif",
+      phone: association.phone || null,
+      email: association.email || null,
+      city: association.city || null,
+      country: association.country || null,
     };
   }
 }

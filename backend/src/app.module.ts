@@ -27,6 +27,7 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { JobsModule } from './modules/jobs/jobs.module';
 import { FileAssetsModule } from './modules/file-assets/file-assets.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { ContributionsModule } from './modules/contributions/contributions.module';
 import { ProjectsModule } from './modules/projects/projects.module';

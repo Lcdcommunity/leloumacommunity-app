@@ -214,20 +214,37 @@ export const api = {
   // PUBLIC / THÈME VISUEL
   // ==========================================
   getPublicTheme: (domain?: string, code?: string) => {
-    const params = new URLSearchParams();
-    if (domain) {
-      const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
-      params.append('domain', cleanDomain);
-    }
-    if (code) params.append('code', code);
-    return http<{
-      id: string;
-      name: string;
-      logoUrl: string | null;
-      themeColors: { primary: string; secondary: string };
-      fontFamily: string;
-    }>(`/public/theme?${params.toString()}`, { auth: false });
-  },
+  const params = new URLSearchParams();
+  if (domain) {
+    const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+    params.append('domain', cleanDomain);
+  }
+  if (code) params.append('code', code);
+  return http<{
+    id: string;
+    name: string;
+    logoUrl: string | null;
+    themeColors: { primary: string; secondary: string };
+    fontFamily: string;
+    phone: string | null;
+    email: string | null;
+    city: string | null;
+    country: string | null;
+  }>(`/public/theme?${params.toString()}`, { auth: false });
+},
+
+getPublicDocuments: (domain?: string, code?: string) => {
+  const params = new URLSearchParams();
+  if (domain) {
+    const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+    params.append('domain', cleanDomain);
+  }
+  if (code) params.append('code', code);
+  return http<Array<{ id: string; title: string; url: string }>>(
+    `/public/documents?${params.toString()}`,
+    { auth: false },
+  );
+},
 
   // ==========================================
   // AUTH / ENRÔLEMENT MEMBRE
