@@ -83,6 +83,7 @@ import { DomainProvisioningModule } from './domain-provisioning/domain-provision
     NotificationsModule,
     JobsModule,
     FileAssetsModule,
+    DocumentsModule, // 🔥 CORRIGÉ : module créé mais jamais enregistré jusqu'ici
     LedgerModule,
     ContributionsModule,
     ProjectsModule,

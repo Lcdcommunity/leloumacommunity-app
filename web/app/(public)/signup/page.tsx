@@ -30,6 +30,16 @@
 //        valide (ex. une étape "Précisez" devenue obsolète), on avance automatiquement.
 // - [INTACT] Logique de thème dynamique, i18n/RTL, auto-remplissage de l'indicatif téléphonique,
 //        calcul de force du mot de passe, et écran de succès final : strictement inchangés.
+//
+// CHANGELOG v2.1.0 :
+// - [DYNAMIQUE] Suppression de COMMUNES_ORIGINE (liste figée des sous-préfectures de Lélouma).
+//        La liste des communes/villages d'origine est maintenant chargée par association via
+//        un nouvel appel api.getPublicOriginLocalities(domain, code) — voir note en bas de fichier.
+//        Si l'association n'a configuré aucune liste, l'écran bascule automatiquement en champ
+//        texte libre (plus de dépendance à une liste guinéenne pour les autres associations).
+// - [DYNAMIQUE] Identité par défaut alignée sur celle du login ('Console Grand Chef' au lieu de
+//        'Lélouma') tant qu'aucun thème d'association n'est résolu.
+// - [DYNAMIQUE] Texte d'explication de la commune d'origine généralisé (retrait de "en Guinée").
 
 'use client';
 
@@ -72,11 +82,6 @@ export const PROFESSION_LIST = [
   'Sans emploi',
   'Retraité(e)',
   'Autre',
-];
-
-export const COMMUNES_ORIGINE = [
-  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
-  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
 ];
 
 export const COUNTRIES = [
@@ -179,12 +184,17 @@ export default function MemberSignupPage() {
     secondary: string;
     fontFamily: string;
   }>({
-    name: 'Lélouma',
+    name: 'Console Grand Chef',
     logoUrl: null,
     primary: '#2563EB',
     secondary: '#059669',
     fontFamily: "'DM Sans', sans-serif",
   });
+
+  // Liste des communes/villages d'origine, configurée par association.
+  // Tableau vide = association sans liste configurée → l'écran bascule en texte libre.
+  const [originLocalities, setOriginLocalities] = useState<string[]>([]);
+  const [loadingOriginLocalities, setLoadingOriginLocalities] = useState(true);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -325,6 +335,35 @@ export default function MemberSignupPage() {
     fetchTheme();
   }, []);
 
+  // Charge la liste des communes/villages d'origine propre à l'association résolue
+  // via le domaine/code courant. Aucune liste configurée → tableau vide, l'écran
+  // "commune d'origine" bascule alors automatiquement en champ texte libre.
+  useEffect(() => {
+    const fetchOriginLocalities = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeParam = urlParams.get('code') || undefined;
+        const domainParam = urlParams.get('domain') || undefined;
+        const currentDomain = !codeParam && !domainParam ? window.location.hostname : undefined;
+
+        if (currentDomain === 'localhost' || currentDomain === 'votre-domaine-principal.com') {
+          return;
+        }
+
+        const data = await api.getPublicOriginLocalities(domainParam || currentDomain, codeParam);
+        if (data?.localities?.length) {
+          setOriginLocalities(data.localities);
+        }
+      } catch (err) {
+        console.warn("Liste des communes d'origine non trouvée.", err);
+      } finally {
+        setLoadingOriginLocalities(false);
+      }
+    };
+
+    fetchOriginLocalities();
+  }, []);
+
   useEffect(() => {
     if (!mounted) return;
     const dataToSave = {
@@ -364,14 +403,16 @@ export default function MemberSignupPage() {
 
   // ── Garde-fou : si l'écran restauré depuis sessionStorage ne correspond plus
   //    à un écran valide (ex. la sous-question "Précisez" n'est plus applicable
-  //    car la réponse "Autre" a changé entre-temps), on avance automatiquement. ──
+  //    car la réponse "Autre" a changé entre-temps, ou parce que la liste des
+  //    communes d'origine vient de charger et ne contient plus de choix "Autre"),
+  //    on avance automatiquement. ──
   useEffect(() => {
     if (!mounted) return;
     if (shouldSkip(STEP_KEYS[step])) {
       goToStep(1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mounted, step, associationRole, originSubPrefecture, birthCountry, country]);
+  }, [mounted, step, associationRole, originSubPrefecture, birthCountry, country, originLocalities]);
 
   const handleBirthDateChange = (e: ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
@@ -434,7 +475,7 @@ export default function MemberSignupPage() {
         if (!customAssociationRole.trim()) return t('signup.errRoleOther', 'Veuillez préciser le poste occupé.');
         return null;
       case 'originSubPrefecture':
-        if (!originSubPrefecture) return t('signup.errCommune', 'La commune d\'origine est requise.');
+        if (!originSubPrefecture.trim()) return t('signup.errCommune', 'La commune d\'origine est requise.');
         return null;
       case 'originSubPrefectureOther':
         if (!customOriginSubPrefecture.trim()) return t('signup.errCommuneOther', 'Veuillez préciser la commune d\'origine.');
@@ -528,7 +569,9 @@ export default function MemberSignupPage() {
   // ── Navigation entre écrans, avec saut automatique des questions "Autre" non applicables ──
   function shouldSkip(key: StepKey): boolean {
     if (key === 'associationRoleOther') return associationRole !== 'Autre';
-    if (key === 'originSubPrefectureOther') return originSubPrefecture !== 'Autre';
+    // Pas de liste de communes configurée pour cette association → l'écran principal
+    // capture déjà du texte libre, donc cette sous-étape "Précisez" ne sert jamais.
+    if (key === 'originSubPrefectureOther') return originLocalities.length === 0 || originSubPrefecture !== 'Autre';
     if (key === 'birthCountryOther') return birthCountry !== 'Autre';
     if (key === 'countryOther') return country !== 'Autre';
     return false;
@@ -1013,33 +1056,52 @@ export default function MemberSignupPage() {
                 </div>
               )}
 
-              {/* ── ÉCRAN 5 : Commune d'origine ── */}
+              {/* ── ÉCRAN 5 : Commune d'origine (dynamique par association) ── */}
               {currentKey === 'originSubPrefecture' && (
                 <div className="sp-panel sp-stack sp-question-anim" key={step}>
                   <QuestionHeader title={t('signup.q.originCommune.title', 'Quelle est votre commune d\'origine ?')} />
                   <Explain>
-                    {t('signup.q.originCommune.explain', "C'est la commune ou le village d'où vient votre famille en Guinée, même si vous n'y avez jamais habité vous-même.")}
-                    <Example>{t('signup.q.originCommune.example', 'Exemple : Lafou, Manda, Korbé.')}</Example>
+                    {t('signup.q.originCommune.explain', "C'est la commune, le village ou la ville d'où vient votre famille, même si vous n'y avez jamais habité vous-même.")}
+                    {originLocalities.length > 0 && (
+                      <Example>
+                        {t('signup.q.originCommune.example', 'Exemple :')} {originLocalities.slice(0, 3).join(', ')}.
+                      </Example>
+                    )}
                   </Explain>
                   <div className="sp-field">
-                    <select
-                      className="sp-select sp-select-big"
-                      value={originSubPrefecture}
-                      onChange={e => { setOriginSubPrefecture(e.target.value); if (e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}
-                      onKeyDown={handleEnterAdvance}
-                      autoFocus
-                      required
-                    >
-                      <option value="">{t('signup.selectCommune', 'Sélectionnez votre commune...')}</option>
-                      {COMMUNES_ORIGINE.map(commune => (
-                        <option key={commune} value={commune}>{commune}</option>
-                      ))}
-                    </select>
+                    {originLocalities.length > 0 ? (
+                      <select
+                        className="sp-select sp-select-big"
+                        value={originSubPrefecture}
+                        onChange={e => { setOriginSubPrefecture(e.target.value); if (e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}
+                        onKeyDown={handleEnterAdvance}
+                        autoFocus
+                        required
+                      >
+                        <option value="">
+                          {loadingOriginLocalities ? t('signup.loading', 'Chargement...') : t('signup.selectCommune', 'Sélectionnez votre commune...')}
+                        </option>
+                        {originLocalities.map(commune => (
+                          <option key={commune} value={commune}>{commune}</option>
+                        ))}
+                        <option value="Autre">{t('signup.other', 'Autre')}</option>
+                      </select>
+                    ) : (
+                      <input
+                        className="sp-input sp-input-big"
+                        value={originSubPrefecture}
+                        onChange={e => setOriginSubPrefecture(e.target.value)}
+                        onKeyDown={handleEnterAdvance}
+                        placeholder={loadingOriginLocalities ? t('signup.loading', 'Chargement...') : t('signup.specifyCommune', 'Précisez votre commune')}
+                        autoFocus
+                        required
+                      />
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* ── ÉCRAN 5b (conditionnel) : Précisez la commune ── */}
+              {/* ── ÉCRAN 5b (conditionnel — uniquement si l'association a une liste ET "Autre" est choisi) : Précisez la commune ── */}
               {currentKey === 'originSubPrefectureOther' && (
                 <div className="sp-panel sp-stack sp-question-anim" key={step}>
                   <QuestionHeader title={t('signup.q.originCommuneOther.title', 'Précisez votre commune d\'origine')} />

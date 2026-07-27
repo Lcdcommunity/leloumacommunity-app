@@ -6,6 +6,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PublicThemeController } from './public-theme.controller';
 import { PublicDocumentsController } from './public-documents.controller';
+import { PublicOriginLocalitiesController } from './public-origin-localities.controller';
 
 @Module({
   imports: [PrismaModule, NotificationsModule],
@@ -13,6 +14,7 @@ import { PublicDocumentsController } from './public-documents.controller';
     AssociationsController,
     PublicThemeController,
     PublicDocumentsController,
+    PublicOriginLocalitiesController,
   ],
   providers: [AssociationsService],
 })

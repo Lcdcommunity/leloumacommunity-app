@@ -110,6 +110,10 @@ export default function SuperAdminContributionsPage() {
   const [loading, setLoading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<Contribution | null>(null);
 
+  // 🔥 NOUVEAU : filtres par antenne et par nom/prénom (côté client)
+  const [antennaFilter, setAntennaFilter] = useState('');
+  const [nameQuery, setNameQuery] = useState('');
+
   const [antennas, setAntennas] = useState<{ id: string; name: string }[]>([]);
   const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
   const [exportAntenna, setExportAntenna] = useState('');
@@ -140,7 +144,13 @@ export default function SuperAdminContributionsPage() {
   );
 
   useEffect(() => {
-    void load('');
+    // 🔥 CORRECTION : on différait l'appel d'un tick (setTimeout 0) pour éviter
+    // que les setState synchrones de load() (setError/setLoading) ne s'exécutent
+    // dans le corps même de l'effet — cause du warning ESLint set-state-in-effect.
+    const timerId = setTimeout(() => {
+      void load('');
+    }, 0);
+
     const initAntennas = async () => {
       try {
         const res = await api.listAntennas({ pageSize: 100 });
@@ -148,6 +158,8 @@ export default function SuperAdminContributionsPage() {
       } catch (e) { console.error(e); }
     };
     void initAntennas();
+
+    return () => clearTimeout(timerId);
   }, [load]);
 
   useEffect(() => {
@@ -240,15 +252,38 @@ export default function SuperAdminContributionsPage() {
     }
   };
 
+  // 🔥 NOUVEAU : filtrage combiné statut + antenne + nom/prénom, tout côté client
   const displayedItems = useMemo(() => {
-    if (!status) return items;
-    return items.filter((c) => {
-      if (status === 'PENDING_VALIDATION' || status === 'PENDING') {
-        return c.status === 'PENDING_VALIDATION' || c.status === 'PENDING';
-      }
-      return c.status === status;
-    });
-  }, [items, status]);
+    let result = items;
+
+    if (status) {
+      result = result.filter((c) => {
+        if (status === 'PENDING_VALIDATION' || status === 'PENDING') {
+          return c.status === 'PENDING_VALIDATION' || c.status === 'PENDING';
+        }
+        return c.status === status;
+      });
+    }
+
+    if (antennaFilter) {
+      result = result.filter(
+        (c) => c.antennaId === antennaFilter || c.antenna?.id === antennaFilter,
+      );
+    }
+
+    const trimmedQuery = nameQuery.trim().toLowerCase();
+    if (trimmedQuery) {
+      result = result.filter((c) => {
+        const firstName = c.member?.firstName ?? '';
+        const lastName = c.member?.lastName ?? '';
+        const fullNameA = `${firstName} ${lastName}`.toLowerCase();
+        const fullNameB = `${lastName} ${firstName}`.toLowerCase();
+        return fullNameA.includes(trimmedQuery) || fullNameB.includes(trimmedQuery);
+      });
+    }
+
+    return result;
+  }, [items, status, antennaFilter, nameQuery]);
 
   const total = items.length;
   const pending = items.filter((c) => c.status === 'PENDING' || c.status === 'PENDING_VALIDATION').length;
@@ -266,6 +301,8 @@ export default function SuperAdminContributionsPage() {
   void _pendingByCurrency;
 
   const hasPending = pending > 0;
+  // 🔥 NOUVEAU : un filtre actif (statut, antenne ou recherche) déclenche l'affichage du bouton "Réinitialiser"
+  const hasActiveFilter = Boolean(status || antennaFilter || nameQuery);
 
   return (
     <AppShell title="Cotisations globales">
@@ -317,11 +354,15 @@ export default function SuperAdminContributionsPage() {
         .sc-panel-title { font-size: clamp(0.7rem, 2.5vw, 0.75rem); font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .sc-count-chip { font-size: .68rem; font-weight: 900; padding: .2rem .6rem; border-radius: 99px; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; flex-shrink: 0; }
 
-        .sc-toolbar { display: flex; flex-direction: row; gap: 0.6rem; align-items: center; flex-wrap: nowrap; padding: 0.9rem 1.4rem; border-bottom: 1px solid rgba(220,38,38,.07); }
-        .sc-field { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+        /* 🔥 NOUVEAU : toolbar en flex-wrap pour accueillir 2 champs de filtre supplémentaires sans casser sur mobile */
+        .sc-toolbar { display: flex; flex-direction: row; gap: 0.6rem; align-items: center; flex-wrap: wrap; padding: 0.9rem 1.4rem; border-bottom: 1px solid rgba(220,38,38,.07); }
+        .sc-field { display: flex; flex-direction: row; align-items: center; gap: 0.5rem; flex: 1 1 190px; min-width: 0; }
+        .sc-field-search { flex: 2 1 220px; }
         .sc-label { font-size: 0.7rem; font-weight: 900; color: #374151; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
         .sc-select { flex: 1; height: 40px; border-radius: 11px; border: 1px solid rgba(220,38,38,.18); background: rgba(255,255,255,.9); padding: 0 1.8rem 0 .85rem; font-family: 'DM Sans',sans-serif; font-size: .84rem; font-weight: 700; color: #111827; outline: none; appearance: none; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right .65rem center; transition: border-color .2s,box-shadow .2s; min-width: 0; text-overflow: ellipsis; }
         .sc-select:focus { border-color: rgba(220,38,38,.42); box-shadow: 0 0 0 3px rgba(220,38,38,.09); }
+        /* 🔥 NOUVEAU : le champ recherche texte réutilise .sc-select mais sans le style "dropdown" (pas de flèche, curseur texte) */
+        input.sc-select { cursor: text; background-image: none; padding: 0 .85rem; }
         
         .sc-filter-btn { height: 40px; padding: 0 1.2rem; border-radius: 11px; background: linear-gradient(135deg,#991B1B,#DC2626); border: none; color: white; cursor: pointer; font-family: 'DM Sans',sans-serif; font-size: .84rem; font-weight: 800; display: flex; align-items: center; justify-content: center; gap: .45rem; box-shadow: 0 3px 10px rgba(220,38,38,.3); transition: all .18s; white-space: nowrap; flex-shrink: 0; }
         .sc-filter-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 16px rgba(220,38,38,.42); }
@@ -329,9 +370,11 @@ export default function SuperAdminContributionsPage() {
         
         @media(max-width: 500px) {
             .sc-toolbar { padding: 0.7rem 0.8rem; gap: 0.4rem; }
-            .sc-field { gap: 0.35rem; }
+            .sc-field { gap: 0.35rem; min-width: 140px; }
+            .sc-field-search { flex: 1 1 100%; }
             .sc-label { font-size: 0.6rem; letter-spacing: 0; }
             .sc-select { padding: 0 1.2rem 0 0.5rem; font-size: 0.75rem; background-position: right 0.4rem center; }
+            input.sc-select { padding: 0 0.5rem; }
             .sc-filter-btn { padding: 0 0.8rem; font-size: 0.75rem; }
         }
 
@@ -536,6 +579,29 @@ export default function SuperAdminContributionsPage() {
           </div>
 
           <div className="sc-toolbar">
+            {/* 🔥 NOUVEAU : recherche par nom / prénom du membre */}
+            <div className="sc-field sc-field-search">
+              <label className="sc-label">Recherche</label>
+              <input
+                className="sc-select"
+                type="text"
+                placeholder="Nom ou prénom..."
+                value={nameQuery}
+                onChange={(e) => setNameQuery(e.target.value)}
+              />
+            </div>
+
+            {/* 🔥 NOUVEAU : filtre par antenne, réutilise la liste déjà chargée pour la modale d'export */}
+            <div className="sc-field">
+              <label className="sc-label">Antenne</label>
+              <select className="sc-select" value={antennaFilter} onChange={(e) => setAntennaFilter(e.target.value)}>
+                <option value="">Toutes</option>
+                {antennas.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+
             <div className="sc-field">
               <label className="sc-label">Statut</label>
               <select className="sc-select" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -568,8 +634,18 @@ export default function SuperAdminContributionsPage() {
                   </button>
                 );
               })}
-              {status && (
-                <button className="sc-chip" style={{ color: '#6B7280', background: '#F9FAFB', borderColor: '#E5E7EB' }} onClick={() => { setStatus(''); void load(''); }}>
+              {/* 🔥 CORRECTION : le bouton "Réinitialiser" efface désormais aussi l'antenne et la recherche */}
+              {hasActiveFilter && (
+                <button
+                  className="sc-chip"
+                  style={{ color: '#6B7280', background: '#F9FAFB', borderColor: '#E5E7EB' }}
+                  onClick={() => {
+                    setStatus('');
+                    setAntennaFilter('');
+                    setNameQuery('');
+                    void load('');
+                  }}
+                >
                   <svg width="8" height="8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.8"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg> Réinitialiser
                 </button>
               )}
@@ -588,8 +664,8 @@ export default function SuperAdminContributionsPage() {
           ) : !error && displayedItems.length === 0 ? (
             <div className="sc-empty">
               <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke="#E5E7EB" strokeWidth="1.3"><path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-              <div className="sc-empty-title">Aucune cotisation trouvée pour ce statut</div>
-              <div className="sc-empty-sub">Essayez de modifier le filtre ou de réinitialiser.</div>
+              <div className="sc-empty-title">Aucune cotisation trouvée pour ce filtre</div>
+              <div className="sc-empty-sub">Essayez de modifier les critères ou de réinitialiser.</div>
             </div>
           ) : !error ? (
             <>

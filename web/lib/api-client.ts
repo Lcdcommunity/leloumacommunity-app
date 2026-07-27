@@ -246,6 +246,19 @@ getPublicDocuments: (domain?: string, code?: string) => {
   );
 },
 
+getPublicOriginLocalities: (domain?: string, code?: string) => {
+  const params = new URLSearchParams();
+  if (domain) {
+    const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+    params.append('domain', cleanDomain);
+  }
+  if (code) params.append('code', code);
+  return http<{ localities: string[] }>(
+    `/public/origin-localities?${params.toString()}`,
+    { auth: false },
+  );
+},
+
   // ==========================================
   // AUTH / ENRÔLEMENT MEMBRE
   // ==========================================

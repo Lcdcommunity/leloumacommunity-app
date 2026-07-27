@@ -1,5 +1,5 @@
 // backend/src/modules/associations/dto/update-association.dto.ts
-import { IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateAssociationDto {
   @IsOptional()
@@ -81,6 +81,14 @@ export class UpdateAssociationDto {
   @IsOptional()
   @IsDateString({}, { message: 'La date de fondation doit être valide (YYYY-MM-DD)' })
   foundedAt?: string;
+
+  // Liste des communes/villages d'origine proposée aux membres à l'inscription
+  // (champ "commune d'origine" du signup). Tableau vide ou absent = pas de
+  // liste configurée, le frontend bascule alors en saisie libre.
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  originLocalities?: string[];
 
   // 🔒 RETIRÉ : expenseValidationThreshold — exclusivement par devise
   // désormais (table Pricing), voir expenses.service.ts.

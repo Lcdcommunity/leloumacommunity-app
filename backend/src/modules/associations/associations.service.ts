@@ -43,6 +43,7 @@ export class AssociationsService {
         ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
         ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
         ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency as CurrencyCode } : {}),
+        ...(data.originLocalities !== undefined ? { originLocalities: data.originLocalities } : {}),
         // 🔒 isActive : volontairement absent (SYSTEM_ADMIN uniquement).
         // 🔒 expenseValidationThreshold : volontairement absent — concept
         // exclusivement par devise désormais (table Pricing), voir
