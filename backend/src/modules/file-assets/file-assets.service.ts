@@ -1,7 +1,8 @@
-// src/modules/file-assets/file-assets.service.ts
+// backend/src/modules/file-assets/file-assets.service.ts
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FileCategory, FileVisibility } from '@prisma/client';
+import { uploadBufferToCloudinary, deleteFromCloudinary } from './storage/cloudinary.util';
 
 export type FileAssetResponse = {
   id: string;
@@ -19,24 +20,28 @@ export class FileAssetsService {
 
   async createFromUpload(params: {
     associationId: string;
-    storedFileName: string;
+    fileBuffer: Buffer;
     originalName: string;
     mimeType: string;
     size: number;
     label?: string;
     category?: FileCategory;
   }): Promise<FileAssetResponse> {
-    if (!params.storedFileName) throw new BadRequestException('Fichier manquant.');
+    if (!params.fileBuffer) throw new BadRequestException('Fichier manquant.');
+
+    const uploaded = await uploadBufferToCloudinary(params.fileBuffer, {
+      folder: `assograndchef/${params.associationId}`,
+    });
 
     const created = await this.prisma.fileAsset.create({
       data: {
         associationId: params.associationId,
-        storageProvider: 'local',
-        storageKey: params.storedFileName,
+        storageProvider: 'cloudinary',
+        storageKey: uploaded.public_id,
         originalFilename: params.originalName,
         mimeType: params.mimeType,
         sizeBytes: BigInt(params.size),
-        url: `/uploads/${params.storedFileName}`,
+        url: uploaded.secure_url,
         category: params.category || FileCategory.OTHER,
         visibility: FileVisibility.PRIVATE,
       },
@@ -75,7 +80,8 @@ export class FileAssetsService {
   }
 
   /**
-   * 🔥 AJOUT : Suppression sécurisée (métadonnées)
+   * 🔥 Suppression sécurisée : retire aussi le fichier réel sur Cloudinary,
+   * pas seulement la ligne en base (sinon fuite de stockage silencieuse).
    */
   async delete(id: string, associationId: string): Promise<{ success: boolean }> {
     const found = await this.prisma.fileAsset.findFirst({
@@ -83,6 +89,13 @@ export class FileAssetsService {
     });
 
     if (!found) throw new NotFoundException('Fichier introuvable.');
+
+    if (found.storageProvider === 'cloudinary' && found.storageKey) {
+      const resourceType = found.mimeType.startsWith('image/') ? 'image' : 'raw';
+      await deleteFromCloudinary(found.storageKey, resourceType).catch((err) => {
+        console.error(`Échec suppression Cloudinary pour ${found.storageKey}`, err);
+      });
+    }
 
     await this.prisma.fileAsset.delete({
       where: { id },

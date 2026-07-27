@@ -59,7 +59,7 @@ importers:
         specifier: ^0.14.1
         version: 0.14.4
       cloudinary:
-        specifier: ^2.9.0
+        specifier: ^2.10.0
         version: 2.10.0
       cookie-parser:
         specifier: ^1.4.7

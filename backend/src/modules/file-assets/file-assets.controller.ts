@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { multerDiskStorage } from './storage/multer.config';
+import { multerMemoryStorage } from './storage/multer.config';
 import { FileAssetsService } from './file-assets.service';
 import { CreateFileAssetDto } from './dto/create-file-asset.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -26,7 +26,7 @@ export class FileAssetsController {
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: multerDiskStorage,
+      storage: multerMemoryStorage,
       limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
     }),
   )
@@ -41,7 +41,7 @@ export class FileAssetsController {
 
     return this.service.createFromUpload({
       associationId: user.associationId,
-      storedFileName: file.filename,
+      fileBuffer: file.buffer,
       originalName: file.originalname,
       mimeType: file.mimetype,
       size: file.size,
@@ -52,13 +52,11 @@ export class FileAssetsController {
 
   @Get(':id')
   getOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    // 🔥 SÉCURISÉ : On passe l'ID de l'asso de l'utilisateur connecté
     return this.service.getById(id, user.associationId);
   }
 
   @Delete(':id')
   deleteOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    // 🔥 SÉCURISÉ : Cloisonnement lors de la suppression
     return this.service.delete(id, user.associationId);
   }
 }

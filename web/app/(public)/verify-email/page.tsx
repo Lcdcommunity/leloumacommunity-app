@@ -332,7 +332,7 @@ function VerifyEmailContent({ theme }: { theme: ThemeConfig }) {
 
 export default function VerifyEmailPage() {
   const [theme, setTheme] = useState<ThemeConfig>({
-    name: "LELOUMA COMMUNAUTE",
+    name: "Console Grand Chef",
     logoUrl: null,
     primary: "#2563EB", 
     secondary: "#1D4ED8",

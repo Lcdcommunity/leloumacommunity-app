@@ -1,63 +1,37 @@
 // web/app/page.tsx
+// v2.0.0 — Page dynamisée par association (multi-tenant) : texte, logo et couleurs
+//          ne sont plus figés sur l'identité Lélouma
+//
+// CHANGELOG v2.0.0 (vs v1.0.4) :
+// - [DYNAMIQUE] Nom et logo chargés via api.getPublicTheme(domain, code), même
+//        convention que login/signup/verify-email/logout. Hors association
+//        résolue (Grand Chef, ou domaine sans thème configuré) : nom 'Grand Chef',
+//        logo absent (cercle vide dans l'en-tête, comme sur les autres pages).
+// - [CONTENU] Texte de la 1ʳᵉ slide généralisé : ne mentionne plus "Lélouma
+//        Communauté pour le Développement" ni "Léloumiens" (démonyme spécifique
+//        à Lélouma) — le nom de l'association est déjà affiché dynamiquement dans
+//        l'en-tête juste au-dessus, pas besoin de le répéter dans le texte.
+// - [VISUEL] Les 6 photos Peulh/Fulani du Fouta Djallon (choisies intentionnellement
+//        pour Lélouma en v1.0.3, sur indication explicite à l'époque) sont retirées.
+//        Remplacées par un fond dégradé utilisant les couleurs de thème de
+//        l'association (primary/secondary) + une icône ligne décorative par slide.
+//        Aucune photo de personnes : plus aucune représentation ethnique implicite
+//        pour les associations qui ne sont pas Lélouma. Le fond se recolore donc
+//        automatiquement selon l'identité de chaque association, sans dépendre
+//        d'un jeu de photos à sélectionner à la main pour chacune.
+// - [NETTOYAGE] Clé localStorage renommée lcd_onboarding_v1 → onboarding_seen_v1
+//        (nom générique ; aucun impact fonctionnel, le localStorage est déjà
+//        cloisonné par domaine par le navigateur, donc aucune collision possible
+//        entre associations).
+// - [INTACT] Navigation swipe/clavier, points de progression, bouton "Passer",
+//        CTA finale (Se connecter / Créer un compte), timing d'animation : tous
+//        strictement inchangés.
+//
 // v1.0.4 — Fix recadrage photos (trop zoomées) + ajout flèche retour
-//
-// CHANGELOG v1.0.4 (vs v1.0.3) :
-// - [FIX] Les photos de couverture paraissaient "trop zoomées" sur mobile : avec
-//        object-fit: cover sur un écran très haut et étroit (390×844), une photo
-//        au format paysage/standard était étirée pour remplir tout l'écran, donc
-//        on ne voyait plus qu'une fine tranche du centre de l'image (ex. juste la
-//        tête de la vache, ou le bébé disparu du cadre "mère et enfant"). Remplacé
-//        par un système à deux calques par slide : un calque flouté en fond
-//        (object-fit: cover + blur) qui comble tout l'écran sans jamais paraître
-//        "zoomé" puisqu'il est flou, et la vraie photo par-dessus en
-//        object-fit: contain, qui n'est donc JAMAIS recadrée — on voit toujours
-//        la photo entière, quel que soit son ratio d'origine.
-// - [AJOUT] Flèche de retour (chevron) dans le coin supérieur gauche, à côté du
-//        logo, visible uniquement à partir de la 2ᵉ slide (rien à voir derrière sur
-//        la 1ʳᵉ). Réutilise la fonction goPrev() déjà existante (swipe/clavier).
-//
 // v1.0.3 — Photos de couverture remplacées par de l'imagerie Peulh/Fulani authentique
-//
-// CHANGELOG v1.0.3 (vs v1.0.2) :
-// - [CONTENU] Les 6 photos (déjà "Noir(e)s souriant(e)s" en v1.0.2 mais génériques,
-//        type stock afro-américain) remplacées par 6 photos montrant spécifiquement
-//        des Peulh/Fulani — l'ethnie de la région du Fouta Djallon en Guinée, dont
-//        Lélouma fait partie — sur indication explicite de l'utilisateur (capture
-//        d'écran de référence : "femmes peulhs du Fouta Djallon aux champs").
-//        Sources : Pexels + Unsplash, licences gratuites, contenu vérifié au cas par
-//        cas via les tags de la page source (ex. "Fulani", "Fulani Woman", "smiling",
-//        localisation) avant intégration — aucune photo choisie à l'aveugle.
-//        Localisation des clichés : Nigeria (pas Guinée) — c'est la même ethnie peulh,
-//        mais ce n'est pas littéralement le Fouta Djallon guinéen ; à remplacer par de
-//        vraies photos de la communauté dès que possible (voir note IMAGES ci-dessous).
-//
 // v1.0.2 — Correction libellé + photos de couverture (toutes vérifiées individuellement)
-//
-// CHANGELOG v1.0.2 (vs v1.0.1) :
-// - [FIX CRITIQUE] Les 6 photos de couverture étaient des choix faits de mémoire, non
-//        vérifiés, et montraient par erreur des personnes blanches au lieu de femmes et
-//        hommes noirs comme demandé initialement. Remplacées par 6 photos Unsplash dont
-//        le contenu a été vérifié individuellement (tags exacts de la page source :
-//        "black", "black woman", "african american", "black man smiling", etc., et
-//        identité du photographe quand pertinent) avant intégration — plus aucune photo
-//        choisie à l'aveugle dans ce fichier.
-// - [FIX] En-tête (.ob-brand) : ajout de la 3ᵉ ligne « pour le Développement » sous
-//        « Lélouma / Communauté », même traitement visuel que VirtualCardWidget.tsx
-//        (texte de liaison en minuscules/poids réduit, le reste hérite de l'uppercase).
-//
 // v1.0.1 — Fix lint : setState synchrone dans un effect (react-hooks/set-state-in-effect)
-//
-// CHANGELOG v1.0.1 (vs v1.0.0) :
-// - [FIX] setMounted(true) déplacé dans un queueMicrotask() pour respecter la règle
-//        ESLint react-hooks/set-state-in-effect (pas de setState appelé de façon
-//        synchrone dans le corps d'un useEffect). Comportement strictement identique,
-//        juste différé d'un micro-tick — même pattern que web/app/login/page.tsx.
-//
 // v1.0.0 — Onboarding / Présentation slides (public, aucune authentification requise)
-//
-// ⚠️  IMAGES : remplacez les URLs Pexels/Unsplash par vos propres photos de la communauté.
-//     Dossier suggéré : web/public/assets/onboarding/slide-{1-6}.jpg
-//     Taille recommandée : 900 × 1600 px (portrait), format WEBP ou JPG < 200 Ko.
 //
 // FONCTIONNEMENT :
 //   • Premier accès → affiche les 6 slides puis propose « Se connecter » / « Créer un compte »
@@ -71,51 +45,118 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { api } from '../lib/api-client';
 
 // ─── Clé localStorage ────────────────────────────────────────────────────────
-const SEEN_KEY = 'lcd_onboarding_v1';
+const SEEN_KEY = 'onboarding_seen_v1';
+
+// ─── Icônes décoratives (une par slide, aucune photo — neutre pour toute association) ──
+function IconGlobe() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M2 12h20" />
+      <path d="M12 2c2.5 2.7 4 6.4 4 10s-1.5 7.3-4 10c-2.5-2.7-4-6.4-4-10s1.5-7.3 4-10z" />
+    </svg>
+  );
+}
+function IconBuilding() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18" />
+      <path d="M5 21V8l7-5 7 5v13" />
+      <path d="M9 21v-6h6v6" />
+      <path d="M9 11h.01M15 11h.01M9 15h.01M15 15h.01" />
+    </svg>
+  );
+}
+function IconCard() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="5" width="20" height="14" rx="2.5" />
+      <path d="M2 10h20" />
+      <path d="M6 15h5" />
+    </svg>
+  );
+}
+function IconCalendar() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="17" rx="2.5" />
+      <path d="M16 2.5v4M8 2.5v4M3 10.5h18" />
+      <path d="M8 15l2 2 4-4" />
+    </svg>
+  );
+}
+function IconMegaphone() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 10v4a1 1 0 001 1h2l5 4V5L6 9H4a1 1 0 00-1 1z" />
+      <path d="M15 8a4 4 0 010 8" />
+      <path d="M18 5a8 8 0 010 14" />
+    </svg>
+  );
+}
+function IconVote() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 9h16v11a1 1 0 01-1 1H5a1 1 0 01-1-1V9z" />
+      <path d="M4 9l2.5-5h11L20 9" />
+      <path d="M9 13.5l2 2 4-4.5" />
+    </svg>
+  );
+}
+
+// ─── Position du dégradé par slide (variété visuelle, mêmes 2 couleurs de thème) ──
+const GRADIENT_POSITIONS: Array<[string, string]> = [
+  ['30% 20%', '80% 80%'],
+  ['70% 15%', '20% 85%'],
+  ['20% 70%', '85% 25%'],
+  ['80% 30%', '15% 75%'],
+  ['50% 10%', '50% 90%'],
+  ['25% 25%', '75% 75%'],
+];
 
 // ─── Slides ──────────────────────────────────────────────────────────────────
-// Remplacez `image` par vos propres photos (ex : '/assets/onboarding/slide-1.jpg')
 const SLIDES = [
   {
     id: 0,
-    image: 'https://images.pexels.com/photos/36845409/pexels-photo-36845409.jpeg?auto=compress&cs=tinysrgb&w=800',
+    Icon: IconGlobe,
     tag: '🌍 Bienvenue',
     title: 'Votre communauté,\npartout dans le monde',
-    desc: 'Lélouma Communauté pour le Développement réunit tous les Léloumiens de la diaspora et du pays en un espace numérique unique et sécurisé.',
+    desc: 'Cette communauté réunit tous ses membres de la diaspora et du pays en un espace numérique unique et sécurisé.',
   },
   {
     id: 1,
-    image: 'https://images.pexels.com/photos/38235231/pexels-photo-38235231.jpeg?auto=compress&cs=tinysrgb&w=800',
+    Icon: IconBuilding,
     tag: '🏗️ Projets',
     title: 'Construisons\nl\'avenir ensemble',
     desc: 'Suivez et soutenez les projets de développement pour votre région : écoles, centres de santé, infrastructures rurales, eau potable...',
   },
   {
     id: 2,
-    image: 'https://images.unsplash.com/photo-1570406794469-630903944dc1?w=800&q=85&fit=crop&crop=faces,top',
+    Icon: IconCard,
     tag: '💳 Cotisations',
     title: 'Cotisez facilement,\nen toute transparence',
     desc: 'Réglez vos cotisations annuelles en ligne, consultez votre historique de paiements et obtenez votre carte de membre active.',
   },
   {
     id: 3,
-    image: 'https://images.pexels.com/photos/34735501/pexels-photo-34735501.jpeg?auto=compress&cs=tinysrgb&w=800',
+    Icon: IconCalendar,
     tag: '🎉 Événements',
     title: 'Ne manquez\naucun rendez-vous',
     desc: 'Assemblées générales, réunions d\'antenne, fêtes communautaires : retrouvez tous les événements au même endroit.',
   },
   {
     id: 4,
-    image: 'https://images.unsplash.com/photo-1645862722306-e9da81aae38c?w=800&q=85&fit=crop&crop=faces,top',
+    Icon: IconMegaphone,
     tag: '📰 Actualités',
     title: 'Toujours informé\ndes nouvelles',
     desc: 'Annonces importantes, résultats de projets, nouvelles de la communauté : l\'information circule librement pour tous les membres.',
   },
   {
     id: 5,
-    image: 'https://images.pexels.com/photos/30483241/pexels-photo-30483241.jpeg?auto=compress&cs=tinysrgb&w=800',
+    Icon: IconVote,
     tag: '🗳️ Élections',
     title: 'Votre voix\ncompte vraiment',
     desc: 'Participez aux votes et aux élections de vos représentants. La démocratie participative est au cœur de notre association.',
@@ -129,6 +170,18 @@ export default function OnboardingPage() {
   const [slide, setSlide]       = useState(0);
   const touchStartX             = useRef<number | null>(null);
 
+  const [theme, setTheme] = useState<{
+    name: string;
+    logoUrl: string | null;
+    primary: string;
+    secondary: string;
+  }>({
+    name: 'Grand Chef',
+    logoUrl: null,
+    primary: '#2563EB',
+    secondary: '#059669',
+  });
+
   // ── Vérification : onboarding déjà vu ? ──────────────────────────────────
   useEffect(() => {
     try {
@@ -139,6 +192,36 @@ export default function OnboardingPage() {
     } catch { /* SSR / incognito */ }
     queueMicrotask(() => setMounted(true));
   }, [router]);
+
+  // ── Charge l'identité (nom + logo + couleurs) de l'association résolue par
+  //    le domaine/code courant — même convention que login/signup/logout. ──
+  useEffect(() => {
+    const fetchTheme = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeParam = urlParams.get('code') || undefined;
+        const domainParam = urlParams.get('domain') || undefined;
+        const currentDomain = !codeParam && !domainParam ? window.location.hostname : undefined;
+
+        if (currentDomain === 'localhost' || currentDomain === 'votre-domaine-principal.com') {
+          return;
+        }
+
+        const data = await api.getPublicTheme(domainParam || currentDomain, codeParam);
+        if (data) {
+          setTheme({
+            name: data.name,
+            logoUrl: data.logoUrl || null,
+            primary: data.themeColors?.primary || '#2563EB',
+            secondary: data.themeColors?.secondary || '#059669',
+          });
+        }
+      } catch (err) {
+        console.warn('Thème personnalisé non trouvé.', err);
+      }
+    };
+    fetchTheme();
+  }, []);
 
   // ── Mémorise l'onboarding comme vu ───────────────────────────────────────
   const markSeen = useCallback(() => {
@@ -198,45 +281,41 @@ export default function OnboardingPage() {
           touch-action: pan-y;
         }
 
-        /* ══ Calque images (crossfade) ═══════════════════════════════════════ */
+        /* ══ Calque de fond (dégradé de couleurs de thème + icône, crossfade) ══ */
         .ob-imgs {
           position: absolute; inset: 0; z-index: 0;
           background: #06103A;
         }
-        .ob-img-layer {
+        .ob-slide-layer {
           position: absolute; inset: 0;
           overflow: hidden;
           transition: opacity 0.75s cubic-bezier(.4,0,.2,1);
         }
-        /* Calque 1 : copie de la photo en fond, floutée + assombrie, qui remplit
-           tout l'écran sans jamais paraître "zoomée" puisqu'elle est censée
-           être floue — elle sert uniquement à combler les bandes vides. */
-        .ob-img-blur {
+        .ob-slide-bg {
           position: absolute; inset: 0;
-          width: 100%; height: 100%;
-          object-fit: cover;
-          filter: blur(60px) brightness(0.6) saturate(1.3);
-          transform: scale(1.3); /* évite de voir le bord net du flou */
         }
-        /* Calque 2 : la vraie photo, jamais recadrée — object-fit: contain
-           garantit qu'on voit l'image en entier, quel que soit son ratio. */
-        .ob-img-fg {
+        .ob-slide-icon-wrap {
           position: absolute; inset: 0;
-          width: 100%; height: 100%;
-          object-fit: contain;
-          object-position: center 40%;
+          display: flex; align-items: center; justify-content: center;
+          padding-bottom: 16vh;
+        }
+        .ob-slide-icon {
+          width: min(58vw, 260px);
+          height: min(58vw, 260px);
+          color: rgba(255,255,255,0.16);
+          filter: drop-shadow(0 20px 50px rgba(0,0,0,0.35));
         }
         /* Dégradé en deux parties :
-           - haut : léger pour laisser respirer la photo
+           - haut : léger pour laisser respirer le fond
            - bas  : fort pour contraster avec le texte blanc */
         .ob-overlay {
           position: absolute; inset: 0; z-index: 1;
           background:
             linear-gradient(
               to bottom,
-              rgba(0,0,0,0.08) 0%,
+              rgba(0,0,0,0.05) 0%,
               rgba(0,0,0,0.00) 22%,
-              rgba(0,0,0,0.28) 45%,
+              rgba(0,0,0,0.30) 45%,
               rgba(0,0,0,0.82) 70%,
               rgba(0,0,0,0.96) 100%
             );
@@ -283,9 +362,10 @@ export default function OnboardingPage() {
           box-shadow: 0 2px 10px rgba(0,0,0,0.25);
         }
         .ob-brand {
-          font-size: 0.66rem; font-weight: 800; line-height: 1.1;
-          letter-spacing: 0.1em; text-transform: uppercase;
+          font-size: 0.7rem; font-weight: 800; line-height: 1.25;
+          letter-spacing: 0.06em; text-transform: uppercase;
           color: rgba(255,255,255,0.88);
+          max-width: 46vw;
         }
         .ob-skip-btn {
           background: rgba(255,255,255,0.12);
@@ -426,31 +506,32 @@ export default function OnboardingPage() {
         onTouchEnd={handleTouchEnd}
       >
 
-        {/* ══ Images de fond (toutes montées, crossfade via opacity) ══════════ */}
+        {/* ══ Fonds (dégradé de thème + icône, crossfade via opacity) ══════════ */}
         <div className="ob-imgs">
-          {SLIDES.map((s, i) => (
-            <div
-              key={s.id}
-              className="ob-img-layer"
-              style={{ opacity: i === slide ? 1 : 0 }}
-              aria-hidden="true"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={s.image}
-                alt=""
-                className="ob-img-blur"
-                loading={i === 0 ? 'eager' : 'lazy'}
-              />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={s.image}
-                alt=""
-                className="ob-img-fg"
-                loading={i === 0 ? 'eager' : 'lazy'}
-              />
-            </div>
-          ))}
+          {SLIDES.map((s, i) => {
+            const [posA, posB] = GRADIENT_POSITIONS[i % GRADIENT_POSITIONS.length];
+            const SlideIcon = s.Icon;
+            return (
+              <div
+                key={s.id}
+                className="ob-slide-layer"
+                style={{ opacity: i === slide ? 1 : 0 }}
+                aria-hidden="true"
+              >
+                <div
+                  className="ob-slide-bg"
+                  style={{
+                    background: `radial-gradient(circle at ${posA}, ${theme.primary}66 0%, transparent 55%), radial-gradient(circle at ${posB}, ${theme.secondary}55 0%, transparent 60%), #06103A`,
+                  }}
+                />
+                <div className="ob-slide-icon-wrap">
+                  <div className="ob-slide-icon">
+                    <SlideIcon />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
           <div className="ob-overlay" />
         </div>
 
@@ -474,19 +555,18 @@ export default function OnboardingPage() {
                 </button>
               )}
               <div className="ob-logo-wrap">
-                <Image
-                  src="/assets/images/logolcd.jpg"
-                  alt="Logo Lélouma Communauté"
-                  width={38}
-                  height={38}
-                  style={{ objectFit: 'cover', borderRadius: '50%' }}
-                  unoptimized
-                />
+                {theme.logoUrl && (
+                  <Image
+                    src={theme.logoUrl}
+                    alt={`Logo ${theme.name}`}
+                    width={38}
+                    height={38}
+                    style={{ objectFit: 'cover', borderRadius: '50%' }}
+                    unoptimized
+                  />
+                )}
               </div>
-              <span className="ob-brand">
-                Lélouma<br />Communauté<br />
-                <span style={{ textTransform: 'none', fontWeight: 600, fontSize: '0.84em' }}>pour le </span>Développement
-              </span>
+              <span className="ob-brand">{theme.name}</span>
             </div>
 
             {/* Le bouton « Passer » disparaît sur la dernière slide */}

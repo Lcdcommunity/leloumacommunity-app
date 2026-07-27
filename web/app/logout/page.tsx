@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { api } from '../../lib/api-client';
 
 const FOLDS_TOTAL = 14;
 
@@ -12,6 +13,11 @@ export default function LogoutPage() {
   const [mounted, setMounted] = useState(false);
   const [titleVisible, setTitleVisible] = useState(false);
   const [farewellVisible, setFarewellVisible] = useState(false);
+
+  const [theme, setTheme] = useState<{ name: string; logoUrl: string | null }>({
+    name: 'Console Grand Chef',
+    logoUrl: null,
+  });
   
   const timerRef1 = useRef<number | null>(null);
   const timerRef2 = useRef<number | null>(null);
@@ -20,8 +26,33 @@ export default function LogoutPage() {
 
   // Marquer le montage côté client
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
+  }, []);
+
+  // Charge l'identité (nom + logo) de l'association résolue par le domaine/code
+  // courant — même convention que login/signup/verify-email. Grand Chef ou
+  // domaine sans association correspondante : identité neutre conservée.
+  useEffect(() => {
+    const fetchTheme = async () => {
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const codeParam = urlParams.get('code') || undefined;
+        const domainParam = urlParams.get('domain') || undefined;
+        const currentDomain = !codeParam && !domainParam ? window.location.hostname : undefined;
+
+        if (currentDomain === 'localhost' || currentDomain === 'votre-domaine-principal.com') {
+          return;
+        }
+
+        const data = await api.getPublicTheme(domainParam || currentDomain, codeParam);
+        if (data) {
+          setTheme({ name: data.name, logoUrl: data.logoUrl || null });
+        }
+      } catch (err) {
+        console.warn('Thème personnalisé non trouvé.', err);
+      }
+    };
+    fetchTheme();
   }, []);
 
   // Logique d'animation PUIS de déconnexion
@@ -216,7 +247,7 @@ export default function LogoutPage() {
         aria-live="polite"
       >
         <p className="farewell-title">Au revoir 👋</p>
-        <p className="farewell-sub">À très bientôt sur Lélouma Communauté</p>
+        <p className="farewell-sub">À très bientôt sur {theme.name}</p>
       </div>
 
       {/* RIDEAU QUI SE FERME */}
@@ -226,7 +257,9 @@ export default function LogoutPage() {
           style={{ opacity: titleVisible ? 1 : 0, transform: titleVisible ? 'scale(1)' : 'scale(0.8)', transition: 'all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
         >
           <div className="tc-logo-wrap">
-            <Image src="/assets/images/logolcd.jpg" alt="Emblème" fill style={{ objectFit: 'contain', padding: '8px' }} unoptimized />
+            {theme.logoUrl && (
+              <Image src={theme.logoUrl} alt="Emblème" fill style={{ objectFit: 'contain', padding: '8px' }} unoptimized />
+            )}
           </div>
           <div className="tc-text">À BIENTÔT</div>
         </div>

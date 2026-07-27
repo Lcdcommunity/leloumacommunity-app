@@ -20,7 +20,9 @@ function ResetPasswordContent() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

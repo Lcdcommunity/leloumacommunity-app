@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
 
 // Configuration des métadonnées de l'application
 export const metadata: Metadata = {
-  title: 'Lelouma Community',
+  title: 'Grand Chef',
   description: 'Plateforme de gestion d’association communautaire - Multi-tenant',
   manifest: '/manifest.json',
   // La référence manuelle à 'apple: /icon-192x192.png' a été retirée pour éviter l'erreur 404.
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Lelouma Community',
+    title: 'Grand Chef',
   },
 };
 
