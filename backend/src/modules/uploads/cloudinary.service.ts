@@ -8,7 +8,6 @@ export class CloudinaryService {
   private readonly logger = new Logger(CloudinaryService.name);
 
   constructor() {
-    // Vérification silencieuse de la configuration au démarrage
     const config = {
       cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
       api_key: process.env.CLOUDINARY_API_KEY,
@@ -28,13 +27,13 @@ export class CloudinaryService {
     });
   }
 
-  async uploadFile(file: Express.Multer.File): Promise<UploadApiResponse> {
+  async uploadFile(file: Express.Multer.File, folder?: string): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
       this.logger.log(`Début de l'upload vers Cloudinary: ${file.originalname} (${file.size} octets)`);
 
       const uploadStream = cloudinary.uploader.upload_stream(
         { 
-          folder: 'leloumacommunity', // Standardisation du nom de dossier sans underscore pour compatibilité optimale
+          folder: folder || 'uploads',
           resource_type: 'auto'
         },
         (error: UploadApiErrorResponse, result: UploadApiResponse) => {
@@ -47,7 +46,6 @@ export class CloudinaryService {
         },
       );
 
-      // Si le buffer est vide, on rejette immédiatement avant d'envoyer
       if (!file.buffer) {
         const error = new Error('Le buffer du fichier est vide');
         this.logger.error('❌ ' + error.message);

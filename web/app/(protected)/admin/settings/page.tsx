@@ -115,7 +115,7 @@ export default function AdminSettingsPage() {
   const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
     
     // 🔥 CORRECTION : Récupérer les préférences sauvegardées au chargement
     const loadPreferences = async () => {

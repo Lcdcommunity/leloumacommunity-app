@@ -178,7 +178,7 @@ export default function SuperAdminSettingsPage() {
   const [secFormKey, setSecFormKey] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
     let isSubscribed = true;
 
     // 🔥 Forcer le thème CLAIR par défaut

@@ -1,4 +1,21 @@
 // web/app/page.tsx
+// v2.1.0 — Mise en page desktop dédiée (responsive complet)
+//
+// CHANGELOG v2.1.0 (vs v2.0.0) :
+// - [DESKTOP] Ajout d'un point de rupture @media (min-width: 900px) : le bloc de
+//        texte (tag/titre/description/points/bouton) est désormais centré
+//        verticalement dans l'espace disponible au lieu de rester plaqué en
+//        bas comme sur mobile. L'icône décorative est repositionnée à droite
+//        de l'écran, formant une mise en page "split" texte/illustration
+//        classique en desktop, au lieu de rester centrée et minuscule au-dessus
+//        d'un immense vide. Le dégradé de contraste (.ob-overlay) est ajusté
+//        en conséquence (accent gauche→droite) pour rester lisible avec un
+//        texte recentré plutôt qu'en bas d'écran. Les boutons ont une largeur
+//        maximale sur desktop au lieu de s'étirer sur toute la largeur.
+// - [INTACT] Aucune règle en dessous de 900px n'est modifiée : le rendu mobile
+//        (plein écran type app, texte en bas, boutons pleine largeur) reste
+//        strictement identique à la v2.0.0.
+//
 // v2.0.0 — Page dynamisée par association (multi-tenant) : texte, logo et couleurs
 //          ne sont plus figés sur l'identité Lélouma
 //
@@ -497,6 +514,98 @@ export default function OnboardingPage() {
         @media (min-width: 480px) {
           .ob-header { padding: 0 2.25rem; }
           .ob-body   { padding: 0 2.25rem; }
+        }
+
+        /* ══════════════════════════════════════════════════════════════════════
+           DESKTOP (>= 900px) — v2.1.0
+           Mise en page "split" : texte centré verticalement à gauche,
+           icône décorative agrandie à droite. Remplace l'empilement bas-de-page
+           hérité du mobile, qui laissait un immense vide au-dessus sur grand écran.
+           ══════════════════════════════════════════════════════════════════════ */
+        @media (min-width: 900px) {
+          .ob-header { padding: 0 3.5rem; }
+
+          /* Le header reste en haut ; .ob-body (flex:1 ci-dessous) se centre
+             verticalement dans tout l'espace restant. */
+          .ob-ui { justify-content: flex-start; }
+
+          .ob-body {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: flex-start;
+            max-width: 620px;
+            width: 100%;
+            padding: 0 4rem;
+            margin: 0;
+          }
+
+          .ob-tag {
+            font-size: 0.8rem;
+            padding: 0.4rem 1.1rem;
+            margin-bottom: 1.25rem;
+          }
+
+          .ob-title {
+            font-size: clamp(2.75rem, 3.4vw, 4rem);
+            margin-bottom: 1.25rem;
+          }
+
+          .ob-desc {
+            font-size: 1.02rem;
+            max-width: 460px;
+            margin-bottom: 2.25rem;
+          }
+
+          .ob-dots { margin-bottom: 2.25rem; }
+
+          .ob-btn-next,
+          .ob-btn-login,
+          .ob-btn-signup {
+            max-width: 380px;
+            height: 56px;
+          }
+
+          .ob-cta { max-width: 380px; }
+
+          .ob-counter { text-align: left; margin-top: 1.1rem; }
+
+          /* Icône décorative repositionnée à droite (mise en page split) */
+          .ob-slide-icon-wrap {
+            justify-content: flex-end;
+            padding-bottom: 0;
+            padding-right: 7vw;
+          }
+          .ob-slide-icon {
+            width: min(26vw, 380px);
+            height: min(26vw, 380px);
+          }
+
+          /* Dégradé de contraste réorienté : accent à gauche (où se trouve le
+             texte) plutôt qu'en bas de l'écran comme sur mobile. */
+          .ob-overlay {
+            background:
+              linear-gradient(
+                to right,
+                rgba(0,0,0,0.65) 0%,
+                rgba(0,0,0,0.45) 32%,
+                rgba(0,0,0,0.15) 55%,
+                rgba(0,0,0,0.05) 75%,
+                rgba(0,0,0,0.15) 100%
+              ),
+              linear-gradient(
+                to bottom,
+                rgba(0,0,0,0.15) 0%,
+                rgba(0,0,0,0.05) 30%,
+                rgba(0,0,0,0.25) 100%
+              );
+          }
+        }
+
+        @media (min-width: 1280px) {
+          .ob-body { padding: 0 6rem; }
+          .ob-slide-icon-wrap { padding-right: 9vw; }
         }
       `}</style>
 

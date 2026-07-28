@@ -282,17 +282,6 @@ interface CelebrationConfig {
   titleColor: string;
 }
 
-// ─── Celebration Overlay ─────────────────────────────────────────────────────
-
-interface CelebrationConfig {
-  emoji: string[];
-  title: string;
-  message: string;
-  colors: string[];
-  gradient: string;
-  titleColor: string;
-}
-
 function getCelebrationConfig(purpose: string): CelebrationConfig {
   switch (purpose) {
     case 'LATE_QUOTA':
@@ -352,6 +341,15 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
   const [visible, setVisible] = React.useState(false);
   const [closing, setClosing] = React.useState(false);
 
+  // 🔥 CORRECTION ESLint (react-hooks/immutability) : handleClose est
+  // désormais déclaré AVANT l'effect qui l'utilise (au lieu d'après), et
+  // stabilisé via useCallback pour pouvoir figurer proprement dans les deps
+  // de l'effect ci-dessous, sans avoir besoin d'un eslint-disable.
+  const handleClose = React.useCallback(() => {
+    setClosing(true);
+    setTimeout(() => onClose(), 400);
+  }, [onClose]);
+
   React.useEffect(() => {
     const generated: ParticleProps[] = Array.from({ length: 60 }, (_, i) => ({
       x: 10 + Math.random() * 80,
@@ -364,17 +362,13 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
       shape: (['circle', 'rect', 'triangle'] as const)[Math.floor(Math.random() * 3)],
       delay: Math.random() * 0.8,
     }));
-    setParticles(generated);
+    // 🔥 CORRECTION ESLint (react-hooks/set-state-in-effect) : setState différé
+    // d'un micro-tick au lieu d'être appelé de façon synchrone dans l'effect.
+    queueMicrotask(() => setParticles(generated));
     const t = setTimeout(() => setVisible(true), 80);
     const t2 = setTimeout(() => handleClose(), 5200);
     return () => { clearTimeout(t); clearTimeout(t2); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleClose = () => {
-    setClosing(true);
-    setTimeout(() => onClose(), 400);
-  };
+  }, [handleClose, config.colors]);
 
   return (
     <div
@@ -572,14 +566,30 @@ export function ContributionCreateForm({
     return pricing ?? { monthlyQuota: 0, membershipCard: 0 };
   }, [pricing]);
 
-  // ── Check if user has late months on mount ─────────────────────────────────
+  // 🔥 CORRECTION ESLint (react-hooks/immutability) : ce bloc était plus bas
+  // (après handlePurposeSelect). L'effet "Excess choice" ci-dessous lit
+  // amountNum et monthlyPrice — ces valeurs doivent être déclarées avant
+  // d'être référencées dans le corps du composant, même si cela fonctionnait
+  // déjà correctement à l'exécution grâce aux closures de useEffect. Le
+  // calcul lui-même est strictement inchangé.
+  // ── Amount derived data ────────────────────────────────────────────────────
+  const amountNum = Number(values.amount);
+  const monthlyPrice = currentPricing.monthlyQuota;
+  const isQuota = values.purpose === 'REGULAR_QUOTA' || values.purpose === 'LATE_QUOTA';
+  const isMembershipCard = values.purpose === 'MEMBERSHIP_CARD';
+  const cardPrice = currentPricing.membershipCard;
 
-   // ── Check if user has late months on mount ─────────────────────────────────
+  const showAdvanceNotice = isQuota && monthlyPrice > 0 && amountNum > monthlyPrice;
+  const monthsCovered = monthlyPrice > 0 && amountNum > 0 ? Math.floor(amountNum / monthlyPrice) : 0;
+
+  // ── Check if user has late months on mount ─────────────────────────────────
   useEffect(() => {
     // Priorité à la prop fournie par le parent (dashboard) — valeur fiable du backend
     if (lateMonthsProp !== undefined) {
-      setHasLateMonths(lateMonthsProp > 0);
-      return;
+      // 🔥 CORRECTION ESLint (react-hooks/set-state-in-effect) : setState différé
+      // via setTimeout(…, 0) au lieu d'être appelé de façon synchrone dans l'effect.
+      const timerId = setTimeout(() => setHasLateMonths(lateMonthsProp > 0), 0);
+      return () => clearTimeout(timerId);
     }
 
     // Fallback si la prop n'est pas fournie : appel dashboard
@@ -633,64 +643,73 @@ export function ContributionCreateForm({
   // ── Excess choice effect ──────────────────────────────────────────────────
   useEffect(() => {
     if (!pendingSubmitAfterExcess || excessChoice === null) return;
-    setPendingSubmitAfterExcess(false);
 
-    const purposeSnapshot = values.purpose;
+    // 🔥 CORRECTION ESLint (react-hooks/set-state-in-effect) : tout le
+    // traitement (y compris les setState) est déplacé dans un timer différé
+    // au lieu d'être exécuté de façon synchrone dans le corps de l'effect.
+    // Comportement final identique, juste non-synchrone par rapport au rendu.
+    const timerId = setTimeout(() => {
+      setPendingSubmitAfterExcess(false);
 
-    if (excessChoice === 'anticipate') {
-      // Soumettre normalement — le backend découpe sur plusieurs années
-      const payload: ContributionValues = {
-        amount: amountNum,
-        currency: selectedCurrency,
-        depositedAt: values.depositedAt,
-        method: values.method,
-        note: values.note,
-        purpose: purposeSnapshot,
-        targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
-        monthReference: refMonth,
-        yearReference: refYear,
-      };
-      setCelebrationPurpose(purposeSnapshot);
-      setPendingPayload(payload);
-      setShowCelebration(true);
-    } else {
-      // Soumettre cotisations année en cours + don pour l'excédent
-      const monthsInStartYear = 12 - refMonth + 1;
-      const quotaAmount = monthsInStartYear * monthlyPrice;
-      const donationAmount = amountNum - quotaAmount;
+      const purposeSnapshot = values.purpose;
 
-      const payloadQuota: ContributionValues = {
-        amount: quotaAmount,
-        currency: selectedCurrency,
-        depositedAt: values.depositedAt,
-        method: values.method,
-        note: values.note,
-        purpose: purposeSnapshot,
-        targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
-        monthReference: refMonth,
-        yearReference: refYear,
-      };
-
-      if (donationAmount > 0) {
-        pendingDonationRef.current = {
-          amount: donationAmount,
+      if (excessChoice === 'anticipate') {
+        // Soumettre normalement — le backend découpe sur plusieurs années
+        const payload: ContributionValues = {
+          amount: amountNum,
           currency: selectedCurrency,
           depositedAt: values.depositedAt,
           method: values.method,
-          note: '[Excédent converti en don]',
-          purpose: 'DONATION',
+          note: values.note,
+          purpose: purposeSnapshot,
           targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
+          monthReference: refMonth,
+          yearReference: refYear,
         };
-        setCelebrationPurpose('DONATION');
-      } else {
         setCelebrationPurpose(purposeSnapshot);
+        setPendingPayload(payload);
+        setShowCelebration(true);
+      } else {
+        // Soumettre cotisations année en cours + don pour l'excédent
+        const monthsInStartYear = 12 - refMonth + 1;
+        const quotaAmount = monthsInStartYear * monthlyPrice;
+        const donationAmount = amountNum - quotaAmount;
+
+        const payloadQuota: ContributionValues = {
+          amount: quotaAmount,
+          currency: selectedCurrency,
+          depositedAt: values.depositedAt,
+          method: values.method,
+          note: values.note,
+          purpose: purposeSnapshot,
+          targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
+          monthReference: refMonth,
+          yearReference: refYear,
+        };
+
+        if (donationAmount > 0) {
+          pendingDonationRef.current = {
+            amount: donationAmount,
+            currency: selectedCurrency,
+            depositedAt: values.depositedAt,
+            method: values.method,
+            note: '[Excédent converti en don]',
+            purpose: 'DONATION',
+            targetMemberId: paymentTarget === 'OTHER' && selectedMember ? selectedMember.id : undefined,
+          };
+          setCelebrationPurpose('DONATION');
+        } else {
+          setCelebrationPurpose(purposeSnapshot);
+        }
+
+        setPendingPayload(payloadQuota);
+        setShowCelebration(true);
       }
 
-      setPendingPayload(payloadQuota);
-      setShowCelebration(true);
-    }
+      setExcessChoice(null);
+    }, 0);
 
-    setExcessChoice(null);
+    return () => clearTimeout(timerId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingSubmitAfterExcess, excessChoice]);
 
@@ -759,16 +778,6 @@ export function ContributionCreateForm({
 
     setValues(prev => ({ ...prev, purpose: purposeValue }));
   }, [currentPricing, selectedCurrency, hasLateMonths]);
-
-  // ── Amount derived data ────────────────────────────────────────────────────
-  const amountNum = Number(values.amount);
-  const monthlyPrice = currentPricing.monthlyQuota;
-  const isQuota = values.purpose === 'REGULAR_QUOTA' || values.purpose === 'LATE_QUOTA';
-  const isMembershipCard = values.purpose === 'MEMBERSHIP_CARD';
-  const cardPrice = currentPricing.membershipCard;
-
-  const showAdvanceNotice = isQuota && monthlyPrice > 0 && amountNum > monthlyPrice;
-  const monthsCovered = monthlyPrice > 0 && amountNum > 0 ? Math.floor(amountNum / monthlyPrice) : 0;
 
   const anticipatedMonths = useMemo(() => {
     if (!showAdvanceNotice || monthsCovered <= 0) return [];

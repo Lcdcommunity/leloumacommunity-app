@@ -132,6 +132,28 @@ export class MemberService {
     private readonly ledger: LedgerService,
   ) {}
 
+  // ─── getPricingMap ────────────────────────────────────────────────────────
+  // 🔥 CORRECTION : la tarification vit dans la table Pricing (celle que
+  // super-admin/settings écrit réellement via updatePricingSuperAdmin), pas
+  // dans AssociationSetting['PRICING_CONFIG'] — cette clé n'était jamais
+  // écrite nulle part, donc monthlyPrice valait toujours 0 partout ici, et
+  // un versement groupé/anticipé ne comptait que pour 1 seul mois couvert.
+  // Un seul point de lecture désormais, réutilisé par getDashboard,
+  // createContribution, listLateMembers et getPricing.
+  private async getPricingMap(
+    associationId: string,
+  ): Promise<Record<string, { monthlyQuota: number; membershipCard: number }>> {
+    const rows = await this.prisma.pricing.findMany({ where: { associationId } });
+    const map: Record<string, { monthlyQuota: number; membershipCard: number }> = {};
+    for (const p of rows) {
+      map[p.currency] = {
+        monthlyQuota: Number(p.monthlyQuota),
+        membershipCard: Number(p.membershipCard),
+      };
+    }
+    return map;
+  }
+
   // ─── getMeOrThrow ─────────────────────────────────────────────────────────
 
   async getMeOrThrow(userId: string) {
@@ -207,7 +229,7 @@ export class MemberService {
       // ── FLAG : carte membre VALIDÉE pour l'année en cours ? ───────────────
       currentYearCard,
       // ── PRICING : nécessaire pour buildCoveredMonths ──────────────────────
-      pricingSetting,
+      allPricing,
     ] = await Promise.all([
       this.prisma.contribution.aggregate({
         where: {
@@ -280,18 +302,10 @@ export class MemberService {
       }),
       // Tarification de l'association — pour déduire le nombre de mois
       // couverts par un versement groupé.
-      this.prisma.associationSetting.findUnique({
-        where: {
-          associationId_key: {
-            associationId: me.associationId,
-            key: 'PRICING_CONFIG',
-          },
-        },
-      }),
+      this.getPricingMap(me.associationId),
     ]);
 
     // ── Prix mensuel du membre ────────────────────────────────────────────────
-    const allPricing = (pricingSetting?.value as Record<string, any>) ?? {};
     const myAntenna  = allAntennas.find((a) => a.id === me.antennaId);
     const myCurrency = myAntenna?.defaultCurrency ?? 'EUR';
     const monthlyPrice =
@@ -539,15 +553,7 @@ export class MemberService {
       if (primaryMembership?.antennaId) finalAntennaId = primaryMembership.antennaId;
     }
 
-    const pricingSetting = await this.prisma.associationSetting.findUnique({
-      where: {
-        associationId_key: {
-          associationId: me.associationId,
-          key: 'PRICING_CONFIG',
-        },
-      },
-    });
-    const allPricing = (pricingSetting?.value as Record<string, any>) || {};
+    const allPricing = await this.getPricingMap(me.associationId);
     const resolvedCurrency = dto.currency || 'EUR';
     const localPricing = allPricing[resolvedCurrency] || {
       monthlyQuota: 0,
@@ -804,22 +810,7 @@ export class MemberService {
 
   async getPricing(userId: string) {
     const me = await this.getMeOrThrow(userId);
-
-    const pricingSetting = await this.prisma.associationSetting.findUnique({
-      where: {
-        associationId_key: {
-          associationId: me.associationId,
-          key: 'PRICING_CONFIG',
-        },
-      },
-    });
-
-    return (
-      (pricingSetting?.value as Record<
-        string,
-        { monthlyQuota: number; membershipCard: number }
-      >) || {}
-    );
+    return this.getPricingMap(me.associationId);
   }
 
   // ─── listLateMembers (visible aux membres) ────────────────────────────────
@@ -834,7 +825,7 @@ export class MemberService {
     const thresholdMonths = 3;
 
     // Récupération des memberships et de la tarification en parallèle.
-    const [memberships, pricingSettingLate] = await Promise.all([
+    const [memberships, allPricingLate] = await Promise.all([
       this.prisma.membership.findMany({
         where: {
           associationId: me.associationId,
@@ -872,17 +863,8 @@ export class MemberService {
           antenna: { select: { id: true, name: true, defaultCurrency: true } },
         },
       }),
-      this.prisma.associationSetting.findUnique({
-        where: {
-          associationId_key: {
-            associationId: me.associationId,
-            key: 'PRICING_CONFIG',
-          },
-        },
-      }),
+      this.getPricingMap(me.associationId),
     ]);
-
-    const allPricingLate = (pricingSettingLate?.value as Record<string, any>) ?? {};
 
     const allLate = memberships
       .map((m) => {

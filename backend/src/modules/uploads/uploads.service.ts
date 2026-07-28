@@ -21,7 +21,11 @@ export class UploadsService {
   ) {}
 
   private get currentDriver(): string {
-    return this.config.get<string>('STORAGE_DRIVER') || 'local';
+    return (
+      this.config.get<string>('STORAGE_DRIVER') ||
+      this.config.get<string>('UPLOAD_DRIVER') ||
+      'local'
+    );
   }
 
   async uploadAndCreateFileAsset(params: {
@@ -36,11 +40,11 @@ export class UploadsService {
     let stored: { url: string; storageKey: string; mimeType?: string; sizeBytes?: bigint };
 
     if (driver === 'cloudinary') {
-      const res = await this.cloudinaryProvider.uploadFile(params.file);
+      const res = await this.cloudinaryProvider.uploadFile(params.file, params.folder || 'uploads');
       stored = {
         url: res.secure_url,
         storageKey: res.public_id,
-        mimeType: params.file.mimetype, // ← Fix : mimetype original au lieu de "raw/pdf"
+        mimeType: params.file.mimetype,
         sizeBytes: BigInt(res.bytes),
       };
     } else if (driver === 's3') {
@@ -67,7 +71,6 @@ export class UploadsService {
       };
     }
 
-    // 1. On construit l'objet dynamiquement SANS le "associationId"
     const fileData: any = {
       uploadedByUserId: params.actor.id,
       storageProvider: driver,
@@ -80,17 +83,14 @@ export class UploadsService {
       visibility: params.isPublic ? FileVisibility.PUBLIC : FileVisibility.PRIVATE,
     };
 
-    // 2. On ajoute l'association UNIQUEMENT si l'utilisateur en a une (le Grand Chef n'en a pas)
     if (params.actor.associationId) {
       fileData.associationId = params.actor.associationId;
     }
 
-    // 3. Création propre
     const created = await this.prisma.fileAsset.create({
       data: fileData,
     });
 
-    // 4. Log de l'action
     await this.audit.log({
       associationId: params.actor.associationId || null,
       actorUserId: params.actor.id,

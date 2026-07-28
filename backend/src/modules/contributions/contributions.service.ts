@@ -38,6 +38,25 @@ export class ContributionsService {
     private readonly notifications: NotificationsService,
   ) {}
 
+  // 🔥 CORRECTION : la tarification vit dans la table Pricing (celle que
+  // super-admin/settings écrit réellement via updatePricingSuperAdmin), pas
+  // dans AssociationSetting['PRICING_CONFIG'] — cette clé n'était jamais
+  // écrite nulle part, donc monthlyPrice valait toujours 0 ici, et un
+  // versement groupé/anticipé ne comptait que pour 1 seul mois couvert.
+  private async getPricingMap(
+    associationId: string,
+  ): Promise<Record<string, { monthlyQuota: number; membershipCard: number }>> {
+    const rows = await this.prisma.pricing.findMany({ where: { associationId } });
+    const map: Record<string, { monthlyQuota: number; membershipCard: number }> = {};
+    for (const p of rows) {
+      map[p.currency] = {
+        monthlyQuota: Number(p.monthlyQuota),
+        membershipCard: Number(p.membershipCard),
+      };
+    }
+    return map;
+  }
+
   async createForMember(dto: CreateContributionDto, actor: AuthUser) {
     if (actor.role !== UserRole.MEMBER) {
       throw new ForbiddenException(
@@ -146,21 +165,7 @@ export class ContributionsService {
     const purpose =
       (dto.purpose as any) ?? 'REGULAR_QUOTA';
 
-    const pricingSetting =
-      await this.prisma.associationSetting.findUnique({
-        where: {
-          associationId_key: {
-            associationId: actor.associationId,
-            key: 'PRICING_CONFIG',
-          },
-        },
-      });
-
-    const allPricing =
-      (pricingSetting?.value as Record<
-        string,
-        any
-      >) || {};
+    const allPricing = await this.getPricingMap(actor.associationId);
 
     const localPricing =
       allPricing[resolvedCurrency] || {
