@@ -1932,4 +1932,12 @@ model AntennaTransfer {
   @@index([receiverAntennaId, status, createdAt])
   @@map("antenna_transfers")
 }
+model PlatformSetting {
+  id              String   @id @default("singleton")
+  platformName    String   @default("LCD Platform")
+  contactEmail    String?
+  maintenanceMode Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
 //npx prisma generate

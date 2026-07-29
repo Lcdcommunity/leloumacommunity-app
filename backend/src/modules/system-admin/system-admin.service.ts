@@ -24,6 +24,17 @@ export interface CreateAssociationPayload {
   city?: string;
 }
 
+// 🔥 AJOUT : payload de mise à jour des réglages plateforme (singleton).
+export interface UpdatePlatformSettingsPayload {
+  platformName?: string;
+  contactEmail?: string;
+  maintenanceMode?: boolean;
+}
+
+// Id fixe du seul et unique enregistrement PlatformSetting — évite d'avoir
+// à gérer une liste alors qu'il n'y a jamais qu'une seule ligne possible.
+const PLATFORM_SETTINGS_ID = 'singleton';
+
 @Injectable()
 export class SystemAdminService {
   constructor(
@@ -215,5 +226,50 @@ export class SystemAdminService {
     await this.prisma.association.delete({ where: { id } });
 
     return { message: `L'association ${association.name} a été détruite définitivement.` };
+  }
+
+  // ╔═══════════════════════════════════════════════════════════════════╗
+  // ║  🔥 AJOUT : Réglages plateforme (nom, email de contact, maintenance) ║
+  // ║  Ligne unique (id fixe 'singleton'), créée à la demande via upsert. ║
+  // ║  ⚠️ maintenanceMode est stocké mais n'est PAS encore appliqué        ║
+  // ║  ailleurs dans l'app (aucun guard ne bloque l'accès pour l'instant) ║
+  // ╚═══════════════════════════════════════════════════════════════════╝
+
+  async getPlatformSettings() {
+    const settings = await this.prisma.platformSetting.upsert({
+      where: { id: PLATFORM_SETTINGS_ID },
+      update: {},
+      create: { id: PLATFORM_SETTINGS_ID },
+    });
+
+    return {
+      platformName: settings.platformName,
+      contactEmail: settings.contactEmail,
+      maintenanceMode: settings.maintenanceMode,
+    };
+  }
+
+  async updatePlatformSettings(data: UpdatePlatformSettingsPayload) {
+    const settings = await this.prisma.platformSetting.upsert({
+      where: { id: PLATFORM_SETTINGS_ID },
+      update: {
+        ...(data.platformName !== undefined ? { platformName: data.platformName } : {}),
+        ...(data.contactEmail !== undefined ? { contactEmail: data.contactEmail } : {}),
+        ...(data.maintenanceMode !== undefined ? { maintenanceMode: data.maintenanceMode } : {}),
+      },
+      create: {
+        id: PLATFORM_SETTINGS_ID,
+        ...(data.platformName !== undefined ? { platformName: data.platformName } : {}),
+        ...(data.contactEmail !== undefined ? { contactEmail: data.contactEmail } : {}),
+        ...(data.maintenanceMode !== undefined ? { maintenanceMode: data.maintenanceMode } : {}),
+      },
+    });
+
+    return {
+      message: 'Paramètres de la plateforme mis à jour avec succès.',
+      platformName: settings.platformName,
+      contactEmail: settings.contactEmail,
+      maintenanceMode: settings.maintenanceMode,
+    };
   }
 }

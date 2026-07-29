@@ -22,6 +22,8 @@ const FONT_OPTIONS: FONT_OPTION[] = [
 ];
 
 // Domaine de base de la plateforme (déjà couvert par un wildcard DNS/SSL).
+// ⚠️ À vérifier : "lcd.com" correspond-il vraiment à ton domaine de base
+// actuel pour Grand Chef/Assograndchef, ou est-ce un reste de l'ancien nom ?
 const PLATFORM_BASE_DOMAIN = 'lcd.com';
 
 const IconDesign = () => <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg>;
@@ -107,7 +109,12 @@ export default function CreateAssociationPage() {
         adminPhone,
       };
 
-      const createdAssociation = await http<{ id: string }>(
+      // 🔥 CORRECTION : le backend renvoie { message, associationId } — pas
+      // { id }. C'était le vrai bug derrière "Internal server error" sur le
+      // provisioning : createdAssociation.id valait toujours undefined, donc
+      // provisionDomainSystemAdmin recevait associationId: undefined, et
+      // Prisma refusait le where sans identifiant valide.
+      const createdAssociation = await http<{ message: string; associationId: string }>(
         '/system-admin/associations',
         { method: 'POST', body: payload },
       );
@@ -123,7 +130,7 @@ export default function CreateAssociationPage() {
       if (isCustomDomain) {
         try {
           const result = await api.provisionDomainSystemAdmin({
-            associationId: createdAssociation.id,
+            associationId: createdAssociation.associationId,
             domain: trimmedDomain,
           });
           setDomainNameServers(result.nameServers);
@@ -328,7 +335,7 @@ export default function CreateAssociationPage() {
               <div className="col-left">
                 <div className="card-glass">
                   <h2 className="section-title"><span className="section-icon"><IconDesign /></span> Identité Visuelle</h2>
-                  
+
                   <div className="gc-form-group">
                     <div className="gc-col">
                       <label className="label">Logo de l&apos;organisation</label>
@@ -383,12 +390,12 @@ export default function CreateAssociationPage() {
                 <div className="card-glass">
                   <h2 className="section-title"><span className="section-icon"><IconLegal /></span> Informations Légales</h2>
                   <div className="gc-form-group">
-                    
+
                     <div className="gc-col">
                       <label className="label">Nom officiel de l&apos;association *</label>
                       <input className="input-custom" value={assoName} onChange={e => setAssoName(e.target.value)} required placeholder="Ex: Association Solidaire" />
                     </div>
-                    
+
                     <div className="gc-row">
                       <div className="gc-col">
                         <label className="label">Code ID *</label>
@@ -412,12 +419,12 @@ export default function CreateAssociationPage() {
                 <div className="card-glass">
                   <h2 className="section-title"><span className="section-icon"><IconLocation /></span> Siège Social</h2>
                   <div className="gc-form-group">
-                    
+
                     <div className="gc-col">
                       <label className="label">Adresse complète</label>
                       <input className="input-custom" value={address} onChange={e => setAddress(e.target.value)} placeholder="Numéro et rue..." />
                     </div>
-                    
+
                     <div className="gc-row">
                       <div className="gc-col">
                         <label className="label">Ville</label>
@@ -442,7 +449,7 @@ export default function CreateAssociationPage() {
                 <div className="card-glass">
                   <h2 className="section-title"><span className="section-icon"><IconAdmin /></span> Compte Administrateur</h2>
                   <div className="gc-form-group">
-                    
+
                     <div className="gc-row">
                       <div className="gc-col">
                         <label className="label">Prénom *</label>
@@ -464,7 +471,7 @@ export default function CreateAssociationPage() {
                         <input type="tel" className="input-custom" value={adminPhone} onChange={e => setAdminPhone(e.target.value)} required placeholder="+33 6..." />
                       </div>
                     </div>
-                    
+
                   </div>
                 </div>
 

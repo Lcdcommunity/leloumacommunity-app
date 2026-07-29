@@ -1339,6 +1339,16 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       method: 'PATCH',
       body: { isActive },
     }),
+    getSystemSettings: () =>
+  http<{ platformName: string; contactEmail: string | null; maintenanceMode: boolean }>(
+    '/system-admin/settings',
+  ),
+
+updateSystemSettings: (body: { platformName?: string; contactEmail?: string; maintenanceMode?: boolean }) =>
+  http<{ message: string; platformName: string; contactEmail: string | null; maintenanceMode: boolean }, typeof body>(
+    '/system-admin/settings',
+    { method: 'PATCH', body },
+  ),
 
     provisionDomainSystemAdmin: (body: { associationId: string; domain: string }) =>
     http<{ nameServers: string[]; zoneStatus: string }, typeof body>(

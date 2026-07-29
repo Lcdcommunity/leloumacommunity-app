@@ -1,8 +1,10 @@
 /////// web/app/(protected)/system-admin/settings/page.tsx
 'use client';
 
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { AppShell } from '../../../../components/layout/AppShell';
+import { api } from '../../../../lib/api-client';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -45,30 +47,70 @@ function Field({
 }
 
 export default function SystemSettingsPage() {
+  const { theme: activeTheme, setTheme: setActiveTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  const [initLoad, setInitLoad] = useState(true);
+
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // 🔥 Branché sur GET/PATCH /system-admin/settings (table PlatformSetting,
+  // ligne unique). ⚠️ maintenanceMode est persisté mais n'est pas encore
+  // appliqué ailleurs dans l'app — aucun guard ne bloque l'accès pour l'instant.
   const [platformName, setPlatformName] = useState('LCD Platform');
-  const [contactEmail, setContactEmail] = useState('contact@lcd-community.com');
+  const [contactEmail, setContactEmail] = useState('');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [initialSettings, setInitialSettings] = useState({ platformName: 'LCD Platform', contactEmail: '', maintenanceMode: false });
+
+  // Thème : next-themes pour l'affichage immédiat + api.updateMemberPreferences
+  // pour la persistance, comme sur super-admin/settings et admin/settings.
   const [theme, setTheme] = useState<Theme>('system');
 
+  // Mot de passe : api.updateMyPassword, le même endpoint que partout ailleurs.
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    queueMicrotask(() => setMounted(true));
+
+    Promise.all([
+      api.getMemberPreferences().catch(() => null),
+      api.getSystemSettings().catch(() => null),
+    ]).then(([prefs, settings]) => {
+      if (prefs?.theme) setTheme(prefs.theme as Theme);
+      if (settings) {
+        setPlatformName(settings.platformName ?? 'LCD Platform');
+        setContactEmail(settings.contactEmail ?? '');
+        setMaintenanceMode(settings.maintenanceMode ?? false);
+        setInitialSettings({
+          platformName: settings.platformName ?? 'LCD Platform',
+          contactEmail: settings.contactEmail ?? '',
+          maintenanceMode: settings.maintenanceMode ?? false,
+        });
+      }
+    }).finally(() => setInitLoad(false));
+  }, []);
 
   const handleCancel = () => {
     setIsEditing(false);
     setPassword('');
     setConfirmPassword('');
+    setPlatformName(initialSettings.platformName);
+    setContactEmail(initialSettings.contactEmail);
+    setMaintenanceMode(initialSettings.maintenanceMode);
     setMsg(null);
+  };
+
+  const handleThemeSelect = (t: Theme) => {
+    setTheme(t);
+    setActiveTheme(t); // application immédiate, comme sur les autres pages settings
   };
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
     setMsg(null);
 
-    // 🔒 AJOUT CHIRURGICAL : Vérification de la correspondance des mots de passe
     if (password && password !== confirmPassword) {
       setMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
       return;
@@ -76,16 +118,26 @@ export default function SystemSettingsPage() {
 
     setLoading(true);
     try {
-      // TODO: Remplacer ceci par le véritable appel API vers ton backend
-      // await api.updateSystemSettings({ platformName, contactEmail, maintenanceMode, theme, password });
-      await new Promise(r => setTimeout(r, 1000)); 
-      
-      setMsg({ type: 'success', text: 'Paramètres enregistrés avec succès !' });
+      const tasks: Promise<unknown>[] = [
+        api.updateMemberPreferences({ theme }),
+        api.updateSystemSettings({ platformName, contactEmail, maintenanceMode }),
+      ];
+      if (password) {
+        tasks.push(api.updateMyPassword(password));
+      }
+
+      await Promise.all(tasks);
+
+      setInitialSettings({ platformName, contactEmail, maintenanceMode });
+      setMsg({ type: 'success', text: 'Paramètres enregistrés avec succès.' });
       setIsEditing(false);
-      setPassword(''); 
+      setPassword('');
       setConfirmPassword('');
-    } catch {
-      setMsg({ type: 'error', text: 'Une erreur est survenue lors de l\'enregistrement.' });
+    } catch (err: unknown) {
+      setMsg({
+        type: 'error',
+        text: err instanceof Error ? err.message : "Une erreur est survenue lors de l'enregistrement.",
+      });
     } finally {
       setLoading(false);
     }
@@ -108,11 +160,13 @@ export default function SystemSettingsPage() {
         .set-btn-edit { padding: 0.5rem 1rem; border-radius: 10px; border: 1px solid #DDD6FE; background: white; color: #7C3AED; font-weight: 700; cursor: pointer; font-size: 0.8rem; }
         .set-footer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 0.75rem; padding: 1.2rem 1.5rem; background: #F9FAFB; border-top: 1px solid #EDE9FE; }
         .btn-save { background: #7C3AED; color: white; border: none; padding: 0.6rem 1.5rem; border-radius: 10px; font-weight: 700; cursor: pointer; }
+        .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-cancel { background: transparent; color: #6B7280; border: 1px solid #E5E7EB; padding: 0.6rem 1.5rem; border-radius: 10px; font-weight: 700; cursor: pointer; }
         .set-toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 1rem; border-radius: 14px; background: #F5F3FF; border: 1px solid #DDD6FE; }
         .theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; }
         .theme-btn { padding: 0.75rem; border-radius: 12px; border: 2px solid #F3F4F6; background: white; cursor: pointer; font-weight: 700; font-size: 0.8rem; color: #6B7280; }
         .theme-btn.active { border-color: #7C3AED; background: #F5F3FF; color: #7C3AED; }
+        .set-unwired-note { font-size: 0.72rem; color: #B45309; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 10px; padding: 0.6rem 0.8rem; margin-top: 0.5rem; line-height: 1.5; }
         @keyframes setin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
@@ -122,7 +176,7 @@ export default function SystemSettingsPage() {
             <h1 className="set-title">Paramètres <span>SaaS</span></h1>
             <p style={{ color: '#6B7280', fontWeight: 500, margin: '0.4rem 0 0' }}>Gestion globale de la plateforme LCD.</p>
           </div>
-          {!isEditing && (
+          {!isEditing && !initLoad && (
             <button type="button" className="set-btn-edit" onClick={() => setIsEditing(true)}>
               Modifier les réglages
             </button>
@@ -146,7 +200,7 @@ export default function SystemSettingsPage() {
               <div className="set-card-head"><span className="set-card-title">🏢 Identité de la Plateforme</span></div>
               <div className="set-card-body">
                 <Field label="Nom de la plateforme" value={platformName} onChange={setPlatformName} disabled={!isEditing} />
-                <Field label="Email de contact système" value={contactEmail} onChange={setContactEmail} disabled={!isEditing} />
+                <Field label="Email de contact système" value={contactEmail} onChange={setContactEmail} disabled={!isEditing} placeholder="contact@ajvk.site" />
               </div>
             </div>
 
@@ -173,7 +227,10 @@ export default function SystemSettingsPage() {
                   </div>
                   <input type="checkbox" checked={maintenanceMode} onChange={e => setMaintenanceMode(e.target.checked)} disabled={!isEditing} style={{ width: 18, height: 18 }} />
                 </div>
-                <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#F9FAFB', borderRadius: '12px', textAlign: 'center' }}>
+                <div className="set-unwired-note">
+                  ⚠️ Cette valeur est maintenant sauvegardée, mais rien dans l&apos;app ne la lit encore pour bloquer l&apos;accès — l&apos;activer ici n&apos;a aucun effet réel sur les membres pour l&apos;instant.
+                </div>
+                <div style={{ marginTop: '1rem', padding: '1rem', background: '#F9FAFB', borderRadius: '12px', textAlign: 'center' }}>
                   <div style={{ fontSize: '0.7rem', color: '#9CA3AF', marginBottom: '0.2rem' }}>Version</div>
                   <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#1F2937' }}>v1.0.4-stable</div>
                 </div>
@@ -185,7 +242,13 @@ export default function SystemSettingsPage() {
               <div className="set-card-body">
                 <div className="theme-grid">
                   {(['light', 'dark', 'system'] as Theme[]).map(t => (
-                    <button key={t} type="button" className={`theme-btn ${theme === t ? 'active' : ''}`} onClick={() => setTheme(t)} disabled={!isEditing}>
+                    <button
+                      key={t}
+                      type="button"
+                      className={`theme-btn ${mounted && (isEditing ? theme : activeTheme) === t ? 'active' : ''}`}
+                      onClick={() => handleThemeSelect(t)}
+                      disabled={!isEditing}
+                    >
                       {t === 'light' ? 'Clair' : t === 'dark' ? 'Sombre' : 'Auto'}
                     </button>
                   ))}
