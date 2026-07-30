@@ -1,5 +1,5 @@
 // backend/src/domain-provisioning/providers/cloudflare.provider.ts
-// v4.0 — + User-Agent explicite (Cloudflare filtre les requêtes sans UA reconnaissable)
+// v5.0 — auth par Global API Key (email + clé) à la place du token scoped
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import axios from 'axios';
 
@@ -22,9 +22,10 @@ export class CloudflareProvider {
         method: init?.method ?? 'GET',
         data: init?.body ? JSON.parse(init.body) : undefined,
         headers: {
-          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+          'X-Auth-Email': process.env.CLOUDFLARE_EMAIL,
+          'X-Auth-Key': process.env.CLOUDFLARE_GLOBAL_KEY,
           'Content-Type': 'application/json',
-          'User-Agent': 'curl/8.4.0', // 🔑 sans ça, Cloudflare renvoyait "Authentication error"
+          'User-Agent': 'curl/8.4.0',
         },
         validateStatus: () => true,
       });
