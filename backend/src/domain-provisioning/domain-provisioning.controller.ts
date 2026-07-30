@@ -1,5 +1,5 @@
 // backend/src/domain-provisioning/domain-provisioning.controller.ts
-// v2.1
+// v2.2 — + route debug-curl temporaire (protégée CRON_SECRET), à retirer après diagnostic
 import {
   Controller,
   Post,
@@ -9,6 +9,7 @@ import {
   UseGuards,
   UnauthorizedException,
 } from '@nestjs/common';
+import { exec } from 'child_process';
 import { DomainProvisioningService } from './domain-provisioning.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -19,9 +20,6 @@ import { UserRole } from '@prisma/client';
 export class DomainProvisioningController {
   constructor(private readonly service: DomainProvisioningService) {}
 
-  // Contrairement à SystemAdminController, le @UseGuards n'est PAS au niveau du
-  // controller ici : la route 'check' ci-dessous n'utilise pas de JWT du tout
-  // (elle est protégée par CRON_SECRET), le guard doit donc rester local à 'provision'.
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.SYSTEM_ADMIN)
   @Post('provision')
@@ -35,5 +33,26 @@ export class DomainProvisioningController {
       throw new UnauthorizedException();
     }
     return this.service.checkPendingDomains();
+  }
+
+  // 🔍 DEBUG TEMPORAIRE — à retirer une fois le diagnostic Cloudflare terminé.
+  // Fait tourner un vrai curl depuis le réseau Render lui-même, pour vérifier
+  // si le blocage vient du réseau/IP sortant plutôt que de fetch/axios.
+  @Get('debug-curl')
+  debugCurl(@Headers('authorization') auth: string) {
+    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+      throw new UnauthorizedException();
+    }
+    return new Promise((resolve) => {
+      const cmd = `curl -s "https://api.cloudflare.com/client/v4/zones?name=ajvk.site" -H "Authorization: Bearer ${process.env.CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json"`;
+      exec(cmd, { timeout: 15000 }, (error, stdout, stderr) => {
+        resolve({
+          hadError: !!error,
+          errorMessage: error?.message ?? null,
+          stdout,
+          stderr,
+        });
+      });
+    });
   }
 }
