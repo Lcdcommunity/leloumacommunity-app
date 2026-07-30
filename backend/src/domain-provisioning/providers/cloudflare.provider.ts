@@ -1,5 +1,5 @@
 // backend/src/domain-provisioning/providers/cloudflare.provider.ts
-// v3.0 — fetch natif remplacé par axios (bug undici/Node sur Render)
+// v3.1 — axios + marqueur de diagnostic temporaire [AXIOS-V3]
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import axios from 'axios';
 
@@ -29,14 +29,16 @@ export class CloudflareProvider {
       });
       json = res.data;
     } catch (err: any) {
+      // 🔍 DEBUG TEMPORAIRE — marqueur [AXIOS-V3], à retirer une fois le diagnostic fait
       throw new InternalServerErrorException(
-        `Cloudflare request failed: ${err.message}`,
+        `[AXIOS-V3] Cloudflare request failed: ${err.message}`,
       );
     }
 
     if (!json.success) {
+      // 🔍 DEBUG TEMPORAIRE — marqueur [AXIOS-V3], à retirer une fois le diagnostic fait
       throw new InternalServerErrorException(
-        `Cloudflare API error: ${JSON.stringify(json.errors)}`,
+        `[AXIOS-V3] Cloudflare API error: ${JSON.stringify(json.errors)}`,
       );
     }
     return json.result;
