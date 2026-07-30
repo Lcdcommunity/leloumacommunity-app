@@ -14,6 +14,9 @@ interface CloudflareZone {
 @Injectable()
 export class CloudflareProvider {
   private async cfFetch(path: string, init?: RequestInit) {
+    // 🔍 DEBUG TEMPORAIRE — à retirer une fois le diagnostic fait
+    console.log('[DEBUG CF]', process.env.CLOUDFLARE_API_TOKEN?.length, process.env.CLOUDFLARE_API_TOKEN?.slice(0, 10));
+
     const res = await fetch(`${CF_API}${path}`, {
       ...init,
       headers: {
