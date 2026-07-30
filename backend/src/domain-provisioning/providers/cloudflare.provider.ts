@@ -1,6 +1,7 @@
 // backend/src/domain-provisioning/providers/cloudflare.provider.ts
-// v2.0
+// v3.0 — fetch natif remplacé par axios (bug undici/Node sur Render)
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import axios from 'axios';
 
 const CF_API = 'https://api.cloudflare.com/client/v4';
 
@@ -13,19 +14,26 @@ interface CloudflareZone {
 
 @Injectable()
 export class CloudflareProvider {
-  private async cfFetch(path: string, init?: RequestInit) {
-    // 🔍 DEBUG TEMPORAIRE — à retirer une fois le diagnostic fait
-    console.log('[DEBUG CF]', process.env.CLOUDFLARE_API_TOKEN?.length, process.env.CLOUDFLARE_API_TOKEN?.slice(0, 10));
+  private async cfFetch(path: string, init?: { method?: 'GET' | 'POST' | 'PUT'; body?: string }) {
+    let json: any;
+    try {
+      const res = await axios({
+        url: `${CF_API}${path}`,
+        method: init?.method ?? 'GET',
+        data: init?.body ? JSON.parse(init.body) : undefined,
+        headers: {
+          Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        validateStatus: () => true, // on gère nous-mêmes les erreurs via json.success
+      });
+      json = res.data;
+    } catch (err: any) {
+      throw new InternalServerErrorException(
+        `Cloudflare request failed: ${err.message}`,
+      );
+    }
 
-    const res = await fetch(`${CF_API}${path}`, {
-      ...init,
-      headers: {
-        Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
-        'Content-Type': 'application/json',
-        ...(init?.headers || {}),
-      },
-    });
-    const json = await res.json();
     if (!json.success) {
       throw new InternalServerErrorException(
         `Cloudflare API error: ${JSON.stringify(json.errors)}`,
