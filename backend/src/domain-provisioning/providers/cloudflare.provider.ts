@@ -1,5 +1,5 @@
 // backend/src/domain-provisioning/providers/cloudflare.provider.ts
-// v3.1 — axios + marqueur de diagnostic temporaire [AXIOS-V3]
+// v4.0 — + User-Agent explicite (Cloudflare filtre les requêtes sans UA reconnaissable)
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import axios from 'axios';
 
@@ -24,21 +24,20 @@ export class CloudflareProvider {
         headers: {
           Authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`,
           'Content-Type': 'application/json',
+          'User-Agent': 'curl/8.4.0', // 🔑 sans ça, Cloudflare renvoyait "Authentication error"
         },
-        validateStatus: () => true, // on gère nous-mêmes les erreurs via json.success
+        validateStatus: () => true,
       });
       json = res.data;
     } catch (err: any) {
-      // 🔍 DEBUG TEMPORAIRE — marqueur [AXIOS-V3], à retirer une fois le diagnostic fait
       throw new InternalServerErrorException(
-        `[AXIOS-V3] Cloudflare request failed: ${err.message}`,
+        `Cloudflare request failed: ${err.message}`,
       );
     }
 
     if (!json.success) {
-      // 🔍 DEBUG TEMPORAIRE — marqueur [AXIOS-V3], à retirer une fois le diagnostic fait
       throw new InternalServerErrorException(
-        `[AXIOS-V3] Cloudflare API error: ${JSON.stringify(json.errors)}`,
+        `Cloudflare API error: ${JSON.stringify(json.errors)}`,
       );
     }
     return json.result;
