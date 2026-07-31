@@ -7,7 +7,7 @@ import { AppShell } from '../../../../../components/layout/AppShell';
 import { ContributionCreateForm } from '../../../../../components/member/ContributionCreateForm';
 import { api } from '../../../../../lib/api-client';
 
-type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | '';
+type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | 'GBP' | 'CAD' | 'CHF' | '';
 
 type ContributionFormData = {
   amount: number;
@@ -20,17 +20,12 @@ type ContributionFormData = {
   targetMemberId?: string;
 };
 
-type DashboardResponse = {
-  stats?: {
-    lateMonths?: number;
-  };
-};
-
 export default function MemberNewContributionPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBootLoading, setIsBootLoading] = useState(true);
-  const [pricing, setPricing] = useState<{ monthlyQuota: number; membershipCard: number }>({ monthlyQuota: 0, membershipCard: 0 });
+  const [pricingMap, setPricingMap] = useState<Record<string, { monthlyQuota: number; membershipCard: number }>>({});
+  const [selfCurrency, setSelfCurrency] = useState<string>('');
   const [lateMonths, setLateMonths] = useState<number | undefined>(undefined);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -40,28 +35,31 @@ export default function MemberNewContributionPage() {
 
     async function bootstrap() {
       try {
-        const apiAny = api as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
-
         const [allPricing, dashboard] = await Promise.all([
           api.getAssociationPricing().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)),
-          (typeof apiAny['getMemberDashboard'] === 'function'
-            ? apiAny['getMemberDashboard']()
-            : Promise.resolve(null)
-          ).catch(() => null) as Promise<DashboardResponse | null>,
+          // 🔥 CORRECTION : l'ancien code appelait `api.getMemberDashboard()`,
+          // une méthode qui n'existe pas dans api-client.ts (la vraie
+          // méthode s'appelle `dashboardMember`). L'appel échouait donc
+          // toujours en silence, lateMonths et l'antenne restaient indéfinis.
+          api.dashboardMember().catch(() => null),
         ]);
 
         if (!mounted) return;
 
-        const localPricing = allPricing['EUR'] || allPricing['GNF'] || { monthlyQuota: 0, membershipCard: 0 };
-        setPricing({
-          monthlyQuota: Number(localPricing.monthlyQuota) || 0,
-          membershipCard: Number(localPricing.membershipCard) || 0,
-        });
+        setPricingMap(allPricing);
 
         if (dashboard?.stats?.lateMonths !== undefined) {
           setLateMonths(dashboard.stats.lateMonths);
         }
 
+        // 🔥 AJOUT : devise de l'antenne du membre connecté, pour le cas
+        // "Pour moi-même" — dérivée de antennaBalances (déjà renvoyé par le
+        // dashboard) plutôt que d'un nouvel appel réseau.
+        const myAntennaId = (dashboard?.me as { antennaId?: string | null } | undefined)?.antennaId;
+        const myAntennaBalance = dashboard?.antennaBalances?.find((a) => a.id === myAntennaId);
+        if (myAntennaBalance?.currency) {
+          setSelfCurrency(myAntennaBalance.currency);
+        }
       } catch (error) {
         console.error('Erreur récupération infos:', error);
       } finally {
@@ -81,7 +79,7 @@ export default function MemberNewContributionPage() {
     setErrorMsg(null);
 
     if (!values.currency) {
-      setErrorMsg("Veuillez sélectionner une devise.");
+      setErrorMsg("Devise introuvable pour ce versement. Réessayez ou contactez votre administrateur.");
       setIsSubmitting(false);
       return;
     }
@@ -89,7 +87,7 @@ export default function MemberNewContributionPage() {
     try {
       await api.createContributionMember({
         amount: values.amount,
-        currency: values.currency as 'GNF' | 'EUR' | 'USD' | 'XOF',
+        currency: values.currency as 'GNF' | 'EUR' | 'USD' | 'XOF' | 'GBP' | 'CAD' | 'CHF',
         method: values.method,
         depositedAt: values.depositedAt,
         note: values.note,
@@ -326,7 +324,8 @@ export default function MemberNewContributionPage() {
                   <ContributionCreateForm
                     onSubmit={handleSubmit}
                     isSubmitting={isSubmitting}
-                    pricing={pricing}
+                    pricingMap={pricingMap}
+                    selfCurrency={selfCurrency}
                     lateMonths={lateMonths}
                   />
                 </>

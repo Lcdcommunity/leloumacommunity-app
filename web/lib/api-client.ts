@@ -712,9 +712,16 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     ),
 
   searchMembers: (q: string) =>
-    http<Array<{ id: string; firstName: string; lastName: string; email: string; phone?: string | null }>>(
-      `/member/search-users?q=${encodeURIComponent(q)}`
-    ),
+    http<Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      phone?: string | null;
+      antennaId?: string | null;
+      antennaName?: string | null;
+      currency?: string | null;
+    }>>(`/member/search-users?q=${encodeURIComponent(q)}`),
 
   approveMemberAccount: (userId: string) =>
     http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),

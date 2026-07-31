@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as express from 'express';
 import cookieParser = require('cookie-parser');
 import { AppModule } from './app.module';
+import { PrismaService } from './prisma/prisma.service';
 
 // VAPID (push notifications)
 import { configureVapid } from './config/vapid.config';
@@ -50,7 +51,39 @@ function getAllowedOrigins(): string[] {
   ]);
 }
 
-function isAllowedOrigin(origin: string | undefined, allowed: string[]): boolean {
+// 🔥 Cache mémoire des domaines personnalisés vérifiés en base — évite de
+// taper Prisma à chaque requête CORS, tout en laissant un nouveau domaine
+// provisionné devenir valide en moins d'une minute (pas besoin de redéployer).
+const customDomainCache = new Map<string, { valid: boolean; expiresAt: number }>();
+const CUSTOM_DOMAIN_CACHE_TTL_MS = 60_000;
+
+async function isCustomDomainRegistered(
+  hostname: string,
+  prisma: PrismaService,
+): Promise<boolean> {
+  const cached = customDomainCache.get(hostname);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.valid;
+  }
+
+  const association = await prisma.association.findFirst({
+    where: { domainName: hostname, isActive: true },
+    select: { id: true },
+  });
+
+  const valid = !!association;
+  customDomainCache.set(hostname, {
+    valid,
+    expiresAt: Date.now() + CUSTOM_DOMAIN_CACHE_TTL_MS,
+  });
+  return valid;
+}
+
+async function isAllowedOrigin(
+  origin: string | undefined,
+  allowed: string[],
+  prisma: PrismaService,
+): Promise<boolean> {
   if (!origin) return true;
 
   const clean = origin.replace(/\/+$/, '');
@@ -69,10 +102,13 @@ function isAllowedOrigin(origin: string | undefined, allowed: string[]): boolean
   if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
   if (hostname.endsWith('.vercel.app')) return true;
 
-  // 🔥 domaine prod
+  // 🔥 domaine prod historique
   if (hostname.endsWith('leloumacommunity.com')) return true;
 
-  return false;
+  // 🔥 domaines personnalisés des clients (ex: ajvk.site) — vérifiés en
+  // base plutôt que dans une liste statique, sinon chaque nouveau domaine
+  // provisionné casse le CORS tant qu'on n'a pas redéployé.
+  return isCustomDomainRegistered(hostname, prisma);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -80,6 +116,8 @@ function isAllowedOrigin(origin: string | undefined, allowed: string[]): boolean
 // ─────────────────────────────────────────────────────────────
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { cors: false });
+
+  const prisma = app.get(PrismaService);
 
   // VAPID
   const vapidEnabled = configureVapid();
@@ -98,18 +136,23 @@ async function bootstrap() {
   console.log('🌍 CORS ORIGINS:', allowedOrigins);
 
   // ─────────────────────────────────────────────────────────────
-  // ✅ CORS CONFIG FINAL (FIX COMPLET)
+  // ✅ CORS CONFIG FINAL (domaines personnalisés vérifiés dynamiquement)
   // ─────────────────────────────────────────────────────────────
   app.enableCors({
     origin: (origin, callback) => {
-      const ok = isAllowedOrigin(origin, allowedOrigins);
-
-      if (ok) {
-        callback(null, true);
-      } else {
-        console.error('❌ CORS BLOCKED:', origin);
-        callback(null, false);
-      }
+      isAllowedOrigin(origin, allowedOrigins, prisma)
+        .then((ok) => {
+          if (ok) {
+            callback(null, true);
+          } else {
+            console.error('❌ CORS BLOCKED:', origin);
+            callback(null, false);
+          }
+        })
+        .catch((err) => {
+          console.error('❌ CORS CHECK ERROR:', err);
+          callback(null, false);
+        });
     },
     credentials: true,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
@@ -118,23 +161,10 @@ async function bootstrap() {
       'Accept',
       'Authorization',
       'x-tenant-id',
-      'x-tenant-domain', // ✅ FIX CRITIQUE
+      'x-tenant-domain',
     ],
     exposedHeaders: ['set-cookie'],
     optionsSuccessStatus: 204,
-  });
-
-  // ─────────────────────────────────────────────────────────────
-  // ✅ FORCE PREFLIGHT HANDLING (ANTI BUG NAVIGATEUR)
-  // ─────────────────────────────────────────────────────────────
-  const server = app.getHttpAdapter().getInstance();
-
-  server.options('*', (req, res) => {
-    res.header(
-      'Access-Control-Allow-Headers',
-      'Content-Type, Accept, Authorization, x-tenant-id, x-tenant-domain',
-    );
-    res.sendStatus(204);
   });
 
   // ─────────────────────────────────────────────────────────────
@@ -148,6 +178,8 @@ async function bootstrap() {
       transformOptions: { enableImplicitConversion: true },
     }),
   );
+
+  const server = app.getHttpAdapter().getInstance();
 
   // Proxy (Render / Vercel / Nginx)
   server.set('trust proxy', 1);

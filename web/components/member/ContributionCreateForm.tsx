@@ -4,7 +4,7 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/api-client';
 
-type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | '';
+type SupportedCurrency = 'GNF' | 'EUR' | 'USD' | 'XOF' | 'GBP' | 'CAD' | 'CHF' | '';
 
 export interface SearchMemberResult {
   id: string;
@@ -12,6 +12,9 @@ export interface SearchMemberResult {
   lastName: string;
   email: string;
   phone?: string | null;
+  antennaId?: string | null;
+  antennaName?: string | null;
+  currency?: string | null;
 }
 
 interface ContributionValues {
@@ -30,7 +33,8 @@ interface Props {
   onSubmit: (values: ContributionValues) => Promise<void>;
   isSubmitting?: boolean;
   defaultPurpose?: string;
-  pricing?: { monthlyQuota: number; membershipCard: number };
+  pricingMap?: Record<string, { monthlyQuota: number; membershipCard: number }>;
+  selfCurrency?: string;
   lateMonths?: number;
 }
 
@@ -96,6 +100,9 @@ function getCurrencyMeta(currency: SupportedCurrency) {
     case 'XOF': return { prefix: 'F CFA', label: 'Franc CFA (XOF)' };
     case 'USD': return { prefix: '$', label: 'Dollar américain (USD)' };
     case 'EUR': return { prefix: '€', label: 'Euro (EUR)' };
+    case 'GBP': return { prefix: '£', label: 'Livre sterling (GBP)' };
+    case 'CHF': return { prefix: 'CHF', label: 'Franc suisse (CHF)' };
+    case 'CAD': return { prefix: 'CA$', label: 'Dollar canadien (CAD)' };
     default: return { prefix: '', label: 'Devise' };
   }
 }
@@ -269,8 +276,6 @@ function MonthYearPicker({ month, year, onChange }: MonthYearPickerProps) {
   );
 }
 
-// ── Types for api responses ───────────────────────────────────────────────────
-
 // ─── Celebration Overlay ─────────────────────────────────────────────────────
 
 interface CelebrationConfig {
@@ -341,10 +346,6 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
   const [visible, setVisible] = React.useState(false);
   const [closing, setClosing] = React.useState(false);
 
-  // 🔥 CORRECTION ESLint (react-hooks/immutability) : handleClose est
-  // désormais déclaré AVANT l'effect qui l'utilise (au lieu d'après), et
-  // stabilisé via useCallback pour pouvoir figurer proprement dans les deps
-  // de l'effect ci-dessous, sans avoir besoin d'un eslint-disable.
   const handleClose = React.useCallback(() => {
     setClosing(true);
     setTimeout(() => onClose(), 400);
@@ -362,8 +363,6 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
       shape: (['circle', 'rect', 'triangle'] as const)[Math.floor(Math.random() * 3)],
       delay: Math.random() * 0.8,
     }));
-    // 🔥 CORRECTION ESLint (react-hooks/set-state-in-effect) : setState différé
-    // d'un micro-tick au lieu d'être appelé de façon synchrone dans l'effect.
     queueMicrotask(() => setParticles(generated));
     const t = setTimeout(() => setVisible(true), 80);
     const t2 = setTimeout(() => handleClose(), 5200);
@@ -494,11 +493,10 @@ export function ContributionCreateForm({
   onSubmit,
   isSubmitting,
   defaultPurpose,
-  pricing,
+  pricingMap,
+  selfCurrency,
   lateMonths: lateMonthsProp,
 }: Props) {
-
-  const [selectedCurrency, setSelectedCurrency] = useState<SupportedCurrency>('');
 
   // Tiers payment
   const [paymentTarget, setPaymentTarget] = useState<'ME' | 'OTHER'>('ME');
@@ -506,6 +504,19 @@ export function ContributionCreateForm({
   const [searchResults, setSearchResults] = useState<SearchMemberResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedMember, setSelectedMember] = useState<SearchMemberResult | null>(null);
+
+  // 🔥 CORRECTION : la devise n'est plus un choix libre (select) — elle est
+  // dérivée automatiquement de l'antenne du BÉNÉFICIAIRE du versement :
+  // l'antenne du membre connecté si "Pour moi-même", l'antenne du membre
+  // trouvé (renvoyée par searchMembers) si "Pour un autre membre" — même si
+  // le payeur lui-même est dans une autre antenne/devise.
+  const selectedCurrency: SupportedCurrency = useMemo(() => {
+    if (paymentTarget === 'ME') return (selfCurrency as SupportedCurrency) || '';
+    if (paymentTarget === 'OTHER' && selectedMember?.currency) {
+      return selectedMember.currency as SupportedCurrency;
+    }
+    return '';
+  }, [paymentTarget, selfCurrency, selectedMember]);
 
   // Month reference
   const now = new Date();
@@ -562,16 +573,14 @@ export function ContributionCreateForm({
   const currencyMeta = useMemo(() => getCurrencyMeta(selectedCurrency), [selectedCurrency]);
 
   // ── Pricing for the selected currency ─────────────────────────────────────
+  // 🔥 CORRECTION : suit désormais la devise réellement détectée (via la map
+  // complète devise → tarifs), au lieu d'être figée une fois pour toutes par
+  // le parent sur EUR par défaut peu importe la devise réelle du versement.
   const currentPricing = useMemo(() => {
-    return pricing ?? { monthlyQuota: 0, membershipCard: 0 };
-  }, [pricing]);
+    if (!selectedCurrency) return { monthlyQuota: 0, membershipCard: 0 };
+    return pricingMap?.[selectedCurrency] ?? { monthlyQuota: 0, membershipCard: 0 };
+  }, [pricingMap, selectedCurrency]);
 
-  // 🔥 CORRECTION ESLint (react-hooks/immutability) : ce bloc était plus bas
-  // (après handlePurposeSelect). L'effet "Excess choice" ci-dessous lit
-  // amountNum et monthlyPrice — ces valeurs doivent être déclarées avant
-  // d'être référencées dans le corps du composant, même si cela fonctionnait
-  // déjà correctement à l'exécution grâce aux closures de useEffect. Le
-  // calcul lui-même est strictement inchangé.
   // ── Amount derived data ────────────────────────────────────────────────────
   const amountNum = Number(values.amount);
   const monthlyPrice = currentPricing.monthlyQuota;
@@ -582,27 +591,36 @@ export function ContributionCreateForm({
   const showAdvanceNotice = isQuota && monthlyPrice > 0 && amountNum > monthlyPrice;
   const monthsCovered = monthlyPrice > 0 && amountNum > 0 ? Math.floor(amountNum / monthlyPrice) : 0;
 
+  // 🔥 AJOUT : re-synchronise le montant "carte membre" quand la devise
+  // détectée change (ex. on bascule vers un membre tiers dont l'antenne a
+  // une devise différente) — remplace l'ancien handleCurrencyChange qui
+  // faisait ça manuellement au onChange du select supprimé.
+  useEffect(() => {
+    if (values.purpose !== 'MEMBERSHIP_CARD' || cardPrice <= 0) return;
+    const timerId = setTimeout(() => {
+      setValues(prev => ({ ...prev, amount: cardPrice.toString() }));
+    }, 0);
+    return () => clearTimeout(timerId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCurrency, cardPrice]);
+
   // ── Check if user has late months on mount ─────────────────────────────────
   useEffect(() => {
-    // Priorité à la prop fournie par le parent (dashboard) — valeur fiable du backend
     if (lateMonthsProp !== undefined) {
-      // 🔥 CORRECTION ESLint (react-hooks/set-state-in-effect) : setState différé
-      // via setTimeout(…, 0) au lieu d'être appelé de façon synchrone dans l'effect.
       const timerId = setTimeout(() => setHasLateMonths(lateMonthsProp > 0), 0);
       return () => clearTimeout(timerId);
     }
 
-    // Fallback si la prop n'est pas fournie : appel dashboard
     let mounted = true;
 
     type DashboardResult = { stats?: { lateMonths?: number } };
 
     async function checkLate() {
       try {
-        const apiAny = api as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>;
-        const res = typeof apiAny['getMemberDashboard'] === 'function'
-          ? (await apiAny['getMemberDashboard']()) as DashboardResult
-          : null;
+        // 🔥 CORRECTION : `getMemberDashboard` n'existe pas sur `api` —
+        // la vraie méthode s'appelle `dashboardMember`. Cet appel échouait
+        // donc toujours en silence auparavant (catch → true par défaut).
+        const res = (await api.dashboardMember()) as DashboardResult;
 
         if (!mounted) return;
 
@@ -644,17 +662,12 @@ export function ContributionCreateForm({
   useEffect(() => {
     if (!pendingSubmitAfterExcess || excessChoice === null) return;
 
-    // 🔥 CORRECTION ESLint (react-hooks/set-state-in-effect) : tout le
-    // traitement (y compris les setState) est déplacé dans un timer différé
-    // au lieu d'être exécuté de façon synchrone dans le corps de l'effect.
-    // Comportement final identique, juste non-synchrone par rapport au rendu.
     const timerId = setTimeout(() => {
       setPendingSubmitAfterExcess(false);
 
       const purposeSnapshot = values.purpose;
 
       if (excessChoice === 'anticipate') {
-        // Soumettre normalement — le backend découpe sur plusieurs années
         const payload: ContributionValues = {
           amount: amountNum,
           currency: selectedCurrency,
@@ -670,7 +683,6 @@ export function ContributionCreateForm({
         setPendingPayload(payload);
         setShowCelebration(true);
       } else {
-        // Soumettre cotisations année en cours + don pour l'excédent
         const monthsInStartYear = 12 - refMonth + 1;
         const quotaAmount = monthsInStartYear * monthlyPrice;
         const donationAmount = amountNum - quotaAmount;
@@ -794,14 +806,6 @@ export function ContributionCreateForm({
 
   const isMembershipCardPriceLocked = isMembershipCard && cardPrice > 0 && !!selectedCurrency;
 
-  // ── Handle currency change ─────────────────────────────────────────────────
-  const handleCurrencyChange = useCallback((currency: SupportedCurrency) => {
-    setSelectedCurrency(currency);
-    if (values.purpose === 'MEMBERSHIP_CARD' && cardPrice > 0) {
-      setValues(prev => ({ ...prev, amount: cardPrice.toString() }));
-    }
-  }, [values.purpose, cardPrice]);
-
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -890,7 +894,7 @@ export function ContributionCreateForm({
     ? (currencyMeta.prefix.length > 2 ? '4.2rem' : '2.5rem')
     : '1rem';
 
-  const isSubmitDisabled = isSubmitting || (paymentTarget === 'OTHER' && !selectedMember);
+  const isSubmitDisabled = isSubmitting || (paymentTarget === 'OTHER' && !selectedMember) || !selectedCurrency;
 
   return (
     <>
@@ -978,15 +982,6 @@ export function ContributionCreateForm({
         .ccf-input:focus { border-color: #059669; background: white; box-shadow: 0 0 0 3px rgba(5,150,105,0.15); }
         .ccf-input::placeholder { color: rgba(107,114,128,0.45); font-weight: 500; }
         .ccf-input:disabled { background: #F3F4F6; color: #6B7280; cursor: not-allowed; border-color: rgba(0,0,0,0.08); }
-
-        .ccf-select {
-          cursor: pointer;
-          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 7L11 1' stroke='%23059669' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 1rem center;
-          padding-right: 2.5rem;
-          appearance: none;
-        }
 
         .ccf-row-montant-devise {
           display: grid;
@@ -1152,6 +1147,11 @@ export function ContributionCreateForm({
                   <div>
                     <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#065F46' }}>{selectedMember.firstName} {selectedMember.lastName}</div>
                     <div style={{ fontSize: '0.7rem', color: '#047857' }}>{selectedMember.email || selectedMember.phone}</div>
+                    {selectedMember.antennaName && (
+                      <div style={{ fontSize: '0.68rem', color: '#059669', marginTop: '0.15rem' }}>
+                        Antenne {selectedMember.antennaName}{selectedMember.currency ? ` · devise ${selectedMember.currency}` : ''}
+                      </div>
+                    )}
                   </div>
                   <button type="button" onClick={() => { setSelectedMember(null); setSearchQuery(''); setSearchResults([]); }} style={{ background: 'white', border: '1px solid #A7F3D0', padding: '0.4rem 0.7rem', borderRadius: '8px', fontSize: '0.7rem', fontWeight: 700, color: '#059669', cursor: 'pointer' }}>
                     Changer
@@ -1171,7 +1171,9 @@ export function ContributionCreateForm({
                       {visibleResults.map(m => (
                         <div key={m.id} className="ccf-search-item" onClick={() => setSelectedMember(m)}>
                           <span className="ccf-search-name">{m.firstName} {m.lastName}</span>
-                          <span className="ccf-search-meta">{[m.email, m.phone].filter(Boolean).join(' • ')}</span>
+                          <span className="ccf-search-meta">
+                            {[m.antennaName, m.email, m.phone].filter(Boolean).join(' • ')}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -1284,18 +1286,33 @@ export function ContributionCreateForm({
 
           <div className="ccf-field">
             <span className="ccf-label">Devise</span>
-            <select
-              className="ccf-input ccf-select"
-              value={selectedCurrency}
-              required
-              onChange={(e) => handleCurrencyChange(e.target.value as SupportedCurrency)}
-            >
-              <option value="" disabled>Choisir…</option>
-              <option value="EUR">Euro (EUR)</option>
-              <option value="GNF">Franc guinéen (GNF)</option>
-              <option value="USD">Dollar (USD)</option>
-              <option value="XOF">Franc CFA (XOF)</option>
-            </select>
+            {/* 🔥 CORRECTION : sélecteur retiré — la devise est automatique,
+                dérivée de l'antenne du bénéficiaire du versement. */}
+            {selectedCurrency ? (
+              <div className="ccf-price-lock">
+                <div className="ccf-price-lock-icon">
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: '1rem', fontFamily: "'Cormorant Garamond', serif", fontWeight: 700, color: '#065F46' }}>
+                    {currencyMeta.label}
+                  </div>
+                  <div style={{ fontSize: '0.65rem', color: '#059669', marginTop: '0.1rem' }}>
+                    {paymentTarget === 'OTHER' && selectedMember?.antennaName
+                      ? `Antenne ${selectedMember.antennaName}`
+                      : 'Déterminée par votre antenne'}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="ccf-input" style={{ display: 'flex', alignItems: 'center', color: '#9CA3AF', fontWeight: 500 }}>
+                {paymentTarget === 'OTHER'
+                  ? 'Sélectionnez un membre pour déterminer la devise'
+                  : 'Devise indisponible — contactez votre administrateur'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1425,21 +1442,17 @@ export function ContributionCreateForm({
         </button>
       </form>
 
-      {/* 🎉 Célébration post-soumission */}
-      {showCelebration && (
+      {showCelebration && pendingPayload && (
         <CelebrationOverlay
           purpose={celebrationPurpose}
-          onClose={() => {
+          onClose={async () => {
             setShowCelebration(false);
-            if (pendingPayload) {
-              void onSubmit(pendingPayload).then(() => {
-                if (pendingDonationRef.current) {
-                  void onSubmit(pendingDonationRef.current);
-                  pendingDonationRef.current = null;
-                }
-              });
-              setPendingPayload(null);
+            await onSubmit(pendingPayload);
+            if (pendingDonationRef.current) {
+              await onSubmit(pendingDonationRef.current);
+              pendingDonationRef.current = null;
             }
+            setPendingPayload(null);
           }}
         />
       )}

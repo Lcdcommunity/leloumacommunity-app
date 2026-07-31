@@ -55,14 +55,11 @@ function buildCoveredMonths(
   for (const c of contributions) {
     const amt = c.amount != null ? Number(c.amount) : 0;
 
-    // Nombre de mois couverts — calculé avant le branchement,
-    // s'applique dans les deux cas (avec ou sans monthReference).
     const numMonths =
       monthlyPrice > 0 && amt > 0
         ? Math.min(48, Math.max(1, Math.floor(amt / monthlyPrice)))
         : 1;
 
-    // Point de départ : monthReference si renseigné, sinon mois du paiement.
     let m: number;
     let y: number;
 
@@ -75,7 +72,6 @@ function buildCoveredMonths(
       y = d.getFullYear();
     }
 
-    // Peupler N mois consécutifs à partir du point de départ.
     for (let i = 0; i < numMonths; i++) {
       covered.add(`${y}-${String(m).padStart(2, '0')}`);
       m++;
@@ -87,8 +83,6 @@ function buildCoveredMonths(
 }
 
 // ─── Helper 2 : calcule les mois de retard ────────────────────────────────────
-// Ne compte QUE les mois passés (le mois courant est toujours exclu).
-// Accepte un Set<string> pré-construit par buildCoveredMonths.
 function computeLateMonths(
   coveredMonths: Set<string>,
   joinDate: Date,
@@ -99,7 +93,6 @@ function computeLateMonths(
   const currentMonth = now.getMonth() + 1;
 
   let lateMonths = 0;
-  // Départ au mois PRÉCÉDENT : le mois en cours n'est jamais considéré en retard.
   let checkMonth = currentMonth - 1;
   let checkYear = currentYear;
 
@@ -133,13 +126,6 @@ export class MemberService {
   ) {}
 
   // ─── getPricingMap ────────────────────────────────────────────────────────
-  // 🔥 CORRECTION : la tarification vit dans la table Pricing (celle que
-  // super-admin/settings écrit réellement via updatePricingSuperAdmin), pas
-  // dans AssociationSetting['PRICING_CONFIG'] — cette clé n'était jamais
-  // écrite nulle part, donc monthlyPrice valait toujours 0 partout ici, et
-  // un versement groupé/anticipé ne comptait que pour 1 seul mois couvert.
-  // Un seul point de lecture désormais, réutilisé par getDashboard,
-  // createContribution, listLateMembers et getPricing.
   private async getPricingMap(
     associationId: string,
   ): Promise<Record<string, { monthlyQuota: number; membershipCard: number }>> {
@@ -201,20 +187,10 @@ export class MemberService {
   }
 
   // ─── getDashboard ─────────────────────────────────────────────────────────
-  // ╔═══════════════════════════════════════════════════════════════════════╗
-  // ║  CORRECTION BUG PAIEMENTS GROUPÉS                                    ║
-  // ║                                                                       ║
-  // ║  buildCoveredMonths éclate virtuellement un paiement groupé           ║
-  // ║  (ex : 24 € / 2 € = 12 mois) pour que computeLateMonths retrouve     ║
-  // ║  les bons mois couverts, sans toucher aux données existantes en BDD.  ║
-  // ║                                                                       ║
-  // ║  currentMonthCovered est dérivé du même Set → cohérence garantie.    ║
-  // ╚═══════════════════════════════════════════════════════════════════════╝
 
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
 
-    // Référence temporelle calculée une seule fois pour la cohérence de tous les checks.
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
@@ -226,9 +202,7 @@ export class MemberService {
       allAntennas,
       myRegularContributions,
       lastContribution,
-      // ── FLAG : carte membre VALIDÉE pour l'année en cours ? ───────────────
       currentYearCard,
-      // ── PRICING : nécessaire pour buildCoveredMonths ──────────────────────
       allPricing,
     ] = await Promise.all([
       this.prisma.contribution.aggregate({
@@ -260,8 +234,6 @@ export class MemberService {
         where: { associationId: me.associationId, isActive: true },
         select: { id: true, name: true, defaultCurrency: true },
       }),
-      // Toutes les cotisations VALIDATED REGULAR/LATE.
-      // amount est nécessaire pour détecter les paiements groupés dans buildCoveredMonths.
       this.prisma.contribution.findMany({
         where: {
           associationId: me.associationId,
@@ -279,7 +251,6 @@ export class MemberService {
           amount: true,
         },
       }),
-      // Dernière contribution VALIDATED toutes purposes confondues.
       this.prisma.contribution.findFirst({
         where: {
           associationId: me.associationId,
@@ -289,7 +260,6 @@ export class MemberService {
         orderBy: { validatedAt: 'desc' },
         select: { validatedAt: true, createdAt: true },
       }),
-      // Carte membre VALIDÉE pour l'année en cours.
       this.prisma.contribution.findFirst({
         where: {
           associationId: me.associationId,
@@ -300,12 +270,9 @@ export class MemberService {
         },
         select: { id: true },
       }),
-      // Tarification de l'association — pour déduire le nombre de mois
-      // couverts par un versement groupé.
       this.getPricingMap(me.associationId),
     ]);
 
-    // ── Prix mensuel du membre ────────────────────────────────────────────────
     const myAntenna  = allAntennas.find((a) => a.id === me.antennaId);
     const myCurrency = myAntenna?.defaultCurrency ?? 'EUR';
     const monthlyPrice =
@@ -313,7 +280,6 @@ export class MemberService {
       Number(allPricing['EUR']?.monthlyQuota)       ||
       0;
 
-    // ── Calcul retard & couverture du mois courant ────────────────────────────
     const coveredMonths   = buildCoveredMonths(myRegularContributions, monthlyPrice);
     const lateMonths      = computeLateMonths(coveredMonths, me.createdAt);
     const currentMonthKey = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
@@ -322,10 +288,6 @@ export class MemberService {
       ? (lastContribution.validatedAt ?? lastContribution.createdAt).toISOString()
       : null;
 
-    // après
-    // 🔥 CORRECTION : solde recalculé via LedgerService.getBalances (source
-    // unique de vérité, incluant les virements inter-antennes TRANSFER_IN /
-    // TRANSFER_OUT), au lieu de Contribution - Expense qui les ignorait.
     const antennaBalances = await Promise.all(
       allAntennas.map(async (ant) => {
         const currency = ant.defaultCurrency || 'EUR';
@@ -375,7 +337,6 @@ export class MemberService {
         activeProjects,
         lateMonths,
         myLastContributionAt,
-        // SOURCE DE VÉRITÉ pour le WelcomePopup — dérivés du même Set, cohérents.
         currentMonthCovered: coveredMonths.has(currentMonthKey),
         hasValidMembershipCard: !!currentYearCard,
       },
@@ -490,12 +451,21 @@ export class MemberService {
   }
 
   // ─── searchMembers ────────────────────────────────────────────────────────
+  // 🔥 AJOUT : renvoie désormais aussi la devise de l'antenne principale du
+  // membre trouvé (antenna.defaultCurrency, fallback sur la devise par
+  // défaut de l'association) — nécessaire pour que le frontend déduise
+  // automatiquement la devise du versement quand on paie pour un membre tiers.
 
   async searchMembers(userId: string, q: string) {
     const me = await this.getMeOrThrow(userId);
     if (!q || q.trim().length < 2) return [];
 
-    return this.prisma.user.findMany({
+    const association = await this.prisma.association.findUnique({
+      where: { id: me.associationId },
+      select: { defaultCurrency: true },
+    });
+
+    const users = await this.prisma.user.findMany({
       where: {
         associationId: me.associationId,
         role: 'MEMBER',
@@ -515,9 +485,34 @@ export class MemberService {
         lastName: true,
         email: true,
         phone: true,
+        memberships: {
+          where: { isPrimary: true, status: 'APPROVED' },
+          take: 1,
+          select: {
+            antenna: {
+              select: { id: true, name: true, defaultCurrency: true },
+            },
+          },
+        },
       },
     });
+
+    return users.map((u) => {
+      const antenna = u.memberships[0]?.antenna;
+      return {
+        id: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        email: u.email,
+        phone: u.phone,
+        antennaId: antenna?.id ?? null,
+        antennaName: antenna?.name ?? null,
+        currency: antenna?.defaultCurrency ?? association?.defaultCurrency ?? 'EUR',
+      };
+    });
   }
+
+  // ─── createContribution ───────────────────────────────────────────────────
 
   // ─── createContribution ───────────────────────────────────────────────────
 
@@ -553,8 +548,30 @@ export class MemberService {
       if (primaryMembership?.antennaId) finalAntennaId = primaryMembership.antennaId;
     }
 
-    const allPricing = await this.getPricingMap(me.associationId);
-    const resolvedCurrency = dto.currency || 'EUR';
+    // 🔥 VERROU SÉCURITÉ : la devise n'est plus acceptée depuis dto.currency —
+    // recalculée ici à partir de l'antenne réelle du bénéficiaire
+    // (finalAntennaId), repli sur la devise par défaut de l'association puis
+    // EUR. Un client ne peut donc plus faire persister une devise qui ne
+    // correspond pas à l'antenne réelle du versement, même en modifiant la
+    // requête à la main. dto.currency reste accepté (le front peut continuer
+    // à l'envoyer) mais n'est plus utilisé pour déterminer la devise
+    // réellement enregistrée — écrasé silencieusement, pas de rejet, pour
+    // ne jamais bloquer un dépôt légitime sur un désaccord de devise.
+    const [association, finalAntenna, allPricing] = await Promise.all([
+      this.prisma.association.findUnique({
+        where: { id: me.associationId },
+        select: { defaultCurrency: true },
+      }),
+      this.prisma.antenna.findUnique({
+        where: { id: finalAntennaId },
+        select: { defaultCurrency: true },
+      }),
+      this.getPricingMap(me.associationId),
+    ]);
+
+    const resolvedCurrency: CurrencyCode =
+      finalAntenna?.defaultCurrency ?? association?.defaultCurrency ?? CurrencyCode.EUR;
+
     const localPricing = allPricing[resolvedCurrency] || {
       monthlyQuota: 0,
       membershipCard: 0,
@@ -824,7 +841,6 @@ export class MemberService {
     const pageSize = query.pageSize ?? 50;
     const thresholdMonths = 3;
 
-    // Récupération des memberships et de la tarification en parallèle.
     const [memberships, allPricingLate] = await Promise.all([
       this.prisma.membership.findMany({
         where: {
