@@ -2,6 +2,7 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/services/mail.service';
+import { VercelProvider } from '../../domain-provisioning/providers/vercel.provider';
 import { normalizeDomain } from '../../common/utils/domain.util';
 import * as bcrypt from 'bcryptjs';
 import { UserRole, UserStatus } from '@prisma/client';
@@ -24,22 +25,20 @@ export interface CreateAssociationPayload {
   city?: string;
 }
 
-// 🔥 AJOUT : payload de mise à jour des réglages plateforme (singleton).
 export interface UpdatePlatformSettingsPayload {
   platformName?: string;
   contactEmail?: string;
   maintenanceMode?: boolean;
 }
 
-// Id fixe du seul et unique enregistrement PlatformSetting — évite d'avoir
-// à gérer une liste alors qu'il n'y a jamais qu'une seule ligne possible.
 const PLATFORM_SETTINGS_ID = 'singleton';
 
 @Injectable()
 export class SystemAdminService {
   constructor(
     private prisma: PrismaService,
-    private mailService: MailService
+    private mailService: MailService,
+    private vercel: VercelProvider,
   ) {}
 
   async createAssociationWithSuperAdmin(data: CreateAssociationPayload) {
@@ -93,8 +92,6 @@ export class SystemAdminService {
       return { association, superAdmin };
     });
 
-    // Non-bloquant : l'association et le compte existent déjà à ce stade.
-    // Un échec d'envoi ne doit pas ressembler à un échec de création.
     try {
       await this.mailService.sendSuperAdminWelcome({
         to: result.superAdmin.email,
@@ -154,9 +151,6 @@ export class SystemAdminService {
     const assoc = await this.prisma.association.findUnique({ where: { id } });
     if (!assoc) throw new NotFoundException('Association introuvable.');
 
-    // Normalisation AVANT le contrôle de doublon (et réutilisée pour l'écriture) :
-    // sinon un code qui ne diffère que par la casse/les espaces passe le test
-    // puis plante sur la contrainte @unique une fois normalisé.
     let normalizedCode: string | undefined;
     if (data.code) {
       normalizedCode = data.code.toUpperCase().replace(/\s/g, '');
@@ -219,21 +213,27 @@ export class SystemAdminService {
     }));
   }
 
+  // 🔥 CORRECTION : détache le domaine Vercel avant de supprimer l'association,
+  // sinon il reste "accroché" au projet et bloque toute réutilisation future
+  // de ce domaine (Vercel renvoie 400 ou 409 "domain_already_in_use").
+  // Non-bloquant : un échec Vercel ne doit pas empêcher la suppression en base.
   async deleteAssociation(id: string) {
     const association = await this.prisma.association.findUnique({ where: { id } });
     if (!association) throw new NotFoundException('Association introuvable.');
+
+    if (association.domainName) {
+      try {
+        await this.vercel.removeDomain(association.domainName);
+        await this.vercel.removeDomain(`www.${association.domainName}`);
+      } catch (err) {
+        console.error(`Échec du détachement du domaine Vercel ${association.domainName}`, err);
+      }
+    }
 
     await this.prisma.association.delete({ where: { id } });
 
     return { message: `L'association ${association.name} a été détruite définitivement.` };
   }
-
-  // ╔═══════════════════════════════════════════════════════════════════╗
-  // ║  🔥 AJOUT : Réglages plateforme (nom, email de contact, maintenance) ║
-  // ║  Ligne unique (id fixe 'singleton'), créée à la demande via upsert. ║
-  // ║  ⚠️ maintenanceMode est stocké mais n'est PAS encore appliqué        ║
-  // ║  ailleurs dans l'app (aucun guard ne bloque l'accès pour l'instant) ║
-  // ╚═══════════════════════════════════════════════════════════════════╝
 
   async getPlatformSettings() {
     const settings = await this.prisma.platformSetting.upsert({

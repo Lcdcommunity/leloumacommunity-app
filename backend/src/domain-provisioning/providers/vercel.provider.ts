@@ -1,5 +1,5 @@
 // backend/src/domain-provisioning/providers/vercel.provider.ts
-// v2.0
+// v2.1 — + removeDomain(), addDomain() gère aussi le 409 "domain_already_in_use"
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 
 const VERCEL_API = 'https://api.vercel.com';
@@ -34,9 +34,23 @@ export class VercelProvider {
       method: 'POST',
       body: JSON.stringify({ name: domain }),
     }).catch((err) => {
-      // 400 = le domaine est déjà attaché à ce projet : idempotent, on l'ignore.
-      if ((err as { vercelStatus?: number })?.vercelStatus === 400) {
+      const status = (err as { vercelStatus?: number })?.vercelStatus;
+      // 400/409 = le domaine est déjà attaché à CE projet : idempotent, on l'ignore.
+      if (status === 400 || status === 409) {
         return this.getDomainStatus(domain);
+      }
+      throw err;
+    });
+  }
+
+  /** Détache un domaine du projet Vercel — appelé quand une association est supprimée. */
+  removeDomain(domain: string) {
+    return this.vercelFetch(`/v9/projects/${process.env.VERCEL_PROJECT_ID}/domains/${domain}`, {
+      method: 'DELETE',
+    }).catch((err) => {
+      // 404 = déjà absent du projet : idempotent, on l'ignore.
+      if ((err as { vercelStatus?: number })?.vercelStatus === 404) {
+        return null;
       }
       throw err;
     });
