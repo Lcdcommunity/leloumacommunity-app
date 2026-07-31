@@ -1,17 +1,197 @@
 // web/app/(protected)/system-admin/profile/page.tsx
 'use client';
 
-import React, { useEffect, useState, type FormEvent } from 'react';
+import React, { useEffect, useState, useCallback, type FormEvent } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
-import { api } from '../../../../lib/api-client';
+import { api, type FullUserProfile } from '../../../../lib/api-client';
 import { formatDate } from '../../../../lib/format';
-import type { CurrentUser } from '../../../../types/user';
 
-// On étend le type CurrentUser pour inclure les nouveaux champs sans utiliser 'any'
-interface ProfileUser extends CurrentUser {
-  address?: string;
-  postalCode?: string;
-}
+// On utilise directement FullUserProfile (renvoyé par /users/me), qui contient
+// déjà addressLine1 / addressLine2 / postalCode / city / country / phone.
+type ProfileUser = FullUserProfile;
+
+// ─────────────────────────────────────────────────────────────────────────
+// Icônes : déclarées HORS du composant pour éviter l'erreur ESLint
+// react-hooks/static-components (composants recréés à chaque render).
+// ─────────────────────────────────────────────────────────────────────────
+const IconUser = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
+const IconMail = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>;
+const IconPhone = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
+const IconMap = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+  :root {
+    --bg: #F8FAFC;
+    --surface: #FFFFFF;
+    --surface-2: #F1F5F9;
+    --border: rgba(15, 23, 42, 0.08);
+    --border-hover: rgba(139, 92, 246, 0.4);
+    --accent: #8B5CF6;
+    --accent-glow: rgba(139, 92, 246, 0.15);
+    --text-1: #0F172A;
+    --text-2: #334155;
+    --text-3: #64748B;
+    --green: #059669;
+    --red: #DC2626;
+    
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 8px 16px -4px rgba(0,0,0,0.05), 0 4px 8px -4px rgba(0,0,0,0.03);
+  }
+
+  .prof-wrap { 
+    font-family: 'Inter', sans-serif; 
+    padding: clamp(1rem, 3vw, 2rem); 
+    max-width: 1040px; 
+    margin: 0 auto; 
+    color: var(--text-1);
+    animation: profin 0.4s ease-out; 
+    padding-bottom: 6rem;
+  }
+
+  /* ─── HEADER ─── */
+  .prof-header { 
+    display: flex; justify-content: space-between; align-items: flex-end; 
+    margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; 
+  }
+  .prof-title { 
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 800; color: var(--text-1); 
+    letter-spacing: -0.03em; margin: 0 0 0.2rem 0; line-height: 1.1;
+  }
+  .prof-title span { 
+    background: linear-gradient(135deg, var(--accent), #C026D3);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .prof-subtitle { color: var(--text-3); font-weight: 500; margin: 0; font-size: 0.85rem; }
+
+  /* ─── ALERTS ─── */
+  .prof-alert {
+    padding: 0.8rem 1rem; border-radius: 12px; margin-bottom: 1.5rem; 
+    font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;
+  }
+  .prof-alert-success { background: #ECFDF5; color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
+  .prof-alert-error { background: #FEF2F2; color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+
+  /* ─── MAIN GRID ─── */
+  .prof-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+  @media (min-width: 900px) { .prof-grid { grid-template-columns: 320px 1fr; } }
+
+  .prof-card { 
+    background: var(--surface); border-radius: 20px; border: 1px solid var(--border); 
+    box-shadow: var(--shadow-sm); overflow: hidden; position: relative; 
+  }
+  
+  /* ─── SIDEBAR PREMIUM ─── */
+  .prof-cover {
+    height: 100px; width: 100%;
+    background: linear-gradient(135deg, var(--accent), #C026D3);
+    position: relative;
+  }
+  .prof-cover::after {
+    content: ''; position: absolute; inset: 0;
+    background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" opacity="0.1"><circle cx="2" cy="2" r="2" fill="white"/></svg>') repeat;
+  }
+  .prof-avatar-wrap {
+    display: flex; justify-content: center; margin-top: -45px; position: relative; z-index: 2;
+  }
+  .prof-avatar { 
+    width: 90px; height: 90px; border-radius: 24px; 
+    background: var(--surface); border: 4px solid var(--surface);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 2rem; color: var(--accent); font-weight: 800; 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .prof-side-content { padding: 1rem 1.5rem 1.5rem; text-align: center; }
+  .prof-name { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.25rem; font-weight: 800; margin-bottom: 0.2rem; }
+  .prof-role-badge { 
+    display: inline-block; padding: 0.35rem 0.8rem; background: var(--surface-2); color: var(--accent); 
+    border: 1px solid var(--border); border-radius: 100px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .prof-stats { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: left; }
+  .prof-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem; background: var(--surface-2); border-radius: 12px; }
+  .prof-stat-label { font-size: 0.65rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+  .prof-stat-val { font-size: 0.8rem; font-weight: 700; color: var(--text-1); }
+
+  /* ─── FORM CONTENT ─── */
+  .prof-main-pad { padding: 1.5rem; }
+  .prof-section-title { 
+    font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.05rem; font-weight: 800; 
+    margin: 0 0 1.5rem 0; display: flex; align-items: center; gap: 0.6rem; color: var(--text-1);
+  }
+
+  /* Lignes Flexbox forcées pour le responsive */
+  .gc-form-group { display: flex; flex-direction: column; gap: 1rem; }
+  
+  .gc-row { 
+    display: flex; gap: 0.75rem; width: 100%; 
+  }
+  .gc-col { 
+    flex: 1; display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; 
+  }
+
+  .prof-label { 
+    font-size: 0.65rem; font-weight: 700; color: var(--text-3); 
+    text-transform: uppercase; letter-spacing: 0.08em; padding-left: 0.2rem;
+    display: flex; align-items: center; gap: 0.3rem;
+  }
+  .prof-label svg { opacity: 0.6; }
+  
+  .prof-input-wrap { position: relative; }
+  .prof-input { 
+    font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--text-1); 
+    padding: 0.8rem 1rem; width: 100%; box-sizing: border-box;
+    background: var(--surface-2); border-radius: 10px; border: 1px solid transparent; 
+    outline: none; transition: all 0.2s;
+  }
+  .prof-input::placeholder { color: #94A3B8; font-weight: 500; }
+  .prof-input:focus { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+  .prof-input:disabled { color: var(--text-3); cursor: not-allowed; opacity: 0.8; }
+  .prof-input.editing { background: var(--surface); border: 1px solid var(--border); }
+  .prof-input.editing:hover { border-color: var(--border-hover); }
+
+  .prof-hint { font-size: 0.65rem; color: var(--text-3); margin-top: 0.25rem; margin-left: 0.2rem; }
+
+  /* ─── ACTIONS ─── */
+  .btn-edit-toggle { 
+    background: var(--surface); color: var(--text-1); border: 1px solid var(--border); 
+    padding: 0.5rem 1rem; border-radius: 10px; font-weight: 600; font-size: 0.8rem;
+    cursor: pointer; transition: all 0.2s; box-shadow: var(--shadow-sm);
+  }
+  .btn-edit-toggle:hover { background: var(--surface-2); }
+
+  .prof-footer-actions { 
+    margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem; 
+    padding-top: 1.5rem; border-top: 1px solid var(--border); 
+  }
+  .btn-save { 
+    background: linear-gradient(135deg, var(--accent), #C026D3); color: white; border: none; 
+    padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
+    cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px var(--accent-glow);
+  }
+  .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(139,92,246,0.3); }
+  .btn-save:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+  
+  .btn-cancel { 
+    background: transparent; color: var(--text-2); border: 1px solid var(--border); 
+    padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-cancel:hover { background: var(--surface-2); color: var(--text-1); }
+
+  /* ─── ID SYSTEM & SECU ─── */
+  .prof-system-id { margin-top: 1.5rem; text-align: center; font-size: 0.65rem; color: var(--text-3); }
+  .prof-system-id span { font-family: monospace; background: var(--surface-2); padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; color: var(--text-2); }
+
+  .prof-security-banner {
+    margin-top: 1.5rem; border-radius: 16px; background: linear-gradient(to right, var(--surface), #FDFBFF); 
+    padding: 1.25rem; border: 1px dashed var(--border-hover);
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+  }
+
+  @keyframes profin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+`;
 
 export default function SystemAdminProfile() {
   const [user, setUser] = useState<ProfileUser | null>(null);
@@ -27,30 +207,40 @@ export default function SystemAdminProfile() {
   const [phone, setPhone] = useState('');
   const [city, setCity] = useState('');
   const [country, setCountry] = useState('');
-  const [address, setAddress] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
   const [postalCode, setPostalCode] = useState('');
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = () => {
-    setLoading(true);
-    api.me()
-      .then((data) => {
-        const u = data as ProfileUser;
+  // Déclarée avec useCallback AVANT le useEffect qui l'utilise (fix
+  // react-hooks/immutability : sinon `loadProfile` est référencée avant
+  // d'être déclarée, et le useEffect ne suit pas ses mises à jour).
+  //
+  // 🔧 FIX react-hooks/set-state-in-effect : pas de setLoading(true) synchrone
+  // ici — `loading` vaut déjà `true` à l'initialisation du state (voir plus bas).
+  // Le premier appel exécuté de façon synchrone depuis le useEffect est donc
+  // api.getMyProfile(), qui se contente de démarrer la promesse ; tous les
+  // setState (setUser, setLoading(false), etc.) se produisent dans des
+  // callbacks asynchrones (.then/.catch/.finally), ce que la règle autorise.
+  const loadProfile = useCallback(() => {
+    // 🔧 FIX : /users/me (getMyProfile) renvoie addressLine1/postalCode/city/country,
+    // contrairement à /auth/me (api.me()) qui ne les contient pas forcément.
+    api.getMyProfile()
+      .then((u) => {
         setUser(u);
         setFirstName(u.firstName || '');
         setLastName(u.lastName || '');
         setPhone(u.phone || '');
         setCity(u.city || '');
         setCountry(u.country || '');
-        setAddress(u.address || '');
+        setAddressLine1(u.addressLine1 || '');
         setPostalCode(u.postalCode || '');
       })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
-  };
+  }, []);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const handleCancel = () => {
     if (user) {
@@ -59,7 +249,7 @@ export default function SystemAdminProfile() {
       setPhone(user.phone || '');
       setCity(user.city || '');
       setCountry(user.country || '');
-      setAddress(user.address || '');
+      setAddressLine1(user.addressLine1 || '');
       setPostalCode(user.postalCode || '');
     }
     setIsEditing(false);
@@ -72,23 +262,20 @@ export default function SystemAdminProfile() {
     setMsg(null);
 
     try {
-      // 🚨 TODO API: Remplacez le timeout par votre véritable appel API d'update.
-      // Exemple: await api.updateProfile({ firstName, lastName, phone, city, country, address, postalCode });
-      await new Promise(r => setTimeout(r, 800)); 
+      // 🔧 FIX : véritable appel API (PATCH /users/me) au lieu du mock setTimeout.
+      // On récupère la réponse du backend et on l'utilise comme source de vérité
+      // plutôt que de reconstruire l'objet localement.
+      const updated = await api.updateMyProfile({
+        firstName,
+        lastName,
+        phone,
+        city,
+        country,
+        addressLine1,
+        postalCode,
+      });
 
-      // On met à jour l'utilisateur localement pour refléter les changements à l'écran
-      // sans avoir à refaire un loadProfile() qui ramènerait les anciennes données de la BDD.
-      setUser(prev => prev ? { 
-        ...prev, 
-        firstName, 
-        lastName, 
-        phone, 
-        city, 
-        country, 
-        address, 
-        postalCode 
-      } as ProfileUser : null);
-
+      setUser(updated);
       setMsg({ type: 'success', text: 'Profil mis à jour avec succès !' });
       setIsEditing(false);
     } catch (err: unknown) {
@@ -98,186 +285,6 @@ export default function SystemAdminProfile() {
       setSaveLoading(false);
     }
   }
-
-  const CSS = `
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
-
-    :root {
-      --bg: #F8FAFC;
-      --surface: #FFFFFF;
-      --surface-2: #F1F5F9;
-      --border: rgba(15, 23, 42, 0.08);
-      --border-hover: rgba(139, 92, 246, 0.4);
-      --accent: #8B5CF6;
-      --accent-glow: rgba(139, 92, 246, 0.15);
-      --text-1: #0F172A;
-      --text-2: #334155;
-      --text-3: #64748B;
-      --green: #059669;
-      --red: #DC2626;
-      
-      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-md: 0 8px 16px -4px rgba(0,0,0,0.05), 0 4px 8px -4px rgba(0,0,0,0.03);
-    }
-
-    .prof-wrap { 
-      font-family: 'Inter', sans-serif; 
-      padding: clamp(1rem, 3vw, 2rem); 
-      max-width: 1040px; 
-      margin: 0 auto; 
-      color: var(--text-1);
-      animation: profin 0.4s ease-out; 
-      padding-bottom: 6rem;
-    }
-
-    /* ─── HEADER ─── */
-    .prof-header { 
-      display: flex; justify-content: space-between; align-items: flex-end; 
-      margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; 
-    }
-    .prof-title { 
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      font-size: clamp(1.5rem, 4vw, 2.2rem); font-weight: 800; color: var(--text-1); 
-      letter-spacing: -0.03em; margin: 0 0 0.2rem 0; line-height: 1.1;
-    }
-    .prof-title span { 
-      background: linear-gradient(135deg, var(--accent), #C026D3);
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    }
-    .prof-subtitle { color: var(--text-3); font-weight: 500; margin: 0; font-size: 0.85rem; }
-
-    /* ─── ALERTS ─── */
-    .prof-alert {
-      padding: 0.8rem 1rem; border-radius: 12px; margin-bottom: 1.5rem; 
-      font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 0.5rem;
-    }
-    .prof-alert-success { background: #ECFDF5; color: var(--green); border: 1px solid rgba(16,185,129,0.2); }
-    .prof-alert-error { background: #FEF2F2; color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
-
-    /* ─── MAIN GRID ─── */
-    .prof-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
-    @media (min-width: 900px) { .prof-grid { grid-template-columns: 320px 1fr; } }
-
-    .prof-card { 
-      background: var(--surface); border-radius: 20px; border: 1px solid var(--border); 
-      box-shadow: var(--shadow-sm); overflow: hidden; position: relative; 
-    }
-    
-    /* ─── SIDEBAR PREMIUM ─── */
-    .prof-cover {
-      height: 100px; width: 100%;
-      background: linear-gradient(135deg, var(--accent), #C026D3);
-      position: relative;
-    }
-    .prof-cover::after {
-      content: ''; position: absolute; inset: 0;
-      background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" opacity="0.1"><circle cx="2" cy="2" r="2" fill="white"/></svg>') repeat;
-    }
-    .prof-avatar-wrap {
-      display: flex; justify-content: center; margin-top: -45px; position: relative; z-index: 2;
-    }
-    .prof-avatar { 
-      width: 90px; height: 90px; border-radius: 24px; 
-      background: var(--surface); border: 4px solid var(--surface);
-      display: flex; align-items: center; justify-content: center;
-      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 2rem; color: var(--accent); font-weight: 800; 
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .prof-side-content { padding: 1rem 1.5rem 1.5rem; text-align: center; }
-    .prof-name { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.25rem; font-weight: 800; margin-bottom: 0.2rem; }
-    .prof-role-badge { 
-      display: inline-block; padding: 0.35rem 0.8rem; background: var(--surface-2); color: var(--accent); 
-      border: 1px solid var(--border); border-radius: 100px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-    }
-    .prof-stats { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.5rem; text-align: left; }
-    .prof-stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.8rem; background: var(--surface-2); border-radius: 12px; }
-    .prof-stat-label { font-size: 0.65rem; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
-    .prof-stat-val { font-size: 0.8rem; font-weight: 700; color: var(--text-1); }
-
-    /* ─── FORM CONTENT ─── */
-    .prof-main-pad { padding: 1.5rem; }
-    .prof-section-title { 
-      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.05rem; font-weight: 800; 
-      margin: 0 0 1.5rem 0; display: flex; align-items: center; gap: 0.6rem; color: var(--text-1);
-    }
-
-    /* Lignes Flexbox forcées pour le responsive */
-    .gc-form-group { display: flex; flex-direction: column; gap: 1rem; }
-    
-    .gc-row { 
-      display: flex; gap: 0.75rem; width: 100%; 
-    }
-    .gc-col { 
-      flex: 1; display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; 
-    }
-
-    .prof-label { 
-      font-size: 0.65rem; font-weight: 700; color: var(--text-3); 
-      text-transform: uppercase; letter-spacing: 0.08em; padding-left: 0.2rem;
-      display: flex; align-items: center; gap: 0.3rem;
-    }
-    .prof-label svg { opacity: 0.6; }
-    
-    .prof-input-wrap { position: relative; }
-    .prof-input { 
-      font-family: 'Inter', sans-serif; font-size: 0.85rem; font-weight: 600; color: var(--text-1); 
-      padding: 0.8rem 1rem; width: 100%; box-sizing: border-box;
-      background: var(--surface-2); border-radius: 10px; border: 1px solid transparent; 
-      outline: none; transition: all 0.2s;
-    }
-    .prof-input::placeholder { color: #94A3B8; font-weight: 500; }
-    .prof-input:focus { background: var(--surface); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
-    .prof-input:disabled { color: var(--text-3); cursor: not-allowed; opacity: 0.8; }
-    .prof-input.editing { background: var(--surface); border: 1px solid var(--border); }
-    .prof-input.editing:hover { border-color: var(--border-hover); }
-
-    .prof-hint { font-size: 0.65rem; color: var(--text-3); margin-top: 0.25rem; margin-left: 0.2rem; }
-
-    /* ─── ACTIONS ─── */
-    .btn-edit-toggle { 
-      background: var(--surface); color: var(--text-1); border: 1px solid var(--border); 
-      padding: 0.5rem 1rem; border-radius: 10px; font-weight: 600; font-size: 0.8rem;
-      cursor: pointer; transition: all 0.2s; box-shadow: var(--shadow-sm);
-    }
-    .btn-edit-toggle:hover { background: var(--surface-2); }
-
-    .prof-footer-actions { 
-      margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem; 
-      padding-top: 1.5rem; border-top: 1px solid var(--border); 
-    }
-    .btn-save { 
-      background: linear-gradient(135deg, var(--accent), #C026D3); color: white; border: none; 
-      padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 600; font-size: 0.85rem;
-      cursor: pointer; transition: all 0.2s; box-shadow: 0 4px 12px var(--accent-glow);
-    }
-    .btn-save:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(139,92,246,0.3); }
-    .btn-save:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
-    
-    .btn-cancel { 
-      background: transparent; color: var(--text-2); border: 1px solid var(--border); 
-      padding: 0.75rem 1.5rem; border-radius: 10px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s;
-    }
-    .btn-cancel:hover { background: var(--surface-2); color: var(--text-1); }
-
-    /* ─── ID SYSTEM & SECU ─── */
-    .prof-system-id { margin-top: 1.5rem; text-align: center; font-size: 0.65rem; color: var(--text-3); }
-    .prof-system-id span { font-family: monospace; background: var(--surface-2); padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 600; color: var(--text-2); }
-
-    .prof-security-banner {
-      margin-top: 1.5rem; border-radius: 16px; background: linear-gradient(to right, var(--surface), #FDFBFF); 
-      padding: 1.25rem; border: 1px dashed var(--border-hover);
-      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
-    }
-
-    @keyframes profin { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-  `;
-
-  // Icons Helper
-  const IconUser = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
-  const IconMail = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>;
-  const IconPhone = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>;
-  const IconMap = () => <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 
   return (
     <AppShell title="Mon Profil - Administration">
@@ -370,7 +377,7 @@ export default function SystemAdminProfile() {
                   <div className="gc-row">
                     <div className="gc-col">
                       <label className="prof-label"><IconMap /> Libellé (Adresse)</label>
-                      <input className={`prof-input ${isEditing ? 'editing' : ''}`} value={address} onChange={e => setAddress(e.target.value)} disabled={!isEditing} placeholder="N° et rue" />
+                      <input className={`prof-input ${isEditing ? 'editing' : ''}`} value={addressLine1} onChange={e => setAddressLine1(e.target.value)} disabled={!isEditing} placeholder="N° et rue" />
                     </div>
                     <div className="gc-col" style={{ flex: 0.6 }}> 
                       <label className="prof-label">Code Postal</label>

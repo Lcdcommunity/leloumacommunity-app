@@ -30,8 +30,12 @@ export default function SystemAdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedAsso, setSelectedAsso] = useState<AssociationItem | null>(null);
-  
+
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // 🛡️ Confirmation de suppression renforcée : modale custom + saisie du nom exact
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
 
   const fetchDashboardData = () => {
     api.getSystemDashboard()
@@ -67,21 +71,21 @@ export default function SystemAdminDashboard() {
     try {
       setIsProcessing(true);
       const newStatus = selectedAsso.isActive === false ? true : false;
-      
+
       // 🔒 APPEL API RÉEL
       await api.updateAssociationStatusSystemAdmin(selectedAsso.id, newStatus);
-      
+
       setData((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          associations: prev.associations.map(a => 
+          associations: prev.associations.map(a =>
             a.id === selectedAsso.id ? { ...a, isActive: newStatus } : a
           )
         };
       });
       setSelectedAsso({ ...selectedAsso, isActive: newStatus });
-    } catch (err: unknown) { 
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erreur inconnue';
       alert("Erreur lors de la modification du statut : " + msg);
     } finally {
@@ -89,27 +93,31 @@ export default function SystemAdminDashboard() {
     }
   };
 
-  // Logique de Suppression (MAINTENANT CONNECTÉE)
-  const handleDelete = async () => {
+  // Ouvre la modale de confirmation de suppression (ne supprime rien elle-même)
+  const handleDelete = () => {
     if (!selectedAsso) return;
-    
-    const confirm = window.confirm(`⚠️ DANGER ⚠️\n\nÊtes-vous sûr de vouloir SUPPRIMER DÉFINITIVEMENT l'association "${selectedAsso.name}" ?\n\nCette action détruira toutes les antennes, membres, transactions et fichiers liés à cette organisation. C'est irréversible.`);
-    if (!confirm) return;
+    setDeleteConfirmInput('');
+    setShowDeleteConfirm(true);
+  };
+
+  // Exécute réellement la suppression, uniquement si le nom saisi correspond
+  const executeDelete = async () => {
+    if (!selectedAsso) return;
+    if (deleteConfirmInput.trim() !== selectedAsso.name) return;
 
     try {
       setIsProcessing(true);
-      
-      // 🔒 APPEL API RÉEL 
+
+      // 🔒 APPEL API RÉEL
       await api.deleteAssociationSystemAdmin(selectedAsso.id);
-      
-      alert(`L'association ${selectedAsso.name} a été supprimée.`);
-      
+
+      setShowDeleteConfirm(false);
       setSelectedAsso(null);
       // On rafraîchit les données pour avoir les bons chiffres en haut de page
       setLoading(true);
       fetchDashboardData();
-      
-    } catch (err: unknown) { 
+
+    } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erreur inconnue';
       alert("Erreur lors de la suppression : " + msg);
     } finally {
@@ -513,6 +521,56 @@ export default function SystemAdminDashboard() {
     }
     .gc-btn-close-modal:hover { background: var(--surface); color: var(--text-1); border-color: var(--text-3); }
 
+    /* ─── DANGER MODAL (confirmation de suppression) ─── */
+    .gc-danger-overlay {
+      position: fixed; inset: 0;
+      background: rgba(15, 23, 42, 0.55); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000; padding: 1.5rem;
+      animation: fadeIn 0.2s ease;
+    }
+    .gc-danger-modal {
+      background: var(--surface); width: 100%; max-width: 440px;
+      border-radius: 20px; border: 1px solid rgba(239,68,68,0.3);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+      padding: 1.75rem;
+      animation: scaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .gc-danger-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      background: var(--red-bg); color: var(--red);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1rem;
+    }
+    .gc-danger-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.15rem; font-weight: 800; color: var(--text-1);
+      margin-bottom: 0.5rem;
+    }
+    .gc-danger-text {
+      font-size: 0.88rem; color: var(--text-2); line-height: 1.5; margin-bottom: 1.25rem;
+    }
+    .gc-danger-text b { color: var(--text-1); }
+    .gc-danger-input {
+      width: 100%; height: 46px; border-radius: 12px; box-sizing: border-box;
+      border: 1.5px solid var(--border); padding: 0 1rem;
+      font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
+      outline: none; transition: border-color 0.2s;
+      margin-bottom: 1.25rem;
+    }
+    .gc-danger-input:focus { border-color: var(--red); box-shadow: 0 0 0 4px rgba(239,68,68,0.1); }
+    .gc-danger-actions { display: flex; gap: 0.75rem; }
+    .gc-danger-actions button {
+      flex: 1; height: 46px; border-radius: 12px; font-weight: 700; font-size: 0.88rem;
+      cursor: pointer; border: none; transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+    }
+    .gc-danger-cancel { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border) !important; }
+    .gc-danger-cancel:hover { background: var(--surface); }
+    .gc-danger-confirm { background: var(--red); color: white; }
+    .gc-danger-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
+    .gc-danger-confirm:not(:disabled):hover { filter: brightness(0.9); }
+
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(16px); }
       to { opacity: 1; transform: translateY(0); }
@@ -749,7 +807,7 @@ export default function SystemAdminDashboard() {
               </button>
 
               <div className="gc-actions-grid">
-                <button 
+                <button
                   className={selectedAsso.isActive !== false ? "gc-btn-warning" : "gc-btn-success"}
                   onClick={handleToggleStatus}
                   disabled={isProcessing}
@@ -772,7 +830,7 @@ export default function SystemAdminDashboard() {
                   )}
                 </button>
 
-                <button 
+                <button
                   className="gc-btn-danger"
                   onClick={handleDelete}
                   disabled={isProcessing}
@@ -786,6 +844,50 @@ export default function SystemAdminDashboard() {
 
               <button className="gc-btn-close-modal" onClick={() => setSelectedAsso(null)} disabled={isProcessing}>
                 Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── DANGER MODAL : confirmation de suppression avec saisie du nom exact ── */}
+      {showDeleteConfirm && selectedAsso && (
+        <div className="gc-danger-overlay" onClick={() => !isProcessing && setShowDeleteConfirm(false)}>
+          <div className="gc-danger-modal" onClick={e => e.stopPropagation()}>
+            <div className="gc-danger-icon">
+              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+              </svg>
+            </div>
+            <div className="gc-danger-title">Supprimer définitivement cette instance ?</div>
+            <p className="gc-danger-text">
+              Cette action détruira toutes les antennes, membres, transactions et fichiers liés à{' '}
+              <b>{selectedAsso.name}</b>. C&apos;est irréversible.
+              <br /><br />
+              Pour confirmer, tapez le nom exact de l&apos;association : <b>{selectedAsso.name}</b>
+            </p>
+            <input
+              className="gc-danger-input"
+              value={deleteConfirmInput}
+              onChange={e => setDeleteConfirmInput(e.target.value)}
+              placeholder={selectedAsso.name}
+              autoFocus
+              disabled={isProcessing}
+            />
+            <div className="gc-danger-actions">
+              <button
+                className="gc-danger-cancel"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isProcessing}
+              >
+                Annuler
+              </button>
+              <button
+                className="gc-danger-confirm"
+                onClick={executeDelete}
+                disabled={isProcessing || deleteConfirmInput.trim() !== selectedAsso.name}
+              >
+                {isProcessing ? 'Suppression...' : 'Supprimer définitivement'}
               </button>
             </div>
           </div>
