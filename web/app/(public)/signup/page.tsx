@@ -40,12 +40,17 @@
 // - [DYNAMIQUE] Identité par défaut alignée sur celle du login ('Console Grand Chef' au lieu de
 //        'Lélouma') tant qu'aucun thème d'association n'est résolu.
 // - [DYNAMIQUE] Texte d'explication de la commune d'origine généralisé (retrait de "en Guinée").
+//
+// CHANGELOG v2.2.0 :
+// - [UI] Logo du header remplacé par <AdaptiveLogo> : anneau coloré auto-détecté depuis le
+//        logo de l'association, fond blanc fixe pour garantir le contraste dans tous les cas.
 
 'use client';
 
 import { ChangeEvent, FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { AdaptiveLogo } from '../../../components/AdaptiveLogo';
 import { api } from '../../../lib/api-client';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../../lib/i18n';
@@ -871,11 +876,9 @@ export default function MemberSignupPage() {
 
           {/* Header */}
           <div className="sp-header">
-            {theme.logoUrl && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-                <Image src={theme.logoUrl} alt={`Logo ${theme.name}`} width={60} height={60} style={{ objectFit: 'contain', borderRadius: '50%' }} unoptimized />
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+              <AdaptiveLogo src={theme.logoUrl} alt={`Logo ${theme.name}`} size={60} />
+            </div>
             <div className="sp-badge">
               <div className="sp-badge-dot" />
               {t('signup.newMember', 'Nouveau membre')}

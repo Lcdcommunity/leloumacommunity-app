@@ -13,21 +13,18 @@ interface AdaptiveLogoProps {
 
 interface DetectedStyle {
   ringColor: string;
-  needsBackground: boolean;
 }
 
 const DEFAULT_STYLE: DetectedStyle = {
   ringColor: '#1A56DB',
-  needsBackground: false,
 };
 
 /**
- * Cadre de logo qui s'adapte automatiquement à l'image chargée :
- * - détecte si les bords de l'image sont transparents (pas besoin d'un fond
- *   blanc plaqué derrière) ou opaques (fond blanc ajouté pour éviter un
- *   carré moche visible autour d'un logo sans transparence)
- * - extrait une couleur moyenne des bords pour teinter l'anneau autour du
- *   logo, au lieu d'une couleur fixe qui jure parfois selon le logo
+ * Cadre de logo avec un anneau dont la couleur s'adapte automatiquement au
+ * logo chargé (couleur moyenne extraite des bords de l'image), sur un fond
+ * blanc fixe qui garantit un contraste net quel que soit le logo — évite
+ * que l'anneau et le fond du logo se confondent quand le logo n'a pas de
+ * transparence.
  */
 export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogoProps) {
   const [style, setStyle] = useState<DetectedStyle>(DEFAULT_STYLE);
@@ -58,8 +55,6 @@ export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogo
         ctx.drawImage(img, 0, 0, w, h);
         const { data } = ctx.getImageData(0, 0, w, h);
 
-        let transparentEdgePixels = 0;
-        let edgeSamples = 0;
         let rSum = 0, gSum = 0, bSum = 0, colorSamples = 0;
 
         for (let y = 0; y < h; y++) {
@@ -68,20 +63,13 @@ export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogo
             if (!isEdge) continue;
             const i = (y * w + x) * 4;
             const a = data[i + 3];
-            edgeSamples++;
-            if (a < 20) {
-              transparentEdgePixels++;
-              continue;
-            }
+            if (a < 20) continue; // pixel transparent, ignoré pour la couleur
             rSum += data[i];
             gSum += data[i + 1];
             bSum += data[i + 2];
             colorSamples++;
           }
         }
-
-        const transparentRatio = edgeSamples > 0 ? transparentEdgePixels / edgeSamples : 0;
-        const needsBackground = transparentRatio > 0.3;
 
         let ringColor = DEFAULT_STYLE.ringColor;
         if (colorSamples > 0) {
@@ -91,7 +79,7 @@ export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogo
           ringColor = `rgb(${r}, ${g}, ${b})`;
         }
 
-        if (!cancelled) setStyle({ ringColor, needsBackground });
+        if (!cancelled) setStyle({ ringColor });
       } catch {
         if (!cancelled) setStyle(DEFAULT_STYLE);
       }
@@ -125,7 +113,7 @@ export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogo
           borderRadius: '50%',
           overflow: 'hidden',
           position: 'relative',
-          background: style.needsBackground ? 'white' : 'transparent',
+          background: '#FFFFFF',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -136,7 +124,7 @@ export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogo
             src={src}
             alt={alt}
             fill
-            style={{ objectFit: 'contain', padding: style.needsBackground ? '10%' : '4%' }}
+            style={{ objectFit: 'contain', padding: '8%' }}
             unoptimized
           />
         ) : (
