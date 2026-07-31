@@ -5,6 +5,7 @@ import { FormEvent, useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { AdaptiveLogo } from '../../components/AdaptiveLogo';
 import { login } from '../../lib/auth';
 import { api } from '../../lib/api-client';
 import { useTranslation } from 'react-i18next';
@@ -501,21 +502,15 @@ export default function LoginPage() {
           </div>
 
           <div className="lp-logo-wrap">
-            <div className="lp-logo-box">
-              <div className="lp-logo-inner">
-                {theme.logoUrl && (
-                  <Image src={theme.logoUrl} alt={`Logo ${theme.name}`} fill priority style={{ objectFit: 'contain', padding: '5px' }} unoptimized />
-                )}
-              </div>
-            </div>
-            <h1 className="lp-title">
-              {t('login.welcome', 'Bienvenue dans votre')}
-              <span>{t('login.secureSpace', 'Espace sécurisé')}</span>
-              <small style={{ display: 'block', fontSize: '0.6em', marginTop: '0.5rem', fontWeight: 500, opacity: 0.75, color: 'var(--text-muted)' }}>
-                {theme.name.toUpperCase()}
-              </small>
-            </h1>
-          </div>
+  <AdaptiveLogo src={theme.logoUrl} alt={`Logo ${theme.name}`} size={88} />
+  <h1 className="lp-title">
+    {t('login.welcome', 'Bienvenue dans votre')}
+    <span>{t('login.secureSpace', 'Espace sécurisé')}</span>
+    <small style={{ display: 'block', fontSize: '0.6em', marginTop: '0.5rem', fontWeight: 500, opacity: 0.75, color: 'var(--text-muted)' }}>
+      {theme.name.toUpperCase()}
+    </small>
+  </h1>
+</div>
 
           {error && (
             <div className="lp-error">

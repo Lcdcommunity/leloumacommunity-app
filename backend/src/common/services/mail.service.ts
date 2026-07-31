@@ -9,7 +9,7 @@ type SendAdminInvitationParams = {
   antennaName: string;
   temporaryPassword: string;
   associationTitle?: string;
-  logoUrl?: string; // 👈 AJOUT DU PARAMÈTRE LOGO
+  logoUrl?: string;
 };
 
 type SendSuperAdminWelcomeParams = {
@@ -18,7 +18,7 @@ type SendSuperAdminWelcomeParams = {
   lastName: string;
   associationName: string;
   temporaryPassword: string;
-  logoUrl?: string; // 👈 AJOUT DU PARAMÈTRE LOGO
+  logoUrl?: string;
 };
 
 @Injectable()
@@ -93,7 +93,6 @@ export class MailService {
       ? `<p style="margin:0 0 10px 0;"><strong>Fonction :</strong> ${params.associationTitle}</p>`
       : '';
 
-    // 💉 INJECTION DU LOGO S'IL EXISTE
     const logoHtml = params.logoUrl
       ? `<div style="text-align:center; margin-bottom: 24px;">
            <img src="${params.logoUrl}" alt="Logo" style="max-height: 80px; width: auto; border-radius: 8px;" />
@@ -104,7 +103,7 @@ export class MailService {
       <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#ffffff;color:#111827; border: 1px solid #E5E7EB; border-radius: 12px;">
         ${logoHtml}
         <h2 style="margin:0 0 16px 0;color:#1D4ED8;">Bienvenue ${params.firstName} ${params.lastName}</h2>
-        <p style="margin:0 0 14px 0;">Votre compte administrateur d’antenne a été créé.</p>
+        <p style="margin:0 0 14px 0;">Votre compte administrateur d'antenne a été créé.</p>
         <p style="margin:0 0 10px 0;"><strong>Antenne :</strong> ${params.antennaName}</p>
         ${titleLine}
         <p style="margin:0 0 10px 0;"><strong>Adresse email :</strong> ${params.to}</p>
@@ -122,7 +121,7 @@ export class MailService {
     const text = [
       `Bonjour ${params.firstName} ${params.lastName},`,
       '',
-      'Votre compte administrateur d’antenne a été créé.',
+      'Votre compte administrateur d\'antenne a été créé.',
       `Antenne : ${params.antennaName}`,
       params.associationTitle ? `Fonction : ${params.associationTitle}` : '',
       `Adresse email : ${params.to}`,
@@ -156,10 +155,9 @@ export class MailService {
       return;
     }
 
-    const subject = `Votre espace Association ${params.associationName} est créé`;
+    const subject = `Bienvenue sur AssoGlobal — vos identifiants de connexion`;
     const loginUrl = this.getLoginUrl();
 
-    // 💉 INJECTION DU LOGO S'IL EXISTE
     const logoHtml = params.logoUrl
       ? `<div style="text-align:center; margin-bottom: 24px;">
            <img src="${params.logoUrl}" alt="Logo ${params.associationName}" style="max-height: 80px; width: auto; border-radius: 8px;" />
@@ -169,35 +167,39 @@ export class MailService {
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:32px;background:#ffffff;color:#111827; border: 1px solid #E5E7EB; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
         ${logoHtml}
-        <h2 style="margin:0 0 16px 0;color:#7C3AED;text-align:center;">Félicitations ${params.firstName} !</h2>
-        <p style="margin:0 0 14px 0;font-size:16px;">Votre espace association <strong>${params.associationName}</strong> est désormais prêt à être utilisé.</p>
+        <h2 style="margin:0 0 16px 0;color:#7C3AED;text-align:center;">Bienvenue ${params.firstName} ${params.lastName} !</h2>
+        <p style="margin:0 0 14px 0;font-size:16px;text-align:center;">
+          Vous avez été désigné(e) administrateur(rice) général(e) de <strong>${params.associationName}</strong>.
+          Nous sommes ravis de vous accompagner dans cette mission et vous souhaitons plein succès à la tête de votre association.
+        </p>
         <div style="background-color: #F3F4F6; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
-          <p style="margin:0 0 10px 0;font-size:15px;">Vous avez été désigné comme <strong>Super Administrateur</strong>. C'est vous qui avez les pleins pouvoirs pour configurer l'association, créer les antennes et inviter les administrateurs locaux.</p>
-          <p style="margin:0 0 10px 0;font-size:15px;"><strong>Identifiant de connexion :</strong> ${params.to}</p>
+          <p style="margin:0 0 10px 0;font-size:15px;"><strong>Adresse email :</strong> ${params.to}</p>
           <p style="margin:0;font-size:15px;"><strong>Mot de passe provisoire :</strong> ${params.temporaryPassword}</p>
         </div>
-        <p style="margin:18px 0 0 0;text-align:center;">Accédez à votre tableau de bord ici :</p>
-        <p style="margin:12px 0 24px 0;text-align:center;">
+        <p style="margin:0 0 18px 0;font-size:14px;color:#4B5563;text-align:center;">
+          Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.
+        </p>
+        <p style="margin:0;text-align:center;">
           <a href="${loginUrl}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;font-size:16px;">
             Accéder à mon espace
           </a>
         </p>
-        <p style="margin:0;color:#B91C1C;font-size:14px;text-align:center;"><strong>Important :</strong> Veuillez modifier ce mot de passe dès votre première connexion pour des raisons de sécurité.</p>
       </div>
     `;
 
     const text = [
-      `Félicitations ${params.firstName} !`,
+      `Bonjour ${params.firstName} ${params.lastName},`,
       '',
-      `Votre espace association ${params.associationName} est désormais prêt.`,
-      'Vous avez été désigné comme Super Administrateur.',
+      'Bienvenue sur AssoGlobal !',
       '',
-      `Identifiant de connexion : ${params.to}`,
+      `Vous avez été désigné(e) administrateur(rice) général(e) de ${params.associationName}. Nous vous souhaitons plein succès à la tête de votre association.`,
+      '',
+      `Adresse email : ${params.to}`,
       `Mot de passe provisoire : ${params.temporaryPassword}`,
       '',
       `Connexion : ${loginUrl}`,
       '',
-      'Important : Veuillez modifier ce mot de passe dès votre première connexion.',
+      'Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.',
     ].join('\n');
 
     await transporter.sendMail({
