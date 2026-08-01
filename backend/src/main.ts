@@ -105,6 +105,13 @@ async function isAllowedOrigin(
   // 🔥 domaine prod historique
   if (hostname.endsWith('leloumacommunity.com')) return true;
 
+  // 🔥 CORRECTION : domaine de la console Grand Chef (system-admin) elle-même
+  // — n'est rattaché à aucune Association en base (ce n'est pas un domaine
+  // client), donc isCustomDomainRegistered() ne peut jamais le trouver, quoi
+  // que contiennent CORS_ORIGINS/FRONTEND_URL. Couvre dkmoney.store ET tous
+  // ses sous-domaines (www. inclus) en un seul check.
+  if (hostname === 'dkmoney.store' || hostname.endsWith('.dkmoney.store')) return true;
+
   // 🔥 domaines personnalisés des clients (ex: ajvk.site) — vérifiés en
   // base plutôt que dans une liste statique, sinon chaque nouveau domaine
   // provisionné casse le CORS tant qu'on n'a pas redéployé.

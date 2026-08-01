@@ -1,4 +1,4 @@
-/////// web/app/(protected)/system-admin/page.tsx
+// web/app/(protected)/system-admin/page.tsx
 'use client';
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -36,6 +36,13 @@ export default function SystemAdminDashboard() {
   // 🛡️ Confirmation de suppression renforcée : modale custom + saisie du nom exact
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmInput, setDeleteConfirmInput] = useState('');
+
+  // 🔥 CORRECTION : le bouton restait désactivé même en tapant le nom exact
+  // affiché — l'ancienne comparaison ne nettoyait que la saisie, pas
+  // selectedAsso.name. Un espace en trop (début/fin, espaces multiples, ou
+  // espace insécable venu d'un copier-coller) dans le nom stocké empêchait
+  // tout match, quoi qu'on tape.
+  const normalizeForCompare = (s: string) => s.trim().replace(/\s+/g, ' ');
 
   const fetchDashboardData = () => {
     api.getSystemDashboard()
@@ -103,7 +110,7 @@ export default function SystemAdminDashboard() {
   // Exécute réellement la suppression, uniquement si le nom saisi correspond
   const executeDelete = async () => {
     if (!selectedAsso) return;
-    if (deleteConfirmInput.trim() !== selectedAsso.name) return;
+    if (normalizeForCompare(deleteConfirmInput) !== normalizeForCompare(selectedAsso.name)) return;
 
     try {
       setIsProcessing(true);
@@ -885,7 +892,7 @@ export default function SystemAdminDashboard() {
               <button
                 className="gc-danger-confirm"
                 onClick={executeDelete}
-                disabled={isProcessing || deleteConfirmInput.trim() !== selectedAsso.name}
+                disabled={isProcessing || normalizeForCompare(deleteConfirmInput) !== normalizeForCompare(selectedAsso.name)}
               >
                 {isProcessing ? 'Suppression...' : 'Supprimer définitivement'}
               </button>

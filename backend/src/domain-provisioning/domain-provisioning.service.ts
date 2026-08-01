@@ -1,5 +1,7 @@
 // backend/src/domain-provisioning/domain-provisioning.service.ts
-// v2.0
+// v2.1 — provisionAssociationDomain() passe désormais domainStatus à ACTIVE
+// immédiatement quand tout réussit du premier coup, au lieu d'attendre le
+// prochain passage du cron (jusqu'à 6h plus tard)
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { VercelProvider } from './providers/vercel.provider';
@@ -33,6 +35,19 @@ export class DomainProvisioningService {
       await this.cloudflare.pointToVercel(zoneId, domain);
       await this.vercel.addDomain(domain);
       await this.vercel.addDomain(`www.${domain}`);
+
+      // 🔥 CORRECTION : sans ça, domainStatus restait bloqué sur
+      // PENDING_VERIFICATION jusqu'au prochain passage du cron (toutes les
+      // 6h, voir checkPendingDomains) même quand tout est déjà fonctionnel
+      // immédiatement — Vercel sert déjà le site, mais la BDD ne le sait
+      // pas encore, ce qui peut affecter tout ce qui teste domainStatus.
+      const vercelStatus = await this.vercel.getDomainStatus(domain);
+      if (vercelStatus.verified) {
+        await this.prisma.association.update({
+          where: { id: associationId },
+          data: { domainStatus: 'ACTIVE' },
+        });
+      }
     }
 
     return { nameServers, zoneStatus: status };
