@@ -99,6 +99,13 @@ export class SystemAdminService {
         lastName: result.superAdmin.lastName,
         associationName: result.association.name,
         temporaryPassword,
+        // 🔥 CORRECTION : sans ça, le mail pointait toujours vers le
+        // FRONTEND_URL global (dkmoney.store) au lieu du domaine propre de
+        // l'association — pouvait bloquer la connexion à cause du verrou
+        // multi-tenant dans AuthService.login(). null si l'association n'a
+        // pas encore de domaine dédié, mail.service.ts gère déjà ce cas en
+        // repli sur FRONTEND_URL.
+        associationDomain: result.association.domainName ?? undefined,
       });
     } catch (mailErr) {
       console.error(`Échec de l'envoi de l'email de bienvenue à ${result.superAdmin.email}`, mailErr);
@@ -213,10 +220,6 @@ export class SystemAdminService {
     }));
   }
 
-  // 🔥 CORRECTION : détache le domaine Vercel avant de supprimer l'association,
-  // sinon il reste "accroché" au projet et bloque toute réutilisation future
-  // de ce domaine (Vercel renvoie 400 ou 409 "domain_already_in_use").
-  // Non-bloquant : un échec Vercel ne doit pas empêcher la suppression en base.
   async deleteAssociation(id: string) {
     const association = await this.prisma.association.findUnique({ where: { id } });
     if (!association) throw new NotFoundException('Association introuvable.');

@@ -19,6 +19,7 @@ type SendSuperAdminWelcomeParams = {
   associationName: string;
   temporaryPassword: string;
   logoUrl?: string;
+  associationDomain?: string; // 🔥 AJOUT : ex. "ajvk.site", sans protocole ni www
 };
 
 @Injectable()
@@ -46,9 +47,6 @@ export class MailService {
     });
   }
 
-  // 🔥 CORRECTION : unifié avec AuthMailerService qui lit MAIL_FROM en
-  // priorité — ce service lisait SMTP_FROM seul, deux variables Render
-  // distinctes jamais garanties synchronisées entre elles.
   private getFromAddress(): string {
     return process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@localhost.local';
   }
@@ -73,7 +71,14 @@ export class MailService {
     );
   }
 
-  private getLoginUrl(): string {
+  // 🔥 CORRECTION : accepte désormais un domaine spécifique à l'association
+  // (celui vraiment utilisé pour se connecter, à cause du verrou multi-tenant
+  // dans AuthService.login()) — repli sur FRONTEND_URL/APP_URL si l'association
+  // n'a pas encore de domaine propre configuré.
+  private getLoginUrl(associationDomain?: string): string {
+    if (associationDomain && associationDomain.trim()) {
+      return `https://${associationDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')}/login`;
+    }
     return `${this.getFrontendBaseUrl()}/login`;
   }
 
@@ -137,9 +142,6 @@ export class MailService {
       .filter(Boolean)
       .join('\n');
 
-    // 🔥 CORRECTION : try/catch ajouté — sendMail() n'était pas protégé,
-    // un échec SMTP (auth, domaine non vérifié, etc.) remontait en exception
-    // non gérée au lieu d'être loggé clairement comme sur AuthMailerService.
     try {
       await transporter.sendMail({
         from: this.getFromAddress(),
@@ -167,7 +169,7 @@ export class MailService {
     }
 
     const subject = `Bienvenue sur AssoGlobal — vos identifiants de connexion`;
-    const loginUrl = this.getLoginUrl();
+    const loginUrl = this.getLoginUrl(params.associationDomain);
 
     const logoHtml = params.logoUrl
       ? `<div style="text-align:center; margin-bottom: 24px;">
@@ -187,13 +189,16 @@ export class MailService {
           <p style="margin:0 0 10px 0;font-size:15px;"><strong>Adresse email :</strong> ${params.to}</p>
           <p style="margin:0;font-size:15px;"><strong>Mot de passe provisoire :</strong> ${params.temporaryPassword}</p>
         </div>
-        <p style="margin:0 0 18px 0;font-size:14px;color:#4B5563;text-align:center;">
-          Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.
-        </p>
-        <p style="margin:0;text-align:center;">
+        <p style="margin:0 0 8px 0;text-align:center;">
           <a href="${loginUrl}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;font-size:16px;">
             Accéder à mon espace
           </a>
+        </p>
+        <p style="margin:0 0 18px 0;text-align:center;font-size:13px;color:#6B7280;">
+          ou copiez ce lien : <a href="${loginUrl}" style="color:#7C3AED;word-break:break-all;">${loginUrl}</a>
+        </p>
+        <p style="margin:0 0 4px 0;font-size:14px;color:#4B5563;text-align:center;">
+          Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.
         </p>
       </div>
     `;
@@ -213,8 +218,6 @@ export class MailService {
       'Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.',
     ].join('\n');
 
-    // 🔥 CORRECTION : même try/catch — c'est très probablement ce qui rend
-    // l'échec actuel invisible dans les logs.
     try {
       await transporter.sendMail({
         from: this.getFromAddress(),
