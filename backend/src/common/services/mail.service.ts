@@ -46,8 +46,11 @@ export class MailService {
     });
   }
 
+  // 🔥 CORRECTION : unifié avec AuthMailerService qui lit MAIL_FROM en
+  // priorité — ce service lisait SMTP_FROM seul, deux variables Render
+  // distinctes jamais garanties synchronisées entre elles.
   private getFromAddress(): string {
-    return process.env.SMTP_FROM || 'no-reply@localhost.local';
+    return process.env.MAIL_FROM || process.env.SMTP_FROM || 'no-reply@localhost.local';
   }
 
   private normalizeUrl(url: string): string {
@@ -134,13 +137,21 @@ export class MailService {
       .filter(Boolean)
       .join('\n');
 
-    await transporter.sendMail({
-      from: this.getFromAddress(),
-      to: params.to,
-      subject,
-      text,
-      html,
-    });
+    // 🔥 CORRECTION : try/catch ajouté — sendMail() n'était pas protégé,
+    // un échec SMTP (auth, domaine non vérifié, etc.) remontait en exception
+    // non gérée au lieu d'être loggé clairement comme sur AuthMailerService.
+    try {
+      await transporter.sendMail({
+        from: this.getFromAddress(),
+        to: params.to,
+        subject,
+        text,
+        html,
+      });
+    } catch (error: unknown) {
+      this.logger.error(`❌ Échec envoi invitation admin -> ${params.to}`, error);
+      throw error;
+    }
   }
 
   async sendSuperAdminWelcome(
@@ -202,12 +213,19 @@ export class MailService {
       'Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.',
     ].join('\n');
 
-    await transporter.sendMail({
-      from: this.getFromAddress(),
-      to: params.to,
-      subject,
-      text,
-      html,
-    });
+    // 🔥 CORRECTION : même try/catch — c'est très probablement ce qui rend
+    // l'échec actuel invisible dans les logs.
+    try {
+      await transporter.sendMail({
+        from: this.getFromAddress(),
+        to: params.to,
+        subject,
+        text,
+        html,
+      });
+    } catch (error: unknown) {
+      this.logger.error(`❌ Échec envoi bienvenue super admin -> ${params.to}`, error);
+      throw error;
+    }
   }
 }
