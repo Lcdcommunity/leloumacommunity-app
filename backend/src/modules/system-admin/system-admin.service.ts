@@ -3,9 +3,10 @@ import { Injectable, ConflictException, NotFoundException, BadRequestException }
 import { PrismaService } from '../../prisma/prisma.service';
 import { MailService } from '../../common/services/mail.service';
 import { VercelProvider } from '../../domain-provisioning/providers/vercel.provider';
+import { NotificationsService } from '../notifications/notifications.service';
 import { normalizeDomain } from '../../common/utils/domain.util';
 import * as bcrypt from 'bcryptjs';
-import { UserRole, UserStatus, CurrencyCode } from '@prisma/client';
+import { UserRole, UserStatus, CurrencyCode, NotificationType } from '@prisma/client';
 
 export interface CreateAssociationPayload {
   associationName: string;
@@ -100,6 +101,7 @@ export class SystemAdminService {
     private prisma: PrismaService,
     private mailService: MailService,
     private vercel: VercelProvider,
+    private notifications: NotificationsService,
   ) {}
 
   async createAssociationWithSuperAdmin(data: CreateAssociationPayload) {
@@ -165,6 +167,13 @@ export class SystemAdminService {
       });
     } catch (mailErr) {
       console.error(`Échec de l'envoi de l'email de bienvenue à ${result.superAdmin.email}`, mailErr);
+      // 🔥 AJOUT : ce genre d'échec ne remontait qu'aux logs Render, invisible
+      // sans y aller exprès — désormais visible dans le centre de notifications
+      // du Grand Chef.
+      await this.notifications.notifySystemAdmins(
+        `Échec de l'envoi de l'email de bienvenue pour "${result.association.name}" (${result.superAdmin.email}) : ${mailErr instanceof Error ? mailErr.message : 'erreur inconnue'}`,
+        NotificationType.SYSTEM_ALERT,
+      );
     }
 
     return {
@@ -199,10 +208,6 @@ export class SystemAdminService {
     };
   }
 
-  // 🔥 CORRECTION : ajout de `logoFile` en include — sans ça, la page
-  // d'édition n'avait aucun moyen d'afficher le logo actuel de l'association.
-  // themeColors/fontFamily sont déjà des champs scalaires, donc déjà présents
-  // dans la réponse Prisma, juste jamais typés/exposés côté front avant ça.
   async getAssociationById(id: string) {
     return this.prisma.association.findUnique({
       where: { id },
@@ -247,8 +252,6 @@ export class SystemAdminService {
       }
     }
 
-    // 🔥 AJOUT : cette route n'a pas de DTO class-validator, donc on vérifie
-    // nous-mêmes que la devise envoyée est une valeur connue avant de l'écrire.
     let defaultCurrency: CurrencyCode | undefined;
     if (data.defaultCurrency !== undefined) {
       if (!Object.values(CurrencyCode).includes(data.defaultCurrency as CurrencyCode)) {

@@ -26,14 +26,19 @@ export class NotificationsService {
 
   /**
    * Liste les notifications de l'utilisateur connecté
-   * 🔥 AJOUT CHIRURGICAL : Filtre strict par associationId
+   * 🔥 CORRECTION : associationId maintenant nullable — un SYSTEM_ADMIN
+   * (Grand Chef) n'est rattaché à aucune association, donc filtrer dessus
+   * excluait systématiquement toutes ses notifications. Le filtre ne
+   * s'applique désormais que si associationId est renseigné ; un
+   * SYSTEM_ADMIN voit ainsi toutes les notifications qui lui sont adressées,
+   * quelle que soit l'association d'origine.
    */
-  async listMyNotifications(userId: string, associationId: string, query: NotificationsQueryDto): Promise<NotificationListItem[]> {
+  async listMyNotifications(userId: string, associationId: string | null, query: NotificationsQueryDto): Promise<NotificationListItem[]> {
     const items = await this.prisma.notificationRecipient.findMany({
       where: {
         userId,
         notification: {
-          associationId, // 🔒 Verrouillage de l'instance
+          ...(associationId ? { associationId } : {}),
           ...(query.type ? { type: query.type as NotificationType } : {}),
         }
       },
@@ -54,14 +59,13 @@ export class NotificationsService {
 
   /**
    * Marque une notification comme lue
-   * 🔥 AJOUT CHIRURGICAL : Vérification de l'appartenance à l'association
    */
-  async markAsRead(userId: string, associationId: string, notificationId: string): Promise<{ ok: true }> {
+  async markAsRead(userId: string, associationId: string | null, notificationId: string): Promise<{ ok: true }> {
     const recipient = await this.prisma.notificationRecipient.findFirst({
       where: { 
         notificationId, 
         userId,
-        notification: { associationId } // 🔒 Sécurité SaaS
+        ...(associationId ? { notification: { associationId } } : {}),
       },
     });
 
@@ -74,23 +78,24 @@ export class NotificationsService {
 
     return { ok: true };
   }
-  async deleteOne(userId: string, associationId: string, notificationId: string): Promise<{ ok: true }> {
-  const recipient = await this.prisma.notificationRecipient.findFirst({
-    where: {
-      notificationId,
-      userId,
-      notification: { associationId },
-    },
-  });
 
-  if (!recipient) throw new NotFoundException('Notification introuvable.');
+  async deleteOne(userId: string, associationId: string | null, notificationId: string): Promise<{ ok: true }> {
+    const recipient = await this.prisma.notificationRecipient.findFirst({
+      where: {
+        notificationId,
+        userId,
+        ...(associationId ? { notification: { associationId } } : {}),
+      },
+    });
 
-  await this.prisma.notificationRecipient.delete({
-    where: { id: recipient.id },
-  });
+    if (!recipient) throw new NotFoundException('Notification introuvable.');
 
-  return { ok: true };
-}
+    await this.prisma.notificationRecipient.delete({
+      where: { id: recipient.id },
+    });
+
+    return { ok: true };
+  }
 
   /**
    * Crée une notification pour un utilisateur spécifique
@@ -180,6 +185,35 @@ export class NotificationsService {
   }
 
   /**
+   * 🔥 AJOUT : notifie tous les Grand Chef (SYSTEM_ADMIN) de la plateforme.
+   * Pas d'associationId — ces notifications sont au niveau plateforme, pas
+   * rattachées à une instance cliente en particulier (cohérent avec
+   * `Notification.associationId` qui est optionnel dans le schema).
+   */
+  async notifySystemAdmins(message: string, type: NotificationType, metadata?: Prisma.InputJsonValue) {
+    const systemAdmins = await this.prisma.user.findMany({
+      where: { role: 'SYSTEM_ADMIN', status: 'ACTIVE' },
+      select: { id: true },
+    });
+
+    if (systemAdmins.length === 0) return;
+
+    await this.prisma.notification.create({
+      data: {
+        type,
+        title: 'Plateforme',
+        message,
+        payload: metadata || Prisma.JsonNull,
+        recipients: {
+          createMany: {
+            data: systemAdmins.map((sa) => ({ userId: sa.id })),
+          },
+        },
+      },
+    });
+  }
+
+  /**
    * 🔥 NOUVEAU : Sauvegarde subscription push
    */
   async savePushSubscription(
@@ -203,7 +237,6 @@ export class NotificationsService {
     pushTitle?: string;
     pushBody?: string;
   }): Promise<{ id: string; pushSent: boolean }> {
-    // 1. Crée la notification en base
     const created = await this.prisma.notification.create({
       data: {
         associationId: params.associationId,
@@ -217,7 +250,6 @@ export class NotificationsService {
       },
     });
 
-    // 2. Envoie la notification push si l'utilisateur a activé
     let pushSent = false;
     try {
       const userPrefs = await this.prisma.userPreference.findUnique({
@@ -242,7 +274,6 @@ export class NotificationsService {
         pushSent = result.sent > 0;
       }
     } catch (error) {
-      // Ne fait pas échouer la création si le push échoue
       this.logger.error('Erreur envoi push:', error);
     }
 
@@ -260,10 +291,8 @@ export class NotificationsService {
     metadata?: Prisma.InputJsonValue,
     pushTitle?: string,
   ): Promise<void> {
-    // 1. Notification en base (méthode existante)
     await this.notifyAntennaAdmins(antennaId, associationId, message, type, metadata);
 
-    // 2. Push notification
     await this.pushService.sendToAntennaAdmins(antennaId, associationId, {
       title: pushTitle || 'Alerte Antenne',
       body: message,
@@ -285,10 +314,8 @@ export class NotificationsService {
     type: NotificationType,
     pushTitle?: string,
   ): Promise<void> {
-    // 1. Notification en base
     await this.notifySuperAdmins(associationId, message, type);
 
-    // 2. Push notification
     await this.pushService.sendToSuperAdmins(associationId, {
       title: pushTitle || 'Alerte Système',
       body: message,

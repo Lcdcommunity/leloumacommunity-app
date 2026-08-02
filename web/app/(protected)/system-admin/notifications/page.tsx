@@ -1,4 +1,4 @@
-// web/app/(protected)/super-admin/notifications/page.tsx
+// web/app/(protected)/system-admin/notifications/page.tsx
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -52,7 +52,7 @@ function typeLabel(type?: string | null): string {
   return MAP[type] ?? type.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase());
 }
 
-export default function SuperAdminNotificationsPage() {
+export default function SystemAdminNotificationsPage() {
   const [items,      setItems]      = useState<NotificationItem[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState<string | null>(null);
@@ -82,9 +82,6 @@ export default function SuperAdminNotificationsPage() {
     } finally { setLoading(false); }
   }, []);
 
-  // 🔧 FIX react-hooks/set-state-in-effect : load() pose setLoading/setError
-  // de façon synchrone avant son premier await — appelé directement dans un
-  // effect, ça déclenche le warning. On diffère l'appel d'un tick.
   useEffect(() => {
     const timerId = setTimeout(() => { void load(); }, 0);
     return () => clearTimeout(timerId);
@@ -174,12 +171,12 @@ export default function SuperAdminNotificationsPage() {
         .snf-wrap{font-family:'DM Sans',sans-serif;padding:clamp(.85rem,3vw,1.5rem);max-width:700px;margin:0 auto;padding-bottom:6rem}
 
         .snf-header{margin-bottom:1.1rem;opacity:0;animation:snfin .4s .03s cubic-bezier(.22,1,.36,1) forwards}
-        .snf-eyebrow{font-size:.59rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.2rem;display:flex;align-items:center;gap:.32rem}
-        .snf-eyedot{width:5px;height:5px;background:#EF4444;border-radius:50%;animation:snfpulse 2s ease-in-out infinite}
+        .snf-eyebrow{font-size:.59rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#7C3AED;margin-bottom:.2rem;display:flex;align-items:center;gap:.32rem}
+        .snf-eyedot{width:5px;height:5px;background:#8B5CF6;border-radius:50%;animation:snfpulse 2s ease-in-out infinite}
         .snf-titlerow{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
         .snf-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.45rem,4vw,1.8rem);font-weight:700;color:#0F172A;letter-spacing:-.02em;margin:0;line-height:1.1}
-        .snf-title span{background:linear-gradient(135deg,#991B1B,#DC2626);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-        .snf-pill{display:inline-flex;align-items:center;justify-content:center;min-width:21px;height:21px;padding:0 .42rem;background:#DC2626;color:white;border-radius:99px;font-size:.65rem;font-weight:900;animation:snfpop .3s cubic-bezier(.22,1,.36,1)}
+        .snf-title span{background:linear-gradient(135deg,#7C3AED,#C026D3);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+        .snf-pill{display:inline-flex;align-items:center;justify-content:center;min-width:21px;height:21px;padding:0 .42rem;background:#7C3AED;color:white;border-radius:99px;font-size:.65rem;font-weight:900;animation:snfpop .3s cubic-bezier(.22,1,.36,1)}
 
         .snf-stats{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap;opacity:0;animation:snfin .4s .055s cubic-bezier(.22,1,.36,1) forwards}
         .snf-stat{background:white;border:1px solid #E2E8F0;border-radius:9px;padding:.35rem .65rem;display:flex;align-items:center;gap:.35rem;box-shadow:0 1px 2px rgba(0,0,0,.03)}
@@ -189,7 +186,7 @@ export default function SuperAdminNotificationsPage() {
         .snf-bar{display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;margin-bottom:.8rem;opacity:0;animation:snfin .4s .08s cubic-bezier(.22,1,.36,1) forwards}
         .snf-tabs{display:flex;gap:.18rem;background:#F1F5F9;padding:.18rem;border-radius:9px}
         .snf-tab{border:none;background:transparent;padding:.25rem .58rem;border-radius:7px;font-size:.68rem;font-weight:700;color:#64748B;cursor:pointer;transition:all .12s;white-space:nowrap}
-        .snf-tab.on{background:white;color:#DC2626;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+        .snf-tab.on{background:white;color:#7C3AED;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 
         .sb{height:30px;padding:0 .68rem;border-radius:8px;border:1px solid;font-family:'DM Sans',sans-serif;font-size:.68rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:.28rem;transition:all .12s;white-space:nowrap}
         .sb:disabled{opacity:.42;cursor:not-allowed}
@@ -202,7 +199,7 @@ export default function SuperAdminNotificationsPage() {
         .snf-panel{background:white;border-radius:16px;border:1px solid #E2E8F0;box-shadow:0 2px 8px rgba(0,0,0,.04);overflow:hidden;opacity:0;animation:snfin .4s .11s cubic-bezier(.22,1,.36,1) forwards}
 
         .snf-selbar{display:flex;align-items:center;gap:.6rem;padding:.55rem 1rem;background:#F8FAFC;border-bottom:1px solid #E2E8F0}
-        .snf-chk{width:15px;height:15px;accent-color:#DC2626;cursor:pointer}
+        .snf-chk{width:15px;height:15px;accent-color:#7C3AED;cursor:pointer}
 
         .snf-item{display:flex;align-items:center;gap:.7rem;padding:.75rem 1rem;border-bottom:1px solid #F1F5F9;transition:background .1s;position:relative}
         .snf-item:last-child{border-bottom:none}
@@ -232,7 +229,7 @@ export default function SuperAdminNotificationsPage() {
         .sib.dl{color:#DC2626;border-color:#FECACA}.sib.dl:hover{background:#FEF2F2}
 
         .snf-load{display:flex;align-items:center;justify-content:center;padding:2.5rem;gap:.5rem;color:#64748B;font-size:.8rem}
-        .snf-ring{width:19px;height:19px;border:2px solid #E2E8F0;border-top-color:#DC2626;border-radius:50%;animation:snfspin .8s linear infinite}
+        .snf-ring{width:19px;height:19px;border:2px solid #E2E8F0;border-top-color:#7C3AED;border-radius:50%;animation:snfspin .8s linear infinite}
         .snf-empty{display:flex;flex-direction:column;align-items:center;padding:3.5rem 1.5rem;gap:.5rem}
         .snf-empty-e{font-size:1.9rem}
         .snf-empty-t{font-size:.85rem;font-weight:700;color:#374151;margin:0}
@@ -251,7 +248,7 @@ export default function SuperAdminNotificationsPage() {
 
         {/* ── Header ── */}
         <div className="snf-header">
-          <div className="snf-eyebrow"><div className="snf-eyedot"/>Super Admin</div>
+          <div className="snf-eyebrow"><div className="snf-eyedot"/>Grand Chef</div>
           <div className="snf-titlerow">
             <h1 className="snf-title">Centre de <span>notifications</span></h1>
             {unreadCount > 0 && <span className="snf-pill">{unreadCount}</span>}
@@ -262,7 +259,7 @@ export default function SuperAdminNotificationsPage() {
         <div className="snf-stats">
           {[
             {n: items.length,                     l: 'Total',    c: '#0F172A'},
-            {n: unreadCount,                      l: 'Non lues', c: '#DC2626'},
+            {n: unreadCount,                      l: 'Non lues', c: '#7C3AED'},
             {n: items.filter(x=>x.isRead).length, l: 'Lues',     c: '#059669'},
           ].map(s=>(
             <div key={s.l} className="snf-stat">

@@ -1,11 +1,11 @@
 // backend/src/domain-provisioning/domain-provisioning.service.ts
-// v2.1 — provisionAssociationDomain() passe désormais domainStatus à ACTIVE
-// immédiatement quand tout réussit du premier coup, au lieu d'attendre le
-// prochain passage du cron (jusqu'à 6h plus tard)
+// v2.2 — ajout de notifySystemAdmins() sur l'échec du cron checkPendingDomains
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { VercelProvider } from './providers/vercel.provider';
 import { CloudflareProvider } from './providers/cloudflare.provider';
+import { NotificationsService } from '../modules/notifications/notifications.service';
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class DomainProvisioningService {
@@ -13,6 +13,7 @@ export class DomainProvisioningService {
     private readonly prisma: PrismaService,
     private readonly vercel: VercelProvider,
     private readonly cloudflare: CloudflareProvider,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -86,6 +87,12 @@ export class DomainProvisioningService {
         }
       } catch (e) {
         console.error(`Échec vérification ${asso.domainName}`, e);
+        // 🔥 AJOUT : ce cron tourne sans surveillance — sans ça, un échec
+        // répété restait invisible indéfiniment dans les logs Render.
+        await this.notifications.notifySystemAdmins(
+          `Échec du provisioning de domaine pour "${asso.name}" (${asso.domainName}) : ${e instanceof Error ? e.message : 'erreur inconnue'}`,
+          NotificationType.SYSTEM_ALERT,
+        );
       }
     }
     return { checked: pending.length, activated };
