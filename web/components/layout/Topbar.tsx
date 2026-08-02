@@ -1,3 +1,4 @@
+//web/components/layout/Topbar.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -6,7 +7,12 @@ import { useRouter, usePathname } from 'next/navigation';
 import { api } from '../../lib/api-client';
 import type { UserRole } from '../../types/user';
 
+// 🔥 CORRECTION : aucun cas pour SYSTEM_ADMIN — le Grand Chef tombait dans
+// le `return` par défaut prévu pour les membres, d'où le lien "Profil"
+// (avatar de la Topbar) qui l'envoyait vers /member/profile au lieu de
+// /system-admin/profile.
 function resolveRoutes(role: UserRole | null) {
+  if (role === 'SYSTEM_ADMIN')  return { notifications: '/system-admin/notifications', profile: '/system-admin/profile' };
   if (role === 'SUPER_ADMIN')   return { notifications: '/super-admin/notifications', profile: '/super-admin/settings' };
   if (role === 'ANTENNA_ADMIN') return { notifications: '/admin/notifications',       profile: '/admin/profile' };
   return                               { notifications: '/member/notifications',       profile: '/member/profile' };
@@ -22,11 +28,23 @@ function getInitials(first: string, last: string): string {
 
 /**
  * Couleurs par rôle :
+ *  SYSTEM_ADMIN  → violet (Grand Chef — cohérent avec la console system-admin)
  *  SUPER_ADMIN   → rouge doux (non agressif)
  *  ANTENNA_ADMIN → bleu ciel
  *  MEMBER        → vert
  */
 const ROLE_META = {
+  SYSTEM_ADMIN: {
+    label: 'Grand Chef',
+    accent: '#7C3AED',
+    onlineColor: '#8B5CF6',
+    gradient: 'linear-gradient(135deg,#7C3AED,#8B5CF6)',
+    topbarBg: 'rgba(250,249,255,0.96)',
+    borderColor: 'rgba(124,58,237,0.10)',
+    shadow: 'rgba(124,58,237,0.06)',
+    pillBg: '#F5F3FF',
+    pillText: '#7C3AED',
+  },
   SUPER_ADMIN: {
     label: 'Super Admin',
     accent: '#C0392B',

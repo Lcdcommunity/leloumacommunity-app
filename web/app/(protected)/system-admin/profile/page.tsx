@@ -313,9 +313,16 @@ export default function SystemAdminProfile() {
           <div style={{ padding: '4rem 1rem', textAlign: 'center', color: 'var(--text-3)', fontWeight: 600 }}>
              Chargement sécurisé...
           </div>
+        ) : error ? (
+          // 🔥 CORRECTION : `error` était stocké dans le catch de loadProfile
+          // mais jamais affiché — si le chargement échouait, la page restait
+          // blanche (loading=false, user=null, aucun rendu).
+          <div className="prof-alert prof-alert-error">
+            ✕ {error}
+          </div>
         ) : user ? (
           <div className="prof-grid">
-            
+
             {/* SIDEBAR */}
             <aside>
               <div className="prof-card">
@@ -328,7 +335,7 @@ export default function SystemAdminProfile() {
                 <div className="prof-side-content">
                   <h2 className="prof-name">{firstName} {lastName}</h2>
                   <div className="prof-role-badge">Grand Chef</div>
-                  
+
                   <div className="prof-stats">
                     <div className="prof-stat-row">
                       <span className="prof-stat-label">Membre depuis</span>
@@ -349,9 +356,9 @@ export default function SystemAdminProfile() {
                 <h3 className="prof-section-title">
                   Identité & Coordonnées
                 </h3>
-                
+
                 <div className="gc-form-group">
-                  
+
                   {/* Ligne 1 : Prénom | Nom */}
                   <div className="gc-row">
                     <div className="gc-col">
@@ -399,12 +406,12 @@ export default function SystemAdminProfile() {
 
                   {/* Ligne 5 : Téléphone */}
                   <div className="gc-row">
-                    <div className="gc-col">
+                    {/* 🔥 CORRECTION : colonne vide retirée (servait juste à
+                        l'espacement) — remplacée par une largeur max fixe sur
+                        la vraie colonne pour garder le même alignement visuel. */}
+                    <div className="gc-col" style={{ maxWidth: 'calc(50% - 0.375rem)' }}>
                       <label className="prof-label"><IconPhone /> Téléphone</label>
                       <input className={`prof-input ${isEditing ? 'editing' : ''}`} value={phone} onChange={e => setPhone(e.target.value)} disabled={!isEditing} placeholder="+33 6..." />
-                    </div>
-                    <div className="gc-col">
-                      {/* Empty col for spacing */}
                     </div>
                   </div>
 

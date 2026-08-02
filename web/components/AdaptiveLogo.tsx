@@ -20,11 +20,10 @@ const DEFAULT_STYLE: DetectedStyle = {
 };
 
 /**
- * Cadre de logo avec un anneau dont la couleur s'adapte automatiquement au
- * logo chargé (couleur moyenne extraite des bords de l'image), sur un fond
- * blanc fixe qui garantit un contraste net quel que soit le logo — évite
- * que l'anneau et le fond du logo se confondent quand le logo n'a pas de
- * transparence.
+ * Cadre de logo, carré aux coins arrondis, sans contour coloré — juste une
+ * ombre douce et neutre pour la définition. La couleur détectée à partir du
+ * logo (bords de l'image) sert uniquement à teinter le "?" de repli quand
+ * aucun logo n'est chargé, plus d'anneau autour de l'image.
  */
 export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogoProps) {
   const [style, setStyle] = useState<DetectedStyle>(DEFAULT_STYLE);
@@ -94,52 +93,44 @@ export function AdaptiveLogo({ src, alt, size = 88, fallbackText }: AdaptiveLogo
     };
   }, [src]);
 
+  // 🔥 CORRECTION : cercle + anneau (padding coloré) remplacés par un carré
+  // aux coins arrondis, sans contour — juste une ombre neutre et discrète.
   return (
     <div
       style={{
         width: size,
         height: size,
-        borderRadius: '50%',
-        padding: 4,
-        background: `linear-gradient(135deg, ${style.ringColor}, ${style.ringColor}CC)`,
-        boxShadow: `0 8px 24px ${style.ringColor}55`,
+        borderRadius: size * 0.22,
+        overflow: 'hidden',
+        position: 'relative',
+        background: '#FFFFFF',
+        boxShadow: '0 8px 20px rgba(15,23,42,0.10)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         flexShrink: 0,
       }}
     >
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          borderRadius: '50%',
-          overflow: 'hidden',
-          position: 'relative',
-          background: '#FFFFFF',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {src ? (
-          <Image
-            src={src}
-            alt={alt}
-            fill
-            style={{ objectFit: 'contain', padding: '8%' }}
-            unoptimized
-          />
-        ) : (
-          <span
-            style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: size * 0.35,
-              fontWeight: 700,
-              color: style.ringColor,
-            }}
-          >
-            {fallbackText || '?'}
-          </span>
-        )}
-      </div>
+      {src ? (
+        <Image
+          src={src}
+          alt={alt}
+          fill
+          style={{ objectFit: 'contain', padding: '8%' }}
+          unoptimized
+        />
+      ) : (
+        <span
+          style={{
+            fontFamily: "'Cormorant Garamond', serif",
+            fontSize: size * 0.35,
+            fontWeight: 700,
+            color: style.ringColor,
+          }}
+        >
+          {fallbackText || '?'}
+        </span>
+      )}
     </div>
   );
 }
