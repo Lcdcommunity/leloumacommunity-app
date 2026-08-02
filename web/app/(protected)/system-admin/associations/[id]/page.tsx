@@ -1,8 +1,9 @@
 // web/app/(protected)/system-admin/associations/[id]/page.tsx
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { AppShell } from '../../../../../components/layout/AppShell';
 import { api } from '../../../../../lib/api-client';
 import { formatDate } from '../../../../../lib/format';
@@ -17,15 +18,38 @@ interface AssociationDetail {
   country?: string | null;
   createdAt: string;
   updatedAt: string;
+  logoFile?: { id: string; url: string } | null;
+  themeColors?: Record<string, string> | null;
+  fontFamily?: string | null;
   _count: {
     users: number;
     antennas: number;
   };
 }
 
+const FONT_OPTIONS = [
+  { name: 'DM Sans (Moderne)', value: "'DM Sans', sans-serif" },
+  { name: 'Inter (Pro)', value: "'Inter', sans-serif" },
+  { name: 'Montserrat (Élégant)', value: "'Montserrat', sans-serif" },
+  { name: 'Playfair Display (Classique)', value: "'Playfair Display', serif" },
+  { name: 'Roboto (Standard)', value: "'Roboto', sans-serif" },
+];
+
+const CURRENCY_OPTIONS = [
+  { value: 'EUR', label: 'Euro (EUR)' },
+  { value: 'GNF', label: 'Franc guinéen (GNF)' },
+  { value: 'XOF', label: 'Franc CFA (XOF)' },
+  { value: 'USD', label: 'Dollar américain (USD)' },
+  { value: 'GBP', label: 'Livre sterling (GBP)' },
+  { value: 'CHF', label: 'Franc suisse (CHF)' },
+  { value: 'CAD', label: 'Dollar canadien (CAD)' },
+];
+
 export default function AssociationDetails() {
   const { id } = useParams();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [asso, setAsso] = useState<AssociationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -34,12 +58,17 @@ export default function AssociationDetails() {
   const [editName, setEditName] = useState('');
   const [editCode, setEditCode] = useState('');
   const [editDomain, setEditDomain] = useState('');
+  const [editFontFamily, setEditFontFamily] = useState(FONT_OPTIONS[0].value);
+  const [editPrimaryColor, setEditPrimaryColor] = useState('#7C3AED');
+  const [editSecondaryColor, setEditSecondaryColor] = useState('#10B981');
+  const [editCurrency, setEditCurrency] = useState('EUR');
+
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const [domainNameServers, setDomainNameServers] = useState<string[] | null>(null);
   const [domainActionError, setDomainActionError] = useState<string | null>(null);
 
-  // .then() explicite (pas async/await) : c'est le pattern que la règle ESLint
-  // set-state-in-effect reconnaît de façon fiable comme "indirect", cf. sa doc.
   const fetchAssociation = useCallback(() => {
     return api.getAssociationByIdSystemAdmin(id as string).then((data) => {
       const d = data as AssociationDetail;
@@ -47,6 +76,12 @@ export default function AssociationDetails() {
       setEditName(d.name);
       setEditCode(d.code);
       setEditDomain(d.domainName || '');
+      setEditFontFamily(d.fontFamily || FONT_OPTIONS[0].value);
+      setEditPrimaryColor(d.themeColors?.primary || '#7C3AED');
+      setEditSecondaryColor(d.themeColors?.secondary || '#10B981');
+      setEditCurrency(d.defaultCurrency || 'EUR');
+      setLogoPreview(d.logoFile?.url || null);
+      setLogoFile(null);
     });
   }, [id]);
 
@@ -55,6 +90,16 @@ export default function AssociationDetails() {
       .catch(() => router.push('/system-admin/associations'))
       .finally(() => setLoading(false));
   }, [fetchAssociation, router]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setLogoPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
 
   const toggleStatus = async () => {
     if (!asso) return;
@@ -81,10 +126,20 @@ export default function AssociationDetails() {
       const trimmedDomain = editDomain.trim();
       const domainChanged = trimmedDomain !== (asso?.domainName || '');
 
+      let logoFileId: string | undefined;
+      if (logoFile) {
+        const uploadRes = await api.uploadFile(logoFile, { category: 'ASSOCIATION_DOCUMENT' });
+        logoFileId = uploadRes.id;
+      }
+
       await api.updateAssociationDetailsSystemAdmin(id as string, {
         name: editName,
         code: editCode,
-        domainName: trimmedDomain, // ton backend normalise déjà '' -> null, pas besoin de le faire ici
+        domainName: trimmedDomain,
+        ...(logoFileId ? { logoFileId } : {}),
+        themeColors: { primary: editPrimaryColor, secondary: editSecondaryColor },
+        fontFamily: editFontFamily,
+        defaultCurrency: editCurrency,
       });
 
       if (domainChanged && trimmedDomain) {
@@ -142,6 +197,11 @@ export default function AssociationDetails() {
         
         .sys-input { padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px solid #DDD6FE; font-family: inherit; font-size: 0.85rem; font-weight: 600; outline: none; color: #111827; width: 60%; text-align: right; background: #F5F3FF; transition: border-color 0.2s;}
         .sys-input:focus { border-color: #7C3AED; }
+        .sys-select {
+          padding: 0.5rem 0.8rem; border-radius: 8px; border: 1px solid #DDD6FE; font-family: inherit;
+          font-size: 0.85rem; font-weight: 600; outline: none; color: #111827; width: 60%; text-align: right;
+          background: #F5F3FF; appearance: none; cursor: pointer;
+        }
         
         .btn-edit { background: #F5F3FF; color: #7C3AED; border: 1px solid #DDD6FE; padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
         .btn-edit:hover { background: #EDE9FE; }
@@ -158,6 +218,27 @@ export default function AssociationDetails() {
         .stat-label { font-size: 0.7rem; font-weight: 700; color: #6D28D9; text-transform: uppercase; }
         .ns-banner { background: #F5F3FF; border: 1px solid #DDD6FE; border-radius: 12px; padding: 1rem; margin-top: 1rem; font-size: 0.8rem; }
         .ns-banner code { display: block; font-weight: 700; color: #7C3AED; margin-top: 0.4rem; }
+
+        .logo-upload-zone {
+          width: 100%; height: 90px; border: 2px dashed rgba(124,58,237,0.3); border-radius: 12px;
+          display: flex; align-items: center; justify-content: center; cursor: pointer;
+          transition: all 0.2s; background: rgba(124,58,237,0.02); position: relative; overflow: hidden;
+        }
+        .logo-upload-zone:hover { border-color: #7C3AED; background: white; }
+        .logo-img { object-fit: contain; }
+        .current-logo-preview { border-radius: 10px; object-fit: contain; background: #F5F3FF; border: 1px solid #DDD6FE; }
+        .color-row { display: flex; gap: 0.6rem; }
+        .color-item {
+          flex: 1; position: relative; height: 42px; border-radius: 8px;
+          background: #F5F3FF; overflow: hidden; display: flex; align-items: center; justify-content: center;
+          border: 1px solid #DDD6FE;
+        }
+        .color-picker { position: absolute; opacity: 0; width: 100%; height: 100%; cursor: pointer; z-index: 2; }
+        .color-display { display: flex; align-items: center; gap: 0.4rem; z-index: 1; pointer-events: none; }
+        .color-circle { width: 14px; height: 14px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .color-label { font-size: 0.7rem; font-weight: 700; color: #111827; }
+        .color-swatch-sm { width: 18px; height: 18px; border-radius: 50%; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.15); display: inline-block; }
+
         @keyframes detIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
@@ -195,6 +276,56 @@ export default function AssociationDetails() {
                     <span className="info-label">Domaine Dédié</span>
                     <input className="sys-input" value={editDomain} onChange={e => setEditDomain(e.target.value)} placeholder="asso.lcd.com" />
                   </div>
+
+                  <div className="info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
+                    <span className="info-label">Logo</span>
+                    <div className="logo-upload-zone" onClick={() => fileInputRef.current?.click()}>
+                      {logoPreview ? (
+                        <Image src={logoPreview} alt="Logo" fill className="logo-img" unoptimized />
+                      ) : (
+                        <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
+                          <span style={{ fontSize: '1.5rem' }}>📁</span>
+                          <span style={{ color: '#7C3AED', fontWeight: 600, fontSize: '0.8rem' }}>Uploader un logo</span>
+                        </div>
+                      )}
+                    </div>
+                    <input type="file" ref={fileInputRef} onChange={handleLogoChange} hidden accept="image/*" />
+                  </div>
+
+                  <div className="info-row">
+                    <span className="info-label">Police d&apos;écriture</span>
+                    <select className="sys-select" value={editFontFamily} onChange={e => setEditFontFamily(e.target.value)} style={{ fontFamily: editFontFamily }}>
+                      {FONT_OPTIONS.map(f => <option key={f.value} value={f.value}>{f.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="info-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
+                    <span className="info-label">Couleurs du thème</span>
+                    <div className="color-row">
+                      <div className="color-item">
+                        <input type="color" className="color-picker" value={editPrimaryColor} onChange={e => setEditPrimaryColor(e.target.value)} />
+                        <div className="color-display">
+                          <span className="color-circle" style={{ backgroundColor: editPrimaryColor }} />
+                          <span className="color-label">Principale</span>
+                        </div>
+                      </div>
+                      <div className="color-item">
+                        <input type="color" className="color-picker" value={editSecondaryColor} onChange={e => setEditSecondaryColor(e.target.value)} />
+                        <div className="color-display">
+                          <span className="color-circle" style={{ backgroundColor: editSecondaryColor }} />
+                          <span className="color-label">Accent</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="info-row">
+                    <span className="info-label">Devise par défaut</span>
+                    <select className="sys-select" value={editCurrency} onChange={e => setEditCurrency(e.target.value)}>
+                      {CURRENCY_OPTIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                  </div>
+
                   <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1rem' }}>
                     <button type="button" className="btn-edit" onClick={() => setIsEditing(false)} disabled={actionLoading}>Annuler</button>
                     <button type="submit" className="btn-edit" style={{ background: '#7C3AED', color: 'white' }} disabled={actionLoading}>Enregistrer</button>
@@ -205,6 +336,22 @@ export default function AssociationDetails() {
                   <div className="info-row"><span className="info-label">Nom Officiel</span><span className="info-value">{asso.name}</span></div>
                   <div className="info-row"><span className="info-label">Code Identifiant</span><span className="info-value" style={{ fontFamily: 'monospace', color: '#7C3AED' }}>{asso.code}</span></div>
                   <div className="info-row"><span className="info-label">Domaine Dédié</span><span className="info-value">{asso.domainName || 'Non configuré'}</span></div>
+                  <div className="info-row">
+                    <span className="info-label">Logo</span>
+                    <span className="info-value">
+                      {asso.logoFile?.url
+                        ? <Image src={asso.logoFile.url} alt="Logo" width={36} height={36} className="current-logo-preview" unoptimized />
+                        : 'Non configuré'}
+                    </span>
+                  </div>
+                  <div className="info-row"><span className="info-label">Police</span><span className="info-value" style={{ fontFamily: asso.fontFamily || undefined }}>{asso.fontFamily || 'Défaut'}</span></div>
+                  <div className="info-row">
+                    <span className="info-label">Couleurs</span>
+                    <span className="info-value" style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                      <span className="color-swatch-sm" style={{ background: asso.themeColors?.primary || '#7C3AED' }} />
+                      <span className="color-swatch-sm" style={{ background: asso.themeColors?.secondary || '#10B981' }} />
+                    </span>
+                  </div>
                 </>
               )}
 
@@ -219,7 +366,7 @@ export default function AssociationDetails() {
                   {domainActionError}
                 </div>
               )}
-              
+
               <div className="info-row" style={{ marginTop: '1rem', border: 'none' }}><span className="info-label">Devise par défaut</span><span className="info-value">{asso.defaultCurrency}</span></div>
               <div className="info-row" style={{ border: 'none' }}><span className="info-label">Pays</span><span className="info-value">{asso.country || 'Non spécifié'}</span></div>
               <div className="info-row" style={{ border: 'none' }}><span className="info-label">Date de création</span><span className="info-value">{formatDate(asso.createdAt)}</span></div>

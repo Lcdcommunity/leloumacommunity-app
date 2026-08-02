@@ -1,5 +1,6 @@
 // backend/src/modules/associations/dto/update-association.dto.ts
-import { IsArray, IsDateString, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { CurrencyCode } from '@prisma/client';
 
 export class UpdateAssociationDto {
   @IsOptional()
@@ -67,10 +68,14 @@ export class UpdateAssociationDto {
   @MaxLength(20)
   postalCode?: string;
 
+  // 🔥 CORRECTION : IsString() seul laissait passer n'importe quelle chaîne
+  // (ex. "BANANA") — associations.service.ts la force-castait ensuite en
+  // CurrencyCode sans vérification, et c'est Postgres qui finissait par
+  // rejeter la valeur avec une 500 brute au lieu d'un message de validation
+  // propre. IsEnum valide contre les vraies valeurs de CurrencyCode.
   @IsOptional()
-  @IsString()
-  @MaxLength(10)
-  defaultCurrency?: string;
+  @IsEnum(CurrencyCode, { message: 'Devise invalide.' })
+  defaultCurrency?: CurrencyCode;
 
   // 🔒 RETIRÉ : isActive (SYSTEM_ADMIN uniquement)
 
@@ -78,13 +83,12 @@ export class UpdateAssociationDto {
   @IsString()
   logoFileId?: string;
 
-  @IsOptional()
-  @IsDateString({}, { message: 'La date de fondation doit être valide (YYYY-MM-DD)' })
-  foundedAt?: string;
+  // 🔥 CORRECTION : foundedAt retiré — n'existe pas comme colonne sur
+  // Association dans schema.prisma. Le champ passait la validation (IsDateString
+  // ne vérifie que le format) mais n'était jamais écrit par updateCurrent()
+  // (ligne manquante dans le data: {}) : envoyer une date ne renvoyait aucune
+  // erreur mais ne sauvegardait jamais rien, silencieusement.
 
-  // Liste des communes/villages d'origine proposée aux membres à l'inscription
-  // (champ "commune d'origine" du signup). Tableau vide ou absent = pas de
-  // liste configurée, le frontend bascule alors en saisie libre.
   @IsOptional()
   @IsArray()
   @IsString({ each: true })

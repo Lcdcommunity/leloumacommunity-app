@@ -2,7 +2,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType, CurrencyCode } from '@prisma/client';
+import { NotificationType } from '@prisma/client';
 import { UpdateAssociationDto } from './dto/update-association.dto';
 
 @Injectable()
@@ -42,7 +42,10 @@ export class AssociationsService {
         ...(data.addressLine1 !== undefined ? { addressLine1: data.addressLine1 } : {}),
         ...(data.addressLine2 !== undefined ? { addressLine2: data.addressLine2 } : {}),
         ...(data.postalCode !== undefined ? { postalCode: data.postalCode } : {}),
-        ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency as CurrencyCode } : {}),
+        // 🔥 CORRECTION : plus besoin de `as CurrencyCode` — le DTO valide
+        // désormais la valeur via @IsEnum(CurrencyCode), data.defaultCurrency
+        // est déjà correctement typé CurrencyCode ici.
+        ...(data.defaultCurrency !== undefined ? { defaultCurrency: data.defaultCurrency } : {}),
         ...(data.originLocalities !== undefined ? { originLocalities: data.originLocalities } : {}),
         // 🔒 isActive : volontairement absent (SYSTEM_ADMIN uniquement).
         // 🔒 expenseValidationThreshold : volontairement absent — concept

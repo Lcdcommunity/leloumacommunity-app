@@ -1,4 +1,4 @@
-/////// backend/src/modules/system-admin/system-admin.controller.ts
+// backend/src/modules/system-admin/system-admin.controller.ts
 import { 
   Controller, 
   Post, 
@@ -44,11 +44,22 @@ export class SystemAdminController {
     return this.systemAdminService.getAssociationById(id);
   }
 
+  // 🔥 CORRECTION : type élargi pour couvrir logo/thème/police/devise, qui
+  // n'étaient jamais transmis au service — c'est ça qui empêchait la page
+  // d'édition de les sauvegarder, même une fois le formulaire complété.
   @Patch('associations/:id')
   @Roles(UserRole.SYSTEM_ADMIN)
   updateAssociationDetails(
     @Param('id') id: string,
-    @Body() data: { name?: string; code?: string; domainName?: string }
+    @Body() data: {
+      name?: string;
+      code?: string;
+      domainName?: string;
+      logoFileId?: string | null;
+      themeColors?: Record<string, string>;
+      fontFamily?: string;
+      defaultCurrency?: string;
+    }
   ) {
     return this.systemAdminService.updateAssociationDetails(id, data);
   }
@@ -68,7 +79,6 @@ export class SystemAdminController {
     return this.systemAdminService.deleteAssociation(id);
   }
 
-  // 🔥 AJOUT : réglages plateforme (nom, email de contact, mode maintenance)
   @Get('settings')
   @Roles(UserRole.SYSTEM_ADMIN)
   getSettings() {

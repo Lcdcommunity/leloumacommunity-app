@@ -1289,7 +1289,7 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       }`
     ),
 
-  // ==========================================
+ // ==========================================
   // SYSTEM ADMIN (GRAND CHEF)
   // ==========================================
   createAssociationSystemAdmin: (body: {
@@ -1346,13 +1346,28 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       country?: string | null;
       createdAt: string;
       updatedAt: string;
+      logoFile?: { id: string; url: string } | null;
+      themeColors?: Record<string, string> | null;
+      fontFamily?: string | null;
       _count: { users: number; antennas: number };
     }>(`/system-admin/associations/${id}`),
 
   deleteAssociationSystemAdmin: (id: string) =>
     http<{ message: string }>(`/system-admin/associations/${id}`, { method: 'DELETE' }),
 
-  updateAssociationDetailsSystemAdmin: (id: string, body: { name?: string; code?: string; domainName?: string }) =>
+  // 🔥 CORRECTION : body élargi pour couvrir logo/thème/police/devise —
+  // sans ça, ces champs étaient bien envoyés par la page d'édition mais
+  // TypeScript les aurait rejetés à la compilation (ou silencieusement
+  // ignorés selon la config), puisque le type ne les déclarait pas.
+  updateAssociationDetailsSystemAdmin: (id: string, body: {
+    name?: string;
+    code?: string;
+    domainName?: string;
+    logoFileId?: string | null;
+    themeColors?: Record<string, string>;
+    fontFamily?: string;
+    defaultCurrency?: string;
+  }) =>
     http<{ id: string; name: string; code: string; domainName: string | null }, typeof body>(
       `/system-admin/associations/${id}`, { method: 'PATCH', body }
     ),
