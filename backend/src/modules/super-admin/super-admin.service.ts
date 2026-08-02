@@ -551,11 +551,21 @@ export class SuperAdminService {
       const newAntennaIds = data.antennaIds;
 
       await this.prisma.$transaction(async (tx) => {
+<<<<<<< HEAD
+=======
+        // Toutes les assignations existantes (actives ou révoquées) pour cet
+        // admin, pour réutiliser les lignes déjà présentes au lieu d'en
+        // recréer en double.
+>>>>>>> ffb0d0c (feat(admin): sélection d'antenne à la création + fix lint set-state-in-effect)
         const existingAssignments = await tx.antennaAdminAssignment.findMany({
           where: { adminUserId: userId, associationId },
         });
         const existingByAntenna = new Map(existingAssignments.map(a => [a.antennaId, a]));
 
+<<<<<<< HEAD
+=======
+        // 1) Désactiver les antennes actives qui sortent de la sélection
+>>>>>>> ffb0d0c (feat(admin): sélection d'antenne à la création + fix lint set-state-in-effect)
         const toDeactivate = existingAssignments
           .filter(a => a.isActive && !newAntennaIds.includes(a.antennaId))
           .map(a => a.id);
@@ -567,6 +577,12 @@ export class SuperAdminService {
           });
         }
 
+<<<<<<< HEAD
+=======
+        // 2) Pour chaque antenne sélectionnée : réactiver la ligne existante
+        //    (active ou précédemment révoquée), ou en créer une nouvelle si
+        //    elle n'a jamais existé pour cet admin.
+>>>>>>> ffb0d0c (feat(admin): sélection d'antenne à la création + fix lint set-state-in-effect)
         for (const antennaId of newAntennaIds) {
           const existing = existingByAntenna.get(antennaId);
           if (existing) {
