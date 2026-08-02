@@ -1,11 +1,12 @@
 // web/components/admin/DocumentForm.tsx
 'use client';
 
-import { FormEvent, useState, useRef } from 'react';
+import { FormEvent, useEffect, useState, useRef } from 'react';
 import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
 import { Textarea } from '../ui/Textarea';
-import { api } from '../../lib/api-client';
+import { api, type MyTransferAntenna } from '../../lib/api-client';
 
 export function DocumentForm({
   onCreated,
@@ -20,8 +21,22 @@ export function DocumentForm({
   const [loadingSave, setLoadingSave] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
-  
+
+  // Sélecteur d'antenne (admin multi-antennes) : masqué si l'admin ne gère
+  // qu'une seule antenne (retombe automatiquement dessus côté backend),
+  // affiché et requis s'il en gère plusieurs.
+  const [antennas, setAntennas] = useState<MyTransferAntenna[]>([]);
+  const [antennaId, setAntennaId] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getMyTransferAntennas()
+      .then((res) => { if (!cancelled) setAntennas(res); })
+      .catch(() => { /* silencieux : le backend retombera sur l'antenne unique */ });
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleUpload(file: File | null) {
     if (!file) return;
@@ -54,7 +69,11 @@ export function DocumentForm({
       setError("Veuillez sélectionner un fichier avant d'enregistrer.");
       return;
     }
-    
+    if (antennas.length > 1 && !antennaId) {
+      setError('Veuillez sélectionner une antenne.');
+      return;
+    }
+
     setLoadingSave(true);
     setError(null);
     try {
@@ -62,11 +81,13 @@ export function DocumentForm({
         title,
         description: description || undefined,
         fileAssetId,
+        antennaId: antennaId || undefined,
       });
       setTitle('');
       setDescription('');
       setFileAssetId(null);
       setFileName(null);
+      setAntennaId('');
       await onCreated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur enregistrement');
@@ -88,8 +109,20 @@ export function DocumentForm({
       `}</style>
 
       <div style={{ display: 'grid', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        {antennas.length > 1 && (
+          <Select
+            label="Antenne"
+            value={antennaId}
+            onChange={(e) => setAntennaId(e.target.value)}
+            options={[
+              { value: '', label: 'Sélectionnez une antenne…' },
+              ...antennas.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+          />
+        )}
+
         <Input label="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} />
-        
+
         <Textarea
           label="Description"
           value={description}
@@ -101,7 +134,7 @@ export function DocumentForm({
           <label style={{ fontSize: '0.85rem', fontWeight: 600, color: '#374151' }}>
             Fichier / Document <span style={{ color: '#DC2626' }}>*</span>
           </label>
-          
+
           <input 
             ref={fileInputRef}
             type="file" 

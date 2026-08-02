@@ -15,8 +15,14 @@ export class AdminService {
   ) {}
 
   /**
-   * Helper privé pour récupérer le contexte complet (Antenne + Association)
+   * Helper privé pour récupérer le contexte complet (Antenne(s) + Association)
    * CORRECTION CHIRURGICALE : Support du SUPER_ADMIN sans assignation d'antenne fixe.
+   * CORRECTION (2) : un admin peut être responsable de PLUSIEURS antennes (tant
+   * qu'elles partagent la même devise) — on renvoie donc désormais la liste
+   * complète de ses antennes actives (`antennaIds`) via `findMany`, au lieu
+   * d'une seule antenne choisie arbitrairement par `findFirst`. C'était la
+   * cause du bug où un admin multi-antennes ne voyait les cotisations/membres/
+   * projets/documents/annonces que d'UNE seule de ses antennes.
    */
   private async getAdminContext(adminId: string) {
     const user = await this.prisma.user.findUnique({ 
@@ -28,23 +34,23 @@ export class AdminService {
 
     if (user.role === UserRole.SUPER_ADMIN) {
       return {
-        antennaId: undefined, 
+        antennaIds: undefined,
         associationId: user.associationId
       };
     }
 
-    const assignment = await this.prisma.antennaAdminAssignment.findFirst({
+    const assignments = await this.prisma.antennaAdminAssignment.findMany({
       where: { adminUserId: adminId, isActive: true },
       include: { antenna: true }
     });
 
-    if (!assignment || !assignment.antenna) {
+    if (assignments.length === 0 || !assignments[0].antenna) {
       throw new ForbiddenException("Vous n'avez aucune antenne active assignée.");
     }
 
     return {
-      antennaId: assignment.antennaId,
-      associationId: assignment.antenna.associationId
+      antennaIds: assignments.map(a => a.antennaId),
+      associationId: assignments[0].antenna.associationId
     };
   }
 
@@ -80,16 +86,64 @@ export class AdminService {
     }
   }
 
+  /**
+   * Détermine l'antenne cible d'un nouveau MEMBRE pour un admin qui peut gérer
+   * plusieurs antennes. Un membre doit toujours appartenir à une antenne réelle
+   * (jamais "global"). Si le front envoie un antennaId explicite (sélecteur),
+   * on vérifie qu'il fait bien partie des antennes actives de l'admin. Sinon,
+   * on retombe sur le comportement historique (première antenne gérée, ou
+   * première antenne de l'association pour un SUPER_ADMIN) — ce fallback est
+   * volontairement conservé pour ne rien casser tant que le sélecteur n'est
+   * pas branché sur le formulaire de création.
+   */
+  private async resolveRequiredAntennaId(
+    antennaIds: string[] | undefined,
+    associationId: string,
+    requestedAntennaId?: string,
+  ): Promise<string> {
+    if (requestedAntennaId) {
+      if (antennaIds && !antennaIds.includes(requestedAntennaId)) {
+        throw new ForbiddenException("Cette antenne ne fait pas partie de vos antennes assignées.");
+      }
+      return requestedAntennaId;
+    }
+
+    if (antennaIds?.length) {
+      return antennaIds[0];
+    }
+
+    const fallback = await this.prisma.antenna.findFirst({ where: { associationId } });
+    if (!fallback) throw new NotFoundException("Aucune antenne disponible pour cette association.");
+    return fallback.id;
+  }
+
+  /**
+   * Même logique que `resolveRequiredAntennaId`, mais pour les entités qui
+   * peuvent rester "globales" (antennaId null) — projets, documents, annonces.
+   */
+  private async resolveOptionalAntennaId(
+    antennaIds: string[] | undefined,
+    requestedAntennaId?: string,
+  ): Promise<string | null> {
+    if (requestedAntennaId) {
+      if (antennaIds && !antennaIds.includes(requestedAntennaId)) {
+        throw new ForbiddenException("Cette antenne ne fait pas partie de vos antennes assignées.");
+      }
+      return requestedAntennaId;
+    }
+    return antennaIds?.[0] || null;
+  }
+
   // --- GESTION DES MEMBRES (APPROBATIONS) ---
 
   async listPendingApprovals(adminId: string, page: number, pageSize: number) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
     const where: Prisma.UserWhereInput = { 
       associationId,
       status: UserStatus.PENDING_APPROVAL, 
       role: UserRole.MEMBER, 
-      ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+      ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
     };
 
     const [items, total] = await Promise.all([
@@ -113,12 +167,12 @@ export class AdminService {
   }
 
   async approveMember(userId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
       where: { 
         id: userId, 
         associationId, 
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       } 
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
@@ -140,12 +194,12 @@ export class AdminService {
   }
 
   async rejectMember(userId: string, adminId: string, reason: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
       where: { 
         id: userId, 
         associationId, 
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       } 
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
@@ -167,12 +221,12 @@ export class AdminService {
   }
 
   async listMembers(adminId: string, page: number, pageSize: number, q?: string, status?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
     const where: Prisma.UserWhereInput = { 
       associationId,
       role: UserRole.MEMBER,
-      ...(antennaId ? { memberships: { some: { antennaId } } } : {}),
+      ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}),
       ...(status ? { status: status as UserStatus } : { NOT: { status: UserStatus.DELETED } }) 
     };
 
@@ -199,12 +253,12 @@ export class AdminService {
   }
 
   async exportMembers(adminId: string): Promise<string> {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const members = await this.prisma.user.findMany({ 
       where: { 
         associationId,
         role: UserRole.MEMBER,
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {})
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {})
       }, 
       orderBy: { lastName: 'asc' } 
     });
@@ -215,14 +269,14 @@ export class AdminService {
   }
 
   async listLateMembers(adminId: string, page: number, pageSize: number) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
     const users = await this.prisma.user.findMany({ 
       where: { 
         associationId,
         status: UserStatus.ACTIVE, 
         role: UserRole.MEMBER,
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       },
       orderBy: { lastName: 'asc' },
       include: {
@@ -264,8 +318,8 @@ export class AdminService {
     };
   }
 
-  async createMember(adminId: string, data: CreateMemberDto) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+  async createMember(adminId: string, data: CreateMemberDto & { antennaId?: string }) {
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
@@ -274,7 +328,10 @@ export class AdminService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    const targetAntennaId = antennaId || (await this.prisma.antenna.findFirst({ where: { associationId } })).id;
+    // Sélecteur d'antenne (admin multi-antennes) : utilise l'antenne choisie
+    // côté front si fournie et valide, sinon retombe sur le comportement
+    // historique (première antenne gérée par l'admin).
+    const targetAntennaId = await this.resolveRequiredAntennaId(antennaIds, associationId, data.antennaId);
 
     const newUser = await this.prisma.user.create({
       data: {
@@ -322,12 +379,12 @@ export class AdminService {
   }
 
   async suspendUser(userId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
       where: { 
         id: userId, 
         associationId, 
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       } 
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
@@ -349,12 +406,12 @@ export class AdminService {
   }
 
   async activateUser(userId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
       where: { 
         id: userId, 
         associationId, 
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       } 
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
@@ -375,12 +432,12 @@ export class AdminService {
   }
 
   async deleteUser(userId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
       where: { 
         id: userId, 
         associationId, 
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       } 
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
@@ -392,12 +449,12 @@ export class AdminService {
   }
 
   async updateAntennaMember(userId: string, adminId: string, data: any) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const user = await this.prisma.user.findFirst({ 
       where: { 
         id: userId, 
         associationId, 
-        ...(antennaId ? { memberships: { some: { antennaId } } } : {}) 
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       } 
     });
 
@@ -427,7 +484,7 @@ export class AdminService {
   // --- GESTION DES COTISATIONS ---
 
   async listContributions(adminId: string, page: number, pageSize: number, status?: string, q?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
 
     let contributionStatus: ContributionStatus | undefined = undefined;
@@ -437,7 +494,7 @@ export class AdminService {
 
     const where: Prisma.ContributionWhereInput = { 
       associationId,
-      ...(antennaId ? { antennaId } : {}), 
+      ...(antennaIds ? { antennaId: { in: antennaIds } } : {}), 
       ...(contributionStatus ? { status: contributionStatus } : {}) 
     };
     if (q) { 
@@ -485,12 +542,12 @@ export class AdminService {
    * depuis ce panneau admin.
    */
   async validateContribution(contributionId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
       where: { 
         id: contributionId, 
         associationId,
-        ...(antennaId ? { antennaId } : {})
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {})
       },
       include: { member: true } 
     });
@@ -563,12 +620,12 @@ export class AdminService {
   }
 
   async rejectContribution(contributionId: string, adminId: string, reason: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
       where: { 
         id: contributionId, 
         associationId,
-        ...(antennaId ? { antennaId } : {})
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {})
       } 
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
@@ -600,12 +657,12 @@ export class AdminService {
    * une correction manuelle.
    */
   async updateContribution(contributionId: string, adminId: string, amount: number) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
       where: { 
         id: contributionId, 
         associationId,
-        ...(antennaId ? { antennaId } : {}) 
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
       } 
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
@@ -631,12 +688,12 @@ export class AdminService {
    * l'argent reste compté dans le solde).
    */
   async deleteContribution(contributionId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
       where: { 
         id: contributionId, 
         associationId,
-        ...(antennaId ? { antennaId } : {}) 
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
       } 
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
@@ -659,7 +716,7 @@ export class AdminService {
   // --- GESTION DES PROJETS ET PROPOSITIONS ---
 
   async listProjects(adminId: string, page: number, pageSize: number, status?: string, q?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.ProjectWhereInput = { 
@@ -669,10 +726,10 @@ export class AdminService {
 
     const andConditions: Prisma.ProjectWhereInput[] = [];
 
-    if (antennaId) {
+    if (antennaIds) {
       andConditions.push({
         OR: [
-          { antennaId: antennaId },
+          { antennaId: { in: antennaIds } },
           { status: { notIn: [ProjectStatus.PROPOSED, ProjectStatus.UNDER_REVIEW] } }
         ]
       });
@@ -721,14 +778,14 @@ export class AdminService {
   }
 
   async exportProjectPdf(projectId: string, adminId: string): Promise<Buffer> {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const project = await this.prisma.project.findFirst({
       where: { 
         id: projectId, 
         associationId,
-        ...(antennaId ? { 
+        ...(antennaIds ? { 
           OR: [
-            { antennaId: antennaId },
+            { antennaId: { in: antennaIds } },
             { status: { notIn: [ProjectStatus.PROPOSED, ProjectStatus.UNDER_REVIEW] } }
           ]
         } : {})
@@ -819,11 +876,11 @@ export class AdminService {
   }
 
   async listProjectProposals(adminId: string, page: number, pageSize: number, status?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
     const where: Prisma.ProjectProposalWhereInput = { 
       associationId,
-      ...(antennaId ? { antennaId } : {}), 
+      ...(antennaIds ? { antennaId: { in: antennaIds } } : {}), 
       ...(status ? { status: status as ProposalStatus } : {}) 
     };
 
@@ -843,13 +900,13 @@ export class AdminService {
   }
 
   async approveProjectProposal(proposalId: string, adminId: string, reviewComment?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
     const proposal = await this.prisma.projectProposal.findFirst({
       where: {
         id: proposalId,
         associationId,
-        ...(antennaId ? { antennaId } : {}),
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}),
       },
       include: { author: true },
     });
@@ -869,7 +926,10 @@ export class AdminService {
     const project = await this.prisma.project.create({
       data: {
         associationId,
-        antennaId: antennaId ?? proposal.antennaId ?? null,
+        // On garde l'antenne d'origine de la proposition (non ambigu) ; on ne
+        // retombe sur la première antenne de l'admin que si la proposition
+        // elle-même n'en avait pas (ex. proposition créée par un super admin).
+        antennaId: proposal.antennaId ?? antennaIds?.[0] ?? null,
         title: proposal.title,
         description: proposal.description,
         budgetAmount: proposal.estimatedBudget ?? null,
@@ -898,13 +958,13 @@ export class AdminService {
   }
 
   async rejectProjectProposal(proposalId: string, adminId: string, reviewComment?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
     const proposal = await this.prisma.projectProposal.findFirst({
       where: {
         id: proposalId,
         associationId,
-        ...(antennaId ? { antennaId } : {}),
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}),
       },
       include: { author: true },
     });
@@ -937,17 +997,19 @@ export class AdminService {
   }
 
   async createProject(adminId: string, data: any) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
     let safeStatus = data.status;
     if (safeStatus === 'DRAFT') safeStatus = ProjectStatus.PROPOSED;
     if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
     if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
 
+    const targetAntennaId = await this.resolveOptionalAntennaId(antennaIds, data.antennaId);
+
     const project = await this.prisma.project.create({
       data: { 
         associationId,
-        antennaId: antennaId || null,
+        antennaId: targetAntennaId,
         title: data.title,
         summary: data.summary,
         description: data.description,
@@ -983,12 +1045,12 @@ export class AdminService {
   }
 
   async updateProject(projectId: string, adminId: string, data: any) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const project = await this.prisma.project.findFirst({
       where: {
         id: projectId,
         associationId,
-        ...(antennaId ? { antennaId } : {}),
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}),
       },
     });
     if (!project) throw new NotFoundException('Projet introuvable.');
@@ -1033,12 +1095,12 @@ export class AdminService {
   }
 
   async deleteProject(projectId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const project = await this.prisma.project.findFirst({ 
       where: { 
         id: projectId, 
         associationId,
-        ...(antennaId ? { antennaId } : {}) 
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
       } 
     });
     if (!project) throw new NotFoundException("Projet introuvable.");
@@ -1048,11 +1110,11 @@ export class AdminService {
   // --- GESTION DES DOCUMENTS ---
 
   async listDocuments(adminId: string, page: number, pageSize: number, q?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
     const where: Prisma.DocumentWhereInput = { 
       associationId,
-      ...(antennaId ? { antennaId } : {}) 
+      ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
     };
 
     if (q) {
@@ -1068,14 +1130,16 @@ export class AdminService {
   }
 
   async createDocument(adminId: string, data: any) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
+
+    const targetAntennaId = await this.resolveOptionalAntennaId(antennaIds, data.antennaId);
 
     const doc = await this.prisma.document.create({
       data: {
         title: data.title,
         description: data.description,
         fileId: data.fileId,
-        antennaId: antennaId || null,
+        antennaId: targetAntennaId,
         associationId,
         uploadedByUserId: adminId, 
         publishedAt: new Date(),
@@ -1088,12 +1152,12 @@ export class AdminService {
   }
 
   async deleteDocument(documentId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const doc = await this.prisma.document.findFirst({ 
       where: { 
         id: documentId, 
         associationId,
-        ...(antennaId ? { antennaId } : {}) 
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
       } 
     });
     if (!doc) throw new NotFoundException("Document introuvable.");
@@ -1103,11 +1167,11 @@ export class AdminService {
   // --- GESTION DES CONTENUS (ANNONCES) ---
 
   async listContents(adminId: string, page: number, pageSize: number, q?: string, status?: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
     const where: Prisma.NewsPostWhereInput = { 
       associationId,
-      ...(antennaId ? { antennaId } : {}), 
+      ...(antennaIds ? { antennaId: { in: antennaIds } } : {}), 
       ...(status ? { status: status as PostStatus } : {}) 
     };
 
@@ -1139,7 +1203,9 @@ export class AdminService {
   }
 
   async createContent(adminId: string, data: any) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
+
+    const targetAntennaId = await this.resolveOptionalAntennaId(antennaIds, data.antennaId);
 
     const post = await this.prisma.newsPost.create({
       data: {
@@ -1147,10 +1213,10 @@ export class AdminService {
         content: data.content || data.body || '',
         status: data.status || PostStatus.DRAFT,
         coverImageFileId: data.coverImageFileId || data.coverFileAssetId || null,
-        antennaId: antennaId || null,
+        antennaId: targetAntennaId,
         associationId,
         createdByUserId: adminId,
-        scope: antennaId ? 'ANTENNA' : 'GLOBAL',
+        scope: targetAntennaId ? 'ANTENNA' : 'GLOBAL',
         ...(data.status === PostStatus.PUBLISHED ? { publishedAt: new Date(), publishedByUserId: adminId } : {}),
         attachments: data.imageIds?.length > 0 ? {
           create: data.imageIds.slice(0, 3).map((fileId: string) => ({ fileId }))
@@ -1166,12 +1232,12 @@ export class AdminService {
   }
 
   async updateContent(contentId: string, adminId: string, data: any) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const post = await this.prisma.newsPost.findFirst({ 
       where: { 
         id: contentId, 
         associationId,
-        ...(antennaId ? { antennaId } : {}) 
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
       } 
     });
     if (!post) throw new NotFoundException("Contenu introuvable.");
@@ -1199,12 +1265,12 @@ export class AdminService {
   }
 
   async deleteContent(contentId: string, adminId: string) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const post = await this.prisma.newsPost.findFirst({ 
       where: { 
         id: contentId, 
         associationId,
-        ...(antennaId ? { antennaId } : {}) 
+        ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
       } 
     });
     if (!post) throw new NotFoundException("Contenu introuvable.");
@@ -1213,12 +1279,12 @@ export class AdminService {
 
   // --- NOTIFICATIONS ---
   async listNotifications(adminId: string, page: number, pageSize: number) {
-    const { antennaId, associationId } = await this.getAdminContext(adminId);
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.NotificationWhereInput = { 
       associationId,
-      ...(antennaId ? { antennaId } : {}) 
+      ...(antennaIds ? { antennaId: { in: antennaIds } } : {}) 
     };
 
     const [items, total] = await Promise.all([

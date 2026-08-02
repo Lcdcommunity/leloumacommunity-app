@@ -765,6 +765,9 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     addressLine1?: string;
     addressLine2?: string;
     postalCode?: string;
+    // Sélecteur d'antenne (admin multi-antennes) — optionnel, retombe sur
+    // l'antenne unique de l'admin si non fourni.
+    antennaId?: string;
   }) =>
     http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),
 
@@ -1008,6 +1011,9 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     startsAt?: string | null;
     endsAt?: string | null;
     photoIds?: string[];
+    // Sélecteur d'antenne (admin multi-antennes) — optionnel, projet "global"
+    // (antennaId null) si non fourni et admin sur plusieurs antennes.
+    antennaId?: string;
   }) =>
     http<Project, typeof body>('/admin/projects', { method: 'POST', body }),
 
@@ -1146,7 +1152,14 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       }`
     ),
 
-  createAntennaDocument: (body: { title: string; description?: string; fileAssetId?: string | null }) =>
+  createAntennaDocument: (body: {
+    title: string;
+    description?: string;
+    fileAssetId?: string | null;
+    // Sélecteur d'antenne (admin multi-antennes) — optionnel, document
+    // "global" si non fourni et admin sur plusieurs antennes.
+    antennaId?: string;
+  }) =>
     http<DocumentItem, typeof body>('/admin/documents', { method: 'POST', body }),
 
   updateAntennaDocument: (id: string, body: Partial<DocumentItem>) =>
@@ -1175,6 +1188,9 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     content?: string;
     status?: string;
     coverImageFileId?: string | null;
+    // Sélecteur d'antenne (admin multi-antennes) — optionnel, annonce
+    // "globale" (scope GLOBAL) si non fourni et admin sur plusieurs antennes.
+    antennaId?: string;
   }) =>
     http<ContentPost, typeof body>('/admin/contents', { method: 'POST', body }),
 

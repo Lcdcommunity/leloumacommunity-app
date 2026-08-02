@@ -491,6 +491,18 @@ export class SuperAdminService {
     });
   }
 
+  /**
+   * 🔥 CORRECTION : l'ancienne implémentation désactivait TOUTES les
+   * assignations actives puis recréait des lignes pour les antennes
+   * sélectionnées — y compris celles qui ne changeaient pas. Dès qu'une
+   * antenne restait dans la sélection (le cas le plus courant, quasi toujours
+   * vrai), on tentait de créer une ligne (adminUserId, antennaId) qui existait
+   * déjà en base (juste désactivée), ce qui viole la contrainte d'unicité et
+   * remonte en "Internal server error" côté front. On calcule maintenant un
+   * vrai diff : on désactive seulement ce qui sort de la sélection, on
+   * réactive ce qui existait déjà (actif ou précédemment révoqué), et on ne
+   * crée que les paires (admin, antenne) réellement nouvelles.
+   */
   async updateAntennaAdmin(userId: string, data: Partial<CreateAntennaAdminDto>, actorId: string, associationId: string) {
     const admin = await this.prisma.user.findFirst({
       where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN },
@@ -513,22 +525,60 @@ export class SuperAdminService {
         throw new BadRequestException("Impossible d'assigner des antennes utilisant des devises différentes à un même administrateur.");
       }
 
+      const newAntennaIds = data.antennaIds;
+
       await this.prisma.$transaction(async (tx) => {
-        await tx.antennaAdminAssignment.updateMany({
+        // Toutes les assignations existantes (actives ou révoquées) pour cet
+        // admin, pour réutiliser les lignes déjà présentes au lieu d'en
+        // recréer en double.
+        const existingAssignments = await tx.antennaAdminAssignment.findMany({
           where: { adminUserId: userId, associationId },
-          data: { isActive: false, revokedAt: new Date(), revokedByUserId: actorId },
         });
+        const existingByAntenna = new Map(existingAssignments.map(a => [a.antennaId, a]));
 
-        const newAssignments = data.antennaIds!.map(id => ({
-          associationId,
-          antennaId: id,
-          adminUserId: userId,
-          assignedByUserId: actorId,
-          isPrimaryManager: true,
-          isActive: true,
-        }));
+        // 1) Désactiver les antennes actives qui sortent de la sélection
+        const toDeactivate = existingAssignments
+          .filter(a => a.isActive && !newAntennaIds.includes(a.antennaId))
+          .map(a => a.id);
 
-        await tx.antennaAdminAssignment.createMany({ data: newAssignments });
+        if (toDeactivate.length > 0) {
+          await tx.antennaAdminAssignment.updateMany({
+            where: { id: { in: toDeactivate } },
+            data: { isActive: false, revokedAt: new Date(), revokedByUserId: actorId },
+          });
+        }
+
+        // 2) Pour chaque antenne sélectionnée : réactiver la ligne existante
+        //    (active ou précédemment révoquée), ou en créer une nouvelle si
+        //    elle n'a jamais existé pour cet admin.
+        for (const antennaId of newAntennaIds) {
+          const existing = existingByAntenna.get(antennaId);
+          if (existing) {
+            if (!existing.isActive) {
+              await tx.antennaAdminAssignment.update({
+                where: { id: existing.id },
+                data: {
+                  isActive: true,
+                  revokedAt: null,
+                  revokedByUserId: null,
+                  assignedByUserId: actorId,
+                  isPrimaryManager: true,
+                },
+              });
+            }
+          } else {
+            await tx.antennaAdminAssignment.create({
+              data: {
+                associationId,
+                antennaId,
+                adminUserId: userId,
+                assignedByUserId: actorId,
+                isPrimaryManager: true,
+                isActive: true,
+              },
+            });
+          }
+        }
       });
     }
 

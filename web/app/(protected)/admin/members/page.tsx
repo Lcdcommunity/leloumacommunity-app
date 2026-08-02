@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
-import { api } from '../../../../lib/api-client';
+import { api, type MyTransferAntenna } from '../../../../lib/api-client';
 import { formatDate, fullName } from '../../../../lib/format';
 import type { UserSummary, UserStatus } from '../../../../types/user';
 
@@ -156,6 +156,18 @@ export default function AdminMembersDirectoryPage() {
     addressLine1: '', postalCode: '', city: '', country: '', customCountry: ''
   });
 
+  // États pour la sélection d'antenne (multi-antenne)
+  const [antennas, setAntennas] = useState<MyTransferAntenna[]>([]);
+  const [antennaId, setAntennaId] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getMyTransferAntennas()
+      .then((res) => { if (!cancelled) setAntennas(res); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
   // ⚡ ÉTATS D'EXPORTATION (NOUVEAU)
   const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
   const [exportStartMonth, setExportStartMonth] = useState('');
@@ -182,7 +194,8 @@ export default function AdminMembersDirectoryPage() {
   }, [q, status]);
 
   useEffect(() => {
-    void loadMembers();
+    const timer = setTimeout(() => { void loadMembers(); }, 0);
+    return () => clearTimeout(timer);
   }, [loadMembers]);
 
   /* ── Actions ── */
@@ -311,6 +324,11 @@ export default function AdminMembersDirectoryPage() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsCreating(true);
+    if (antennas.length > 1 && !antennaId) {
+      alert('Veuillez sélectionner une antenne.');
+      setIsCreating(false);
+      return;
+    }
     try {
       const finalBirthCountry = formData.birthCountry === 'Autre' ? formData.customBirthCountry : formData.birthCountry;
       const finalCountry = formData.country === 'Autre' ? formData.customCountry : formData.country;
@@ -323,6 +341,7 @@ export default function AdminMembersDirectoryPage() {
         email: formData.email,
         password: formData.password,
         phone: formData.phone || undefined,
+        antennaId: antennaId || undefined,
         city: formData.city || undefined,
         country: finalCountry || undefined,
         originSubPrefecture: finalOrigin || undefined,
@@ -348,6 +367,7 @@ export default function AdminMembersDirectoryPage() {
   const resetCreateForm = () => {
     setIsCreateModalOpen(false);
     setCreatedPassword(null);
+    setAntennaId('');
     setFormData({
       firstName: '', lastName: '', email: '', password: '', phone: '',
       birthDate: '', placeOfBirth: '', birthCountry: '', customBirthCountry: '',
@@ -806,6 +826,15 @@ export default function AdminMembersDirectoryPage() {
                     <div className="md-edit-section">
                       <div className="md-edit-section-title">Identité & Contact</div>
                       <div className="aa-form-grid">
+                        {antennas.length > 1 && (
+                          <div className="aa-form-group full">
+                            <label className="aa-form-label">Antenne *</label>
+                            <select className="md-edit-select" required value={antennaId} onChange={e => setAntennaId(e.target.value)}>
+                              <option value="">Sélectionnez...</option>
+                              {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </select>
+                          </div>
+                        )}
                         <div className="aa-form-group">
                           <label className="aa-form-label">Prénom *</label>
                           <input required className="aa-form-input" type="text" value={formData.firstName} onChange={e => setFormData({ ...formData, firstName: e.target.value })} />

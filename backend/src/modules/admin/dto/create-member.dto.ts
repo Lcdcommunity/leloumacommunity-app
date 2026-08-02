@@ -1,4 +1,4 @@
-//backend/src/modules/admin/dto/create-member.dto.ts
+//////backend/src/modules/admin/dto/create-member.dto.ts
 import { IsEmail, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateMemberDto {
@@ -71,4 +71,11 @@ export class CreateMemberDto {
   @IsOptional()
   @IsString()
   birthCountry?: string;
+
+  // Sélecteur d'antenne (admin multi-antennes) : optionnel — un admin sur une
+  // seule antenne n'a pas besoin de le renseigner, le backend retombe alors
+  // sur son antenne unique. Voir AdminService.resolveRequiredAntennaId.
+  @IsOptional()
+  @IsString()
+  antennaId?: string;
 }

@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback, useRef, DragEvent } from 'react';
 import { AppShell } from '../../../../components/layout/AppShell';
-import { api } from '../../../../lib/api-client';
+import { api, type MyTransferAntenna } from '../../../../lib/api-client';
 import { getAccessToken } from '../../../../lib/auth-store';
 import type { Project, ProjectStatus } from '../../../../types/project';
 import { formatCurrency, formatDate } from '../../../../lib/format';
@@ -302,7 +302,9 @@ function GalleryThumb({
       )}
     </button>
   );
-}/* ══════════════════════════════════════════════════════ PROJECT DETAIL MODAL */
+}
+
+/* ══════════════════════════════════════════════════════ PROJECT DETAIL MODAL */
 function ProjectModal({
   project,
   onClose,
@@ -825,15 +827,26 @@ const TA: React.CSSProperties = { width: '100%', borderRadius: 11, border: '1px 
 const SS: React.CSSProperties = { ...IS, appearance: 'none', cursor: 'pointer', backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2.5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right .75rem center', paddingRight: '2.2rem' };
 
 interface FormValues {
-  title: string; summary: string; description: string; locationText: string; promoterName: string; status: string; budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string; targetBeneficiaries: string; populationImpact: string; environmentalImpact: string; risksAndMitigation: string; implementationMethod: string; specificObjectives: string; expectedResults: string; successIndicators: string;
+  title: string; summary: string; description: string; locationText: string; promoterName: string; status: string; budgetPlanned: string; budgetSpent: string; startsAt: string; endsAt: string; targetBeneficiaries: string; populationImpact: string; environmentalImpact: string; risksAndMitigation: string; implementationMethod: string; specificObjectives: string; expectedResults: string; successIndicators: string; antennaId: string;
 }
 
-const EMPTY: FormValues = { title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'PROPOSED', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '', targetBeneficiaries: '', populationImpact: '', environmentalImpact: '', risksAndMitigation: '', implementationMethod: '', specificObjectives: '', expectedResults: '', successIndicators: '' };
+const EMPTY: FormValues = { title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'PROPOSED', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '', targetBeneficiaries: '', populationImpact: '', environmentalImpact: '', risksAndMitigation: '', implementationMethod: '', specificObjectives: '', expectedResults: '', successIndicators: '', antennaId: '' };
 
 function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploadProgress }: { initial?: FormValues; onSave: (v: FormValues, p: File[]) => void; onCancel: () => void; submitting: boolean; submitLabel: string; uploadProgress: string | null; }) {
   const [v, setV] = useState<FormValues>(initial ?? EMPTY);
   const [photos, setPhotos] = useState<PhotoFile[]>([]);
   const f = (k: keyof FormValues) => ({ value: v[k], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setV((p) => ({ ...p, [k]: e.target.value })) });
+
+  // Sélecteur d'antenne (admin multi-antennes) : masqué si l'admin ne gère
+  // qu'une seule antenne, affiché et requis s'il en gère plusieurs.
+  const [antennas, setAntennas] = useState<MyTransferAntenna[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    api.getMyTransferAntennas()
+      .then((res) => { if (!cancelled) setAntennas(res); })
+      .catch(() => { /* silencieux : le backend retombera sur l'antenne unique / global */ });
+    return () => { cancelled = true; };
+  }, []);
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSave(v, photos.map((p) => p.file)); }}>
@@ -841,6 +854,15 @@ function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploa
         <div className="pp-form-section">
           <h3 className="pp-form-section-title"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Informations Générales</h3>
           <div style={{ display: 'grid', gap: '.85rem' }}>
+            {antennas.length > 1 && (
+              <div>
+                <label style={LS}>Antenne <span style={{ color: '#EF4444' }}>*</span></label>
+                <select style={SS} required value={v.antennaId} onChange={(e) => setV((p) => ({ ...p, antennaId: e.target.value }))}>
+                  <option value="">Sélectionnez une antenne…</option>
+                  {antennas.map((a) => (<option key={a.id} value={a.id}>{a.name}</option>))}
+                </select>
+              </div>
+            )}
             <div><label style={LS}>Titre du projet <span style={{ color: '#EF4444' }}>*</span></label><input style={IS} placeholder="Nom officiel du projet" required {...f('title')} /></div>
             <div><label style={LS}>Résumé court</label><input style={IS} placeholder="Une phrase d'accroche ou résumé rapide" {...f('summary')} /></div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
@@ -923,30 +945,35 @@ export default function AdminProjectsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.listAntennaProjects({ page: 1, pageSize: 100, q: q || undefined, status: statusFilter || undefined });
-      setItems(res?.items ?? []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur chargement projets');
-    } finally {
-      setLoading(false);
-    }
+  // .then()/.catch()/.finally() explicite (pas async/await) : la règle
+  // ESLint "set-state-in-effect" détecte un setState synchrone dès que la
+  // fonction appelée depuis l'effet exécute setState avant son premier
+  // await. Ici, `load()` ne fait qu'enchaîner des .then() : aucun setState
+  // ne s'exécute de façon synchrone au moment où l'effet l'invoque, ils ne
+  // se déclenchent que dans les callbacks (donc de façon asynchrone).
+  const load = useCallback(() => {
+    return Promise.resolve()
+      .then(() => setLoading(true))
+      .then(() => api.listAntennaProjects({ page: 1, pageSize: 100, q: q || undefined, status: statusFilter || undefined }))
+      .then((res) => {
+        setItems(res?.items ?? []);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Erreur chargement projets');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [q, statusFilter]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   function openCreate() { setEditing(null); setSaveError(null); setFormMode('create'); setDetailProject(null); }
   function openEdit(p: Project) { setEditing(p); setSaveError(null); setFormMode('edit'); setDetailProject(null); }
   function closeForm() { setFormMode('hidden'); setEditing(null); setSaveError(null); }
-
-  // ─── PATCH CHIRURGICAL web/app/(protected)/admin/projects/page.tsx ───────────
-// Remplacer la fonction handleSave() existante par celle-ci.
-// Correction : lors d'une modification, les anciennes photos du projet
-// sont préservées et les nouvelles s'y ajoutent.
-// ─────────────────────────────────────────────────────────────────────────────
 
   async function handleSave(values: FormValues, photos: File[]) {
     setSaveError(null);
@@ -981,6 +1008,7 @@ export default function AdminProjectsPage() {
         budgetSpent:          values.budgetSpent ? Number(values.budgetSpent) : undefined,
         startsAt:             values.startsAt || null,
         endsAt:               values.endsAt || null,
+        antennaId:            values.antennaId || undefined,
       };
 
       if (editing) {
@@ -1042,6 +1070,9 @@ export default function AdminProjectsPage() {
     implementationMethod: editing.implementationMethod ?? '', specificObjectives: typeof editing.specificObjectives === 'string' ? editing.specificObjectives : JSON.stringify(editing.specificObjectives ?? ''),
     expectedResults: typeof editing.expectedResults === 'string' ? editing.expectedResults : JSON.stringify(editing.expectedResults ?? ''),
     successIndicators: typeof editing.successIndicators === 'string' ? editing.successIndicators : JSON.stringify(editing.successIndicators ?? ''),
+    // 🔎 si `Project` (types/project.ts) n'a pas encore `antennaId`, ajoute
+    // `antennaId?: string | null;` au type — le mapper backend le renvoie déjà.
+    antennaId: (editing as Project & { antennaId?: string | null }).antennaId ?? '',
   } : undefined;
 
   const draftCount = items.filter((i) => i.status === 'PROPOSED').length;

@@ -1,12 +1,12 @@
 // web/components/admin/ContentForm.tsx
 'use client';
 
-import { FormEvent, useState, useRef } from 'react';
+import { FormEvent, useEffect, useState, useRef } from 'react';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
-import { api } from '../../lib/api-client';
+import { api, type MyTransferAntenna } from '../../lib/api-client';
 
 type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
 
@@ -27,22 +27,35 @@ export function ContentForm({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [status, setStatus] = useState<ContentStatus>('DRAFT');
-  
+
   const [images, setImages] = useState<UploadedImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
 
+  // Sélecteur d'antenne (admin multi-antennes) : masqué si l'admin ne gère
+  // qu'une seule antenne, affiché et requis s'il en gère plusieurs.
+  const [antennas, setAntennas] = useState<MyTransferAntenna[]>([]);
+  const [antennaId, setAntennaId] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const MAX_IMAGES = 3;
 
+  useEffect(() => {
+    let cancelled = false;
+    api.getMyTransferAntennas()
+      .then((res) => { if (!cancelled) setAntennas(res); })
+      .catch(() => { /* silencieux : le backend retombera sur l'antenne unique */ });
+    return () => { cancelled = true; };
+  }, []);
+
   async function handleFilesUpload(files: FileList | File[] | null) {
     if (!files || files.length === 0) return;
-    
+
     const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
-    
+
     if (validFiles.length === 0) {
       setError('Veuillez sélectionner des images valides.');
       return;
@@ -68,7 +81,7 @@ export function ContentForm({
           folder: 'content-covers',
           description: 'Image contenu',
         });
-        
+
         newUploadedImages.push({ id: uploaded.id, preview, name: file.name });
         setImages([...newUploadedImages]);
       } catch {
@@ -76,7 +89,7 @@ export function ContentForm({
         setError(`Erreur lors de l'upload de ${file.name}`);
       }
     }
-    
+
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -84,16 +97,22 @@ export function ContentForm({
   function handleRemoveImage(index: number) {
     const imgToRemove = images[index];
     if (imgToRemove?.preview) URL.revokeObjectURL(imgToRemove.preview);
-    
+
     setImages(prev => prev.filter((_, i) => i !== index));
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+
+    if (antennas.length > 1 && !antennaId) {
+      setError('Veuillez sélectionner une antenne.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    
+
     try {
       const payload = {
         title,
@@ -101,6 +120,7 @@ export function ContentForm({
         status,
         coverImageFileId: images[0]?.id || null,
         imageIds: images.slice(1).map(img => img.id),
+        antennaId: antennaId || undefined,
       };
 
       // 🔥 CORRECTION CHIRURGICALE : 
@@ -113,7 +133,8 @@ export function ContentForm({
       setStatus('DRAFT');
       images.forEach(img => URL.revokeObjectURL(img.preview));
       setImages([]);
-      
+      setAntennaId('');
+
       await onCreated?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de la création');
@@ -140,15 +161,27 @@ export function ContentForm({
       `}</style>
 
       <div style={{ display: 'grid', gap: '1.25rem', marginBottom: '1.5rem' }}>
+        {antennas.length > 1 && (
+          <Select
+            label="Antenne"
+            value={antennaId}
+            onChange={(e) => setAntennaId(e.target.value)}
+            options={[
+              { value: '', label: 'Sélectionnez une antenne…' },
+              ...antennas.map((a) => ({ value: a.id, label: a.name })),
+            ]}
+          />
+        )}
+
         <Input label="Titre" required value={title} onChange={(e) => setTitle(e.target.value)} />
-        
+
         <Textarea
           label="Contenu / Information"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           style={{ minHeight: '120px' }}
         />
-        
+
         <Select
           label="Statut"
           value={status}
@@ -169,7 +202,7 @@ export function ContentForm({
               {images.length} / {MAX_IMAGES}
             </span>
           </div>
-          
+
           <input 
             ref={fileInputRef}
             type="file" 
@@ -185,7 +218,7 @@ export function ContentForm({
                 <div key={img.id} className="cf-preview-container">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.preview} alt={`Aperçu ${idx + 1}`} className="cf-preview-img" />
-                  
+
                   <button type="button" onClick={() => handleRemoveImage(idx)} className="cf-remove-btn" title="Supprimer l'image">
                     <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                       <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" />

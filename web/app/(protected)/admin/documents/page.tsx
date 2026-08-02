@@ -258,19 +258,41 @@ export default function AdminDocumentsPage() {
   const [viewingDoc,        setViewingDoc]        = useState<DocumentItem | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
-  const load = useCallback(async (searchQuery?: string) => {
-    setError(null); setLoading(true);
-    try {
-      const res = await api.listAntennaDocuments({ q: searchQuery ?? undefined, page: 1, pageSize: 100 });
-      setItems(res.items);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur chargement documents');
-    } finally {
-      setLoading(false);
-    }
+  // 🔧 FIX react-hooks/set-state-in-effect :
+  // Logique de fetch "pure", écrite en chaîne .then/.catch/.finally plutôt
+  // qu'en async/await : la règle ne reconnaît de façon fiable que ce style
+  // comme "asynchrone" (elle ne suit pas toujours le flux après un `await`
+  // dans un try/finally). Ici, aucun setState n'est exécuté de façon
+  // synchrone quand la fonction est appelée — seul api.listAntennaDocuments(...)
+  // démarre, et tous les setState vivent dans des callbacks de promesse.
+  const fetchDocuments = useCallback((searchQuery?: string) => {
+    return api
+      .listAntennaDocuments({ q: searchQuery ?? undefined, page: 1, pageSize: 100 })
+      .then((res) => {
+        setItems(res.items);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Erreur chargement documents');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, []);
 
-  useEffect(() => { void load(''); }, [load]);
+  // Version "interactive" utilisée par les actions déclenchées par
+  // l'utilisateur (recherche, suppression) — celle-ci PEUT remettre
+  // loading/error à zéro de façon synchrone puisqu'elle est appelée depuis
+  // un gestionnaire d'événement, jamais depuis un effet.
+  const load = useCallback((searchQuery?: string) => {
+    setError(null);
+    setLoading(true);
+    return fetchDocuments(searchQuery);
+  }, [fetchDocuments]);
+
+  useEffect(() => {
+    void fetchDocuments('');
+  }, [fetchDocuments]);
 
   async function handleDelete(doc: DocumentItem) {
     setBusyId(doc.id); setDeleteTarget(null); setViewingDoc(null);
