@@ -1,4 +1,4 @@
-/////// backend/src/modules/super-admin/super-admin.service.ts
+// backend/src/modules/super-admin/super-admin.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -15,12 +15,18 @@ import {
   CurrencyCode,
   PostStatus,
 } from '@prisma/client';
+import { randomBytes, createHash } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { MailService } from '../../common/services/mail.service';
+import { AuthMailerService } from '../auth/auth.mailer.service';
 import { CreateAntennaDto } from './dto/create-antenna.dto';
 import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
 import { memberMapper } from '../member/member.mapper';
 import { NotificationsService } from '../notifications/notifications.service';
+
+// 🔥 AJOUT : même durée que dans system-admin.service.ts pour le lien de
+// définition de mot de passe — un email de bienvenue peut être ouvert
+// plusieurs jours après réception.
+const WELCOME_SET_PASSWORD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type PrismaLike = PrismaService | Prisma.TransactionClient;
 
@@ -59,7 +65,7 @@ type CreateDocumentInput = {
 export class SuperAdminService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly mailService: MailService,
+    private readonly authMailer: AuthMailerService,
     private readonly notifications: NotificationsService,
   ) {}
 
@@ -475,12 +481,30 @@ export class SuperAdminService {
     });
 
     if (data.sendInvite !== false) {
-      await this.mailService.sendAntennaAdminInvitation({
+      // 🔥 CORRECTION : mot de passe en clair remplacé par un lien de
+      // définition de mot de passe, et lien pointé vers le domaine propre de
+      // l'association plutôt que FRONTEND_URL global (même correctif que
+      // pour les super admins).
+      const association = await this.prisma.association.findUnique({
+        where: { id: associationId },
+        select: { name: true, domainName: true },
+      });
+
+      const base = association?.domainName
+        ? `https://${association.domainName.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`
+        : (process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+      const setPasswordUrl = `${base}/reset-password?token=${encodeURIComponent(result.rawToken)}&welcome=1`;
+
+      // 🔥 CORRECTION (erreur TS2353) : `associationDomain` retiré — ce champ
+      // n'existe pas dans la signature de sendWelcomeSetPasswordEmail, et il
+      // était de toute façon inutile ici : setPasswordUrl contient déjà le
+      // bon domaine, calculé juste au-dessus.
+      await this.authMailer.sendWelcomeSetPasswordEmail({
         to: result.user.email,
         firstName: result.user.firstName,
-        lastName: result.user.lastName,
+        associationName: association?.name ?? antennaNames,
+        setPasswordUrl,
         antennaName: antennaNames,
-        temporaryPassword: result.temporaryPassword,
         associationTitle: data.associationTitle || data.function,
       });
     }
@@ -510,7 +534,6 @@ export class SuperAdminService {
 
     if (!admin) throw new NotFoundException('Administrateur introuvable.');
 
-    // S'il y a une mise à jour des antennes assignées
     if (data.antennaIds && data.antennaIds.length > 0) {
       const antennas = await this.prisma.antenna.findMany({
         where: { id: { in: data.antennaIds }, associationId },
@@ -528,15 +551,11 @@ export class SuperAdminService {
       const newAntennaIds = data.antennaIds;
 
       await this.prisma.$transaction(async (tx) => {
-        // Toutes les assignations existantes (actives ou révoquées) pour cet
-        // admin, pour réutiliser les lignes déjà présentes au lieu d'en
-        // recréer en double.
         const existingAssignments = await tx.antennaAdminAssignment.findMany({
           where: { adminUserId: userId, associationId },
         });
         const existingByAntenna = new Map(existingAssignments.map(a => [a.antennaId, a]));
 
-        // 1) Désactiver les antennes actives qui sortent de la sélection
         const toDeactivate = existingAssignments
           .filter(a => a.isActive && !newAntennaIds.includes(a.antennaId))
           .map(a => a.id);
@@ -548,9 +567,6 @@ export class SuperAdminService {
           });
         }
 
-        // 2) Pour chaque antenne sélectionnée : réactiver la ligne existante
-        //    (active ou précédemment révoquée), ou en créer une nouvelle si
-        //    elle n'a jamais existé pour cet admin.
         for (const antennaId of newAntennaIds) {
           const existing = existingByAntenna.get(antennaId);
           if (existing) {
@@ -885,8 +901,8 @@ export class SuperAdminService {
     const existing = await prisma.user.findUnique({ where: { email: payload.email } });
     if (existing) throw new ConflictException('Email déjà utilisé.');
 
-    const temporaryPassword = this.generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(temporaryPassword, 10);
+    const randomPlaceholderPassword = randomBytes(24).toString('hex');
+    const passwordHash = await bcrypt.hash(randomPlaceholderPassword, 10);
     const now = new Date();
 
     const user = await prisma.user.create({
@@ -925,11 +941,19 @@ export class SuperAdminService {
 
     await prisma.antennaAdminAssignment.createMany({ data: assignments });
 
-    return { user, temporaryPassword };
-  }
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
 
-  private generateTemporaryPassword() {
-    return Math.random().toString(36).slice(-10) + '!A1';
+    await prisma.passwordResetToken.create({
+      data: {
+        associationId: payload.associationId,
+        userId: user.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + WELCOME_SET_PASSWORD_TTL_MS),
+      },
+    });
+
+    return { user, rawToken };
   }
 
   private async buildUniqueAntennaCode(associationId: string, preferredCode?: string, fallbackName?: string) {

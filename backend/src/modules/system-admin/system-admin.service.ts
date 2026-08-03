@@ -1,7 +1,8 @@
 // backend/src/modules/system-admin/system-admin.service.ts
 import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { randomBytes, createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MailService } from '../../common/services/mail.service';
+import { AuthMailerService } from '../auth/auth.mailer.service';
 import { VercelProvider } from '../../domain-provisioning/providers/vercel.provider';
 import { NotificationsService } from '../notifications/notifications.service';
 import { normalizeDomain } from '../../common/utils/domain.util';
@@ -33,6 +34,12 @@ export interface UpdatePlatformSettingsPayload {
 }
 
 const PLATFORM_SETTINGS_ID = 'singleton';
+
+// 🔥 AJOUT : durée de validité du lien "définir votre mot de passe" envoyé à
+// la création — volontairement plus long que le lien "mot de passe oublié"
+// (30 min), car un email de bienvenue peut être ouvert plusieurs jours après
+// réception.
+const WELCOME_SET_PASSWORD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 const COUNTRY_TO_CURRENCY: Record<string, CurrencyCode> = {
   guinee: CurrencyCode.GNF,
@@ -99,10 +106,22 @@ function resolveDefaultCurrencyForCountry(country?: string | null): CurrencyCode
 export class SystemAdminService {
   constructor(
     private prisma: PrismaService,
-    private mailService: MailService,
+    private authMailer: AuthMailerService,
     private vercel: VercelProvider,
     private notifications: NotificationsService,
   ) {}
+
+  // 🔥 AJOUT : construit l'URL de définition de mot de passe sur le domaine
+  // propre de l'association si elle en a un (même raison que le lien de
+  // connexion du mail de bienvenue précédent : éviter le verrou multi-tenant
+  // de AuthService.login() si l'utilisateur atterrit sur le mauvais domaine),
+  // sinon repli sur FRONTEND_URL/APP_URL.
+  private buildSetPasswordUrl(associationDomain: string | null | undefined, token: string): string {
+    const base = associationDomain
+      ? `https://${associationDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '')}`
+      : (process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+    return `${base}/reset-password?token=${encodeURIComponent(token)}&welcome=1`;
+  }
 
   async createAssociationWithSuperAdmin(data: CreateAssociationPayload) {
     const existingAsso = await this.prisma.association.findUnique({ where: { code: data.code } });
@@ -117,8 +136,12 @@ export class SystemAdminService {
       if (existingDomain) throw new ConflictException('Ce domaine est déjà utilisé par une autre instance.');
     }
 
-    const temporaryPassword = Math.random().toString(36).slice(-8) + 'A1!';
-    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+    // 🔥 CORRECTION : ce mot de passe n'est plus jamais communiqué à
+    // personne — il sert uniquement à satisfaire la contrainte NOT NULL de
+    // passwordHash. Le super admin définit son vrai mot de passe via le lien
+    // envoyé plus bas, sur le même flux que "mot de passe oublié".
+    const randomPlaceholderPassword = randomBytes(24).toString('hex');
+    const passwordHash = await bcrypt.hash(randomPlaceholderPassword, 12);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const association = await tx.association.create({
@@ -153,23 +176,33 @@ export class SystemAdminService {
         }
       });
 
-      return { association, superAdmin };
+      // 🔥 AJOUT : token de définition de mot de passe, même mécanisme que
+      // AuthService.forgotPassword() (PasswordResetToken, sha256, expiry) —
+      // resetPassword() côté auth le consomme déjà sans changement nécessaire.
+      const rawToken = randomBytes(32).toString('hex');
+      const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+
+      await tx.passwordResetToken.create({
+        data: {
+          associationId: association.id,
+          userId: superAdmin.id,
+          tokenHash,
+          expiresAt: new Date(Date.now() + WELCOME_SET_PASSWORD_TTL_MS),
+        },
+      });
+
+      return { association, superAdmin, rawToken };
     });
 
     try {
-      await this.mailService.sendSuperAdminWelcome({
+      await this.authMailer.sendWelcomeSetPasswordEmail({
         to: result.superAdmin.email,
         firstName: result.superAdmin.firstName,
-        lastName: result.superAdmin.lastName,
         associationName: result.association.name,
-        temporaryPassword,
-        associationDomain: result.association.domainName ?? undefined,
+        setPasswordUrl: this.buildSetPasswordUrl(result.association.domainName, result.rawToken),
       });
     } catch (mailErr) {
       console.error(`Échec de l'envoi de l'email de bienvenue à ${result.superAdmin.email}`, mailErr);
-      // 🔥 AJOUT : ce genre d'échec ne remontait qu'aux logs Render, invisible
-      // sans y aller exprès — désormais visible dans le centre de notifications
-      // du Grand Chef.
       await this.notifications.notifySystemAdmins(
         `Échec de l'envoi de l'email de bienvenue pour "${result.association.name}" (${result.superAdmin.email}) : ${mailErr instanceof Error ? mailErr.message : 'erreur inconnue'}`,
         NotificationType.SYSTEM_ALERT,

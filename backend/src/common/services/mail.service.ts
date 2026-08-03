@@ -10,6 +10,7 @@ type SendAdminInvitationParams = {
   temporaryPassword: string;
   associationTitle?: string;
   logoUrl?: string;
+  associationDomain?: string | null; // 🔥 AJOUT
 };
 
 type SendSuperAdminWelcomeParams = {
@@ -19,7 +20,7 @@ type SendSuperAdminWelcomeParams = {
   associationName: string;
   temporaryPassword: string;
   logoUrl?: string;
-  associationDomain?: string; // 🔥 AJOUT : ex. "ajvk.site", sans protocole ni www
+  associationDomain?: string | null; // 🔥 AJOUT (cohérence, probablement plus appelé depuis system-admin.service.ts qui utilise désormais AuthMailerService)
 };
 
 @Injectable()
@@ -71,13 +72,13 @@ export class MailService {
     );
   }
 
-  // 🔥 CORRECTION : accepte désormais un domaine spécifique à l'association
-  // (celui vraiment utilisé pour se connecter, à cause du verrou multi-tenant
-  // dans AuthService.login()) — repli sur FRONTEND_URL/APP_URL si l'association
-  // n'a pas encore de domaine propre configuré.
-  private getLoginUrl(associationDomain?: string): string {
-    if (associationDomain && associationDomain.trim()) {
-      return `https://${associationDomain.trim().replace(/^https?:\/\//, '').replace(/\/+$/, '')}/login`;
+  // 🔥 CORRECTION : accepte désormais le domaine propre de l'association —
+  // sans ça, "Se connecter" pointait toujours vers dkmoney.store (console
+  // Grand Chef) au lieu du site de l'association concernée, quel que soit
+  // le domaine réellement configuré pour elle.
+  private getLoginUrl(associationDomain?: string | null): string {
+    if (associationDomain) {
+      return `https://${associationDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '')}/login`;
     }
     return `${this.getFrontendBaseUrl()}/login`;
   }
@@ -95,7 +96,7 @@ export class MailService {
     }
 
     const subject = `Invitation administrateur - ${params.antennaName}`;
-    const loginUrl = this.getLoginUrl();
+    const loginUrl = this.getLoginUrl(params.associationDomain);
 
     const titleLine = params.associationTitle
       ? `<p style="margin:0 0 10px 0;"><strong>Fonction :</strong> ${params.associationTitle}</p>`
@@ -142,18 +143,13 @@ export class MailService {
       .filter(Boolean)
       .join('\n');
 
-    try {
-      await transporter.sendMail({
-        from: this.getFromAddress(),
-        to: params.to,
-        subject,
-        text,
-        html,
-      });
-    } catch (error: unknown) {
-      this.logger.error(`❌ Échec envoi invitation admin -> ${params.to}`, error);
-      throw error;
-    }
+    await transporter.sendMail({
+      from: this.getFromAddress(),
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
   }
 
   async sendSuperAdminWelcome(
@@ -189,16 +185,13 @@ export class MailService {
           <p style="margin:0 0 10px 0;font-size:15px;"><strong>Adresse email :</strong> ${params.to}</p>
           <p style="margin:0;font-size:15px;"><strong>Mot de passe provisoire :</strong> ${params.temporaryPassword}</p>
         </div>
-        <p style="margin:0 0 8px 0;text-align:center;">
+        <p style="margin:0 0 18px 0;font-size:14px;color:#4B5563;text-align:center;">
+          Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.
+        </p>
+        <p style="margin:0;text-align:center;">
           <a href="${loginUrl}" style="display:inline-block;background:#7C3AED;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:bold;font-size:16px;">
             Accéder à mon espace
           </a>
-        </p>
-        <p style="margin:0 0 18px 0;text-align:center;font-size:13px;color:#6B7280;">
-          ou copiez ce lien : <a href="${loginUrl}" style="color:#7C3AED;word-break:break-all;">${loginUrl}</a>
-        </p>
-        <p style="margin:0 0 4px 0;font-size:14px;color:#4B5563;text-align:center;">
-          Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.
         </p>
       </div>
     `;
@@ -218,17 +211,12 @@ export class MailService {
       'Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.',
     ].join('\n');
 
-    try {
-      await transporter.sendMail({
-        from: this.getFromAddress(),
-        to: params.to,
-        subject,
-        text,
-        html,
-      });
-    } catch (error: unknown) {
-      this.logger.error(`❌ Échec envoi bienvenue super admin -> ${params.to}`, error);
-      throw error;
-    }
+    await transporter.sendMail({
+      from: this.getFromAddress(),
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
   }
 }

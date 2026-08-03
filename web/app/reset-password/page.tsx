@@ -10,12 +10,16 @@ function ResetPasswordContent() {
   const params = useSearchParams();
   const router = useRouter();
   const token = useMemo(() => params.get('token') || '', [params]);
+  // 🔥 AJOUT : distingue le lien "bienvenue" (envoyé à la création de compte)
+  // du lien "mot de passe oublié" — même token, même endpoint côté backend,
+  // juste un habillage de texte différent selon la provenance du lien.
+  const isWelcome = useMemo(() => params.get('welcome') === '1', [params]);
 
   const [mounted, setMounted] = useState(false);
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [showPwd, setShowPwd] = useState(false);
-  
+
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,6 +27,24 @@ function ResetPasswordContent() {
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
   }, []);
+
+  const copy = isWelcome
+    ? {
+        title: 'Bienvenue !',
+        subtitle: 'Choisissez un mot de passe fort pour activer votre compte.',
+        submitLabel: 'Activer mon compte',
+        submitLoading: 'Activation...',
+        successTitle: 'Compte activé !',
+        successBody: 'Vous allez être redirigé vers la page de connexion dans quelques instants...',
+      }
+    : {
+        title: 'Nouveau mot de passe',
+        subtitle: 'Définissez un mot de passe fort pour sécuriser votre compte.',
+        submitLabel: 'Réinitialiser mon mot de passe',
+        submitLoading: 'Validation...',
+        successTitle: 'Mot de passe modifié !',
+        successBody: 'Vous allez être redirigé vers la page de connexion dans quelques instants...',
+      };
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -50,7 +72,6 @@ function ResetPasswordContent() {
         body: { token, newPassword: password },
       });
       setSuccess(true);
-      // Redirection automatique de votre logique (ajustée à 3s pour laisser lire le message)
       setTimeout(() => router.replace('/login'), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Le lien est expiré ou invalide.');
@@ -115,14 +136,14 @@ function ResetPasswordContent() {
 
         <div className={`sp-card ${mounted ? 'visible' : ''}`}>
           <div className="sp-header">
-            <h1 className="sp-title">Nouveau mot de passe</h1>
-            <p className="sp-subtitle">Définissez un mot de passe fort pour sécuriser votre compte.</p>
+            <h1 className="sp-title">{copy.title}</h1>
+            <p className="sp-subtitle">{copy.subtitle}</p>
           </div>
 
           {success ? (
             <div className="sp-success-box">
-              <strong>Mot de passe modifié !</strong><br /><br />
-              Vous allez être redirigé vers la page de connexion dans quelques instants...
+              <strong>{copy.successTitle}</strong><br /><br />
+              {copy.successBody}
               <br /><br />
               <Link href="/login" style={{ color: '#047857', fontWeight: 700, textDecoration: 'underline' }}>
                 Aller à la connexion
@@ -184,7 +205,7 @@ function ResetPasswordContent() {
               )}
 
               <button type="submit" className="sp-btn-submit" disabled={loading}>
-                {loading ? 'Validation...' : 'Réinitialiser mon mot de passe'}
+                {loading ? copy.submitLoading : copy.submitLabel}
               </button>
             </form>
           )}
