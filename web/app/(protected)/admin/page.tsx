@@ -4,8 +4,11 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
+import { DashboardCarousel, CarouselProject } from '../../../components/member/DashboardCarousel';
 import { api } from '../../../lib/api-client';
 import { formatCurrency } from '../../../lib/format';
+import type { Project } from '../../../types/project';
+import type { ContentPost } from '../../../types/content';
 
 interface PendingAccount {
   id: string;
@@ -46,6 +49,44 @@ type StatCard = {
   clickable?: boolean;
   onClick?: () => void;
 };
+
+// ── AJOUTÉ : retardataires (carte cliquable) ────────────────────────────────
+// Le montant est estimé (mois de retard × cotisation mensuelle de la devise
+// du membre, avec repli sur GNF si l'entrée ne précise pas de devise) tant
+// que le backend ne renvoie pas un montant déjà calculé — cf. résumé final.
+interface ApiFileAttachment {
+  file?: { url?: string | null } | null;
+}
+
+interface LateMemberEntry {
+  id: string;
+  firstName: string;
+  lastName: string;
+  lateMonths?: number;
+  antennaName?: string;
+  currency?: string;
+}
+
+type RawApiProject = Omit<Project, 'updatedAt'> & {
+  updatedAt?: string | null;
+  budgetPlanned?: number | null;
+  budgetAmount?: number | null;
+  budgetSpent?: number | null;
+  amountSpent?: number | null;
+  endsAt?: string | null;
+  attachments?: ApiFileAttachment[] | null;
+};
+
+type ExtendedCarouselProject = CarouselProject & {
+  updatedAt?: string | Date | null;
+  endsAt?: string | Date | null;
+  budgetPlanned?: number | null;
+  budgetAmount?: number | null;
+  budgetSpent?: number | null;
+  amountSpent?: number | null;
+};
+
+type PricingMap = Record<string, { monthlyQuota: number; membershipCard: number }>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -195,6 +236,79 @@ function AccountDetailModal({ user, onClose }: { user: PendingAccount; onClose: 
   );
 }
 
+// ── AJOUTÉ : carte "Membres en retard" cliquable → nom, prénom, montant ────
+function LateMembersModal({
+  members,
+  pricing,
+  onClose,
+}: {
+  members: LateMemberEntry[];
+  pricing: PricingMap | null;
+  onClose: () => void;
+}) {
+  return (
+    <>
+      <div
+        style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", backdropFilter: "blur(4px)", zIndex: 100 }}
+        onClick={onClose}
+      />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+        zIndex: 101, background: "rgba(253,253,255,.98)", backdropFilter: "blur(18px)",
+        borderRadius: 22, padding: "clamp(1.5rem,4vw,2rem)",
+        width: "min(480px,calc(100vw - 2rem))",
+        border: "1px solid rgba(220,38,38,.15)",
+        boxShadow: "0 24px 60px rgba(220,38,38,.12)",
+        maxHeight: "85vh", overflowY: "auto"
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+          <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: "1.4rem", fontWeight: 700, color: "#111827", margin: 0 }}>
+            Membres en retard
+          </h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9CA3AF" }}>
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
+          {members.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "2rem", color: "#9CA3AF", fontSize: "0.85rem" }}>
+              <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>🎉</div>
+              Aucun retardataire pour le moment.
+            </div>
+          ) : (
+            members.map((m) => {
+              const currency = m.currency || 'GNF';
+              const monthly = pricing?.[currency]?.monthlyQuota ?? 0;
+              const months = m.lateMonths ?? 0;
+              const montant = months * monthly;
+              return (
+                <div key={m.id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "0.9rem 1.1rem", background: "#FEF2F2", borderRadius: 14,
+                  border: "1px solid #FECACA"
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                    <div className="ad-avatar" style={{ background: 'linear-gradient(135deg,#DC2626,#F87171)' }}>{getInitials(m.firstName, m.lastName)}</div>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#374151" }}>{m.firstName} {m.lastName}</div>
+                  </div>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#DC2626' }}>{months > 0 ? `${months} mois` : '—'}</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontSize: "0.9rem", fontWeight: 800, color: "#991B1B" }}>
+                      {monthly > 0 ? formatCurrency(montant, currency) : '—'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function AntennaAdminDashboard() {
@@ -204,6 +318,13 @@ export default function AntennaAdminDashboard() {
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<PendingAccount | null>(null);
 
+  // ── AJOUTÉ : harmonisation avec les dashboards super-admin/membre ────────
+  const [lateMembers, setLateMembers] = useState<LateMemberEntry[]>([]);
+  const [showLateMembersModal, setShowLateMembersModal] = useState(false);
+  const [projectsInProgress, setProjectsInProgress] = useState<ExtendedCarouselProject[]>([]);
+  const [latestContents, setLatestContents] = useState<ContentPost[]>([]);
+  const [pricing, setPricing] = useState<PricingMap | null>(null);
+
   useEffect(() => {
     let isMounted = true;
     void (async () => {
@@ -212,6 +333,62 @@ export default function AntennaAdminDashboard() {
         if (isMounted) setData(res as unknown as DashboardData);
       } catch (err) {
         if (isMounted) setError(err instanceof Error ? err.message : "Erreur chargement dashboard");
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
+
+  // ── AJOUTÉ : retardataires + carrousel projets/actus, en parallèle du
+  //   dashboard principal (n'affecte pas son état de chargement/erreur).
+  useEffect(() => {
+    let isMounted = true;
+    void (async () => {
+      const [lateRes, projectsRes, contentsRes, pricingRes] = await Promise.allSettled([
+        // 🔥 CORRIGÉ : listLateMembersOver3Months (/admin/late-members) est
+        // l'endpoint dédié à l'admin d'antenne — listLateMembersVisible
+        // (/member/late-members) est celui du membre, réutilisé par erreur.
+        api.listLateMembersOver3Months({ page: 1, pageSize: 50 }),
+        api.listProjectsForMembers({ page: 1, pageSize: 6 }),
+        api.listContentsForMembers({ page: 1, pageSize: 5 }),
+        api.getAssociationPricing(),
+      ]);
+      if (!isMounted) return;
+
+      if (lateRes.status === 'fulfilled') {
+        setLateMembers(((lateRes.value as { items?: LateMemberEntry[] })?.items ?? []) as LateMemberEntry[]);
+      }
+      if (projectsRes.status === 'fulfilled') {
+        const rawItems = projectsRes.value.items as unknown as RawApiProject[];
+        setProjectsInProgress(
+          rawItems
+            .filter(p => !['DRAFT', 'CANCELLED', 'ARCHIVED'].includes(p.status as string))
+            .map(p => ({
+              id: p.id,
+              title: p.title,
+              summary: p.summary,
+              description: p.description,
+              startsAt: p.startsAt,
+              endsAt: p.endsAt,
+              createdAt: p.createdAt,
+              updatedAt: p.updatedAt,
+              status: p.status,
+              coverImageFileId: p.coverImageFileId,
+              locationText: p.locationText,
+              budgetPlanned: p.budgetPlanned,
+              budgetAmount: p.budgetAmount,
+              budgetSpent: p.budgetSpent,
+              amountSpent: p.amountSpent,
+              attachments: Array.isArray(p.attachments)
+                ? p.attachments.map(a => ({ file: { url: (a as unknown as { url?: string | null }).url || null } }))
+                : null,
+            })) as ExtendedCarouselProject[]
+        );
+      }
+      if (contentsRes.status === 'fulfilled') {
+        setLatestContents((contentsRes.value.items as ContentPost[]).slice(0, 5));
+      }
+      if (pricingRes.status === 'fulfilled') {
+        setPricing(pricingRes.value as PricingMap);
       }
     })();
     return () => { isMounted = false; };
@@ -306,6 +483,23 @@ export default function AntennaAdminDashboard() {
         </svg>
       ),
       color: "#BE185D", bg: "#FDF2F8", sub: "Membres à jour", spanClass: "ad-span-1",
+    },
+    // ── AJOUTÉ : carte "Retard" cliquable (voir LateMembersModal) ──
+    {
+      label: "Retard",
+      value: lateMembers.length,
+      icon: (
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      ),
+      color: lateMembers.length > 0 ? "#DC2626" : "#059669",
+      bg: lateMembers.length > 0 ? "#FEF2F2" : "#ECFDF5",
+      sub: lateMembers.length > 0 ? "Retardataires · Clic pour détails" : "Aucun retardataire",
+      urgent: lateMembers.length > 0,
+      clickable: true,
+      onClick: () => setShowLateMembersModal(true),
+      spanClass: "ad-span-1",
     },
   ] : [];
 
@@ -433,6 +627,9 @@ export default function AntennaAdminDashboard() {
         .ad-error{display:flex;align-items:center;gap:.6rem;padding:1rem 1.25rem;background:rgba(185,28,28,.06);border:1px solid rgba(185,28,28,.18);border-radius:14px;color:#B91C1C;font-size:.82rem;font-weight:700;margin-bottom:1.5rem}
         @keyframes spin{to{transform:rotate(360deg)}}
         @keyframes fadein{to{opacity:1;transform:translateY(0)}}
+
+        /* ── AJOUTÉ : carrousel (projets + actualités, avec photos) ── */
+        .ad-carousel-wrap { opacity: 0; animation: fadein .5s .32s cubic-bezier(.22,1,.36,1) forwards; margin-bottom: 1.5rem; }
       `}</style>
 
       {error && (
@@ -490,6 +687,11 @@ export default function AntennaAdminDashboard() {
                 </div>
               );
             })}
+          </div>
+
+          {/* ── AJOUTÉ : carrousel projets + actualités (photos) ── */}
+          <div className="ad-carousel-wrap">
+            <DashboardCarousel projects={projectsInProgress} news={latestContents} />
           </div>
 
           <div className="ad-bottom">
@@ -627,6 +829,14 @@ export default function AntennaAdminDashboard() {
         <AccountDetailModal
           user={selectedAccount}
           onClose={() => setSelectedAccount(null)}
+        />
+      )}
+
+      {showLateMembersModal && (
+        <LateMembersModal
+          members={lateMembers}
+          pricing={pricing}
+          onClose={() => setShowLateMembersModal(false)}
         />
       )}
     </AppShell>

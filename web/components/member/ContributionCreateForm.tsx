@@ -683,8 +683,11 @@ export function ContributionCreateForm({
         setPendingPayload(payload);
         setShowCelebration(true);
       } else {
-        const monthsInStartYear = 12 - refMonth + 1;
-        const quotaAmount = monthsInStartYear * monthlyPrice;
+        // 🔥 CORRIGÉ : la part "cotisation" conservée est désormais une
+        // cotisation annuelle pleine (12 mois), pas seulement les mois
+        // restants du calendrier — cohérent avec le nouveau déclencheur de
+        // la modal, basé sur le tarif configuré et non sur le calendrier.
+        const quotaAmount = 12 * monthlyPrice;
         const donationAmount = amountNum - quotaAmount;
 
         const payloadQuota: ContributionValues = {
@@ -830,45 +833,50 @@ export function ContributionCreateForm({
       return;
     }
 
-    // ── Vérification dépassement d'année ──────────────────────────────────
-    if (isQuota && monthlyPrice > 0 && monthsCovered > 1) {
-      const lastMonthIdx = refMonth - 1 + monthsCovered - 1;
-      const lastYear = refYear + Math.floor(lastMonthIdx / 12);
+    // ── Vérification dépassement de la cotisation annuelle ─────────────────
+    // 🔥 CORRIGÉ : déclencheur basé sur le tarif mensuel réellement
+    // configuré par le super admin (monthlyPrice × 12 = cotisation
+    // annuelle), pas sur un franchissement d'année civile. Avant, un
+    // versement de 20€ (10 mois, donc MOINS qu'une cotisation annuelle de
+    // 24€) déclenchait quand même la modal s'il partait de novembre — et à
+    // l'inverse, un versement de exactement 12 mois pile depuis janvier ne
+    // la déclenchait jamais alors qu'il correspond exactement à l'année.
+    // Ici : dès que le versement couvre plus de 12 mois, il dépasse la
+    // cotisation annuelle, quel que soit le mois de départ.
+    if (isQuota && monthlyPrice > 0 && monthsCovered > 12) {
+      const annualQuota = 12 * monthlyPrice;
+      const excessMonths = monthsCovered - 12;
+      const excessAmount = excessMonths * monthlyPrice;
 
-      if (lastYear > refYear) {
-        const monthsInStartYear = 12 - refMonth + 1;
-        const excessMonths = monthsCovered - monthsInStartYear;
-        const excessAmount = excessMonths * monthlyPrice;
-
-        setModal({
-          open: true,
-          type: 'confirm',
-          title: 'Paiement sur plusieurs années',
-          body: (
-            <span>
-              Votre paiement couvre <strong>{monthsCovered} mois</strong> et s&apos;étend
-              jusqu&apos;en <strong>{lastYear}</strong>.<br /><br />
-              L&apos;excédent représente <strong>{excessMonths} mois</strong>{' '}
-              · <strong>{excessAmount.toLocaleString('fr-FR')} {selectedCurrency}</strong>.<br /><br />
-              Souhaitez-vous anticiper ces mois pour <strong>{lastYear}</strong>, ou
-              convertir l&apos;excédent en <strong>don</strong> ?
-            </span>
-          ),
-          confirmLabel: '📅 Anticiper',
-          cancelLabel: '🤝 Convertir en don',
-          onConfirm: () => {
-            setModal(m => ({ ...m, open: false }));
-            setExcessChoice('anticipate');
-            setPendingSubmitAfterExcess(true);
-          },
-          onCancel: () => {
-            setModal(m => ({ ...m, open: false }));
-            setExcessChoice('donate');
-            setPendingSubmitAfterExcess(true);
-          },
-        });
-        return;
-      }
+      setModal({
+        open: true,
+        type: 'confirm',
+        title: 'Cotisation annuelle dépassée',
+        body: (
+          <span>
+            Votre versement de <strong>{amountNum.toLocaleString('fr-FR')} {selectedCurrency}</strong> dépasse
+            la cotisation annuelle configurée{' '}
+            (<strong>{annualQuota.toLocaleString('fr-FR')} {selectedCurrency}</strong> pour 12 mois).<br /><br />
+            L&apos;excédent représente <strong>{excessMonths} mois</strong>{' '}
+            · <strong>{excessAmount.toLocaleString('fr-FR')} {selectedCurrency}</strong>.<br /><br />
+            Souhaitez-vous anticiper ces mois pour l&apos;année suivante, ou
+            convertir l&apos;excédent en <strong>don</strong> ?
+          </span>
+        ),
+        confirmLabel: '📅 Anticiper',
+        cancelLabel: '🤝 Convertir en don',
+        onConfirm: () => {
+          setModal(m => ({ ...m, open: false }));
+          setExcessChoice('anticipate');
+          setPendingSubmitAfterExcess(true);
+        },
+        onCancel: () => {
+          setModal(m => ({ ...m, open: false }));
+          setExcessChoice('donate');
+          setPendingSubmitAfterExcess(true);
+        },
+      });
+      return;
     }
 
     // ── Soumission directe ────────────────────────────────────────────────

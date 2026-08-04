@@ -1,11 +1,100 @@
 // backend/src/modules/admin/admin.service.ts
+//
+// v1.1 — 🔥 CORRECTION : bug des retardataires (même famille que
+//   dashboard-member.service.ts). listLateMembers() calculait diffMonths à
+//   partir de la date de validation du DERNIER versement uniquement
+//   (orderBy validatedAt desc, take 1) puis un diff de dates brut — un
+//   membre ayant validé ses 12 mois d'un coup en janvier (donc
+//   validatedAt = janvier pour les 12) ressortait "en retard" dès février,
+//   sans jamais regarder monthReference/yearReference. Repris ici le même
+//   couple buildCoveredMonths/computeLateMonths que member.service.ts et
+//   dashboard-member.service.ts (pattern déjà dupliqué à plusieurs endroits
+//   du code, ex. getPricingMap()).
+//
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { UserStatus, ContributionStatus, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType, LedgerEntryType } from '@prisma/client';
+import { UserStatus, ContributionStatus, ContributionPurpose, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType, LedgerEntryType } from '@prisma/client';
 import { memberMapper } from '../member/member.mapper';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as bcrypt from 'bcryptjs';
 import { CreateMemberDto } from './dto/create-member.dto';
+
+// ─── Helpers retard (identiques à member.service.ts / dashboard-member.service.ts) ──
+function buildCoveredMonths(
+  contributions: Array<{
+    monthReference: number | null;
+    yearReference: number | null;
+    validatedAt: Date | null;
+    createdAt: Date;
+    amount?: unknown;
+  }>,
+  monthlyPrice: number,
+): Set<string> {
+  const covered = new Set<string>();
+
+  for (const c of contributions) {
+    const amt = c.amount != null ? Number(c.amount) : 0;
+
+    const numMonths =
+      monthlyPrice > 0 && amt > 0
+        ? Math.min(48, Math.max(1, Math.floor(amt / monthlyPrice)))
+        : 1;
+
+    let m: number;
+    let y: number;
+
+    if (c.monthReference && c.yearReference) {
+      m = c.monthReference;
+      y = c.yearReference;
+    } else {
+      const d = new Date(c.validatedAt ?? c.createdAt);
+      m = d.getMonth() + 1;
+      y = d.getFullYear();
+    }
+
+    for (let i = 0; i < numMonths; i++) {
+      covered.add(`${y}-${String(m).padStart(2, '0')}`);
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+  }
+
+  return covered;
+}
+
+function computeLateMonths(
+  coveredMonths: Set<string>,
+  joinDate: Date,
+  maxLookback = 24,
+): number {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  let lateMonths = 0;
+  let checkMonth = currentMonth - 1;
+  let checkYear = currentYear;
+
+  if (checkMonth < 1) {
+    checkMonth = 12;
+    checkYear--;
+  }
+
+  for (let i = 0; i < maxLookback; i++) {
+    const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
+    const monthStart = new Date(checkYear, checkMonth - 1, 1);
+
+    if (monthStart < new Date(joinDate.getFullYear(), joinDate.getMonth(), 1))
+      break;
+
+    if (!coveredMonths.has(key)) lateMonths++;
+
+    checkMonth--;
+    if (checkMonth < 1) { checkMonth = 12; checkYear--; }
+  }
+
+  return lateMonths;
+}
 
 @Injectable()
 export class AdminService {
@@ -13,6 +102,22 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
   ) {}
+
+  // ─── getPricingMap (même pattern dupliqué que member.service.ts /
+  //   contributions.service.ts / dashboard-member.service.ts) ──────────────
+  private async getPricingMap(
+    associationId: string,
+  ): Promise<Record<string, { monthlyQuota: number; membershipCard: number }>> {
+    const rows = await this.prisma.pricing.findMany({ where: { associationId } });
+    const map: Record<string, { monthlyQuota: number; membershipCard: number }> = {};
+    for (const p of rows) {
+      map[p.currency] = {
+        monthlyQuota: Number(p.monthlyQuota),
+        membershipCard: Number(p.membershipCard),
+      };
+    }
+    return map;
+  }
 
   /**
    * Helper privé pour récupérer le contexte complet (Antenne(s) + Association)
@@ -268,43 +373,84 @@ export class AdminService {
     return header + rows;
   }
 
+  // 🔥 CORRIGÉ (v1.1) : basé sur les mois réellement couverts
+  // (buildCoveredMonths/computeLateMonths, alignés sur member.service.ts et
+  // dashboard-member.service.ts) au lieu d'un simple diff sur la date de
+  // validation du dernier versement — cf. commentaire en tête de fichier.
   async listLateMembers(adminId: string, page: number, pageSize: number) {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
-    const users = await this.prisma.user.findMany({ 
-      where: { 
+    const [users, allPricing] = await Promise.all([
+      this.prisma.user.findMany({ 
+        where: { 
+          associationId,
+          status: UserStatus.ACTIVE, 
+          role: UserRole.MEMBER,
+          ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
+        },
+        orderBy: { lastName: 'asc' },
+        include: {
+          // Historique complet des cotisations régulières/retard validées,
+          // avec les champs nécessaires à buildCoveredMonths.
+          contributions: {
+            where: {
+              status: ContributionStatus.VALIDATED,
+              purpose: { in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA] },
+            },
+            select: {
+              monthReference: true,
+              yearReference: true,
+              validatedAt: true,
+              createdAt: true,
+              amount: true,
+            },
+          },
+          // Dernier versement validé (toutes natures) — pour l'affichage
+          // "dernier paiement", indépendant du calcul des mois couverts.
+          memberships: {
+            where: { isPrimary: true },
+            take: 1,
+            select: { antenna: { select: { defaultCurrency: true } } },
+          },
+        },
+      }),
+      this.getPricingMap(associationId),
+    ]);
+
+    // Dernier versement validé (toutes natures confondues), par utilisateur —
+    // requête séparée car le filtre de purpose ci-dessus exclut carte
+    // membre / dons, qui doivent quand même compter pour "dernier paiement".
+    const lastAnyValidated = await this.prisma.contribution.findMany({
+      where: {
         associationId,
-        status: UserStatus.ACTIVE, 
-        role: UserRole.MEMBER,
-        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
+        status: ContributionStatus.VALIDATED,
+        memberUserId: { in: users.map(u => u.id) },
       },
-      orderBy: { lastName: 'asc' },
-      include: {
-        contributions: {
-          where: { status: ContributionStatus.VALIDATED },
-          orderBy: { validatedAt: 'desc' },
-          take: 1
-        }
-      }
+      orderBy: { validatedAt: 'desc' },
+      distinct: ['memberUserId'],
+      select: { memberUserId: true, validatedAt: true },
     });
+    const lastValidatedByUser = new Map(lastAnyValidated.map(c => [c.memberUserId, c.validatedAt]));
 
-    const lateMembers = [];
-    const now = new Date();
+    const lateMembers = users
+      .map((u) => {
+        const antCurrency = u.memberships[0]?.antenna?.defaultCurrency ?? 'EUR';
+        const monthlyPrice =
+          Number(allPricing[antCurrency]?.monthlyQuota) ||
+          Number(allPricing['EUR']?.monthlyQuota)        ||
+          0;
+        const covered = buildCoveredMonths(u.contributions, monthlyPrice);
+        const referenceDate = u.approvedAt || u.createdAt;
+        const lateMonths = computeLateMonths(covered, referenceDate);
 
-    for (const u of users) {
-      const lastContrib = u.contributions[0];
-      const referenceDate = lastContrib?.validatedAt || u.approvedAt || u.createdAt;
-      const diffTime = now.getTime() - referenceDate.getTime();
-      const diffMonths = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 30.44));
-
-      if (diffMonths >= 3) {
-        lateMembers.push({
+        return {
           ...memberMapper.userSummary(u),
-          lateMonths: diffMonths,
-          lastValidatedContributionAt: lastContrib ? lastContrib.validatedAt : null
-        });
-      }
-    }
+          lateMonths,
+          lastValidatedContributionAt: lastValidatedByUser.get(u.id) ?? null,
+        };
+      })
+      .filter((m) => m.lateMonths >= 3)
+      .sort((a, b) => b.lateMonths - a.lateMonths);
 
     const skip = (page - 1) * pageSize;
     const paginatedItems = lateMembers.slice(skip, skip + pageSize);
@@ -742,10 +888,6 @@ export class AdminService {
           { description: { contains: q, mode: 'insensitive' } }
         ]
       }); 
-    }
-
-    if (andConditions.length > 0) {
-      where.AND = andConditions;
     }
 
     const [items, total] = await Promise.all([

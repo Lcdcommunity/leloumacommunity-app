@@ -50,6 +50,9 @@ type DashboardData = {
     lateMonths?: number;
     myLastContributionAt?: string | null;
     currency?: string;
+    // ── AJOUTÉ : harmonisation avec les dashboards admin/super-admin ──
+    members?: number;
+    antennas?: number;
   };
   me: UserSummary;
   virtualCard?: {
@@ -123,6 +126,10 @@ function getPurposeConfig(purpose?: string | null) {
     REGULAR_QUOTA:   { label: 'Cotisation',   icon: '📅', color: '#059669', bg: '#ECFDF5' },
     MEMBERSHIP_CARD: { label: 'Carte membre', icon: '💳', color: '#2563EB', bg: '#EFF6FF' },
     DONATION:        { label: 'Don libre',    icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
+    // ── CORRIGÉ : 'LATE_QUOTA' était utilisé dans hasPendingContribution
+    //   plus bas mais absent de cette table — les cotisations de retard
+    //   retombaient donc sur le badge générique "Cotisation" par défaut.
+    LATE_QUOTA:      { label: 'Cotisation en retard', icon: '⏰', color: '#DC2626', bg: '#FEF2F2' },
   };
   return purpose ? (map[purpose] ?? null) : null;
 }
@@ -360,20 +367,6 @@ function ProjectDetailModal({ project, onClose }: { project: ExtendedCarouselPro
               <p style={{ fontSize: '0.83rem', color: '#374151', lineHeight: 1.65, margin: 0 }}>{project.description}</p>
             </div>
           )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.75rem' }}>
-            {[
-              { label: 'Début',          value: project.startsAt ? formatDate(project.startsAt as string | Date) : '—' },
-              { label: 'Fin prévue',     value: project.endsAt   ? formatDate(project.endsAt   as string | Date) : '—' },
-              { label: 'Budget prévu',   value: planned > 0 ? formatCurrency(planned) : '—' },
-              { label: 'Budget dépensé', value: spent > 0 ? formatCurrency(spent) : '—', urgent: over },
-            ].map(row => (
-              <div key={row.label} style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
-                <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>{row.label}</div>
-                <div style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.05rem', fontWeight: 700, color: row.urgent ? '#DC2626' : '#111827' }}>{row.value}</div>
-              </div>
-            ))}
-          </div>
 
           {planned > 0 && (
             <div style={{ marginTop: '0.65rem', background: '#F8FAFC', borderRadius: 12, padding: '0.85rem 1rem', border: '1px solid #E2E8F0' }}>
@@ -651,7 +644,35 @@ export default function MemberHomePage() {
     }, {});
   }, [data]);
 
+  // ── AJOUTÉ : nombre d'antennes distinctes (déduplication par id — une
+  //   même antenne peut apparaître plusieurs fois dans antennaBalances,
+  //   une fois par devise qu'elle détient).
+  const antennaCount = useMemo(() => {
+    if (!data?.antennaBalances) return 0;
+    return new Set(data.antennaBalances.map(a => a.id)).size;
+  }, [data]);
+
   const stats: StatCard[] = data ? [
+    // ── AJOUTÉ : Membres / Antennes / Projets en cours (visibilité déjà
+    //   offerte côté admin et super-admin) ──
+    {
+      label: 'Membres',
+      value: data.stats.members ?? '—',
+      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>,
+      color: '#2563EB', bg: '#EFF6FF', sub: 'Membres actifs', spanClass: 'mb-span-1',
+    },
+    {
+      label: 'Antennes',
+      value: antennaCount > 0 ? antennaCount : '—',
+      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>,
+      color: '#7C3AED', bg: '#F5F3FF', sub: 'Sections locales', spanClass: 'mb-span-1',
+    },
+    {
+      label: 'Projets en cours',
+      value: data.stats.activeProjects ?? 0,
+      icon: <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2"/></svg>,
+      color: '#0891B2', bg: '#ECFEFF', sub: "Suivis par l'association", spanClass: 'mb-span-1',
+    },
     ...FIXED_CURRENCIES_MEMBER.map(({ cur: fc, label, color, bg }) => {
       const grp = mbCurrencyGroups[fc] ?? { total: 0, antennas: [] };
       return {

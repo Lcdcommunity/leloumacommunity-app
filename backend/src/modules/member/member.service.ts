@@ -187,6 +187,16 @@ export class MemberService {
   }
 
   // ─── getDashboard ─────────────────────────────────────────────────────────
+  // ⚠️ NOTE (harmonisation) : cette méthode a une forme de retour différente
+  // de DashboardMemberService.getMemberDashboard() (clé "user" au lieu de
+  // "me", pas de recentContributions/projectsInProgress/latestContents/
+  // lateMembersPreview) — elle ne correspond pas à ce que le frontend
+  // member/page.tsx attend (DashboardData). Tout indique que c'est
+  // DashboardMemberService.getMemberDashboard() qui est réellement branché
+  // sur /member/dashboard. À vérifier côté contrôleur : si getDashboard()
+  // n'est appelée par aucune route, c'est du code mort à retirer pour éviter
+  // toute confusion future (ex. si quelqu'un la corrige par erreur en
+  // pensant qu'elle est active).
 
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
@@ -511,8 +521,6 @@ export class MemberService {
       };
     });
   }
-
-  // ─── createContribution ───────────────────────────────────────────────────
 
   // ─── createContribution ───────────────────────────────────────────────────
 
@@ -895,6 +903,10 @@ export class MemberService {
           firstName: m.user.firstName,
           lastName: m.user.lastName,
           antennaName: m.antenna?.name ?? null,
+          // 🔥 AJOUT : devise de l'antenne — absente jusqu'ici, alors que
+          // c'est la seule donnée qui manque pour calculer un montant
+          // (mois de retard × cotisation mensuelle) côté frontend.
+          currency: antCurrency,
           lateMonths: computeLateMonths(covered, m.user.createdAt),
         };
       })

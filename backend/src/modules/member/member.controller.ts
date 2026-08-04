@@ -12,6 +12,14 @@ import {
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { MemberService } from './member.service';
+// 🔥 CORRIGÉ : /member/dashboard appelait MemberService.getDashboard(), qui
+// renvoie { user, stats: {...} } — pas la forme attendue par
+// member/page.tsx ({ me, stats: {...}, recentContributions,
+// projectsInProgress, latestContents, upcomingEvents, lateMembersPreview }).
+// DashboardMemberService.getMemberDashboard() a exactement cette forme (et
+// vient d'être corrigée pour le calcul des retards) — c'est elle qui doit
+// être branchée sur cette route.
+import { DashboardMemberService } from '../dashboard/dashboard-member.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -32,11 +40,14 @@ import { PushSubscriptionDto } from './dto/push-subscription.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.MEMBER)
 export class MemberController {
-  constructor(private readonly service: MemberService) {}
+  constructor(
+    private readonly service: MemberService,
+    private readonly dashboardService: DashboardMemberService,
+  ) {}
 
   @Get('dashboard')
   getDashboard(@CurrentUser() user: AuthUser) {
-    return this.service.getDashboard(user.id);
+    return this.dashboardService.getMemberDashboard(user.id);
   }
 
   // Profil
