@@ -36,6 +36,12 @@ interface Props {
   pricingMap?: Record<string, { monthlyQuota: number; membershipCard: number }>;
   selfCurrency?: string;
   lateMonths?: number;
+  // 🔥 AJOUT : plus ancien mois/année impayé du membre — pré-remplit "Mois
+  // de référence" dessus au lieu du mois courant, pour qu'un versement
+  // démarre par rattraper le passif (cf. cas Thierno : payer une année
+  // pleine à partir d'aujourd'hui ne couvrait pas les mois déjà dus avant).
+  defaultMonthReference?: number;
+  defaultYearReference?: number;
 }
 
 const PURPOSES = [
@@ -496,6 +502,8 @@ export function ContributionCreateForm({
   pricingMap,
   selfCurrency,
   lateMonths: lateMonthsProp,
+  defaultMonthReference,
+  defaultYearReference,
 }: Props) {
 
   // Tiers payment
@@ -520,8 +528,11 @@ export function ContributionCreateForm({
 
   // Month reference
   const now = new Date();
-  const [refMonth, setRefMonth] = useState<number>(now.getMonth() + 1);
-  const [refYear, setRefYear] = useState<number>(now.getFullYear());
+  // 🔥 CORRIGÉ : pré-rempli avec le plus ancien mois impayé du membre
+  // (défaultMonthReference/Year, transmis par la page parente) quand il y
+  // en a un, sinon repli sur le mois courant comme avant.
+  const [refMonth, setRefMonth] = useState<number>(defaultMonthReference ?? now.getMonth() + 1);
+  const [refYear, setRefYear] = useState<number>(defaultYearReference ?? now.getFullYear());
 
   // Modal state
   const [modal, setModal] = useState<{
@@ -1242,6 +1253,12 @@ export function ContributionCreateForm({
                   <> Le paiement sera automatiquement réparti sur <strong>{monthsCovered} mois</strong> à partir de ce mois.</>
                 )}
               </p>
+              {paymentTarget === 'ME' && defaultMonthReference && defaultYearReference &&
+                refMonth === defaultMonthReference && refYear === defaultYearReference && (
+                <p style={{ marginTop: '0.4rem', fontSize: '0.7rem', color: '#D97706', lineHeight: 1.5, fontWeight: 700 }}>
+                  💡 Pré-rempli sur votre plus ancien mois impayé ({MONTHS_FR[defaultMonthReference - 1]} {defaultYearReference}), pour rattraper votre retard en premier. Changez-le si besoin.
+                </p>
+              )}
             </div>
           </div>
         )}
