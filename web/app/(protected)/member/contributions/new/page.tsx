@@ -29,6 +29,7 @@ export default function MemberNewContributionPage() {
   const [lateMonths, setLateMonths] = useState<number | undefined>(undefined);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [currencyWarning, setCurrencyWarning] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -37,10 +38,6 @@ export default function MemberNewContributionPage() {
       try {
         const [allPricing, dashboard] = await Promise.all([
           api.getAssociationPricing().catch(() => ({} as Record<string, { monthlyQuota: number; membershipCard: number }>)),
-          // 🔥 CORRECTION : l'ancien code appelait `api.getMemberDashboard()`,
-          // une méthode qui n'existe pas dans api-client.ts (la vraie
-          // méthode s'appelle `dashboardMember`). L'appel échouait donc
-          // toujours en silence, lateMonths et l'antenne restaient indéfinis.
           api.dashboardMember().catch(() => null),
         ]);
 
@@ -52,13 +49,39 @@ export default function MemberNewContributionPage() {
           setLateMonths(dashboard.stats.lateMonths);
         }
 
-        // 🔥 AJOUT : devise de l'antenne du membre connecté, pour le cas
-        // "Pour moi-même" — dérivée de antennaBalances (déjà renvoyé par le
-        // dashboard) plutôt que d'un nouvel appel réseau.
-        const myAntennaId = (dashboard?.me as { antennaId?: string | null } | undefined)?.antennaId;
-        const myAntennaBalance = dashboard?.antennaBalances?.find((a) => a.id === myAntennaId);
-        if (myAntennaBalance?.currency) {
-          setSelfCurrency(myAntennaBalance.currency);
+        // 🔥 CORRECTION DÉFINITIVE : `dashboard.me` est typé `UserSummary`
+        // (l'entité User), qui n'a PAS de champ `antennaId` — l'antenne d'un
+        // membre est une relation `Membership`, distincte de `User`. Le code
+        // précédent castait `dashboard.me` en `{ antennaId?: string }` pour
+        // faire taire TypeScript, mais à l'exécution ce champ est `undefined`
+        // sur le vrai payload : le matching contre `antennaBalances` échouait
+        // donc TOUJOURS, silencieusement, laissant selfCurrency à '' et le
+        // bouton de soumission bloqué sans aucune erreur visible.
+        //
+        // Le type de dashboardMember() expose déjà `stats.currency`, calculé
+        // côté backend — c'est la source de vérité à utiliser en priorité.
+        // On garde ensuite deux replis pour rester robuste si ce champ venait
+        // à manquer sur d'anciens déploiements : le cas mono-antenne (un
+        // seul antennaBalance, donc forcément le bon), puis un message
+        // d'erreur explicite plutôt qu'un bouton mort en silence.
+        const antennaBalances = dashboard?.antennaBalances ?? [];
+
+        let resolvedCurrency: string | undefined = dashboard?.stats?.currency;
+
+        if (!resolvedCurrency && antennaBalances.length === 1) {
+          resolvedCurrency = antennaBalances[0].currency;
+        }
+
+        if (resolvedCurrency) {
+          setSelfCurrency(resolvedCurrency);
+        } else {
+          console.warn('[contributions/new] Devise introuvable au bootstrap', {
+            statsCurrency: dashboard?.stats?.currency,
+            antennaBalances,
+          });
+          setCurrencyWarning(
+            "Impossible de déterminer votre devise de cotisation. Contactez votre administrateur — le bouton de soumission restera désactivé tant que ce n'est pas corrigé.",
+          );
         }
       } catch (error) {
         console.error('Erreur récupération infos:', error);
@@ -300,7 +323,8 @@ export default function MemberNewContributionPage() {
               ) : success ? (
                 <div className="nc-success">
                   <div className="nc-success-icon">
-                    <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2">                      <polyline points="20 6 9 17 4 12" />
+                    <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#059669" strokeWidth="2.2">
+                      <polyline points="20 6 9 17 4 12" />
                     </svg>
                   </div>
                   <p className="nc-success-title">Versement enregistré !</p>
@@ -312,6 +336,14 @@ export default function MemberNewContributionPage() {
                 </div>
               ) : (
                 <>
+                  {currencyWarning && (
+                    <div className="nc-error-box">
+                      <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {currencyWarning}
+                    </div>
+                  )}
                   {errorMsg && (
                     <div className="nc-error-box">
                       <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>

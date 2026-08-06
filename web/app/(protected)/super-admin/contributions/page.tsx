@@ -27,12 +27,19 @@ const METHOD_LABELS: Record<string, string> = {
   OTHER: 'Autre',
 };
 
+// 🔥 CORRIGÉ : "type" n'existe pas sur l'objet renvoyé par le backend — le
+// vrai champ s'appelle "purpose" (REGULAR_QUOTA / LATE_QUOTA /
+// MEMBERSHIP_CARD / DONATION), exactement comme partout ailleurs dans
+// l'appli (admin/contributions, member/contributions/history). Comme ce
+// champ était toujours undefined, formatContributionType tombait
+// systématiquement sur son cas par défaut ("Cotisation régulière"), quel
+// que soit le vrai motif — d'où un don affiché comme "Cotisation régulière".
 type ContributionWithMonthRef = Contribution & {
   monthRef?: string | null;
   month?: string | null;
   contributionMonth?: string | null;
   targetMonth?: string | null;
-  type?: string | null;
+  purpose?: string | null;
 };
 
 const formatMonthRef = (c: ContributionWithMonthRef) => {
@@ -55,13 +62,15 @@ const formatMonthRef = (c: ContributionWithMonthRef) => {
   return `${months[Number(month) - 1] || month} ${year}`;
 };
 
-const formatContributionType = (type?: string) => {
-  switch (type) {
-    case 'MEMBERSHIP': return 'Carte de membre';
-    case 'REGULAR': return 'Cotisation régulière';
-    case 'DONATION': return 'Don';
-    case 'LATE_FEE': return 'Retard';
-    default: return type || 'Cotisation régulière';
+// 🔥 CORRIGÉ : lit désormais purpose (les vraies valeurs backend), plus
+// jamais type. LATE_QUOTA ajouté (absent de l'ancienne table).
+const formatContributionType = (purpose?: string | null) => {
+  switch (purpose) {
+    case 'MEMBERSHIP_CARD': return 'Carte de membre';
+    case 'REGULAR_QUOTA': return 'Cotisation régulière';
+    case 'LATE_QUOTA': return 'Cotisation en retard';
+    case 'DONATION': return 'Don libre';
+    default: return purpose || '—';
   }
 };
 
@@ -219,8 +228,8 @@ export default function SuperAdminContributionsPage() {
           const antenne = c.antenna?.name || '';
           const montant = `${c.amount} ${c.currency || 'EUR'}`;
           const date = formatDate(c.contributionDate || c.createdAt);
-          const typed = (c as ContributionWithMonthRef).type;
-          const type = formatContributionType(typed ? String(typed) : '');
+          // 🔥 CORRIGÉ : purpose au lieu de type
+          const type = formatContributionType((c as ContributionWithMonthRef).purpose);
           const statut = STATUS_MAP[c.status]?.label || c.status;
 
           csv += `"${nom}";"${prenom}";"${email}";"${antenne}";"${montant}";"${date}";"${type}";"${statut}"\n`;
@@ -494,8 +503,8 @@ export default function SuperAdminContributionsPage() {
                 const antenne = c.antenna?.name || '';
                 const montant = `${c.amount} ${c.currency || 'EUR'}`;
                 const date = formatDate(c.contributionDate || c.createdAt);
-                const typed = (c as ContributionWithMonthRef).type;
-                const type = formatContributionType(typed ? String(typed) : '');
+                // 🔥 CORRIGÉ : purpose au lieu de type
+                const type = formatContributionType((c as ContributionWithMonthRef).purpose);
                 const statut = STATUS_MAP[c.status]?.label || c.status;
 
                 return (
@@ -521,7 +530,7 @@ export default function SuperAdminContributionsPage() {
             <div className="sc-eyebrow"><div className="sc-dot" />Super Admin</div>
             <h1 className="sc-title">Cotisations <span>globales</span></h1>
           </div>
-          
+
           <div className="sm-export-group">
             <button className="btn-export btn-pdf" onClick={() => setExportModalType('PDF')}>
               <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm9-9h-6v2h4v10H5V9h4V7H3v14h18V7z"/></svg>
@@ -542,27 +551,27 @@ export default function SuperAdminContributionsPage() {
             icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
           />
           <StatCard
-            label="Validées"
-            value={validated}
-            color="#059669"
-            icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-          />
-          <StatCard
             label="En attente"
             value={pending}
             color="#D97706"
-            icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          />
+          <StatCard
+            label="Validées"
+            value={validated}
+            color="#059669"
+            icon={<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
           />
         </div>
 
         {hasPending && (
           <div className="sc-urgent">
             <div className="sc-urgent-ico">
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.2"><path strokeLinecap="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
             <div className="sc-urgent-text">
-              <strong>{pending} cotisation{pending > 1 ? 's' : ''} en attente de validation</strong>
-              <span>Ces cotisations n&apos;ont pas encore été validées par les administrateurs d&apos;antenne.</span>
+              <strong>{pending} cotisation{pending > 1 ? 's' : ''} en attente</strong>
+              <span>Toutes antennes confondues — validation à effectuer côté administrateur de chaque antenne.</span>
             </div>
           </div>
         )}
@@ -571,48 +580,41 @@ export default function SuperAdminContributionsPage() {
           <div className="sc-panel-head">
             <div className="sc-panel-titlerow">
               <div className="sc-panel-ico">
-                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.3"><path strokeLinecap="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               </div>
-              <span className="sc-panel-title">Suivi des cotisations</span>
-              {displayedItems.length > 0 && <span className="sc-count-chip">{displayedItems.length}</span>}
+              <span className="sc-panel-title">Toutes les cotisations</span>
             </div>
+            <span className="sc-count-chip">{displayedItems.length}</span>
           </div>
 
           <div className="sc-toolbar">
-            {/* 🔥 NOUVEAU : recherche par nom / prénom du membre */}
+            <div className="sc-field">
+              <span className="sc-label">Statut</span>
+              <select className="sc-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+                <option value="">Tous</option>
+                <option value="PENDING_VALIDATION">En attente</option>
+                <option value="VALIDATED">Validée</option>
+                <option value="REJECTED">Rejetée</option>
+                <option value="CANCELLED">Annulée</option>
+              </select>
+            </div>
+            <div className="sc-field">
+              <span className="sc-label">Antenne</span>
+              <select className="sc-select" value={antennaFilter} onChange={(e) => setAntennaFilter(e.target.value)}>
+                <option value="">Toutes</option>
+                {antennas.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
             <div className="sc-field sc-field-search">
-              <label className="sc-label">Recherche</label>
+              <span className="sc-label">Membre</span>
               <input
                 className="sc-select"
                 type="text"
-                placeholder="Nom ou prénom..."
+                placeholder="Nom ou prénom…"
                 value={nameQuery}
                 onChange={(e) => setNameQuery(e.target.value)}
               />
             </div>
-
-            {/* 🔥 NOUVEAU : filtre par antenne, réutilise la liste déjà chargée pour la modale d'export */}
-            <div className="sc-field">
-              <label className="sc-label">Antenne</label>
-              <select className="sc-select" value={antennaFilter} onChange={(e) => setAntennaFilter(e.target.value)}>
-                <option value="">Toutes</option>
-                {antennas.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="sc-field">
-              <label className="sc-label">Statut</label>
-              <select className="sc-select" value={status} onChange={(e) => setStatus(e.target.value)}>
-                <option value="">Tous les statuts</option>
-                <option value="PENDING_VALIDATION">En attente</option>
-                <option value="VALIDATED">Validées</option>
-                <option value="REJECTED">Rejetées</option>
-                <option value="CANCELLED">Annulées</option>
-              </select>
-            </div>
-
             <button className="sc-filter-btn" disabled={loading} onClick={() => void load(status)}>
               {loading ? (
                 <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'scspin .7s linear infinite' }} /> Chargement…</>
@@ -762,7 +764,7 @@ export default function SuperAdminContributionsPage() {
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
-            
+
             <div className="export-flex-row">
               <div className="export-flex-item full">
                 <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.5rem', textTransform: 'uppercase' }}>Filtrer par Antenne</label>
@@ -838,7 +840,8 @@ export default function SuperAdminContributionsPage() {
                 <div className="sm-dp-field">
                   <label>Type</label>
                   <div className="sm-dp-value" style={{ fontWeight: 800 }}>
-                    {formatContributionType((selectedItem as ContributionWithMonthRef).type ?? undefined)}
+                    {/* 🔥 CORRIGÉ : purpose au lieu de type */}
+                    {formatContributionType((selectedItem as ContributionWithMonthRef).purpose)}
                   </div>
                 </div>
                 <div className="sm-dp-field">
