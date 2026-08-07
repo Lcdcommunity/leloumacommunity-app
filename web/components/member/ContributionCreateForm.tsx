@@ -373,7 +373,22 @@ function CelebrationOverlay({ purpose, onClose }: { purpose: string; onClose: ()
     const t = setTimeout(() => setVisible(true), 80);
     const t2 = setTimeout(() => handleClose(), 5200);
     return () => { clearTimeout(t); clearTimeout(t2); };
-  }, [handleClose, config.colors]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // 🔥 CORRECTION CRITIQUE : dépendances vidées à []. Avant, ce useEffect
+  // dépendait de [handleClose, config.colors] — or `config` est recréé par
+  // getCelebrationConfig(purpose) à CHAQUE rendu (nouvel objet, donc nouveau
+  // tableau `config.colors` même si son contenu est identique), et
+  // `handleClose` dépend de `onClose`, qui est une fonction inline recréée à
+  // chaque rendu du parent. React compare les dépendances par référence : les
+  // deux "changeaient" donc à chaque rendu → l'effet se relançait →
+  // setParticles(...) déclenchait un nouveau rendu → nouvelles réfs → l'effet
+  // se relançait encore, sans fin. Boucle infinie de rendu = thread principal
+  // bloqué = page entièrement figée dès le clic sur "Soumettre" (c'est ce
+  // composant qui montait juste après le submit). Cet effet n'a de toute
+  // façon besoin de tourner qu'une seule fois, au montage : le composant est
+  // remonté à chaque nouvelle célébration (clé différente / nouvel élément
+  // JSX), donc pas besoin de réagir à un changement de purpose ou de config.
 
   return (
     <div
