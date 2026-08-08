@@ -592,19 +592,21 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     }>('/dashboard/antenna-admin'),
 
   dashboardMember: () =>
-    http<{
-      stats: MemberDashboardStats & {
-        myTotalContributions?: number;
-        activeProjects?: number;
-        myContributionsTotal?: number;
-        myContributionsValidatedTotal?: number;
-        myPendingContributionsCount?: number;
-        associationTotalBalance?: number;
-        lateMonths?: number;
-        myLastContributionAt?: string | null;
-        currency?: string;
-      };
-      me: UserSummary;
+     http<{
+       stats: MemberDashboardStats & {
+         myTotalContributions?: number;
+         activeProjects?: number;
+         myContributionsTotal?: number;
+         myContributionsValidatedTotal?: number;
+         myPendingContributionsCount?: number;
+         associationTotalBalance?: number;
+         lateMonths?: number;
+         myLastContributionAt?: string | null;
+         currency?: string;
+        earliestUnpaidMonth?: number | null;
+        earliestUnpaidYear?: number | null;
+       };
+       me: UserSummary;
       virtualCard?: VirtualCardData | null;
       recentContributions: Contribution[];
       projectsInProgress: Project[];
@@ -712,16 +714,18 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     ),
 
   searchMembers: (q: string) =>
-    http<Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      email: string;
-      phone?: string | null;
-      antennaId?: string | null;
-      antennaName?: string | null;
-      currency?: string | null;
-    }>>(`/member/search-users?q=${encodeURIComponent(q)}`),
+     http<Array<{
+       id: string;
+       firstName: string;
+       lastName: string;
+       email: string;
+       phone?: string | null;
+       antennaId?: string | null;
+       antennaName?: string | null;
+       currency?: string | null;
+       earliestUnpaidMonth?: number | null;
+       earliestUnpaidYear?: number | null;
+     }>>(`/member/search-users?q=${encodeURIComponent(q)}`),
 
   approveMemberAccount: (userId: string) =>
     http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),

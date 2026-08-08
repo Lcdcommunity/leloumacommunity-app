@@ -35,8 +35,7 @@ type AntennaBalance = {
 // Contrairement au membre (lui-même) ou à l'admin (ses propres antennes),
 // le super-admin voit les retardataires de TOUTE la plateforme : chaque
 // entrée porte donc son antenne. Le montant est estimé (mois de retard ×
-// cotisation mensuelle de la devise de l'antenne) tant que le backend ne
-// renvoie pas directement un montant — cf. résumé en fin de réponse.
+// cotisation mensuelle de la devise de l'antenne).
 interface ApiFileAttachment {
   file?: { url?: string | null } | null;
 }
@@ -490,7 +489,15 @@ export default function SuperAdminDashboardPage() {
       try {
         const [dashRes, lateRes, projectsRes, contentsRes, pricingRes] = await Promise.allSettled([
           api.dashboardSuperAdmin(),
-          api.listLateMembersVisible({ page: 1, pageSize: 100 }),
+          // 🔥 CORRIGÉ (07/08) : /member/late-members est réservé au rôle
+          // MEMBER (member.controller.ts::@Roles(MEMBER) au niveau
+          // contrôleur) — un SUPER_ADMIN s'y voyait refuser l'accès (403),
+          // silencieusement avalé par Promise.allSettled : la carte "Retard"
+          // affichait donc toujours 0. /admin/late-members est autorisé
+          // pour ANTENNA_ADMIN et SUPER_ADMIN (admin.controller.ts) et
+          // renvoie désormais antennaName/currency par membre, avec un
+          // seuil de 1 mois (admin.service.ts::listLateMembers).
+          api.listLateMembersOver3Months({ page: 1, pageSize: 100 }),
           api.listProjectsForMembers({ page: 1, pageSize: 6 }),
           api.listContentsForMembers({ page: 1, pageSize: 5 }),
           api.getAssociationPricing(),

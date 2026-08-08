@@ -1,4 +1,9 @@
 // web/app/(protected)/member/projects/page.tsx
+// v2.0 — CHANGELOG :
+// 🔥 CORRIGÉ (ProjectDetailModal) : project.summary dans le header n'avait
+//    aucune limite de lignes, pouvait écraser la zone défilante en dessous
+//    sur un résumé long. Fix : clamp 2 lignes + minHeight: 0 sur le corps
+//    scrollable (même correctif que sur les pages admin/super-admin/projects).
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -185,7 +190,23 @@ function ProjectDetailModal({ project, onClose }: { project: RichProject; onClos
               {project.title}
             </h2>
             {project.summary && (
-              <p style={{ margin: '0.35rem 0 0', fontSize: '0.82rem', color: '#64748B', lineHeight: 1.5, fontWeight: 500 }}>
+              // ── CORRIGÉ : limité à 2 lignes (ellipse) — un résumé long ne
+              // doit plus pouvoir dominer le header et réduire d'autant la
+              // zone défilante en dessous. La description complète (non
+              // tronquée) reste consultable plus bas dans le corps.
+              <p
+                style={{
+                  margin: '0.35rem 0 0',
+                  fontSize: '0.82rem',
+                  color: '#64748B',
+                  lineHeight: 1.5,
+                  fontWeight: 500,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
                 {project.summary}
               </p>
             )}
@@ -207,7 +228,7 @@ function ProjectDetailModal({ project, onClose }: { project: RichProject; onClos
         </div>
 
         {/* ── Corps scrollable ── */}
-        <div style={{ overflowY: 'auto', flex: 1, padding: '1.1rem 1.4rem 1.5rem' }}>
+        <div style={{ overflowY: 'auto', flex: 1, minHeight: 0, padding: '1.1rem 1.4rem 1.5rem' }}>
 
           {/* ── Galerie photos (Ajoutée) ── */}
           {photos.length > 0 && (
@@ -271,7 +292,9 @@ function ProjectDetailModal({ project, onClose }: { project: RichProject; onClos
               <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.5rem' }}>Description</div>
               <p style={{ fontSize: '0.84rem', color: '#374151', lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap' }}>{project.description}</p>
             </div>
-          )}          {/* Promoteur */}
+          )}
+
+          {/* Promoteur */}
           {project.promoterName && (
             <div style={{ marginBottom: '1rem', padding: '0.75rem 1rem', background: '#F8FAFC', borderRadius: 14, border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#EFF6FF,#DBEAFE)', border: '1px solid #BFDBFE', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -284,7 +307,9 @@ function ProjectDetailModal({ project, onClose }: { project: RichProject; onClos
                 <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#0F172A' }}>{project.promoterName}</div>
               </div>
             </div>
-          )}          {/* Grille dates + budgets */}
+          )}
+
+          {/* Grille dates + budgets */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '0.65rem' }}>
             <div style={{ background: '#F8FAFC', borderRadius: 14, padding: '0.85rem 1rem', border: '1px solid #E2E8F0' }}>
               <div style={{ fontSize: '0.62rem', fontWeight: 800, color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '0.45rem' }}>Début</div>

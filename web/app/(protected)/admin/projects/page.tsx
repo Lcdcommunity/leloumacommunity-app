@@ -1,4 +1,8 @@
 // web/app/(protected)/admin/projects/page.tsx
+// v3.0 — CHANGELOG :
+// 🔥 CORRIGÉ (ProjectModal) : project.summary dans le header n'avait aucune
+//    limite de lignes, pouvait écraser la zone défilante en dessous sur un
+//    résumé long. Fix : clamp 2 lignes + minHeight: 0 sur le corps scrollable.
 'use client';
 
 import { useEffect, useState, useCallback, useRef, DragEvent } from 'react';
@@ -415,9 +419,10 @@ function ProjectModal({
               justifyContent: 'space-between',
               gap: '1rem',
               background: '#F8FAFC',
+              flexShrink: 0,
             }}
           >
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               {project.locationText && (
                 <div
                   style={{
@@ -452,7 +457,23 @@ function ProjectModal({
                 {project.title}
               </h2>
               {project.summary && (
-                <p style={{ fontSize: '.85rem', color: '#64748B', margin: '.4rem 0 0', fontWeight: 500, lineHeight: 1.4 }}>
+                // ── CORRIGÉ : limité à 2 lignes (ellipse) — un résumé très
+                // long ne doit plus pouvoir écraser le header et réduire
+                // d'autant la zone défilante en dessous. La description
+                // complète (non tronquée) reste consultable plus bas.
+                <p
+                  style={{
+                    fontSize: '.85rem',
+                    color: '#64748B',
+                    margin: '.4rem 0 0',
+                    fontWeight: 500,
+                    lineHeight: 1.4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
                   {project.summary}
                 </p>
               )}
@@ -480,7 +501,7 @@ function ProjectModal({
           </div>
 
           {/* Corps scrollable */}
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {/* Galerie photos */}
             <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(37,99,235,.08)' }}>
               <div
@@ -578,7 +599,9 @@ function ProjectModal({
                     {project.endsAt ? formatDate(project.endsAt) : '—'}
                   </span>
                 }
-              />              <DetailRow
+              />
+
+              <DetailRow
                 icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 label="Budget"
                 value={
@@ -607,7 +630,9 @@ function ProjectModal({
                     <span style={{ color: '#D1D5DB' }}>Non défini</span>
                   )
                 }
-              />              <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
+              />
+
+              <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={project.description} />
 
               {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
                 <div style={{ marginTop: '1rem', background: '#F8FAFC', padding: '1rem', borderRadius: 12, border: '1px solid rgba(37,99,235,.08)' }}>
@@ -653,7 +678,7 @@ function ProjectModal({
           </div>
 
           {/* Footer */}
-          <div style={{ background: 'white', borderTop: '1px solid #E5E7EB', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
+          <div style={{ background: 'white', borderTop: '1px solid #E5E7EB', padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', flexShrink: 0 }}>
             <StatusBadge status={project.status} />
             <div style={{ display: 'flex', gap: '.5rem' }}>
               <button onClick={onDelete} style={{ height: 38, padding: '0 1rem', borderRadius: 10, background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', fontFamily: "'DM Sans',sans-serif", fontSize: '.8rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '.4rem', transition: 'all .2s' }}>

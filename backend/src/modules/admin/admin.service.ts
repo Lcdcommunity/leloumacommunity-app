@@ -11,6 +11,16 @@
 //   dashboard-member.service.ts (pattern déjà dupliqué à plusieurs endroits
 //   du code, ex. getPricingMap()).
 //
+// v1.2 — 🔥 AJOUT : listLateMembers() renvoie désormais `currency` et
+//   `antennaName` par membre, requis par LateMembersModal (admin/page.tsx et
+//   super-admin/page.tsx) pour estimer le montant dû (mois × tarif) — absent
+//   jusqu'ici, ce qui faisait retomber ces pages sur un repli 'GNF'
+//   silencieusement faux pour toute autre devise. Seuil également abaissé à
+//   1 mois (au lieu de 3) : cette liste alimente /admin/late-members,
+//   consultée par ANTENNA_ADMIN et SUPER_ADMIN pour relancer tôt,
+//   contrairement à la vue "communautaire" (member.service.ts::listLateMembers)
+//   qui reste à 3.
+//
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ContributionPurpose, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType, LedgerEntryType } from '@prisma/client';
@@ -377,6 +387,8 @@ export class AdminService {
   // (buildCoveredMonths/computeLateMonths, alignés sur member.service.ts et
   // dashboard-member.service.ts) au lieu d'un simple diff sur la date de
   // validation du dernier versement — cf. commentaire en tête de fichier.
+  // 🔥 v1.2 : ajout de `currency` / `antennaName` dans le retour, et seuil
+  // abaissé à 1 mois (cf. commentaire en tête de fichier).
   async listLateMembers(adminId: string, page: number, pageSize: number) {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
@@ -410,7 +422,7 @@ export class AdminService {
           memberships: {
             where: { isPrimary: true },
             take: 1,
-            select: { antenna: { select: { defaultCurrency: true } } },
+            select: { antenna: { select: { defaultCurrency: true, name: true } } },
           },
         },
       }),
@@ -447,9 +459,19 @@ export class AdminService {
           ...memberMapper.userSummary(u),
           lateMonths,
           lastValidatedContributionAt: lastValidatedByUser.get(u.id) ?? null,
+          // 🔥 AJOUT : requis par LateMembersModal (admin/page.tsx et
+          // super-admin/page.tsx) pour estimer le montant dû (mois × tarif)
+          // — absent jusqu'ici, ce qui faisait retomber ces pages sur un
+          // repli 'GNF' silencieusement faux pour toute autre devise.
+          currency: antCurrency,
+          antennaName: u.memberships[0]?.antenna?.name ?? null,
         };
       })
-      .filter((m) => m.lateMonths >= 3)
+      // 🔥 CORRIGÉ : seuil abaissé à 1 mois — cette liste alimente
+      // /admin/late-members, consultée par ANTENNA_ADMIN et SUPER_ADMIN
+      // pour relancer tôt, contrairement à la vue "communautaire"
+      // (member.service.ts::listLateMembers) qui reste à 3.
+      .filter((m) => m.lateMonths >= 1)
       .sort((a, b) => b.lateMonths - a.lateMonths);
 
     const skip = (page - 1) * pageSize;

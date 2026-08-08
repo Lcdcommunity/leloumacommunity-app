@@ -1,4 +1,14 @@
 // web/app/(protected)/super-admin/projects/page.tsx
+// v2.0 — CHANGELOG :
+// 🔥 CORRIGÉ (ProjectModal) : project.summary dans le header n'avait aucune
+//    limite de lignes, pouvait écraser la zone défilante en dessous sur un
+//    résumé long. Fix : clamp 2 lignes + minHeight: 0 sur le corps scrollable.
+// 🔥 CORRIGÉ (load) : ESLint react-hooks/set-state-in-effect — `load` était
+//    un async/await direct appelé dans un useEffect, ce qui exécute
+//    setLoading(true) de façon synchrone au moment où l'effet l'invoque.
+//    Remplacé par une chaîne .then()/.catch()/.finally() explicite (même
+//    pattern déjà utilisé dans admin/projects/page.tsx) : aucun setState ne
+//    s'exécute plus de façon synchrone dans le corps de l'effet.
 'use client';
 
 import { useEffect, useState, useCallback, useRef, DragEvent } from 'react';
@@ -21,7 +31,7 @@ function fixEncoding(str?: string | null): string {
               .replace(/NÂ°/g, 'N°')
               .replace(/Ã©/g, 'é')
               .replace(/Ã¨/g, 'è')
-              .replace(/Ã /g, 'à')
+              .replace(/Ã /g, 'à')
               .replace(/Ã¢/g, 'â')
               .replace(/Ãª/g, 'ê')
               .replace(/Ã®/g, 'î')
@@ -446,9 +456,10 @@ function ProjectModal({
               justifyContent: 'space-between',
               gap: '1rem',
               background: '#F8FAFC',
+              flexShrink: 0,
             }}
           >
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               {project.locationText && (
                 <div
                   style={{
@@ -483,7 +494,23 @@ function ProjectModal({
                 {fixEncoding(project.title)}
               </h2>
               {project.summary && (
-                <p style={{ fontSize: '.85rem', color: '#64748B', margin: '.4rem 0 0', fontWeight: 500, lineHeight: 1.4 }}>
+                // ── CORRIGÉ : limité à 2 lignes (ellipse) — un résumé long
+                // ne doit plus pouvoir écraser le header et réduire d'autant
+                // la zone défilante en dessous. La description complète
+                // (non tronquée) reste consultable plus bas.
+                <p
+                  style={{
+                    fontSize: '.85rem',
+                    color: '#64748B',
+                    margin: '.4rem 0 0',
+                    fontWeight: 500,
+                    lineHeight: 1.4,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}
+                >
                   {fixEncoding(project.summary)}
                 </p>
               )}
@@ -511,7 +538,7 @@ function ProjectModal({
           </div>
 
           {/* Corps scrollable */}
-          <div style={{ overflowY: 'auto', flex: 1 }}>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {/* Galerie photos */}
             <div style={{ padding: '1.25rem', borderBottom: '1px solid rgba(37,99,235,.08)' }}>
               <div
@@ -609,7 +636,8 @@ function ProjectModal({
                     {project.endsAt ? formatDate(project.endsAt) : '—'}
                   </span>
                 }
-              />              
+              />
+
               <DetailRow
                 icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08-.402 2.599-1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                 label="Budget"
@@ -639,8 +667,8 @@ function ProjectModal({
                     <span style={{ color: '#D1D5DB' }}>Non défini</span>
                   )
                 }
-              />              
-              
+              />
+
               <DetailRow vertical icon={<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" /></svg>} label="Description complète" value={fixEncoding(project.description)} />
 
               {(project.targetBeneficiaries || project.populationImpact || project.environmentalImpact) && (
@@ -957,17 +985,27 @@ export default function SuperAdminProjectsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Project | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.listProjects({ page: 1, pageSize: 100, q: q || undefined, status: statusFilter || undefined });
-      setItems(res?.items ?? []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur chargement projets');
-    } finally {
-      setLoading(false);
-    }
+  // 🔥 CORRIGÉ : .then()/.catch()/.finally() explicite (pas async/await) —
+  // la règle ESLint "set-state-in-effect" détecte un setState synchrone dès
+  // que la fonction appelée depuis l'effet exécute setState avant son
+  // premier await. Ici, `load()` ne fait qu'enchaîner des .then() : aucun
+  // setState ne s'exécute de façon synchrone au moment où l'effet
+  // l'invoque, ils ne se déclenchent que dans les callbacks (donc de façon
+  // asynchrone). Même pattern que admin/projects/page.tsx.
+  const load = useCallback(() => {
+    return Promise.resolve()
+      .then(() => setLoading(true))
+      .then(() => api.listProjects({ page: 1, pageSize: 100, q: q || undefined, status: statusFilter || undefined }))
+      .then((res) => {
+        setItems(res?.items ?? []);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Erreur chargement projets');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   }, [q, statusFilter]);
 
   useEffect(() => { void load(); }, [load]);

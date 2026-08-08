@@ -117,6 +117,39 @@ function computeLateMonths(
   return lateMonths;
 }
 
+// ─── Helper 3 : plus ancien mois NON couvert ──────────────────────────────────
+// 🔥 HARMONISÉ (07/08) : même nom et même logique que
+// dashboard-member.service.ts::findEarliestUncoveredMonth (chantier "cas
+// Thierno"), reprise ici pour la borne/défaut de "Mois de référence" côté
+// paiement pour un tiers (searchMembers) et côté validation serveur
+// (createContribution). Sert à la fois de valeur par défaut ET de plafond
+// infranchissable : au-delà, on choisirait un mois de référence postérieur
+// à un trou déjà existant, ce qui laisserait ce trou impayé.
+function findEarliestUncoveredMonth(
+  coveredMonths: Set<string>,
+  joinDate: Date,
+  maxLookahead = 24,
+): { month: number; year: number } | null {
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  let m = joinDate.getMonth() + 1;
+  let y = joinDate.getFullYear();
+
+  for (let i = 0; i < maxLookahead; i++) {
+    const monthStart = new Date(y, m - 1, 1);
+    if (monthStart >= currentMonthStart) return null; // à jour jusqu'au mois courant
+
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    if (!coveredMonths.has(key)) return { month: m, year: y };
+
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+
+  return null;
+}
+
 @Injectable()
 export class MemberService {
   constructor(
@@ -193,10 +226,8 @@ export class MemberService {
   // lateMembersPreview) — elle ne correspond pas à ce que le frontend
   // member/page.tsx attend (DashboardData). Tout indique que c'est
   // DashboardMemberService.getMemberDashboard() qui est réellement branché
-  // sur /member/dashboard. À vérifier côté contrôleur : si getDashboard()
-  // n'est appelée par aucune route, c'est du code mort à retirer pour éviter
-  // toute confusion future (ex. si quelqu'un la corrige par erreur en
-  // pensant qu'elle est active).
+  // sur /member/dashboard (confirmé via member.controller.ts). Code mort,
+  // laissé tel quel (hors périmètre de cette correction).
 
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
@@ -461,19 +492,22 @@ export class MemberService {
   }
 
   // ─── searchMembers ────────────────────────────────────────────────────────
-  // 🔥 AJOUT : renvoie désormais aussi la devise de l'antenne principale du
-  // membre trouvé (antenna.defaultCurrency, fallback sur la devise par
-  // défaut de l'association) — nécessaire pour que le frontend déduise
-  // automatiquement la devise du versement quand on paie pour un membre tiers.
+  // Renvoie earliestUnpaidMonth/earliestUnpaidYear (plus ancien mois non
+  // couvert du membre trouvé) — nécessaire pour que le frontend applique la
+  // même borne de "Mois de référence" quand on paie pour un membre tiers,
+  // basée sur SA situation à lui (pas celle du payeur). Devise inchangée.
 
   async searchMembers(userId: string, q: string) {
     const me = await this.getMeOrThrow(userId);
     if (!q || q.trim().length < 2) return [];
 
-    const association = await this.prisma.association.findUnique({
-      where: { id: me.associationId },
-      select: { defaultCurrency: true },
-    });
+    const [association, allPricing] = await Promise.all([
+      this.prisma.association.findUnique({
+        where: { id: me.associationId },
+        select: { defaultCurrency: true },
+      }),
+      this.getPricingMap(me.associationId),
+    ]);
 
     const users = await this.prisma.user.findMany({
       where: {
@@ -495,6 +529,7 @@ export class MemberService {
         lastName: true,
         email: true,
         phone: true,
+        createdAt: true,
         memberships: {
           where: { isPrimary: true, status: 'APPROVED' },
           take: 1,
@@ -504,11 +539,29 @@ export class MemberService {
             },
           },
         },
+        contributions: {
+          where: {
+            status: ContributionStatus.VALIDATED,
+            purpose: { in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA] },
+          },
+          select: {
+            monthReference: true,
+            yearReference: true,
+            validatedAt: true,
+            createdAt: true,
+            amount: true,
+          },
+        },
       },
     });
 
     return users.map((u) => {
       const antenna = u.memberships[0]?.antenna;
+      const currency = antenna?.defaultCurrency ?? association?.defaultCurrency ?? 'EUR';
+      const monthlyPrice = Number(allPricing[currency]?.monthlyQuota) || 0;
+      const covered = buildCoveredMonths(u.contributions, monthlyPrice);
+      const earliest = findEarliestUncoveredMonth(covered, u.createdAt);
+
       return {
         id: u.id,
         firstName: u.firstName,
@@ -517,12 +570,21 @@ export class MemberService {
         phone: u.phone,
         antennaId: antenna?.id ?? null,
         antennaName: antenna?.name ?? null,
-        currency: antenna?.defaultCurrency ?? association?.defaultCurrency ?? 'EUR',
+        currency,
+        earliestUnpaidMonth: earliest?.month ?? null,
+        earliestUnpaidYear: earliest?.year ?? null,
       };
     });
   }
 
   // ─── createContribution ───────────────────────────────────────────────────
+  // monthReference/yearReference sont bornés par le plus ancien mois NON
+  // couvert du bénéficiaire (findEarliestUncoveredMonth) — un membre ne peut
+  // plus choisir un mois de référence postérieur à celui-ci (ce qui
+  // créerait un trou impayé). S'il ne fournit rien, cette borne sert aussi
+  // de valeur par défaut (remplace l'ancien repli sur "aujourd'hui", qui
+  // ignorait tout passif déjà accumulé). Un choix antérieur reste toujours
+  // libre (rattrapage d'un passif, y compris pré-plateforme).
 
   async createContribution(userId: string, dto: CreateMemberContributionDto) {
     const me = await this.getMeOrThrow(userId);
@@ -591,6 +653,68 @@ export class MemberService {
       (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA;
     const totalAmount = Number(dto.amount);
 
+    // Plus ancien mois non couvert du bénéficiaire (finalMemberId). Repli
+    // par défaut sur "aujourd'hui" si le bénéficiaire n'a pas encore
+    // d'historique exploitable (cas dégénéré) ou si tout est déjà à jour.
+    let boundMonth = new Date().getMonth() + 1;
+    let boundYear = new Date().getFullYear();
+
+    if (
+      purpose === ContributionPurpose.REGULAR_QUOTA ||
+      purpose === ContributionPurpose.LATE_QUOTA ||
+      (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0)
+    ) {
+      const beneficiary = await this.prisma.user.findUnique({
+        where: { id: finalMemberId },
+        select: {
+          createdAt: true,
+          contributions: {
+            where: {
+              status: ContributionStatus.VALIDATED,
+              purpose: {
+                in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA],
+              },
+            },
+            select: {
+              monthReference: true,
+              yearReference: true,
+              validatedAt: true,
+              createdAt: true,
+              amount: true,
+            },
+          },
+        },
+      });
+
+      if (beneficiary) {
+        const covered = buildCoveredMonths(beneficiary.contributions, monthlyPrice);
+        const earliest = findEarliestUncoveredMonth(covered, beneficiary.createdAt);
+        if (earliest) {
+          boundMonth = earliest.month;
+          boundYear = earliest.year;
+        }
+      }
+    }
+
+    // Un choix explicite du membre est validé contre la borne ; l'absence de
+    // choix retombe directement sur la borne (au lieu de "maintenant").
+    const hasExplicitReference = dto.monthReference !== undefined || dto.yearReference !== undefined;
+    let refMonth: number = dto.monthReference ?? boundMonth;
+    let refYear: number = dto.yearReference ?? boundYear;
+
+    if (
+      (purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA) &&
+      hasExplicitReference
+    ) {
+      const chosenKey = refYear * 12 + refMonth;
+      const maxKey = boundYear * 12 + boundMonth;
+      if (chosenKey > maxKey) {
+        throw new BadRequestException(
+          `Le mois de référence choisi (${refMonth}/${refYear}) est postérieur au plus ancien mois non couvert (${boundMonth}/${boundYear}). Choisissez ce mois ou un mois antérieur.`,
+        );
+      }
+    }
+
     if (purpose === ContributionPurpose.MEMBERSHIP_CARD && cardPrice > 0) {
       if (totalAmount < cardPrice) {
         throw new BadRequestException(
@@ -634,8 +758,12 @@ export class MemberService {
       const excess = totalAmount - cardPrice;
       if (excess > 0 && monthlyPrice > 0) {
         let remaining = excess;
-        let m = new Date().getMonth() + 1;
-        let y = new Date().getFullYear();
+        // Démarre au plus ancien mois non couvert (boundMonth/boundYear) au
+        // lieu de "aujourd'hui" — même correction que pour REGULAR_QUOTA/
+        // LATE_QUOTA, pour ne pas laisser un trou entre le dernier mois payé
+        // et maintenant.
+        let m = boundMonth;
+        let y = boundYear;
         while (remaining >= monthlyPrice) {
           contributionsToCreate.push({
             ...baseData,
@@ -657,8 +785,8 @@ export class MemberService {
       totalAmount >= monthlyPrice
     ) {
       let remaining = totalAmount;
-      let m = dto.monthReference ?? new Date().getMonth() + 1;
-      let y = dto.yearReference ?? new Date().getFullYear();
+      let m = refMonth;
+      let y = refYear;
 
       while (remaining >= monthlyPrice) {
         contributionsToCreate.push({
@@ -679,8 +807,14 @@ export class MemberService {
       contributionsToCreate.push({
         ...baseData,
         amount: new Prisma.Decimal(totalAmount),
-        monthReference: dto.monthReference ?? null,
-        yearReference: dto.yearReference ?? null,
+        monthReference:
+          purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA
+            ? refMonth
+            : (dto.monthReference ?? null),
+        yearReference:
+          purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA
+            ? refYear
+            : (dto.yearReference ?? null),
       });
     }
 
@@ -839,6 +973,8 @@ export class MemberService {
   }
 
   // ─── listLateMembers (visible aux membres) ────────────────────────────────
+  // Seuil 3 mois inchangé — c'est la vue "communautaire" volontairement
+  // moins précoce que celle des admins (cf. admin.service.ts).
 
   async listLateMembers(
     userId: string,
@@ -903,9 +1039,6 @@ export class MemberService {
           firstName: m.user.firstName,
           lastName: m.user.lastName,
           antennaName: m.antenna?.name ?? null,
-          // 🔥 AJOUT : devise de l'antenne — absente jusqu'ici, alors que
-          // c'est la seule donnée qui manque pour calculer un montant
-          // (mois de retard × cotisation mensuelle) côté frontend.
           currency: antCurrency,
           lateMonths: computeLateMonths(covered, m.user.createdAt),
         };

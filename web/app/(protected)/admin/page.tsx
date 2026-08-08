@@ -1,4 +1,22 @@
 // web/app/(protected)/admin/page.tsx
+// v3.1 — CHANGELOG :
+// ── CORRIGÉ (07/08) : texte figé "plus de 3 mois" dans l'alerte
+//    "Membres en retard de cotisation" — le seuil réel de cette liste
+//    (/admin/late-members, admin.service.ts::listLateMembers) est
+//    désormais de 1 mois, pas 3 (cf. chantier "cas Thierno" / harmonisation
+//    du retard). Le libellé mentait donc depuis ce changement.
+//
+// v3.0 — CHANGELOG :
+// ── AJOUTÉ : panneaux "Projets en cours" et "Informations récentes" en
+//    défilement horizontal (cartes ad-true-card), même comportement que
+//    super-admin/membre. Modals de détail associés (ProjectDetailModal,
+//    ContentDetailModal). Le carrousel photo (DashboardCarousel) déjà présent
+//    est conservé tel quel. La section "Alertes & Rappels" reste en bas de
+//    page — les nouveaux panneaux sont insérés juste avant elle.
+// ── CORRIGÉ : import de formatDate (manquant, nécessaire aux nouvelles cartes).
+// ── AJOUTÉ : StatusBadge étendu (au-delà de PENDING) pour bien libeller les
+//    statuts de projets/actualités affichés dans les nouvelles cartes.
+
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -6,7 +24,7 @@ import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DashboardCarousel, CarouselProject } from '../../../components/member/DashboardCarousel';
 import { api } from '../../../lib/api-client';
-import { formatCurrency } from '../../../lib/format';
+import { formatCurrency, formatDate } from '../../../lib/format';
 import type { Project } from '../../../types/project';
 import type { ContentPost } from '../../../types/content';
 
@@ -113,9 +131,22 @@ const FIXED_CURRENCIES = [
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
+// ── CHANGÉ : map étendue au-delà de PENDING pour libeller correctement les
+//   statuts de projets/actualités affichés dans les nouvelles cartes.
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
-    PENDING: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    PENDING:            { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    VALIDATED:          { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    IN_PROGRESS:        { label: 'En cours',   color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
+    APPROVED:           { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    COMPLETED:          { label: 'Terminé',    color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+    SUSPENDED:          { label: 'Suspendu',   color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    CANCELLED:          { label: 'Annulé',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+    PROPOSED:           { label: 'Proposé',    color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    DRAFT:              { label: 'Brouillon',  color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    PUBLISHED:          { label: 'Publié',     color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    ARCHIVED:           { label: 'Archivé',    color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    REJECTED:           { label: 'Rejetée',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
   };
   const s = map[status] ?? { label: status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
   return (
@@ -309,6 +340,113 @@ function LateMembersModal({
   );
 }
 
+// ── AJOUTÉ : détail projet — même comportement que membre/super-admin ──────
+function ProjectDetailModal({ project, onClose }: { project: ExtendedCarouselProject; onClose: () => void }) {
+  const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string; bar: string }> = {
+    IN_PROGRESS: { label: 'En cours',  color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', bar: '#3B82F6' },
+    APPROVED:    { label: 'Approuvé',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0', bar: '#10B981' },
+    COMPLETED:   { label: 'Terminé',   color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE', bar: '#8B5CF6' },
+    SUSPENDED:   { label: 'Suspendu',  color: '#D97706', bg: '#FFFBEB', border: '#FDE68A', bar: '#F59E0B' },
+    CANCELLED:   { label: 'Annulé',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA', bar: '#EF4444' },
+    DRAFT:       { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
+    PROPOSED:    { label: 'Proposé',   color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB', bar: '#9CA3AF' },
+  };
+
+  const cfg = STATUS_CFG[project.status || 'DRAFT'] ?? STATUS_CFG['DRAFT'];
+  const planned = project.budgetPlanned ?? project.budgetAmount ?? 0;
+  const spent   = project.budgetSpent   ?? project.amountSpent  ?? 0;
+  const pct     = planned > 0 ? Math.min((spent / planned) * 100, 100) : 0;
+  const over    = spent > planned && planned > 0;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 500, background: '#fff', borderRadius: 24, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 72px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ height: 4, background: cfg.bar, borderRadius: '24px 24px 0 0' }} />
+        <div style={{ padding: '1.1rem 1.3rem 0.8rem', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.22rem', fontSize: '0.62rem', fontWeight: 700, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 99, padding: '0.18rem 0.5rem', marginBottom: '0.45rem' }}>
+              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
+            </span>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.35rem', fontWeight: 600, color: '#111827', margin: 0, lineHeight: 1.25 }}>{project.title}</h2>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: '#F3F4F6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280', flexShrink: 0 }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <div style={{ padding: '0 1.3rem 1.5rem', overflowY: 'auto', maxHeight: 'calc(90vh - 110px)' }}>
+          {project.description && (
+            <div style={{ margin: '1rem 0 0', padding: '0.85rem 1rem', background: '#F8FAFC', borderRadius: 12, border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.4rem' }}>Description</div>
+              <p style={{ fontSize: '0.83rem', color: '#374151', lineHeight: 1.65, margin: 0 }}>{project.description}</p>
+            </div>
+          )}
+
+          {planned > 0 && (
+            <div style={{ marginTop: '0.65rem', background: '#F8FAFC', borderRadius: 12, padding: '0.85rem 1rem', border: '1px solid #E2E8F0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.45rem' }}>
+                <span style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Avancement budgétaire</span>
+                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: over ? '#DC2626' : pct > 80 ? '#D97706' : '#059669' }}>{Math.round(pct)}%{over ? ' ⚠' : ''}</span>
+              </div>
+              <div style={{ height: 7, borderRadius: 99, background: '#E5E7EB', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, borderRadius: 99, background: over ? 'linear-gradient(90deg,#F97316,#DC2626)' : pct > 80 ? '#F59E0B' : 'linear-gradient(90deg,#3B82F6,#6366F1)', transition: 'width 0.9s cubic-bezier(.22,1,.36,1)' }} />
+              </div>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginTop: '0.65rem' }}>
+            <div style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Créé le</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate(project.createdAt as string | Date)}</div>
+            </div>
+            <div style={{ background: '#F8FAFC', borderRadius: 12, padding: '0.8rem 0.9rem', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '0.63rem', fontWeight: 800, color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '0.35rem' }}>Mis à jour</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, color: '#374151' }}>{formatDate((project.updatedAt || project.createdAt) as string | Date)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── AJOUTÉ : détail actualité — même comportement que membre/super-admin ───
+function ContentDetailModal({ content, onClose }: { content: ContentPost; onClose: () => void }) {
+  const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+    PUBLISHED: { label: 'Publié',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+    DRAFT:     { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' },
+    ARCHIVED:  { label: 'Archivé',   color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  };
+  const cfg = STATUS_CFG[content.status] ?? STATUS_CFG['PUBLISHED'];
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(15,23,42,.45)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.25rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 520, background: '#fff', borderRadius: 24, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 32px 72px rgba(0,0,0,0.18)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ height: 4, background: 'linear-gradient(90deg,#059669,#10B981)', borderRadius: '24px 24px 0 0' }} />
+        <div style={{ padding: '1.1rem 1.3rem 0.8rem', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.7rem' }}>
+          <div style={{ flex: 1 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.22rem', fontSize: '0.62rem', fontWeight: 700, color: cfg.color, background: cfg.bg, border: `1px solid ${cfg.border}`, borderRadius: 99, padding: '0.18rem 0.5rem', marginBottom: '0.45rem' }}>
+              <span style={{ width: 4, height: 4, borderRadius: '50%', background: cfg.color }} />{cfg.label}
+            </span>
+            <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: '1.35rem', fontWeight: 600, color: '#111827', margin: 0, lineHeight: 1.25 }}>{content.title}</h2>
+            <div style={{ fontSize: '0.72rem', color: '#9CA3AF', fontWeight: 500, marginTop: '0.35rem' }}>Publié le {formatDate(content.createdAt)}</div>
+          </div>
+          <button onClick={onClose} style={{ width: 32, height: 32, borderRadius: '50%', background: '#F3F4F6', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280', flexShrink: 0 }}>
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div style={{ padding: '1.1rem 1.3rem 1.5rem' }}>
+          {content.body ? (
+            <div style={{ fontSize: '0.88rem', color: '#374151', lineHeight: 1.75, whiteSpace: 'pre-wrap', fontFamily: "'DM Sans', sans-serif" }}>{content.body}</div>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.85rem' }}><div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📄</div>Aucun contenu disponible pour le moment.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function AntennaAdminDashboard() {
@@ -324,6 +462,10 @@ export default function AntennaAdminDashboard() {
   const [projectsInProgress, setProjectsInProgress] = useState<ExtendedCarouselProject[]>([]);
   const [latestContents, setLatestContents] = useState<ContentPost[]>([]);
   const [pricing, setPricing] = useState<PricingMap | null>(null);
+  // ── AJOUTÉ : sélection pour les nouveaux panneaux "Projets en cours" /
+  //   "Informations récentes" (défilement horizontal).
+  const [selectedProject, setSelectedProject] = useState<ExtendedCarouselProject | null>(null);
+  const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -347,6 +489,8 @@ export default function AntennaAdminDashboard() {
         // 🔥 CORRIGÉ : listLateMembersOver3Months (/admin/late-members) est
         // l'endpoint dédié à l'admin d'antenne — listLateMembersVisible
         // (/member/late-members) est celui du membre, réutilisé par erreur.
+        // Seuil réel désormais 1 mois côté backend (admin.service.ts) —
+        // cf. correction du libellé "Alertes & Rappels" plus bas.
         api.listLateMembersOver3Months({ page: 1, pageSize: 50 }),
         api.listProjectsForMembers({ page: 1, pageSize: 6 }),
         api.listContentsForMembers({ page: 1, pageSize: 5 }),
@@ -630,6 +774,21 @@ export default function AntennaAdminDashboard() {
 
         /* ── AJOUTÉ : carrousel (projets + actualités, avec photos) ── */
         .ad-carousel-wrap { opacity: 0; animation: fadein .5s .32s cubic-bezier(.22,1,.36,1) forwards; margin-bottom: 1.5rem; }
+
+        /* ── AJOUTÉ : panneaux "Projets en cours" / "Informations récentes"
+           en défilement horizontal — même comportement que membre/super-admin. ── */
+        .ad-cards-viewport { overflow: hidden; width: 100%; padding: 1.1rem 0; position: relative; }
+        .ad-cards-track { display: flex; gap: 1rem; width: max-content; padding: 0 1.3rem; animation: adPanCards 18s ease-in-out infinite alternate; }
+        .ad-cards-track:hover, .ad-cards-track:active { animation-play-state: paused; }
+        @keyframes adPanCards { 0%, 5% { transform: translateX(0); } 95%, 100% { transform: translateX(calc(-100% + 100vw - 3rem)); } }
+        @media (min-width: 1024px) { .ad-cards-track { animation: none; flex-wrap: wrap; width: 100%; } }
+        .ad-true-card { min-width: 230px; max-width: 260px; flex: 0 0 auto; min-height: 170px; border-radius: 16px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .ad-true-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+        .ad-tc-proj { background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); border-color: #BFDBFE; }
+        .ad-tc-news { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border-color: #A7F3D0; }
+        .ad-tc-title { font-size: 0.92rem; font-weight: 800; color: #111827; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .ad-tc-meta { font-size: 0.7rem; color: #4B5563; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; margin-top: auto; }
+        .ad-tc-btn { font-size: 0.63rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.35rem; }
       `}</style>
 
       {error && (
@@ -694,6 +853,82 @@ export default function AntennaAdminDashboard() {
             <DashboardCarousel projects={projectsInProgress} news={latestContents} />
           </div>
 
+          {/* ── AJOUTÉ : "Projets en cours" + "Informations récentes" en
+              défilement horizontal, même comportement que membre/super-admin.
+              Placé avant le bloc suivant pour que "Alertes & Rappels" reste
+              bien en bas de page. ── */}
+          <div className="ad-bottom" style={{ marginBottom: '1rem' }}>
+            <div className="ad-panel" style={{ animationDelay: "0.36s" }}>
+              <div className="ad-panel-header">
+                <div className="ad-panel-title">
+                  <div className="ad-panel-icon" style={{ background: '#F5F3FF', color: '#7C3AED' }}>
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                  </div>
+                  Projets en cours
+                </div>
+                {projectsInProgress.length > 0 && (
+                  <span className="ad-panel-badge" style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE' }}>{projectsInProgress.length}</span>
+                )}
+              </div>
+              <div className="ad-cards-viewport">
+                {projectsInProgress.length === 0 ? (
+                  <div className="ad-empty">
+                    <div className="ad-empty-icon">📁</div>
+                    <p>Aucun projet actif</p>
+                  </div>
+                ) : (
+                  <div className="ad-cards-track">
+                    {projectsInProgress.map(p => (
+                      <div key={p.id} className="ad-true-card ad-tc-proj" onClick={() => setSelectedProject(p)}>
+                        <StatusBadge status={p.status || 'DRAFT'} />
+                        <div className="ad-tc-title">{p.title}</div>
+                        <div className="ad-tc-meta">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          Mis à jour le {formatDate(p.updatedAt || p.createdAt || null)}
+                        </div>
+                        <div className="ad-tc-btn" style={{ color: '#2563EB' }}>Voir le projet ➔</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="ad-panel" style={{ animationDelay: "0.4s" }}>
+              <div className="ad-panel-header">
+                <div className="ad-panel-title">
+                  <div className="ad-panel-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+                  </div>
+                  Informations récentes
+                </div>
+              </div>
+              <div className="ad-cards-viewport">
+                {latestContents.length === 0 ? (
+                  <div className="ad-empty">
+                    <div className="ad-empty-icon">📄</div>
+                    <p>Aucune actualité publiée</p>
+                  </div>
+                ) : (
+                  <div className="ad-cards-track">
+                    {latestContents.map(c => (
+                      <div key={c.id} className="ad-true-card ad-tc-news" onClick={() => setSelectedContent(c)}>
+                        <StatusBadge status={c.status} />
+                        <div className="ad-tc-title">{c.title}</div>
+                        <div className="ad-tc-meta">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          Publié le {formatDate(c.createdAt)}
+                        </div>
+                        <div className="ad-tc-btn" style={{ color: '#059669' }}>Lire l&apos;article ➔</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── "Demandes d'adhésion" + "Alertes & Rappels" — reste en bas de page ── */}
           <div className="ad-bottom">
             <div className="ad-panel">
               <div className="ad-panel-header">
@@ -768,7 +1003,7 @@ export default function AntennaAdminDashboard() {
                   <div className="ad-alert-dot" style={{ background: "#F59E0B" }} />
                   <div>
                     <div className="ad-alert-title">Membres en retard de cotisation</div>
-                    <div className="ad-alert-desc">Certains membres n&apos;ont pas cotisé depuis plus de 3 mois.</div>
+                    <div className="ad-alert-desc">Certains membres accusent un retard de cotisation — à relancer dès maintenant.</div>
                     <button 
                       className="ad-alert-action" 
                       onClick={() => router.push('/admin/late-members')}
@@ -837,6 +1072,20 @@ export default function AntennaAdminDashboard() {
           members={lateMembers}
           pricing={pricing}
           onClose={() => setShowLateMembersModal(false)}
+        />
+      )}
+
+      {selectedProject && (
+        <ProjectDetailModal
+          project={selectedProject}
+          onClose={() => setSelectedProject(null)}
+        />
+      )}
+
+      {selectedContent && (
+        <ContentDetailModal
+          content={selectedContent}
+          onClose={() => setSelectedContent(null)}
         />
       )}
     </AppShell>

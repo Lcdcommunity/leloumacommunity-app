@@ -27,6 +27,12 @@ export default function MemberNewContributionPage() {
   const [pricingMap, setPricingMap] = useState<Record<string, { monthlyQuota: number; membershipCard: number }>>({});
   const [selfCurrency, setSelfCurrency] = useState<string>('');
   const [lateMonths, setLateMonths] = useState<number | undefined>(undefined);
+  // Plus ancien mois impayé du membre connecté — pré-remplit "Mois de
+  // référence" dessus au lieu du mois courant (cf. cas Thierno : payer une
+  // année pleine à partir d'aujourd'hui ne couvrait pas les mois déjà dus
+  // avant). Sert aussi de plafond côté ContributionCreateForm désormais.
+  const [defaultMonthReference, setDefaultMonthReference] = useState<number | undefined>(undefined);
+  const [defaultYearReference, setDefaultYearReference] = useState<number | undefined>(undefined);
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [currencyWarning, setCurrencyWarning] = useState<string | null>(null);
@@ -49,21 +55,20 @@ export default function MemberNewContributionPage() {
           setLateMonths(dashboard.stats.lateMonths);
         }
 
-        // 🔥 CORRECTION DÉFINITIVE : `dashboard.me` est typé `UserSummary`
-        // (l'entité User), qui n'a PAS de champ `antennaId` — l'antenne d'un
-        // membre est une relation `Membership`, distincte de `User`. Le code
-        // précédent castait `dashboard.me` en `{ antennaId?: string }` pour
-        // faire taire TypeScript, mais à l'exécution ce champ est `undefined`
-        // sur le vrai payload : le matching contre `antennaBalances` échouait
-        // donc TOUJOURS, silencieusement, laissant selfCurrency à '' et le
-        // bouton de soumission bloqué sans aucune erreur visible.
-        //
-        // Le type de dashboardMember() expose déjà `stats.currency`, calculé
-        // côté backend — c'est la source de vérité à utiliser en priorité.
-        // On garde ensuite deux replis pour rester robuste si ce champ venait
-        // à manquer sur d'anciens déploiements : le cas mono-antenne (un
-        // seul antennaBalance, donc forcément le bon), puis un message
-        // d'erreur explicite plutôt qu'un bouton mort en silence.
+        // Plus ancien mois impayé — si le membre a un trou connu, on
+        // pré-remplit "Mois de référence" dessus (sinon le champ retombe sur
+        // le mois courant côté ContributionCreateForm).
+        const stats = dashboard?.stats as
+          | { earliestUnpaidMonth?: number | null; earliestUnpaidYear?: number | null }
+          | undefined;
+        if (stats?.earliestUnpaidMonth && stats?.earliestUnpaidYear) {
+          setDefaultMonthReference(stats.earliestUnpaidMonth);
+          setDefaultYearReference(stats.earliestUnpaidYear);
+        }
+
+        // Devise : stats.currency (source de vérité backend) en priorité,
+        // repli sur l'antenne unique, sinon avertissement explicite plutôt
+        // qu'un bouton mort en silence.
         const antennaBalances = dashboard?.antennaBalances ?? [];
 
         let resolvedCurrency: string | undefined = dashboard?.stats?.currency;
@@ -359,6 +364,8 @@ export default function MemberNewContributionPage() {
                     pricingMap={pricingMap}
                     selfCurrency={selfCurrency}
                     lateMonths={lateMonths}
+                    defaultMonthReference={defaultMonthReference}
+                    defaultYearReference={defaultYearReference}
                   />
                 </>
               )}
