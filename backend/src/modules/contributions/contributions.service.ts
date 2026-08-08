@@ -73,32 +73,20 @@ function buildCoveredMonths(
   return covered;
 }
 
-// 🔥 HARMONISÉ (07/08) : même nom et même logique que
-// member.service.ts::findEarliestUncoveredMonth /
-// dashboard-member.service.ts::findEarliestUncoveredMonth (chantier "cas
-// Thierno"). Ce module (/contributions, POST) est un second chemin de
-// création de cotisation en parallèle de /member/contributions
-// (member.service.ts::createContribution, celui réellement branché sur le
-// frontend actuel) — la même règle y est appliquée par cohérence/sécurité,
-// au cas où ce chemin serait appelé directement.
+// 🔥 CORRIGÉ (08/08) : ne s'arrête plus au mois courant — même correction
+// que member.service.ts::findEarliestUncoveredMonth / dashboard-member.service.ts
+// (voir leur changelog pour le détail du bug corrigé).
 function findEarliestUncoveredMonth(
   coveredMonths: Set<string>,
   joinDate: Date,
   maxLookahead = 24,
 ): { month: number; year: number } | null {
-  const now = new Date();
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
   let m = joinDate.getMonth() + 1;
   let y = joinDate.getFullYear();
 
   for (let i = 0; i < maxLookahead; i++) {
-    const monthStart = new Date(y, m - 1, 1);
-    if (monthStart >= currentMonthStart) return null; // à jour jusqu'au mois courant
-
     const key = `${y}-${String(m).padStart(2, '0')}`;
     if (!coveredMonths.has(key)) return { month: m, year: y };
-
     m++;
     if (m > 12) { m = 1; y++; }
   }
@@ -106,9 +94,6 @@ function findEarliestUncoveredMonth(
   return null;
 }
 
-// 🔥 AJOUT (harmonisation lateMembers ci-dessous) : identique à
-// buildCoveredMonths/computeLateMonths des autres modules
-// (member.service.ts, admin.service.ts, dashboard-member.service.ts).
 function computeLateMonths(
   coveredMonths: Set<string>,
   joinDate: Date,
@@ -122,18 +107,13 @@ function computeLateMonths(
   let checkMonth = currentMonth - 1;
   let checkYear = currentYear;
 
-  if (checkMonth < 1) {
-    checkMonth = 12;
-    checkYear--;
-  }
+  if (checkMonth < 1) { checkMonth = 12; checkYear--; }
 
   for (let i = 0; i < maxLookback; i++) {
     const key = `${checkYear}-${String(checkMonth).padStart(2, '0')}`;
     const monthStart = new Date(checkYear, checkMonth - 1, 1);
 
-    if (monthStart < new Date(joinDate.getFullYear(), joinDate.getMonth(), 1))
-      break;
-
+    if (monthStart < new Date(joinDate.getFullYear(), joinDate.getMonth(), 1)) break;
     if (!coveredMonths.has(key)) lateMonths++;
 
     checkMonth--;
@@ -165,6 +145,13 @@ export class ContributionsService {
     return map;
   }
 
+  // 🔥 CORRIGÉ (08/08) : une seule ligne de cotisation pour tout le
+  // versement, quel que soit le nombre de mois couverts — au lieu d'une
+  // ligne par mois (jusqu'à 12+ lignes pour un an payé d'un coup, multiplié
+  // par le nombre de membres). buildCoveredMonths déduit les mois réellement
+  // couverts à la lecture depuis amount/monthlyPrice. Corrige aussi la perte
+  // silencieuse du reliquat (ex. 6,50 € / 2 € → ancien code : 3 lignes de
+  // 2 €, 0,50 € jamais enregistrés ; désormais amount = montant intégral).
   async createForMember(dto: CreateContributionDto, actor: AuthUser) {
     if (actor.role !== UserRole.MEMBER) {
       throw new ForbiddenException(
@@ -283,8 +270,7 @@ export class ContributionsService {
       Number(localPricing.monthlyQuota) || 0;
 
     // Plus ancien mois non couvert du bénéficiaire (finalMemberId) — borne
-    // et défaut de monthReference/yearReference, même règle que
-    // member.service.ts::createContribution.
+    // et défaut de monthReference/yearReference.
     let boundMonth = new Date().getMonth() + 1;
     let boundYear = new Date().getFullYear();
 
@@ -321,23 +307,20 @@ export class ContributionsService {
 
     const hasExplicitReference =
       dto.monthReference !== undefined || dto.yearReference !== undefined;
-    let currentMonth = dto.monthReference ?? boundMonth;
-    let currentYear = dto.yearReference ?? boundYear;
+    const refMonth = dto.monthReference ?? boundMonth;
+    const refYear = dto.yearReference ?? boundYear;
 
     if ((purpose === 'REGULAR_QUOTA' || purpose === 'LATE_QUOTA') && hasExplicitReference) {
-      const chosenKey = currentYear * 12 + currentMonth;
+      const chosenKey = refYear * 12 + refMonth;
       const maxKey = boundYear * 12 + boundMonth;
       if (chosenKey > maxKey) {
         throw new BadRequestException(
-          `Le mois de référence choisi (${currentMonth}/${currentYear}) est postérieur au plus ancien mois non couvert (${boundMonth}/${boundYear}). Choisissez ce mois ou un mois antérieur.`,
+          `Le mois de référence choisi (${refMonth}/${refYear}) est postérieur au plus ancien mois non couvert (${boundMonth}/${boundYear}). Choisissez ce mois ou un mois antérieur.`,
         );
       }
     }
 
-    const contributionsToCreate: Prisma.ContributionUncheckedCreateInput[] =
-      [];
-
-    let remainingAmount = Number(dto.amount);
+    const totalAmount = Number(dto.amount);
 
     const baseData: Omit<Prisma.ContributionUncheckedCreateInput, 'amount'> = {
       associationId: actor.associationId,
@@ -361,56 +344,20 @@ export class ContributionsService {
       proofFileId: proofFileIdInput ?? null,
     };
 
-    if (
-      (purpose === 'REGULAR_QUOTA' ||
-        purpose === 'LATE_QUOTA') &&
-      monthlyPrice > 0 &&
-      remainingAmount > monthlyPrice
-    ) {
-      while (remainingAmount > 0) {
-        const amountToApply =
-          remainingAmount >= monthlyPrice
-            ? monthlyPrice
-            : remainingAmount;
-
-        contributionsToCreate.push({
-          ...baseData,
-          amount: new Prisma.Decimal(
-            amountToApply,
-          ),
-          monthReference: currentMonth,
-          yearReference: currentYear,
-          memberComment:
-            remainingAmount !== Number(dto.amount)
-              ? `${memberCommentInput?.trim() || ''} [Avance automatique]`.trim()
-              : memberCommentInput?.trim() ??
-                null,
-        });
-
-        remainingAmount -= amountToApply;
-        currentMonth++;
-
-        if (currentMonth > 12) {
-          currentMonth = 1;
-          currentYear++;
-        }
-      }
-    } else {
-      contributionsToCreate.push({
+    const contributionsToCreate: Prisma.ContributionUncheckedCreateInput[] = [
+      {
         ...baseData,
-        amount: new Prisma.Decimal(
-          remainingAmount,
-        ),
+        amount: new Prisma.Decimal(totalAmount),
         monthReference:
           purpose === 'REGULAR_QUOTA' || purpose === 'LATE_QUOTA'
-            ? currentMonth
+            ? refMonth
             : (dto.monthReference ?? null),
         yearReference:
           purpose === 'REGULAR_QUOTA' || purpose === 'LATE_QUOTA'
-            ? currentYear
+            ? refYear
             : (dto.yearReference ?? null),
-      });
-    }
+      },
+    ];
 
     const createdContributions =
       await this.prisma.$transaction(
@@ -696,16 +643,6 @@ export class ContributionsService {
     });
   }
 
-  // 🔥 HARMONISÉ (07/08) : même famille de bug que admin.service.ts /
-  // member.service.ts / dashboard-member.service.ts avant leurs correctifs
-  // — filtrer sur la date du DERNIER versement validé fait ressortir "en
-  // retard" un membre qui a payé toute son année d'un coup, dès que
-  // thresholdMonths se sont écoulés depuis CE versement, même si les mois
-  // suivants sont déjà couverts. Repris ici le calcul par mois réellement
-  // couverts (buildCoveredMonths/computeLateMonths). Endpoint non consommé
-  // par le frontend actuel (aucun appel /contributions/late-members dans
-  // api-client.ts au 07/08) — corrigé quand même pour ne pas laisser ce
-  // piège si la route est un jour rebranchée.
   async lateMembers(
     associationId: string,
     antennaId?: string,

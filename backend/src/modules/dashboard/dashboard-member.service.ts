@@ -1,45 +1,24 @@
 //backend/src/modules/dashboard/dashboard-member.service.ts
 //
-// v1.4 — 🔧 Renommage findEarliestUnpaidMonth -> findEarliestUncoveredMonth
-//   pour coller au vocabulaire "covered/uncovered" utilisé dans les helpers
-//   voisins. Fix accessoire : la comparaison de fin de boucle se faisait sur
-//   une clé string (`${y}-${mm}`) comparée à la clé du mois courant — ça ne
-//   marche que si on tombe exactement dessus, donc si maxLookahead ne
-//   traverse pas pile le mois courant (ex. décalage d'année), on pouvait
-//   dépasser le mois courant sans jamais matcher la clé et continuer à
-//   chercher dans le "futur". Remplacé par une comparaison de Date
-//   (monthStart >= currentMonthStart), plus robuste. maxLookahead ramené de
-//   600 à 24 (aligné sur maxLookback de computeLateMonths, inutile de
-//   chercher 50 ans en avant pour un mois impayé qui doit forcément être
-//   récent).
+// v1.4 — 🔥 CORRIGÉ (08/08) : findEarliestUncoveredMonth ne s'arrête plus au
+//   mois courant. L'ancienne version renvoyait null (→ repli sur
+//   "aujourd'hui") dès qu'elle atteignait le mois en cours, même si des mois
+//   APRÈS étaient déjà couverts par une avance — un membre à jour jusqu'à
+//   décembre 2026 se voyait renvoyer earliestUnpaidMonth=aujourd'hui au lieu
+//   de janvier 2027. Ici : on scanne simplement en avant depuis le mois
+//   d'adhésion jusqu'au premier trou réel, qu'il soit avant, à, ou après le
+//   mois courant.
 //
 // v1.3 — 🔥 AJOUT : stats.earliestUnpaidMonth/earliestUnpaidYear (plus ancien
 //   mois non couvert du membre). Complète le chantier v1.2 : le calcul était
-//   prévu ("cas Thierno") mais jamais réellement câblé dans la réponse — le
-//   frontend (contributions/new/page.tsx) n'avait donc rien à transmettre à
-//   ContributionCreateForm. Réutilise myCoveredMonths déjà calculé plus bas,
-//   aucune requête supplémentaire. Sert désormais aussi de plafond côté
-//   member.service.ts::createContribution (on ne peut plus choisir un mois
-//   de référence postérieur à ce mois).
+//   prévu ("cas Thierno") mais jamais réellement câblé dans la réponse.
 //   Seuil lateMembersPreview aligné sur celui de member.service.ts::listLateMembers
-//   (>= 3 au lieu de > 3) — cohérence stricte avec la règle "visible aux
-//   autres membres à partir de 3 mois de retard".
+//   (>= 3 au lieu de > 3).
 //
 // v1.2 — 🔥 CORRECTION CRITIQUE : bug des retardataires sur paiement anticipé.
 //   myLateMonths et lateMembersPreview utilisaient monthDiff(validatedAt le
-//   plus récent, maintenant) : un membre ayant payé ses 12 mois d'un coup en
-//   janvier (validatedAt = janvier) ressortait "en retard" dès février, parce
-//   que le calcul ne regardait QUE la date de validation du dernier
-//   versement, jamais les mois que ce versement couvre réellement
-//   (monthReference/yearReference). Le module member.service.ts avait déjà
-//   la bonne logique (buildCoveredMonths/computeLateMonths, cf. son
-//   commentaire "24€/2€=12 mois") pour /member/late-members — mais
-//   dashboard-member.service.ts (qui alimente /member/dashboard, donc le
-//   dashboard membre ET son mini-tableau "Retardataires") ne l'utilisait
-//   pas. Fix : mêmes helpers repris ici (pattern déjà dupliqué ailleurs dans
-//   le code, ex. getPricingMap() dans member.service.ts et
-//   contributions.service.ts), appliqués à myLateMonths et à
-//   lateMembersPreview. monthDiff() supprimée (plus utilisée nulle part).
+//   plus récent, maintenant) au lieu de regarder les mois réellement couverts
+//   (monthReference/yearReference). Fix : buildCoveredMonths/computeLateMonths.
 //
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -130,29 +109,22 @@ function computeLateMonths(
   return lateMonths;
 }
 
-// 🔧 RENOMMÉ (v1.4, ex-findEarliestUnpaidMonth) : plus ancien mois NON
-// couvert — même fonction que member.service.ts::findEarliestUncoveredMonth
-// (dupliquée, même pattern que les deux helpers ci-dessus).
+// 🔥 CORRIGÉ (v1.4) : ne s'arrête plus au mois courant — cf. changelog.
 function findEarliestUncoveredMonth(
   coveredMonths: Set<string>,
   joinDate: Date,
   maxLookahead = 24,
 ): { month: number; year: number } | null {
-  const now = new Date();
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
   let m = joinDate.getMonth() + 1;
   let y = joinDate.getFullYear();
 
   for (let i = 0; i < maxLookahead; i++) {
-    const monthStart = new Date(y, m - 1, 1);
-    if (monthStart >= currentMonthStart) return null; // à jour jusqu'au mois courant
-
     const key = `${y}-${String(m).padStart(2, '0')}`;
     if (!coveredMonths.has(key)) return { month: m, year: y };
     m++;
     if (m > 12) { m = 1; y++; }
   }
+
   return null;
 }
 
@@ -439,8 +411,6 @@ export class DashboardMemberService {
           lateMonths: computeLateMonths(covered, u.createdAt),
         };
       })
-      // 🔥 CORRIGÉ (v1.3) : >= 3 au lieu de > 3, cohérent avec le seuil "3
-      // mois" utilisé partout ailleurs pour la visibilité communautaire.
       .filter((x) => x.lateMonths >= 3)
       .sort((a, b) => b.lateMonths - a.lateMonths)
       .slice(0, 10);
@@ -451,8 +421,6 @@ export class DashboardMemberService {
       0;
     const myCoveredMonths = buildCoveredMonths(myRegularContributions, myMonthlyPrice);
     const myLateMonths = computeLateMonths(myCoveredMonths, me.createdAt);
-    // 🔧 RENOMMÉ (v1.4) : plus ancien mois non couvert — réutilise
-    // myCoveredMonths déjà calculé ci-dessus, aucune requête supplémentaire.
     const myEarliestUnpaid = findEarliestUncoveredMonth(myCoveredMonths, me.createdAt);
 
     return {

@@ -35,11 +35,11 @@ import { PushSubscriptionDto } from './dto/push-subscription.dto';
 import { LedgerService } from '../ledger/ledger.service';
 
 // ─── Helper 1 : construit l'ensemble des mois couverts ────────────────────────
-// CORRECTION BUG PAIEMENTS GROUPÉS :
-// Un admin peut valider un unique versement de 24 € avec monthReference = 3.
-// Sans ce helper, computeLateMonths ne voyait qu'un seul mois couvert (mars).
-// Avec ce helper : 24 € / 2 € = 12 mois → on peuple mars à février de l'année suivante.
-// Pour les contributions déjà splittées (12 × 2 €), Math.floor(2/2) = 1 → comportement inchangé.
+// Un versement peut être une SEULE ligne avec un montant global (ex. 24 € avec
+// monthReference=3) — on déduit le nombre de mois couverts depuis
+// amount/monthlyPrice plutôt que de supposer 1 mois par ligne. Voir aussi
+// createContribution() plus bas : c'est cette même logique qui permet
+// désormais d'enregistrer un versement de N mois en une seule ligne.
 function buildCoveredMonths(
   contributions: Array<{
     monthReference: number | null;
@@ -118,31 +118,26 @@ function computeLateMonths(
 }
 
 // ─── Helper 3 : plus ancien mois NON couvert ──────────────────────────────────
-// 🔥 HARMONISÉ (07/08) : même nom et même logique que
-// dashboard-member.service.ts::findEarliestUncoveredMonth (chantier "cas
-// Thierno"), reprise ici pour la borne/défaut de "Mois de référence" côté
-// paiement pour un tiers (searchMembers) et côté validation serveur
-// (createContribution). Sert à la fois de valeur par défaut ET de plafond
-// infranchissable : au-delà, on choisirait un mois de référence postérieur
-// à un trou déjà existant, ce qui laisserait ce trou impayé.
+// 🔥 CORRIGÉ (08/08) : ne s'arrête plus au mois courant. L'ancienne version
+// renvoyait null (→ repli sur "aujourd'hui") dès qu'elle atteignait le mois
+// en cours, même si des mois APRÈS étaient déjà couverts par une avance —
+// un membre à jour jusqu'à décembre 2026 se voyait proposer/imposer août
+// 2026 (aujourd'hui) comme borne au lieu de janvier 2027 (le vrai premier
+// mois non couvert), et un versement sans mois explicite finissait
+// silencieusement enregistré sur l'année en cours au lieu de la suivante.
+// Ici : on scanne simplement en avant depuis le mois d'adhésion jusqu'au
+// premier trou réel, qu'il soit avant, à, ou après le mois courant.
 function findEarliestUncoveredMonth(
   coveredMonths: Set<string>,
   joinDate: Date,
   maxLookahead = 24,
 ): { month: number; year: number } | null {
-  const now = new Date();
-  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
   let m = joinDate.getMonth() + 1;
   let y = joinDate.getFullYear();
 
   for (let i = 0; i < maxLookahead; i++) {
-    const monthStart = new Date(y, m - 1, 1);
-    if (monthStart >= currentMonthStart) return null; // à jour jusqu'au mois courant
-
     const key = `${y}-${String(m).padStart(2, '0')}`;
     if (!coveredMonths.has(key)) return { month: m, year: y };
-
     m++;
     if (m > 12) { m = 1; y++; }
   }
@@ -494,8 +489,7 @@ export class MemberService {
   // ─── searchMembers ────────────────────────────────────────────────────────
   // Renvoie earliestUnpaidMonth/earliestUnpaidYear (plus ancien mois non
   // couvert du membre trouvé) — nécessaire pour que le frontend applique la
-  // même borne de "Mois de référence" quand on paie pour un membre tiers,
-  // basée sur SA situation à lui (pas celle du payeur). Devise inchangée.
+  // même borne de "Mois de référence" quand on paie pour un membre tiers.
 
   async searchMembers(userId: string, q: string) {
     const me = await this.getMeOrThrow(userId);
@@ -578,13 +572,19 @@ export class MemberService {
   }
 
   // ─── createContribution ───────────────────────────────────────────────────
-  // monthReference/yearReference sont bornés par le plus ancien mois NON
+  // 🔥 CORRIGÉ (08/08) : un versement couvrant plusieurs mois (ex. 24 € pour
+  // 12 mois à 2 €) génère désormais UNE SEULE ligne (amount = montant total,
+  // monthReference/yearReference = mois de départ) au lieu d'une ligne par
+  // mois. buildCoveredMonths (déjà conçu pour ça) déduit le nombre de mois
+  // couverts à la lecture depuis amount/monthlyPrice — inutile de le
+  // pré-découper à l'écriture. Corrige au passage la perte silencieuse du
+  // reliquat : l'ancienne boucle ne créait que des lignes de exactement
+  // monthlyPrice chacune et abandonnait le reste (ex. 6,50 € / 2 € → 3
+  // lignes de 2 €, les 0,50 € jamais enregistrés) ; avec une ligne unique au
+  // montant intégral, le reliquat est conservé.
+  // monthReference/yearReference restent bornés par le plus ancien mois NON
   // couvert du bénéficiaire (findEarliestUncoveredMonth) — un membre ne peut
-  // plus choisir un mois de référence postérieur à celui-ci (ce qui
-  // créerait un trou impayé). S'il ne fournit rien, cette borne sert aussi
-  // de valeur par défaut (remplace l'ancien repli sur "aujourd'hui", qui
-  // ignorait tout passif déjà accumulé). Un choix antérieur reste toujours
-  // libre (rattrapage d'un passif, y compris pré-plateforme).
+  // pas choisir un mois de référence postérieur à celui-ci.
 
   async createContribution(userId: string, dto: CreateMemberContributionDto) {
     const me = await this.getMeOrThrow(userId);
@@ -621,12 +621,9 @@ export class MemberService {
     // 🔥 VERROU SÉCURITÉ : la devise n'est plus acceptée depuis dto.currency —
     // recalculée ici à partir de l'antenne réelle du bénéficiaire
     // (finalAntennaId), repli sur la devise par défaut de l'association puis
-    // EUR. Un client ne peut donc plus faire persister une devise qui ne
-    // correspond pas à l'antenne réelle du versement, même en modifiant la
-    // requête à la main. dto.currency reste accepté (le front peut continuer
-    // à l'envoyer) mais n'est plus utilisé pour déterminer la devise
-    // réellement enregistrée — écrasé silencieusement, pas de rejet, pour
-    // ne jamais bloquer un dépôt légitime sur un désaccord de devise.
+    // EUR. dto.currency reste accepté (le front peut continuer à l'envoyer)
+    // mais n'est plus utilisé pour déterminer la devise réellement
+    // enregistrée — écrasé silencieusement, pas de rejet.
     const [association, finalAntenna, allPricing] = await Promise.all([
       this.prisma.association.findUnique({
         where: { id: me.associationId },
@@ -655,7 +652,8 @@ export class MemberService {
 
     // Plus ancien mois non couvert du bénéficiaire (finalMemberId). Repli
     // par défaut sur "aujourd'hui" si le bénéficiaire n'a pas encore
-    // d'historique exploitable (cas dégénéré) ou si tout est déjà à jour.
+    // d'historique exploitable, ou dans le cas extrême où tout le
+    // maxLookahead (24 mois) est déjà couvert (repli acceptable, très rare).
     let boundMonth = new Date().getMonth() + 1;
     let boundYear = new Date().getFullYear();
 
@@ -699,8 +697,8 @@ export class MemberService {
     // Un choix explicite du membre est validé contre la borne ; l'absence de
     // choix retombe directement sur la borne (au lieu de "maintenant").
     const hasExplicitReference = dto.monthReference !== undefined || dto.yearReference !== undefined;
-    let refMonth: number = dto.monthReference ?? boundMonth;
-    let refYear: number = dto.yearReference ?? boundYear;
+    const refMonth: number = dto.monthReference ?? boundMonth;
+    const refYear: number = dto.yearReference ?? boundYear;
 
     if (
       (purpose === ContributionPurpose.REGULAR_QUOTA || purpose === ContributionPurpose.LATE_QUOTA) &&
@@ -757,26 +755,17 @@ export class MemberService {
       });
       const excess = totalAmount - cardPrice;
       if (excess > 0 && monthlyPrice > 0) {
-        let remaining = excess;
-        // Démarre au plus ancien mois non couvert (boundMonth/boundYear) au
-        // lieu de "aujourd'hui" — même correction que pour REGULAR_QUOTA/
-        // LATE_QUOTA, pour ne pas laisser un trou entre le dernier mois payé
-        // et maintenant.
-        let m = boundMonth;
-        let y = boundYear;
-        while (remaining >= monthlyPrice) {
-          contributionsToCreate.push({
-            ...baseData,
-            purpose: ContributionPurpose.REGULAR_QUOTA,
-            amount: new Prisma.Decimal(monthlyPrice),
-            monthReference: m,
-            yearReference: y,
-            memberComment: '[Anticipation depuis excédent carte]',
-          });
-          remaining -= monthlyPrice;
-          m++;
-          if (m > 12) { m = 1; y++; }
-        }
+        // Une seule ligne pour tout l'excédent, démarrant au plus ancien
+        // mois non couvert (boundMonth/boundYear) — même principe que pour
+        // REGULAR_QUOTA/LATE_QUOTA ci-dessous.
+        contributionsToCreate.push({
+          ...baseData,
+          purpose: ContributionPurpose.REGULAR_QUOTA,
+          amount: new Prisma.Decimal(excess),
+          monthReference: boundMonth,
+          yearReference: boundYear,
+          memberComment: '[Anticipation depuis excédent carte]',
+        });
       }
     } else if (
       (purpose === ContributionPurpose.REGULAR_QUOTA ||
@@ -784,25 +773,12 @@ export class MemberService {
       monthlyPrice > 0 &&
       totalAmount >= monthlyPrice
     ) {
-      let remaining = totalAmount;
-      let m = refMonth;
-      let y = refYear;
-
-      while (remaining >= monthlyPrice) {
-        contributionsToCreate.push({
-          ...baseData,
-          amount: new Prisma.Decimal(monthlyPrice),
-          monthReference: m,
-          yearReference: y,
-          memberComment:
-            remaining !== totalAmount
-              ? `${dto.note?.trim() || ''} [Avance automatique]`.trim()
-              : dto.note?.trim() ?? null,
-        });
-        remaining -= monthlyPrice;
-        m++;
-        if (m > 12) { m = 1; y++; }
-      }
+      contributionsToCreate.push({
+        ...baseData,
+        amount: new Prisma.Decimal(totalAmount),
+        monthReference: refMonth,
+        yearReference: refYear,
+      });
     } else {
       contributionsToCreate.push({
         ...baseData,
