@@ -1,4 +1,12 @@
 /////// web/app/(protected)/super-admin/page.tsx
+// v2.1 — CHANGELOG :
+// ── CORRIGÉ (08/08) : panneau "Projets récents" converti d'une grille
+//    statique (sa-project-grid/sa-project-card) à un défilement horizontal
+//    (sa-cards-viewport/sa-cards-track), même comportement que "Informations
+//    récentes" (qui défilait déjà) et que le compte membre/admin. Nouvelle
+//    variante de couleur .sa-tc-proj (bleu) pour distinguer visuellement des
+//    cartes actualités (.sa-tc-news, vert, inchangée). "Cotisations
+//    récentes" non modifié.
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -31,11 +39,6 @@ type AntennaBalance = {
   currency: string;
 };
 
-// ── AJOUTÉ : retardataires vus par le super-admin ──────────────────────────
-// Contrairement au membre (lui-même) ou à l'admin (ses propres antennes),
-// le super-admin voit les retardataires de TOUTE la plateforme : chaque
-// entrée porte donc son antenne. Le montant est estimé (mois de retard ×
-// cotisation mensuelle de la devise de l'antenne).
 interface ApiFileAttachment {
   file?: { url?: string | null } | null;
 }
@@ -177,8 +180,6 @@ function BalancesModal({ currency, balances, onClose }: { currency: string; bala
   );
 }
 
-// ── AJOUTÉ : carte "Retard" cliquable → liste des retardataires, leur
-// antenne et le montant estimé (nom + prénom demandés explicitement).
 function LateMembersModal({
   members,
   pricing,
@@ -423,7 +424,6 @@ function AdminProjectDetailModal({ project, onClose }: { project: BackendProject
   );
 }
 
-// ── AJOUTÉ : détail d'une actualité (section "Informations récentes") ──────
 function ContentDetailModal({ content, onClose }: { content: ContentPost; onClose: () => void }) {
   const STATUS_CFG: Record<string, { label: string; color: string; bg: string; border: string }> = {
     PUBLISHED: { label: 'Publié',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
@@ -475,7 +475,6 @@ export default function SuperAdminDashboardPage() {
   const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null);
   const [selectedProject, setSelectedProject] = useState<BackendProject | null>(null);
 
-  // ── AJOUTÉ : harmonisation avec les dashboards admin/membre ──────────────
   const [lateMembers, setLateMembers] = useState<LateMemberEntry[]>([]);
   const [showLateMembersModal, setShowLateMembersModal] = useState(false);
   const [projectsInProgress, setProjectsInProgress] = useState<ExtendedCarouselProject[]>([]);
@@ -489,14 +488,6 @@ export default function SuperAdminDashboardPage() {
       try {
         const [dashRes, lateRes, projectsRes, contentsRes, pricingRes] = await Promise.allSettled([
           api.dashboardSuperAdmin(),
-          // 🔥 CORRIGÉ (07/08) : /member/late-members est réservé au rôle
-          // MEMBER (member.controller.ts::@Roles(MEMBER) au niveau
-          // contrôleur) — un SUPER_ADMIN s'y voyait refuser l'accès (403),
-          // silencieusement avalé par Promise.allSettled : la carte "Retard"
-          // affichait donc toujours 0. /admin/late-members est autorisé
-          // pour ANTENNA_ADMIN et SUPER_ADMIN (admin.controller.ts) et
-          // renvoie désormais antennaName/currency par membre, avec un
-          // seuil de 1 mois (admin.service.ts::listLateMembers).
           api.listLateMembersOver3Months({ page: 1, pageSize: 100 }),
           api.listProjectsForMembers({ page: 1, pageSize: 6 }),
           api.listContentsForMembers({ page: 1, pageSize: 5 }),
@@ -556,7 +547,6 @@ export default function SuperAdminDashboardPage() {
     return () => { isMounted = false; };
   }, []);
 
-  // Grouper les soldes par devise (identique au dashboard admin)
   const currencyGroups = useMemo(() => {
     if (!data?.antennaBalances?.length) return {} as Record<string, { total: number; antennas: AntennaBalance[] }>;
     return data.antennaBalances.reduce((acc, curr) => {
@@ -568,9 +558,6 @@ export default function SuperAdminDashboardPage() {
     }, {} as Record<string, { total: number; antennas: AntennaBalance[] }>);
   }, [data]);
 
-  // ── RETIRÉ : carte "Associations" (réservée au system-admin) ─────────────
-  // ── AJOUTÉ : "Taux de cotisation" (même formule que côté admin, pour
-  //   harmoniser) et "Retard" (cliquable → LateMembersModal)
   const baseStats: StatCard[] = data ? [
     {
       label: 'Antennes',
@@ -727,19 +714,6 @@ export default function SuperAdminDashboardPage() {
         .sa-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #2563EB, #60A5FA); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; color: white; flex-shrink: 0; }
         .sa-role { font-size: 0.64rem; font-weight: 800; padding: 0.14rem 0.5rem; border-radius: 6px; background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
         .sa-user-cell { display: flex; align-items: center; }
-        
-        /* Projets récents */
-        .sa-project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; padding: 1.25rem; background: #F9FAFB; }
-        .sa-project-card { 
-          background: rgba(37, 99, 235, 0.04); /* BLEU TRANSPARENT DYNAMIQUE */
-          border: 1px solid rgba(37, 99, 235, 0.1); 
-          border-radius: 16px; padding: 1.25rem; 
-          display: flex; flex-direction: column; gap: 1rem; 
-          transition: all 0.2s ease; cursor: pointer; 
-        }
-        .sa-project-card:hover { background: rgba(37, 99, 235, 0.08); border-color: rgba(37, 99, 235, 0.2); }
-        .sa-project-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.6rem; }
-        .sa-project-title { font-family: 'Cormorant Garamond', serif; font-size: 1.05rem; font-weight: 700; color: #111827; line-height: 1.3; }
 
         /* ── AJOUTÉ : carrousel (projets + actualités) + section Informations récentes ── */
         .sa-carousel-wrap { margin-bottom: 1.5rem; opacity: 0; animation: sain 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards; }
@@ -748,15 +722,20 @@ export default function SuperAdminDashboardPage() {
         .sa-cards-track:hover, .sa-cards-track:active { animation-play-state: paused; }
         @keyframes saPanCards { 0%, 5% { transform: translateX(0); } 95%, 100% { transform: translateX(calc(-100% + 100vw - 3rem)); } }
         @media (min-width: 1024px) { .sa-cards-track { animation: none; flex-wrap: wrap; width: 100%; } }
-        .sa-true-card { min-width: 230px; max-width: 260px; flex: 0 0 auto; min-height: 170px; border-radius: 16px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid #A7F3D0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); }
+        /* 🔥 CORRIGÉ (08/08) : .sa-true-card redevient une base structurelle
+           neutre — la couleur (vert "actualités" / bleu "projets") vient
+           désormais des modificateurs .sa-tc-news / .sa-tc-proj, même
+           pattern que member/admin (mb-tc-*/ad-tc-*). */
+        .sa-true-card { min-width: 230px; max-width: 260px; flex: 0 0 auto; min-height: 170px; border-radius: 16px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
         .sa-true-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+        .sa-tc-news { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border-color: #A7F3D0; }
+        .sa-tc-proj { background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); border-color: #BFDBFE; }
         .sa-tc-title { font-size: 0.92rem; font-weight: 800; color: #111827; line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
         .sa-tc-meta { font-size: 0.7rem; color: #4B5563; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; margin-top: auto; }
-        .sa-tc-btn { font-size: 0.63rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.35rem; color: #059669; }
+        .sa-tc-btn { font-size: 0.63rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 0.35rem; }
 
         @media (max-width: 768px) { 
           .hide-mobile { display: none !important; } 
-          .sa-project-grid { grid-template-columns: 1fr; } 
         }
         .sa-error { display: flex; align-items: center; gap: 0.6rem; padding: 1rem 1.25rem; background: rgba(185,28,28,0.06); border: 1px solid rgba(185,28,28,0.18); border-radius: 14px; color: #B91C1C; font-size: 0.82rem; font-weight: 700; margin: clamp(1rem, 3vw, 2rem) auto; max-width: 1340px; }
         .sa-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 55vh; gap: 1rem; color: #6B7280; }
@@ -901,32 +880,39 @@ export default function SuperAdminDashboardPage() {
             <DashboardCarousel projects={projectsInProgress} news={latestContents} />
           </div>
 
+          {/* 🔥 CORRIGÉ (08/08) : "Projets récents" en défilement horizontal
+              (sa-cards-viewport/sa-cards-track), même comportement que
+              "Informations récentes" ci-dessous et que membre/admin —
+              remplace l'ancienne grille statique sa-project-grid. */}
           <div className="sa-grid2">
             <div className="sa-panel sa-panel-full" style={{ animationDelay: '0.62s' }}>
               <div className="sa-panel-head">
                 <div className="sa-panel-title"><div className="sa-panel-ico" style={{ background: '#F5F3FF', color: '#7C3AED' }}><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg></div>Projets récents</div>
+                {data.recentProjects.length > 0 && <span className="sa-count-chip" style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE' }}>{data.recentProjects.length}</span>}
               </div>
-              <div className="sa-project-grid">
-                {data.recentProjects.map(p => {
-                  const { planned, spent } = getProjectBudget(p);
-                  return (
-                    <div key={p.id} className="sa-project-card" onClick={() => setSelectedProject(p)}>
-                      <div className="sa-project-header"><div className="sa-project-title">{p.title}</div><StatusBadge status={p.status} /></div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <div><div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9CA3AF' }}>Budget Prévu</div><div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700 }}>{planned > 0 ? formatCurrency(planned) : '—'}</div></div>
-                          <div style={{ textAlign: 'right' }}><div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#9CA3AF' }}>Dépensé</div><div style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 700 }}>{spent > 0 ? formatCurrency(spent) : '—'}</div></div>
+              <div className="sa-cards-viewport">
+                {data.recentProjects.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.78rem' }}>Aucun projet récent</div>
+                ) : (
+                  <div className="sa-cards-track">
+                    {data.recentProjects.map(p => (
+                      <div key={p.id} className="sa-true-card sa-tc-proj" onClick={() => setSelectedProject(p)}>
+                        <StatusBadge status={p.status} />
+                        <div className="sa-tc-title">{p.title}</div>
+                        <div className="sa-tc-meta">
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          Mis à jour le {formatDate(p.updatedAt || p.createdAt)}
                         </div>
+                        <div className="sa-tc-btn" style={{ color: '#7C3AED' }}>Voir le projet ➔</div>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: '#6B7280', paddingTop: '0.75rem', borderTop: '1px solid rgba(37, 99, 235, 0.1)' }}>Créé le {formatDate(p.createdAt)}</div>
-                    </div>
-                  );
-                })}
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          {/* ── AJOUTÉ : section animée "Informations récentes" (comme côté membre) ── */}
+          {/* ── Section animée "Informations récentes" (comme côté membre) — inchangée ── */}
           <div className="sa-grid2">
             <div className="sa-panel sa-panel-full" style={{ animationDelay: '0.67s' }}>
               <div className="sa-panel-head">
@@ -943,14 +929,14 @@ export default function SuperAdminDashboardPage() {
                 ) : (
                   <div className="sa-cards-track">
                     {latestContents.map(c => (
-                      <div key={c.id} className="sa-true-card" onClick={() => setSelectedContent(c)}>
+                      <div key={c.id} className="sa-true-card sa-tc-news" onClick={() => setSelectedContent(c)}>
                         <StatusBadge status={c.status} />
                         <div className="sa-tc-title">{c.title}</div>
                         <div className="sa-tc-meta">
                           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           Publié le {formatDate(c.createdAt)}
                         </div>
-                        <div className="sa-tc-btn">Lire l&apos;article ➔</div>
+                        <div className="sa-tc-btn" style={{ color: '#059669' }}>Lire l&apos;article ➔</div>
                       </div>
                     ))}
                   </div>

@@ -1,21 +1,23 @@
 // web/app/(protected)/admin/page.tsx
-// v3.1 — CHANGELOG :
-// ── CORRIGÉ (07/08) : texte figé "plus de 3 mois" dans l'alerte
+// v3.2 — CHANGELOG :
+// ── AJOUTÉ : section "Cotisations récentes" (manquante jusqu'ici — le
+//    backend renvoyait déjà `recentPendingContributions` via
+//    dashboard-antenna-admin.service.ts, mais le frontend l'ignorait
+//    totalement). Nouveau panneau plein-largeur (ad-panel-full), tableau
+//    Membre/Motif/Montant/Statut, même pattern que la table "Demandes
+//    d'adhésion" déjà présente. Ajout de `currency` dans DashboardData.stats
+//    (déjà renvoyé par le backend, absent du typage frontend) pour le repli
+//    de devise, et d'un petit helper getPurposeConfig local (même mapping
+//    que côté membre).
+//
+// v3.1 — CORRIGÉ (07/08) : texte figé "plus de 3 mois" dans l'alerte
 //    "Membres en retard de cotisation" — le seuil réel de cette liste
 //    (/admin/late-members, admin.service.ts::listLateMembers) est
-//    désormais de 1 mois, pas 3 (cf. chantier "cas Thierno" / harmonisation
-//    du retard). Le libellé mentait donc depuis ce changement.
+//    désormais de 1 mois, pas 3.
 //
-// v3.0 — CHANGELOG :
-// ── AJOUTÉ : panneaux "Projets en cours" et "Informations récentes" en
-//    défilement horizontal (cartes ad-true-card), même comportement que
-//    super-admin/membre. Modals de détail associés (ProjectDetailModal,
-//    ContentDetailModal). Le carrousel photo (DashboardCarousel) déjà présent
-//    est conservé tel quel. La section "Alertes & Rappels" reste en bas de
-//    page — les nouveaux panneaux sont insérés juste avant elle.
-// ── CORRIGÉ : import de formatDate (manquant, nécessaire aux nouvelles cartes).
-// ── AJOUTÉ : StatusBadge étendu (au-delà de PENDING) pour bien libeller les
-//    statuts de projets/actualités affichés dans les nouvelles cartes.
+// v3.0 — AJOUTÉ : panneaux "Projets en cours" et "Informations récentes" en
+//    défilement horizontal (cartes ad-true-card), carrousel photo
+//    (DashboardCarousel) — inchangés dans cette révision.
 
 'use client';
 
@@ -36,6 +38,18 @@ interface PendingAccount {
   createdAt: string;
 }
 
+// ── AJOUTÉ : forme de recentPendingContributions telle que renvoyée par
+//   dashboard-antenna-admin.service.ts (Contribution + member{firstName,lastName}).
+interface RecentContributionEntry {
+  id: string;
+  amount: number;
+  currency?: string;
+  purpose?: string | null;
+  status: string;
+  createdAt: string;
+  member?: { firstName: string; lastName: string } | null;
+}
+
 interface DashboardData {
   antennaName: string;
   stats: {
@@ -44,6 +58,8 @@ interface DashboardData {
     pendingContributions: number;
     activeProjects: number;
     totalValidatedAmount?: number;
+    // 🔥 AJOUT : déjà renvoyé par le backend (antenna.defaultCurrency), absent du typage.
+    currency?: string;
   };
   antennaBalances?: {
     id: string;
@@ -52,6 +68,8 @@ interface DashboardData {
     currency: string;
   }[];
   recentPendingAccounts: PendingAccount[];
+  // 🔥 AJOUT : déjà renvoyé par le backend, jamais consommé côté frontend jusqu'ici.
+  recentPendingContributions?: RecentContributionEntry[];
 }
 
 type StatCard = {
@@ -121,6 +139,18 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 }
 
+// 🔥 AJOUT : même mapping motif que côté membre (getPurposeConfig), pour la
+// nouvelle table "Cotisations récentes".
+function getPurposeConfig(purpose?: string | null) {
+  const map: Record<string, { label: string; icon: string; color: string; bg: string }> = {
+    REGULAR_QUOTA:   { label: 'Cotisation',   icon: '📅', color: '#059669', bg: '#ECFDF5' },
+    LATE_QUOTA:      { label: 'Retard',       icon: '⏰', color: '#DC2626', bg: '#FEF2F2' },
+    MEMBERSHIP_CARD: { label: 'Carte membre', icon: '💳', color: '#2563EB', bg: '#EFF6FF' },
+    DONATION:        { label: 'Don libre',    icon: '🤝', color: '#D97706', bg: '#FFFBEB' },
+  };
+  return purpose ? (map[purpose] ?? null) : null;
+}
+
 // 4 devises fixes — toujours affichées même si solde = 0
 const FIXED_CURRENCIES = [
   { cur: "GNF", label: "Solde antennes (GNF)",    color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" },
@@ -131,11 +161,10 @@ const FIXED_CURRENCIES = [
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
-// ── CHANGÉ : map étendue au-delà de PENDING pour libeller correctement les
-//   statuts de projets/actualités affichés dans les nouvelles cartes.
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; color: string; bg: string; border: string }> = {
     PENDING:            { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+    PENDING_VALIDATION: { label: 'En attente', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
     VALIDATED:          { label: 'Validée',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
     IN_PROGRESS:        { label: 'En cours',   color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE' },
     APPROVED:           { label: 'Approuvé',   color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
@@ -486,11 +515,9 @@ export default function AntennaAdminDashboard() {
     let isMounted = true;
     void (async () => {
       const [lateRes, projectsRes, contentsRes, pricingRes] = await Promise.allSettled([
-        // 🔥 CORRIGÉ : listLateMembersOver3Months (/admin/late-members) est
-        // l'endpoint dédié à l'admin d'antenne — listLateMembersVisible
-        // (/member/late-members) est celui du membre, réutilisé par erreur.
-        // Seuil réel désormais 1 mois côté backend (admin.service.ts) —
-        // cf. correction du libellé "Alertes & Rappels" plus bas.
+        // listLateMembersOver3Months (/admin/late-members) est l'endpoint
+        // dédié à l'admin d'antenne — seuil réel désormais 1 mois côté
+        // backend (admin.service.ts).
         api.listLateMembersOver3Months({ page: 1, pageSize: 50 }),
         api.listProjectsForMembers({ page: 1, pageSize: 6 }),
         api.listContentsForMembers({ page: 1, pageSize: 5 }),
@@ -647,6 +674,9 @@ export default function AntennaAdminDashboard() {
     },
   ] : [];
 
+  const recentContributions = data?.recentPendingContributions ?? [];
+  const defaultCurrency = data?.stats.currency || 'GNF';
+
   return (
     <AppShell title="Tableau de bord">
       <style>{`
@@ -721,6 +751,9 @@ export default function AntennaAdminDashboard() {
 
         .ad-bottom{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
         @media(max-width:768px){.ad-bottom{grid-template-columns:1fr}}
+        /* 🔥 AJOUT : panneau plein-largeur (même pattern que sa-panel-full côté super-admin) */
+        .ad-panel-full{grid-column:span 2}
+        @media(max-width:768px){.ad-panel-full{grid-column:span 1}}
         .ad-panel{background:rgba(253,253,255,.9);backdrop-filter:blur(12px);border-radius:20px;border:1px solid rgba(37,99,235,.10);box-shadow:0 2px 12px rgba(37,99,235,.05),0 0 0 1px rgba(255,255,255,.8) inset;overflow:hidden;opacity:0;animation:fadein .5s .3s cubic-bezier(.22,1,.36,1) forwards}
         .ad-panel-header{display:flex;align-items:center;justify-content:space-between;padding:1.15rem 1.4rem;border-bottom:1px solid rgba(37,99,235,.08)}
         .ad-panel-title{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#374151;display:flex;align-items:center;gap:.5rem}
@@ -739,11 +772,15 @@ export default function AntennaAdminDashboard() {
         .ad-row-clickable:active { background: rgba(37,99,235,0.08) !important; }
         .ad-table td { padding: 0.65rem 1.2rem; font-size: 0.79rem; color: #374151; font-weight: 500; vertical-align: middle; }
         .ad-table td.muted { color: #9CA3AF; font-size: 0.72rem; }
+        .ad-table td.mono { font-family: 'Cormorant Garamond', serif; font-size: 0.98rem; font-weight: 700; color: #111827; }
         
         .ad-user-cell { display: flex; align-items: center; gap: 0.55rem; }
         .ad-avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; color: white; flex-shrink: 0; background: linear-gradient(135deg, #2563EB, #3B82F6); }
         .ad-member-name { font-size: 0.8rem; font-weight: 700; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ad-member-email { font-size: 0.68rem; color: #9CA3AF; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 🔥 AJOUT : badge motif (table "Cotisations récentes"), même pattern que mb-motif-badge côté membre */
+        .ad-motif-badge { display: inline-flex; align-items: center; gap: 0.28rem; font-size: 0.68rem; font-weight: 600; border-radius: 99px; padding: 0.18rem 0.55rem; white-space: nowrap; max-width: 100%; }
 
         .hide-desktop { display: none !important; }
         
@@ -854,9 +891,7 @@ export default function AntennaAdminDashboard() {
           </div>
 
           {/* ── AJOUTÉ : "Projets en cours" + "Informations récentes" en
-              défilement horizontal, même comportement que membre/super-admin.
-              Placé avant le bloc suivant pour que "Alertes & Rappels" reste
-              bien en bas de page. ── */}
+              défilement horizontal, même comportement que membre/super-admin. ── */}
           <div className="ad-bottom" style={{ marginBottom: '1rem' }}>
             <div className="ad-panel" style={{ animationDelay: "0.36s" }}>
               <div className="ad-panel-header">
@@ -924,6 +959,67 @@ export default function AntennaAdminDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── AJOUTÉ : "Cotisations récentes" — plein-largeur, sous les
+              carrousels et au-dessus des demandes d'adhésion / alertes. ── */}
+          <div className="ad-bottom" style={{ marginBottom: '1rem' }}>
+            <div className="ad-panel ad-panel-full" style={{ animationDelay: "0.44s" }}>
+              <div className="ad-panel-header">
+                <div className="ad-panel-title">
+                  <div className="ad-panel-icon" style={{ background: '#ECFDF5', color: '#059669' }}>
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                  </div>
+                  Cotisations récentes
+                </div>
+                {recentContributions.length > 0 && (
+                  <span className="ad-panel-badge" style={{ background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>{recentContributions.length}</span>
+                )}
+              </div>
+              <div className="ad-panel-body">
+                <table className="ad-table">
+                  <thead>
+                    <tr>
+                      <th>Membre</th>
+                      <th className="hide-mobile">Motif</th>
+                      <th>Montant</th>
+                      <th>Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentContributions.length === 0 ? (
+                      <EmptyRow cols={4} label="Aucune cotisation récente" />
+                    ) : (
+                      recentContributions.map((c) => {
+                        const pc = getPurposeConfig(c.purpose);
+                        const memberName = c.member ? `${c.member.firstName} ${c.member.lastName}` : 'Inconnu';
+                        return (
+                          <tr key={c.id}>
+                            <td>
+                              <div className="ad-user-cell">
+                                <div className="ad-avatar">{getInitials(c.member?.firstName ?? '?', c.member?.lastName ?? '?')}</div>
+                                <div className="ad-member-name">{memberName}</div>
+                              </div>
+                            </td>
+                            <td className="hide-mobile">
+                              {pc ? (
+                                <span className="ad-motif-badge" style={{ background: pc.bg, color: pc.color }}>
+                                  {pc.icon} {pc.label}
+                                </span>
+                              ) : (
+                                <span className="ad-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}>📅 Cotisation</span>
+                              )}
+                            </td>
+                            <td className="mono">{formatCurrency(c.amount, c.currency || defaultCurrency)}</td>
+                            <td><StatusBadge status={c.status} /></td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
