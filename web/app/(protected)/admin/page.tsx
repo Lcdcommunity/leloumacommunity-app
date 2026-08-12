@@ -1,6 +1,20 @@
 // web/app/(protected)/admin/page.tsx
-// v3.2 — CHANGELOG :
-// ── AJOUTÉ : section "Cotisations récentes" (manquante jusqu'ici — le
+// v3.3 — CHANGELOG :
+// ── CORRIGÉ (12/08) : "Taux de cotisation" utilisait
+//    (membres - pendingApprovals)/membres — un calcul de "comptes non en
+//    attente d'approbation", sans aucun rapport avec le paiement réel des
+//    cotisations, malgré le libellé et le sous-texte "Membres à jour".
+//    Remplacé par (membres - lateMembers.length)/membres, qui reflète
+//    réellement la proportion de membres à jour (lateMembers déjà chargé
+//    en state pour la carte "Retard" juste à côté — aucun appel réseau
+//    supplémentaire).
+// ── CORRIGÉ (12/08) : badge "Statut" tronqué dans "Cotisations récentes"
+//    (et potentiellement "Demandes d'adhésion") sur écran étroit —
+//    `.ad-panel` a overflow:hidden (coins arrondis), sans conteneur
+//    scrollable à l'intérieur, donc une table plus large que le panneau
+//    se faisait couper net. Ajout de overflow-x:auto sur .ad-panel-body.
+//
+// v3.2 — AJOUTÉ : section "Cotisations récentes" (manquante jusqu'ici — le
 //    backend renvoyait déjà `recentPendingContributions` via
 //    dashboard-antenna-admin.service.ts, mais le frontend l'ignorait
 //    totalement). Nouveau panneau plein-largeur (ad-panel-full), tableau
@@ -17,7 +31,7 @@
 //
 // v3.0 — AJOUTÉ : panneaux "Projets en cours" et "Informations récentes" en
 //    défilement horizontal (cartes ad-true-card), carrousel photo
-//    (DashboardCarousel) — inchangés dans cette révision.
+//    (DashboardCarousel).
 
 'use client';
 
@@ -644,8 +658,12 @@ export default function AntennaAdminDashboard() {
     },
     {
       label: "Taux de cotisation",
+      // 🔥 CORRIGÉ (12/08) : reflète réellement la proportion de membres à
+      // jour (membres - lateMembers.length), et non plus les comptes non
+      // en attente d'approbation (métrique différente, sans rapport avec le
+      // paiement). lateMembers déjà chargé pour la carte "Retard".
       value: data.stats.members > 0
-        ? `${Math.round(((data.stats.members - (data.stats.pendingApprovals ?? 0)) / data.stats.members) * 100)}%`
+        ? `${Math.max(0, Math.round(((data.stats.members - lateMembers.length) / data.stats.members) * 100))}%`
         : "—",
       icon: (
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
@@ -759,7 +777,13 @@ export default function AntennaAdminDashboard() {
         .ad-panel-title{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#374151;display:flex;align-items:center;gap:.5rem}
         .ad-panel-icon{width:28px;height:28px;background:#EFF6FF;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#2563EB}
         .ad-panel-badge{font-size:.68rem;font-weight:800;padding:.2rem .6rem;border-radius:99px;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
-        .ad-panel-body{padding:.5rem 0}
+        /* 🔥 CORRIGÉ (12/08) : overflow-x:auto — sans ça, .ad-panel (overflow:
+           hidden, pour les coins arrondis) tronquait net toute table plus
+           large que le panneau sur écran étroit (ex. colonne "Statut" coupée
+           dans "Cotisations récentes"/"Demandes d'adhésion"). La table scrolle
+           désormais horizontalement dans son propre conteneur au lieu d'être
+           coupée par le parent. */
+        .ad-panel-body{padding:.5rem 0;overflow-x:auto}
         
         /* ── Tables Modernes ── */
         .ad-table { width: 100%; border-collapse: collapse; }

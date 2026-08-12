@@ -1,12 +1,20 @@
 /////// web/app/(protected)/super-admin/page.tsx
-// v2.1 — CHANGELOG :
-// ── CORRIGÉ (08/08) : panneau "Projets récents" converti d'une grille
+// v2.2 — CHANGELOG :
+// ── CORRIGÉ (12/08) : "Taux de cotisation" utilisait
+//    (membres - pendingAccounts)/membres — un calcul de "comptes non en
+//    attente d'approbation", sans rapport avec le paiement réel des
+//    cotisations. Remplacé par (membres - lateMembers.length)/membres.
+//    lateMembers déjà chargé pour la carte "Retard" — aucun appel réseau
+//    supplémentaire. Pas de bug de troncature de table ici : ce dashboard
+//    utilise des cartes flex (.sa-item-card), pas de <table>, donc rien à
+//    toucher côté CSS.
+//
+// v2.1 — CORRIGÉ : panneau "Projets récents" converti d'une grille
 //    statique (sa-project-grid/sa-project-card) à un défilement horizontal
 //    (sa-cards-viewport/sa-cards-track), même comportement que "Informations
-//    récentes" (qui défilait déjà) et que le compte membre/admin. Nouvelle
-//    variante de couleur .sa-tc-proj (bleu) pour distinguer visuellement des
-//    cartes actualités (.sa-tc-news, vert, inchangée). "Cotisations
-//    récentes" non modifié.
+//    récentes" et que le compte membre/admin. Nouvelle variante de couleur
+//    .sa-tc-proj (bleu) pour distinguer des cartes actualités (.sa-tc-news,
+//    vert, inchangée). "Cotisations récentes" non modifié.
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
@@ -613,8 +621,12 @@ export default function SuperAdminDashboardPage() {
     },
     {
       label: 'Taux de cotisation',
+      // 🔥 CORRIGÉ (12/08) : membres réellement à jour de paiement
+      // (membres - lateMembers.length), au lieu de "comptes non en attente
+      // d'approbation" (pendingAccounts), métrique sans rapport avec le
+      // paiement. lateMembers déjà chargé pour la carte "Retard".
       value: data.stats.members > 0
-        ? `${Math.round(((data.stats.members - (data.stats.pendingAccounts ?? 0)) / data.stats.members) * 100)}%`
+        ? `${Math.max(0, Math.round(((data.stats.members - lateMembers.length) / data.stats.members) * 100))}%`
         : '—',
       icon: (
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
@@ -722,10 +734,6 @@ export default function SuperAdminDashboardPage() {
         .sa-cards-track:hover, .sa-cards-track:active { animation-play-state: paused; }
         @keyframes saPanCards { 0%, 5% { transform: translateX(0); } 95%, 100% { transform: translateX(calc(-100% + 100vw - 3rem)); } }
         @media (min-width: 1024px) { .sa-cards-track { animation: none; flex-wrap: wrap; width: 100%; } }
-        /* 🔥 CORRIGÉ (08/08) : .sa-true-card redevient une base structurelle
-           neutre — la couleur (vert "actualités" / bleu "projets") vient
-           désormais des modificateurs .sa-tc-news / .sa-tc-proj, même
-           pattern que member/admin (mb-tc-*/ad-tc-*). */
         .sa-true-card { min-width: 230px; max-width: 260px; flex: 0 0 auto; min-height: 170px; border-radius: 16px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: 0.6rem; border: 1px solid rgba(255,255,255,0.6); box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
         .sa-true-card:hover { transform: translateY(-4px); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
         .sa-tc-news { background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%); border-color: #A7F3D0; }
@@ -880,10 +888,9 @@ export default function SuperAdminDashboardPage() {
             <DashboardCarousel projects={projectsInProgress} news={latestContents} />
           </div>
 
-          {/* 🔥 CORRIGÉ (08/08) : "Projets récents" en défilement horizontal
-              (sa-cards-viewport/sa-cards-track), même comportement que
-              "Informations récentes" ci-dessous et que membre/admin —
-              remplace l'ancienne grille statique sa-project-grid. */}
+          {/* "Projets récents" en défilement horizontal (sa-cards-viewport/
+              sa-cards-track), même comportement que "Informations récentes"
+              ci-dessous et que membre/admin. */}
           <div className="sa-grid2">
             <div className="sa-panel sa-panel-full" style={{ animationDelay: '0.62s' }}>
               <div className="sa-panel-head">
@@ -912,7 +919,7 @@ export default function SuperAdminDashboardPage() {
             </div>
           </div>
 
-          {/* ── Section animée "Informations récentes" (comme côté membre) — inchangée ── */}
+          {/* ── Section animée "Informations récentes" (comme côté membre) ── */}
           <div className="sa-grid2">
             <div className="sa-panel sa-panel-full" style={{ animationDelay: '0.67s' }}>
               <div className="sa-panel-head">
