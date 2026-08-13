@@ -501,7 +501,7 @@ model Antenna {
   VoteSession                  VoteSession[]
   FinancialProjection          FinancialProjection[]
   videoPosts                   VideoPost[]
-  carouselImages               CarouselImage[]
+  carouselImages                   CarouselImage[]
   transfersSent     AntennaTransfer[] @relation("TransferSender")
   transfersReceived AntennaTransfer[] @relation("TransferReceiver")
 
@@ -536,7 +536,7 @@ model User {
   placeOfBirth                   String?
   countryOfBirth                 String?
   country                        String?
-  city                           String?
+  city                            String?
   originSubPrefecture            String?
   originDistrict                 String?
   originQuarter                  String?
@@ -545,11 +545,11 @@ model User {
   addressLine1                   String?
   addressLine2                   String?
   postalCode                     String?
-  profilePhotoFileId             String?
+  profilePhotoFileId              String?
 
   preferredLanguage              LanguageCode @default(FR)
   timezone                       String?      @default("Europe/Paris")
-  isPhoneVerified                Boolean      @default(false)
+  isPhoneVerified                 Boolean      @default(false)
 
   termsAcceptedAt                DateTime     @default(now())
 
@@ -590,7 +590,7 @@ model User {
   deletedUsers                   User[]       @relation("UserDeletedByUser")
 
   memberships                    Membership[]
-  adminAssignments               AntennaAdminAssignment[]
+  adminAssignments                AntennaAdminAssignment[]
 
   membershipsApproved            Membership[] @relation("MembershipApprovedByUser")
   membershipsRejected            Membership[] @relation("MembershipRejectedByUser")
@@ -658,9 +658,9 @@ model User {
 
   electionCandidates             ElectionCandidate[]
   electionVotes                  ElectionVote[]
-  transfersInitiated             AntennaTransfer[] @relation("TransferInitiatedBy")
-  transfersValidated             AntennaTransfer[] @relation("TransferValidatedBy")
-  transfersRejected              AntennaTransfer[] @relation("TransferRejectedBy")
+  transfersInitiated              AntennaTransfer[] @relation("TransferInitiatedBy")
+  transfersValidated              AntennaTransfer[] @relation("TransferValidatedBy")
+  transfersRejected               AntennaTransfer[] @relation("TransferRejectedBy")
 
   @@index([associationId, role, status])
   @@index([associationId, lastName, firstName])
@@ -1142,7 +1142,7 @@ model Project {
   createdByUserId      String?
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
-  archivedAt           DateTime?
+  archivedAt            DateTime?
 
   association          Association   @relation(fields: [associationId], references: [id], onDelete: Cascade)
   antenna              Antenna?      @relation(fields: [antennaId], references: [id], onDelete: SetNull)
@@ -1634,21 +1634,28 @@ model UserPreference {
 }
 
 model ReminderRunLog {
-  id                String       @id @default(cuid())
+  id                String              @id @default(cuid())
   associationId     String
   antennaId         String?
   kind              ReminderKind
+  // 🔥 AJOUT COMMUNICATIONS : canal utilisé pour CET envoi (EMAIL/SMS), posé
+  // par le nouveau module communications. Reste optionnel/null pour ne rien
+  // casser des lignes déjà écrites par le système de rappels existant (qui
+  // n'a jamais renseigné de canal), et aussi quand un envoi combine les deux
+  // canaux à la fois (voir details Json ci-dessous pour le détail complet
+  // dans ce cas).
+  channel           NotificationChannel?
   thresholdMonths   Int?
-  recipientsCount   Int          @default(0)
-  successCount      Int          @default(0)
-  failedCount       Int          @default(0)
+  recipientsCount   Int                 @default(0)
+  successCount      Int                 @default(0)
+  failedCount       Int                 @default(0)
   details           Json?
   triggeredByUserId String? 
-  triggeredAt       DateTime     @default(now())
+  triggeredAt       DateTime            @default(now())
 
-  association       Association  @relation(fields: [associationId], references: [id], onDelete: Cascade)
-  antenna           Antenna?     @relation(fields: [antennaId], references: [id], onDelete: SetNull)
-  triggeredByUser   User?        @relation("ReminderTriggeredByUser", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
+  association       Association         @relation(fields: [associationId], references: [id], onDelete: Cascade)
+  antenna           Antenna?            @relation(fields: [antennaId], references: [id], onDelete: SetNull)
+  triggeredByUser   User?               @relation("ReminderTriggeredByUser", fields: [triggeredByUserId], references: [id], onDelete: SetNull)
 
   @@index([associationId, kind, triggeredAt])
   @@index([antennaId, kind, triggeredAt])

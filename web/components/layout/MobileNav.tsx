@@ -98,7 +98,11 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/sponsors',      label: 'Partenaires',         ico: E.star,         section: 'Gestion'   },
   { href: '/super-admin/documents',     label: 'Documents',           ico: E.document,     section: 'Gestion'   },
   { href: '/super-admin/contents',      label: 'Informations',        ico: E.news,         section: 'Gestion'   },
-  { href: '/super-admin/communication', label: 'Envoi SMS & Push',    ico: E.send,         section: 'Outils'    },
+  // 🔥 CORRIGÉ (communications) : pointait vers /super-admin/communication
+  // (page "Envoi SMS & Push" jamais livrée) — redirigé vers la nouvelle
+  // page /communications (email + SMS, retardataires + info générale,
+  // filtre par antenne), libellé mis à jour en conséquence.
+  { href: '/super-admin/communications', label: 'Communications',     ico: E.send,         section: 'Outils'    },
   { href: '/super-admin/notifications', label: 'Notifications',       ico: E.bell,         section: 'Outils'    },
   { href: '/super-admin/audit',         label: 'Audit',               ico: E.audit,        section: 'Outils'    },
   { href: '/super-admin/profile',       label: 'Mon profil',          ico: E.profile,      section: 'Outils'    },
@@ -122,7 +126,11 @@ const adminItems: NavItem[] = [
   { href: '/admin/contents',              label: 'Informations',           ico: E.news,         section: 'Contenu'   },
   { href: '/admin/late-members',          label: 'Retardataires +3 mois',  ico: E.clock,        section: 'Contenu'   },
   { href: '/admin/sponsors',              label: 'Partenaires',            ico: E.star,         section: 'Contenu'   },
-  { href: '/admin/communication',         label: 'Envoi SMS & Push',       ico: E.send,         section: 'Outils'    },
+  // 🔥 CORRIGÉ (communications) : pointait vers /admin/communication (page
+  // "Envoi SMS & Push" jamais livrée) — redirigé vers la nouvelle page
+  // /communications (email + SMS, retardataires + info générale), libellé
+  // mis à jour en conséquence.
+  { href: '/admin/communications',        label: 'Communications',         ico: E.send,         section: 'Outils'    },
   { href: '/admin/notifications',         label: 'Notifications',          ico: E.bell,         section: 'Outils'    },
   { href: '/admin/audit',                 label: 'Audit',                  ico: E.audit,        section: 'Outils'    },
   { href: '/admin/settings',              label: 'Paramètres',             ico: E.settings,     section: 'Outils'    },

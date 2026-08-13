@@ -48,6 +48,9 @@ import { UsersModule } from './modules/users/users.module';
 import { ElectionsModule } from './modules/elections/elections.module';
 // 🔥 NOUVEAU : provisioning automatique des domaines custom (Cloudflare + Vercel)
 import { DomainProvisioningModule } from './domain-provisioning/domain-provisioning.module';
+// 🔥 NOUVEAU : page de communication email/SMS (admin/super-admin), module
+// neuf et isolé — voir backend/src/modules/communications/
+import { CommunicationsModule } from './modules/communications/communications.module';
 
 @Module({
   imports: [
@@ -102,6 +105,7 @@ import { DomainProvisioningModule } from './domain-provisioning/domain-provision
     UsersModule,
     ElectionsModule,
     DomainProvisioningModule, // 🔥 NOUVEAU
+    CommunicationsModule, // 🔥 NOUVEAU : communication email/SMS admin/super-admin
   ],
   controllers: [],
   providers: [

@@ -72,7 +72,11 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/sponsors',        label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
   { href: '/super-admin/documents',       label: 'Documents',              icon: <Ico d={ICO.doc} /> },
   { href: '/super-admin/contents',        label: 'Informations',           icon: <Ico d={ICO.news} /> },
-  { href: '/super-admin/communication',   label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> },
+  // 🔥 CORRIGÉ (communications) : pointait vers /super-admin/communication
+  // (page "Envoi SMS & Push" jamais livrée) — redirigé vers la nouvelle
+  // page /communications (email + SMS, retardataires + info générale,
+  // filtre par antenne), libellé mis à jour en conséquence.
+  { href: '/super-admin/communications',  label: 'Communications',         icon: <Ico d={ICO.send} /> },
   { href: '/super-admin/notifications',   label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
   { href: '/super-admin/audit',           label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
   { href: '/super-admin/profile',         label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
@@ -98,7 +102,11 @@ const adminItems: NavItem[] = [
   { href: '/admin/late-members',              label: 'Retardataires +3 mois',  icon: <Ico d={ICO.clock} /> },
   // 🔥 NOUVEAU : Partenaires en lecture seule
   { href: '/admin/sponsors',                  label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
-  { href: '/admin/communication',             label: 'Envoi SMS & Push',       icon: <Ico d={ICO.send} /> },
+  // 🔥 CORRIGÉ (communications) : pointait vers /admin/communication (page
+  // "Envoi SMS & Push" jamais livrée) — redirigé vers la nouvelle page
+  // /communications (email + SMS, retardataires + info générale), libellé
+  // mis à jour en conséquence.
+  { href: '/admin/communications',            label: 'Communications',         icon: <Ico d={ICO.send} /> },
   { href: '/admin/notifications',             label: 'Notifications',          icon: <Ico d={ICO.bell} /> },
   { href: '/admin/audit',                     label: 'Audit',                  icon: <Ico d={ICO.audit} /> },
   { href: '/admin/profile',                   label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
