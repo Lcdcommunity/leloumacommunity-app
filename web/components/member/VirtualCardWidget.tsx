@@ -1,9 +1,10 @@
 // web/components/member/VirtualCardWidget.tsx
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import QRCode from 'react-qr-code';
 import Image from 'next/image';
+import { api } from '../../lib/api-client';
 
 export interface VirtualCardData {
   cardNumber: string;
@@ -22,19 +23,48 @@ export interface VirtualCardData {
     city?: string | null;
     postalCode?: string | null;
     profilePhotoUrl?: string | null;
-    function?: string | null;             // <- AJOUT IMPORTANT
-    professionalStatus?: string | null;   // <- AJOUT IMPORTANT
+    function?: string | null;
+    professionalStatus?: string | null;
   };
   antennaName: string;
 }
 
-export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
+export function VirtualCardWidget({
+  card,
+  showPaymentLink = true,
+}: {
+  card: VirtualCardData | null;
+  showPaymentLink?: boolean;
+}) {
   const [flipped, setFlipped] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
 
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [isHovering, setIsHovering] = useState(false);
   const sceneRef = useRef<HTMLDivElement>(null);
+
+  // 🔥 NOUVEAU : identité de l'association chargée dynamiquement
+  // (multi-tenant) — remplace "Lélouma Communauté" et le logo en dur.
+  const [orgIdentity, setOrgIdentity] = useState<{ name: string; logoUrl: string | null }>({
+    name: 'Association',
+    logoUrl: null,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getAssociation()
+      .then((assoc: any) => {
+        if (cancelled) return;
+        setOrgIdentity({
+          name: assoc?.name || 'Association',
+          logoUrl: assoc?.logoFile?.url || assoc?.logoUrl || null,
+        });
+      })
+      .catch(() => {
+        // Repli neutre — jamais de blocage de l'affichage de la carte.
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const calcTilt = useCallback((clientX: number, clientY: number) => {
     const el = sceneRef.current;
@@ -166,12 +196,10 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
   const cardNum = card?.cardNumber ? card.cardNumber.replace(/[\s-]/g, '') : 'EN ATTENTE';
   const residence = [card?.user?.city, card?.user?.country].filter(Boolean).join(', ') || 'Non renseignée';
 
-  // Utilisation de `originVillage` ou `originCommune`
   const origin = card?.user?.originVillage || card?.user?.originCommune || 'Non renseignée';
 
   const antenna = card?.antennaName || 'Non assignée';
 
-  // Prise en compte chirurgicale du poste occupé (function) puis du statut pro (professionalStatus)
   const memberProfession = card?.user?.function || card?.user?.professionalStatus || 'Non renseignée';
 
   const safeFirstName = card?.user?.firstName || '';
@@ -181,6 +209,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
   const avatarUrl =
     card?.user?.profilePhotoUrl ||
     `https://ui-avatars.com/api/?name=${safeFirstName || 'L'}+${safeLastName || 'C'}&background=E8D2AB&color=6B4A2B`;
+
+  const logoSrc = orgIdentity.logoUrl || '/assets/images/logolcd.jpg';
 
   if (isMinimized) {
     return (
@@ -351,7 +381,6 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           position: relative;
         }
 
-        /* Vagues au fond du recto (beige, vert clair, vert foncé) */
         .vcw-front::before {
           content: '';
           position: absolute;
@@ -375,7 +404,6 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           z-index: 1;
         }
 
-        /* Vague verte au fond du verso */
         .vcw-back::before {
           content: '';
           position: absolute;
@@ -445,12 +473,13 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-org {
           font-size: 0.78rem;
           font-weight: 800;
-          line-height: 1.12;
-          letter-spacing: 0.13em;
+          line-height: 1.25;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
           color: #0f3d2e;
+          max-width: 210px;
         }
-        
+
         .vcw-top-actions {
           display: flex;
           flex-direction: column;
@@ -499,7 +528,6 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           50% { opacity: 0.35; box-shadow: none; }
         }
 
-        /* Drapeau de la Guinée */
         .vcw-guinea-flag, .vcw-guinea-flag-recto {
           width: 34px;
           height: 24px;
@@ -509,13 +537,13 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           overflow: hidden;
         }
         .vcw-guinea-flag::before, .vcw-guinea-flag-recto::before {
-          content: ''; flex: 1; background-color: #CE1126; /* Rouge */
+          content: ''; flex: 1; background-color: #CE1126;
         }
         .vcw-guinea-flag-mid {
-          flex: 1; background-color: #FCD116; /* Jaune */
+          flex: 1; background-color: #FCD116;
         }
         .vcw-guinea-flag::after, .vcw-guinea-flag-recto::after {
-          content: ''; flex: 1; background-color: #009460; /* Vert */
+          content: ''; flex: 1; background-color: #009460;
         }
 
         .vcw-mid {
@@ -627,8 +655,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-weight: 800;
           letter-spacing: 0.15em;
           text-transform: uppercase;
-          color: #0f172a; /* Texte sombre pour visibilité parfaite */
-          text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85); /* Ombre claire pour contraster avec la vague */
+          color: #0f172a;
+          text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
         }
 
         .vcw-card-num {
@@ -636,8 +664,8 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           font-size: 1rem;
           font-weight: 500;
           letter-spacing: 0.14em;
-          color: #ffffff; /* Valeur en blanc */
-          text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65); /* Ombre foncée pour bien ressortir */
+          color: #ffffff;
+          text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -690,10 +718,12 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
         .vcw-back-org {
           font-size: 0.85rem;
           font-weight: 800;
-          line-height: 1.15;
-          letter-spacing: 0.14em;
+          line-height: 1.2;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
           color: #0f3d2e;
+          max-width: 220px;
+          text-align: left;
         }
 
         .vcw-back-sep {
@@ -870,9 +900,10 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           }
 
           .vcw-org {
-            font-size: 0.58rem;
-            line-height: 1.08;
-            letter-spacing: 0.12em;
+            font-size: 0.6rem;
+            line-height: 1.15;
+            letter-spacing: 0.06em;
+            max-width: 140px;
           }
 
           .vcw-top-actions {
@@ -962,8 +993,9 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
           }
 
           .vcw-back-org {
-            font-size: 0.6rem;
-            letter-spacing: 0.12em;
+            font-size: 0.62rem;
+            letter-spacing: 0.06em;
+            max-width: 150px;
           }
 
           .vcw-back-title {
@@ -1034,21 +1066,26 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                 <div className="vcw-lock-title">Carte verrouillée</div>
 
                 <p className="vcw-lock-sub">
-                  {isExpired
-                    ? "Votre carte a expiré. Veuillez la renouveler pour continuer à l'utiliser."
-                    : "Réglez votre adhésion annuelle pour débloquer votre carte membre."}
+                  {showPaymentLink
+                    ? (isExpired
+                        ? "Votre carte a expiré. Veuillez la renouveler pour continuer à l'utiliser."
+                        : "Réglez votre adhésion annuelle pour débloquer votre carte membre.")
+                    : (isExpired
+                        ? "La carte de ce membre a expiré."
+                        : "Ce membre n'a pas encore réglé sa cotisation annuelle.")}
                 </p>
 
-                <a
-                  href="/member/contributions/new"
-                  className="vcw-lock-btn"
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                  Régler ma carte
-                </a>
+                {showPaymentLink && (
+                  
+                    href="/member/contributions/new"
+                    className="vcw-lock-btn"
+                    onPointerDown={(e) => e.stopPropagation()}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    Régler ma carte
+                  </a>
+                )}
               </div>
             </div>
 
@@ -1092,22 +1129,15 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                     <div className="vcw-logo-row">
                       <div className="vcw-logo-ring">
                         <Image
-                          src="/assets/images/logolcd.jpg"
-                          alt="Logo"
+                          src={logoSrc}
+                          alt={orgIdentity.name}
                           width={38}
                           height={38}
                           style={{ objectFit: 'cover', borderRadius: '50%' }}
                         />
                       </div>
 
-                      {/* ── MODIFIÉ : ajout de la 3ᵉ ligne "pour le DÉVELOPPEMENT" ── */}
-                      <span className="vcw-org">
-                        Lélouma
-                        <br />
-                        Communauté
-                        <br />
-                        <span style={{ textTransform: 'none', fontWeight: 600, fontSize: '0.88em' }}>pour le </span>Développement
-                      </span>
+                      <span className="vcw-org">{orgIdentity.name}</span>
                     </div>
 
                     <div className="vcw-top-actions">
@@ -1170,19 +1200,14 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                       <div className="vcw-back-logo-group">
                         <div className="vcw-back-logo-ring">
                           <Image
-                            src="/assets/images/logolcd.jpg"
-                            alt="Logo"
+                            src={logoSrc}
+                            alt={orgIdentity.name}
                             width={38}
                             height={38}
                             style={{ objectFit: 'cover', borderRadius: '50%' }}
                           />
                         </div>
-                        {/* ── MODIFIÉ : ajout de la 3ᵉ ligne "pour le DÉVELOPPEMENT" ── */}
-                        <div className="vcw-back-org">
-                          LÉLOUMA<br />
-                          COMMUNAUTÉ<br />
-                          <span style={{ textTransform: 'none', fontWeight: 600, fontSize: '0.88em' }}>pour le </span>DÉVELOPPEMENT
-                        </div>
+                        <div className="vcw-back-org">{orgIdentity.name.toUpperCase()}</div>
                       </div>
 
                       <div className="vcw-guinea-flag">
@@ -1201,11 +1226,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                           size={typeof window !== 'undefined' && window.innerWidth <= 560 ? 80 : 100}
                           level="H"
                           bgColor="#FFFFFF"
-                          fgColor="#111827"                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: typeof window !== 'undefined' && window.innerWidth <= 560 ? 80 : 100,
+                          fgColor="#111827"/>) : (<div style={{width: typeof window !== 'undefined' && window.innerWidth <= 560 ? 80 : 100,
                             height: typeof window !== 'undefined' && window.innerWidth <= 560 ? 80 : 100,
                             display: 'flex',
                             alignItems: 'center',
@@ -1213,8 +1234,7 @@ export function VirtualCardWidget({ card }: { card: VirtualCardData | null }) {
                             color: '#9CA3AF',
                             fontSize: '.78rem',
                             fontWeight: 700,
-                          }}
-                        >
+                          }}>
                           Indisp.
                         </div>
                       )}

@@ -6,6 +6,7 @@ import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type MyTransferAntenna } from '../../../../lib/api-client';
 import { formatDate, fullName } from '../../../../lib/format';
 import type { UserSummary, UserStatus } from '../../../../types/user';
+import { MemberCardPreviewModal } from '../../../../components/admin/MemberCardPreviewModal';
 
 /* ══════════════════════════════════════════════════════ TYPES */
 type ExtendedMember = UserSummary & {
@@ -133,6 +134,7 @@ export default function AdminMembersDirectoryPage() {
 
   // États de modale détaillée
   const [selectedUser, setSelectedUser] = useState<ExtendedMember | null>(null);
+  const [viewingCard, setViewingCard] = useState<ExtendedMember | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
 
@@ -217,24 +219,24 @@ export default function AdminMembersDirectoryPage() {
       lastName: selectedUser.lastName || '', 
       phone: selectedUser.phone || '',
       professionalStatus: selectedUser.professionalStatus || '', 
-      
+
       function: isStandardFunction ? (selectedUser.function || '') : 'Autre',
       customFunction: isStandardFunction ? '' : (selectedUser.function || ''),
 
       birthDate: selectedUser.birthDate ? new Date(selectedUser.birthDate).toLocaleDateString('fr-FR') : '',
       placeOfBirth: selectedUser.placeOfBirth || '', 
-      
+
       birthCountry: isStandardBirthCountry ? (selectedUser.birthCountry || '') : 'Autre',
       customBirthCountry: isStandardBirthCountry ? '' : (selectedUser.birthCountry || ''),
-      
+
       originSubPrefecture: isStandardOrigin ? (selectedUser.originSubPrefecture || '') : 'Autre',
       customOriginSubPrefecture: isStandardOrigin ? '' : (selectedUser.originSubPrefecture || ''),
-      
+
       originVillage: selectedUser.originVillage || '',
       addressLine1: selectedUser.addressLine1 || '', 
       postalCode: selectedUser.postalCode || '', 
       city: selectedUser.city || '', 
-      
+
       country: isStandardCountry ? (selectedUser.country || '') : 'Autre',
       customCountry: isStandardCountry ? '' : (selectedUser.country || ''),
     });
@@ -562,35 +564,14 @@ export default function AdminMembersDirectoryPage() {
         @keyframes aaFadeInUp { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
         @keyframes aaFadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
         @keyframes aaScaleUp { 0% { transform: scale(0.95) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
-        @keyframes aaspin { to { transform: rotate(360deg); } }
-
-        /* ⚡ CSS D'EXPORTATION ET IMPRESSION */
-        .export-flex-row { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
-        .export-flex-item { flex: 1 1 calc(50% - 0.5rem); min-width: 140px; }
-        .export-flex-item.full { flex: 1 1 100%; }
-
-        @media print {
-          body * { visibility: hidden; }
-          .printable-export-area, .printable-export-area * { visibility: visible; }
-          .printable-export-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
-          .aa-wrap, .aa-modal-overlay { display: none !important; }
-        }
-        .printable-export-area { display: none; }
       `}</style>
 
-      {/* ⚡ LA ZONE IMPRIMABLE CACHÉE POUR LE PDF */}
       {pdfData && (
-        <div className="printable-export-area">
-          <h2 style={{ textAlign: 'center', marginBottom: '20px', fontFamily: "'Cormorant Garamond', serif" }}>Liste des Membres</h2>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: "'DM Sans', sans-serif" }}>
+        <div className="printable-export-area" style={{ display: 'none' }}>
+          <table>
             <thead>
-              <tr style={{ background: '#f1f5f9' }}>
-                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Nom & Prénom</th>
-                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Email</th>
-                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Téléphone</th>
-                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Rôle</th>
-                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Statut</th>
-                <th style={{ border: '1px solid #cbd5e1', padding: '8px', textAlign: 'left' }}>Date Inscription</th>
+              <tr>
+                <th>Nom</th><th>Email</th><th>Téléphone</th><th>Rôle</th><th>Statut</th><th>Date Inscription</th>
               </tr>
             </thead>
             <tbody>
@@ -707,7 +688,6 @@ export default function AdminMembersDirectoryPage() {
                     <th className="hide-mobile" style={thStyle}>Email</th>
                     <th style={{ ...thStyle, width: '120px' }}>Statut</th>
                     <th className="hide-mobile" style={thStyle}>Créé le</th>
-                    {/* 🔥 LA COLONNE D'ACTIONS EST CACHÉE SUR MOBILE */}
                     <th className="hide-mobile" style={{ ...thStyle, textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
@@ -719,7 +699,6 @@ export default function AdminMembersDirectoryPage() {
                       className="aa-row-clickable"
                       onClick={() => openMemberModal(u)} 
                     >
-                      {/* 🔥 COUPE LES TEXTES TROP LONGS AVEC DES POINTS DE SUSPENSION */}
                       <td style={{ ...tdStyle, maxWidth: '200px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '.55rem' }}>
                           <Initials name={fullName(u)} />
@@ -752,7 +731,7 @@ export default function AdminMembersDirectoryPage() {
           )}
         </div>
 
-        {/* ⚡ MODALE D'EXPORTATION SANS SURCHARGER LA PAGE */}
+        {/* ⚡ MODALE D'EXPORTATION */}
         {exportModalType && (
           <div className="aa-modal-overlay" onClick={() => actionLoading !== 'EXPORT' && setExportModalType(null)}>
             <div className="aa-modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px', padding: '2rem', display: 'block', overflow: 'visible' }}>
@@ -797,7 +776,7 @@ export default function AdminMembersDirectoryPage() {
           </div>
         )}
 
-        {/* ── MODALE DE CRÉATION DE MEMBRE (AVEC TOUS LES CHAMPS) ── */}
+        {/* ── MODALE DE CRÉATION DE MEMBRE ── */}
         {isCreateModalOpen && (
           <div className="aa-modal-overlay" onClick={resetCreateForm}>
             <div className="aa-modal-content" onClick={e => e.stopPropagation()}>
@@ -869,7 +848,7 @@ export default function AdminMembersDirectoryPage() {
                           <label className="aa-form-label">Lieu naissance</label>
                           <input className="aa-form-input" value={formData.placeOfBirth} onChange={e => setFormData({ ...formData, placeOfBirth: e.target.value })} />
                         </div>
-                        
+
                         <div className="aa-form-group">
                           <label className="aa-form-label">Pays naissance</label>
                           <select className="md-edit-select" value={formData.birthCountry} onChange={e => { setFormData({ ...formData, birthCountry: e.target.value }); if(e.target.value !== 'Autre') setFormData(f => ({...f, customBirthCountry: ''})); }}>
@@ -880,7 +859,7 @@ export default function AdminMembersDirectoryPage() {
                             <input className="aa-form-input" value={formData.customBirthCountry} onChange={e => setFormData({ ...formData, customBirthCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                           )}
                         </div>
-                        
+
                         <div className="aa-form-group">
                           <label className="aa-form-label">Commune d&apos;origine</label>
                           <select className="md-edit-select" value={formData.originSubPrefecture} onChange={e => { setFormData({ ...formData, originSubPrefecture: e.target.value }); if(e.target.value !== 'Autre') setFormData(f => ({...f, customOriginSubPrefecture: ''})); }}>
@@ -891,7 +870,7 @@ export default function AdminMembersDirectoryPage() {
                             <input className="aa-form-input" value={formData.customOriginSubPrefecture} onChange={e => setFormData({ ...formData, customOriginSubPrefecture: e.target.value })} placeholder="Précisez la commune" style={{ marginTop: '0.4rem' }} />
                           )}
                         </div>
-                        
+
                         <div className="aa-form-group full">
                           <label className="aa-form-label">Village d&apos;origine</label>
                           <input className="aa-form-input" value={formData.originVillage} onChange={e => setFormData({ ...formData, originVillage: e.target.value })} placeholder="Ex: Petel" />
@@ -929,7 +908,7 @@ export default function AdminMembersDirectoryPage() {
                           <label className="aa-form-label">Adresse de résidence</label>
                           <input className="aa-form-input" value={formData.addressLine1} onChange={e => setFormData({ ...formData, addressLine1: e.target.value })} placeholder="N° et nom de rue" />
                         </div>
-                        
+
                         <div className="aa-form-group">
                           <label className="aa-form-label">Code postal</label>
                           <input className="aa-form-input" value={formData.postalCode} onChange={e => setFormData({ ...formData, postalCode: e.target.value })} placeholder="Ex: 75001" />
@@ -987,6 +966,7 @@ export default function AdminMembersDirectoryPage() {
                   <div className="aa-user-hero-info">
                     <div className="aa-user-hero-name">{fullName(selectedUser)}</div>
                     <div className="aa-user-hero-email">{selectedUser.email}</div>
+                    <div className="aa-user-hero-email">Membre depuis le {formatDate(selectedUser.createdAt)}</div>
                     <div style={{ marginTop: '0.2rem' }}>
                       <UserStatusBadge status={selectedUser.status} />
                     </div>
@@ -994,7 +974,6 @@ export default function AdminMembersDirectoryPage() {
                 </div>
 
                 {!isEditing ? (
-                  /* VUE LECTURE COMPLÈTE */
                   <div className="aa-info-grid">
                     <div className="aa-info-item">
                       <span className="aa-info-label">Date d&apos;inscription</span>
@@ -1042,7 +1021,7 @@ export default function AdminMembersDirectoryPage() {
                       <span className="aa-info-label">Adresse de résidence</span>
                       <span className="aa-info-value">{renderInfoValue(selectedUser.addressLine1)}</span>
                     </div>
-                    
+
                     <div className="aa-info-item" style={{ gridColumn: '1 / -1' }}>
                       <span className="aa-info-label">Ville & Pays de résidence</span>
                       <span className="aa-info-value">
@@ -1051,7 +1030,6 @@ export default function AdminMembersDirectoryPage() {
                     </div>
                   </div>
                 ) : (
-                  /* VUE ÉDITION INTÉGRÉE DANS LA MODALE */
                   <form id="editMemberForm" onSubmit={(e) => void handleSaveEdit(e)} className="aa-form-grid">
                     <div className="aa-form-group">
                       <label className="aa-form-label">Prénom</label>
@@ -1077,7 +1055,7 @@ export default function AdminMembersDirectoryPage() {
                       <label className="aa-form-label">Lieu naissance</label>
                       <input className="aa-form-input" value={editData.placeOfBirth} onChange={e => setEditData({ ...editData, placeOfBirth: e.target.value })} />
                     </div>
-                    
+
                     <div className="aa-form-group">
                       <label className="aa-form-label">Pays naissance</label>
                       <select className="md-edit-select" value={editData.birthCountry} onChange={e => { setEditData({ ...editData, birthCountry: e.target.value }); if(e.target.value !== 'Autre') setEditData(f => ({...f, customBirthCountry: ''})); }}>
@@ -1088,7 +1066,7 @@ export default function AdminMembersDirectoryPage() {
                         <input className="aa-form-input" value={editData.customBirthCountry} onChange={e => setEditData({ ...editData, customBirthCountry: e.target.value })} placeholder="Précisez le pays" style={{ marginTop: '0.4rem' }} />
                       )}
                     </div>
-                    
+
                     <div className="aa-form-group">
                       <label className="aa-form-label">Profession</label>
                       <select className="md-edit-select" value={editData.professionalStatus} onChange={e => setEditData({ ...editData, professionalStatus: e.target.value })}>
@@ -1120,12 +1098,12 @@ export default function AdminMembersDirectoryPage() {
                       <label className="aa-form-label">Village origine</label>
                       <input className="aa-form-input" value={editData.originVillage} onChange={e => setEditData({ ...editData, originVillage: e.target.value })} />
                     </div>
-                    
+
                     <div className="aa-form-group">
                       <label className="aa-form-label">Adresse de résidence</label>
                       <input className="aa-form-input" value={editData.addressLine1} onChange={e => setEditData({ ...editData, addressLine1: e.target.value })} />
                     </div>
-                    
+
                     <div className="aa-form-group">
                       <label className="aa-form-label">Code postal</label>
                       <input className="aa-form-input" value={editData.postalCode} onChange={e => setEditData({ ...editData, postalCode: e.target.value })} />
@@ -1155,6 +1133,15 @@ export default function AdminMembersDirectoryPage() {
                       Modifier
                     </button>
 
+                    <button
+                      className="aa-btn"
+                      style={{ background: 'linear-gradient(135deg, #7C3AED, #8B5CF6)', color: 'white', boxShadow: '0 4px 12px rgba(124,58,237,0.25)' }}
+                      onClick={() => setViewingCard(selectedUser)}
+                      disabled={actionLoading !== null}
+                    >
+                      Voir la carte
+                    </button>
+
                     {selectedUser.status === 'PENDING_APPROVAL' && (
                       <button className="aa-btn aa-btn-validate" onClick={() => void handleUpdateStatus('ACTIVE')} disabled={actionLoading !== null}>
                         {actionLoading === 'ACTIVE' ? '...' : 'Valider'}
@@ -1182,6 +1169,15 @@ export default function AdminMembersDirectoryPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {viewingCard && (
+          <MemberCardPreviewModal
+            memberId={viewingCard.id}
+            memberName={fullName(viewingCard)}
+            scope="admin"
+            onClose={() => setViewingCard(null)}
+          />
         )}
 
       </div>

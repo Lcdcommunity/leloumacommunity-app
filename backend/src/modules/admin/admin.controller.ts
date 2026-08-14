@@ -43,6 +43,12 @@ export class AdminController {
     return this.service.listMembers(user.id, +page, +pageSize, q, status);
   }
 
+  // 🔥 NOUVEAU : consultation de la carte de membre (icône "œil")
+  @Get('members/:id/card')
+  getMemberCard(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.service.getMemberCard(id, user.id);
+  }
+
   @Get('members/export')
   @Header('Content-Type', 'text/csv')
   @Header('Content-Disposition', 'attachment; filename="membres-antenne.csv"')
@@ -163,7 +169,6 @@ export class AdminController {
     return this.service.listProjectProposals(user.id, +page, +pageSize, status);
   }
 
-  // 🔥 NOUVEAU : Approuver une proposition → crée automatiquement un projet officiel
   @Patch('project-proposals/:id/approve')
   approveProjectProposal(
     @Param('id') id: string,
@@ -173,7 +178,6 @@ export class AdminController {
     return this.service.approveProjectProposal(id, user.id, reviewComment);
   }
 
-  // 🔥 NOUVEAU : Rejeter une proposition avec commentaire optionnel
   @Patch('project-proposals/:id/reject')
   rejectProjectProposal(
     @Param('id') id: string,

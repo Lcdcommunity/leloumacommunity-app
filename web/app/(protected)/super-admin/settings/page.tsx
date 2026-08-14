@@ -1,4 +1,13 @@
 // web/app/(protected)/super-admin/settings/page.tsx
+//
+// 🔥 AJOUT : coordonnées de l'association (téléphone, email, site web,
+//   adresse/siège) — absentes du formulaire jusqu'ici alors que ces champs
+//   existent déjà côté Association (utilisés entre autres par le pied de
+//   page dynamique des emails de communication). Dynamique par nature :
+//   chargés depuis `api.getAssociation()`, enregistrés via
+//   `api.updateAssociation()`, comme le reste de ce formulaire — rien de
+//   codé en dur, fonctionne pour n'importe quelle association du multi-tenant.
+//
 'use client';
 
 import React, { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
@@ -35,34 +44,6 @@ function InfoRow({ label, value, mono = false }: { label: string; value: string;
         {value || '—'}
       </div>
     </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════ STATUS TOGGLE */
-function StatusToggle({ checked, onChange, disabled = false }: { checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => { if (!disabled) onChange(!checked); }}
-      disabled={disabled}
-      style={{
-        width: 44, height: 24, borderRadius: 99, border: 'none', 
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        background: checked ? 'linear-gradient(135deg,#059669,#10B981)' : '#D1D5DB',
-        position: 'relative', transition: 'background .25s, opacity .2s', flexShrink: 0,
-        boxShadow: (checked && !disabled) ? '0 2px 8px rgba(5,150,105,.35)' : 'none',
-        opacity: disabled ? 0.6 : 1,
-      }}
-    >
-      <span style={{
-        position: 'absolute', top: 3, left: checked ? 23 : 3,
-        width: 18, height: 18, borderRadius: '50%', background: 'white',
-        transition: 'left .22s cubic-bezier(.22,1,.36,1)',
-        boxShadow: '0 1px 4px rgba(0,0,0,.18)',
-      }} />
-    </button>
   );
 }
 
@@ -150,7 +131,17 @@ export default function SuperAdminSettingsPage() {
   // Settings Association
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [isActive, setIsActive] = useState(true);
+
+  // 🔥 AJOUT : coordonnées / siège de l'association — utilisées entre
+  // autres par le pied de page des emails de communication.
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [websiteUrl, setWebsiteUrl] = useState('');
+  const [addressLine1, setAddressLine1] = useState('');
+  const [addressLine2, setAddressLine2] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
+  const [country, setCountry] = useState('');
 
   // Settings Pricing Multi-Devises
   const [activeCurrency, setActiveCurrency] = useState('EUR');
@@ -214,7 +205,16 @@ export default function SuperAdminSettingsPage() {
         setAssociation(a);
         setName(a.name);
         setCode(a.code);
-        setIsActive(a.isActive);
+
+        // 🔥 AJOUT : coordonnées / siège
+        setPhone(a.phone ?? '');
+        setEmail(a.email ?? '');
+        setWebsiteUrl(a.websiteUrl ?? '');
+        setAddressLine1(a.addressLine1 ?? '');
+        setAddressLine2(a.addressLine2 ?? '');
+        setPostalCode(a.postalCode ?? '');
+        setCity(a.city ?? '');
+        setCountry(a.country ?? '');
 
         const formattedMap: PricingMap = {};
         SUPPORTED_CURRENCIES.forEach(cur => {
@@ -298,10 +298,18 @@ export default function SuperAdminSettingsPage() {
     if (association) {
       setName(association.name);
       setCode(association.code);
-      setIsActive(association.isActive);
+      // 🔥 AJOUT : coordonnées / siège
+      setPhone(association.phone ?? '');
+      setEmail(association.email ?? '');
+      setWebsiteUrl(association.websiteUrl ?? '');
+      setAddressLine1(association.addressLine1 ?? '');
+      setAddressLine2(association.addressLine2 ?? '');
+      setPostalCode(association.postalCode ?? '');
+      setCity(association.city ?? '');
+      setCountry(association.country ?? '');
     }
     setPricingMap(JSON.parse(JSON.stringify(initialPricingMap)));
-  };  
+  };
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -318,7 +326,22 @@ export default function SuperAdminSettingsPage() {
 
       // 🔥 CORRECTION DE L'ERREUR 400 BAD REQUEST: 
       // On retire "code" du payload car le backend interdit la modification du code unique
-      const assocPayload: Record<string, string | boolean | number | null> = { name, isActive };
+      const assocPayload: Record<string, string | boolean | number | null> = {
+        name,
+        // 🔥 RETIRÉ : isActive — jamais accepté par UpdateAssociationDto
+        // (volontairement réservé au SYSTEM_ADMIN), le toggle correspondant
+        // a donc été retiré du formulaire plutôt que de forcer l'accès ici.
+        // 🔥 AJOUT : coordonnées / siège — vides envoyés comme null plutôt
+        // que chaîne vide, pour rester cohérent avec des champs nullable.
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+        websiteUrl: websiteUrl.trim() || null,
+        addressLine1: addressLine1.trim() || null,
+        addressLine2: addressLine2.trim() || null,
+        postalCode: postalCode.trim() || null,
+        city: city.trim() || null,
+        country: country.trim() || null,
+      };
 
       const rawThreshold = pricingMap[activeCurrency]?.expenseValidationThreshold || pricingMap['EUR']?.expenseValidationThreshold;
       if (rawThreshold && rawThreshold.toString().trim() !== '') {
@@ -403,7 +426,15 @@ export default function SuperAdminSettingsPage() {
   const isDirty = association
     ? name !== association.name || 
       code !== association.code || 
-      isActive !== association.isActive ||
+      // 🔥 AJOUT : coordonnées / siège
+      phone !== (association.phone ?? '') ||
+      email !== (association.email ?? '') ||
+      websiteUrl !== (association.websiteUrl ?? '') ||
+      addressLine1 !== (association.addressLine1 ?? '') ||
+      addressLine2 !== (association.addressLine2 ?? '') ||
+      postalCode !== (association.postalCode ?? '') ||
+      city !== (association.city ?? '') ||
+      country !== (association.country ?? '') ||
       JSON.stringify(pricingMap) !== JSON.stringify(initialPricingMap)
     : false;
 
@@ -465,8 +496,6 @@ export default function SuperAdminSettingsPage() {
           .ss-tabs { display: flex; gap: 0.4rem; padding: 0.4rem; background: rgba(220,38,38,.05); border-radius: 12px; margin-bottom: 1rem; }
           .ss-tab { flex: 1; padding: 0.55rem 0; text-align: center; font-size: 0.76rem; font-weight: 800; color: #6B7280; border-radius: 8px; cursor: pointer; transition: all 0.2s; border: none; background: transparent; }
           .ss-tab.active { background: white; color: #DC2626; box-shadow: 0 2px 6px rgba(220,38,38,.15); }
-          .ss-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.9rem 1rem;background:rgba(254,242,242,.3);border:1px solid rgba(220,38,38,.1);border-radius:12px}
-          .ss-toggle-label{font-size:.84rem;font-weight:800;color:#111827;margin-bottom:.18rem}
           .ss-toggle-sub{font-size:.72rem;font-weight:600;color:#6B7280;line-height:1.45}
           .ss-form-footer{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1.2rem 1.5rem;border-top:1px solid rgba(220,38,38,.08);}
           .ss-msg-success{display:flex;align-items:center;gap:.45rem;font-size:.8rem;font-weight:800;color:#059669;}
@@ -554,6 +583,90 @@ export default function SuperAdminSettingsPage() {
                           isRTL={isRTL}
                         />
 
+                        {/* 🔥 AJOUT : coordonnées / siège de l'association */}
+                        <div style={{ marginTop: '.8rem', marginBottom: '.2rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(220,38,38,.07)' }}>
+                          <span style={{ fontSize: '.75rem', fontWeight: 900, letterSpacing: '.09em', textTransform: 'uppercase', color: '#1F2937' }}>
+                            {t('settings.contactInfo', 'Coordonnées & siège')}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+                          <Field
+                            label={t('settings.phone', 'Téléphone')}
+                            value={phone}
+                            onChange={setPhone}
+                            placeholder="Ex : +33 6 12 34 56 78"
+                            type="tel"
+                            disabled={!isEditing}
+                            isRTL={isRTL}
+                          />
+                          <Field
+                            label={t('settings.contactEmail', 'Email de contact')}
+                            value={email}
+                            onChange={setEmail}
+                            placeholder="Ex : contact@monassociation.org"
+                            type="email"
+                            disabled={!isEditing}
+                            hint={t('settings.contactEmailHint', "Utilisé notamment dans le pied de page des emails envoyés depuis la plateforme.")}
+                            isRTL={isRTL}
+                          />
+                          <Field
+                            label={t('settings.website', 'Site web')}
+                            value={websiteUrl}
+                            onChange={setWebsiteUrl}
+                            placeholder="Ex : https://monassociation.org"
+                            type="url"
+                            disabled={!isEditing}
+                            isRTL={isRTL}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+                          <Field
+                            label={t('settings.addressLine1', 'Adresse (siège)')}
+                            value={addressLine1}
+                            onChange={setAddressLine1}
+                            placeholder="Ex : 12 rue de la Paix"
+                            disabled={!isEditing}
+                            isRTL={isRTL}
+                          />
+                          <Field
+                            label={t('settings.addressLine2', "Complément d'adresse")}
+                            value={addressLine2}
+                            onChange={setAddressLine2}
+                            placeholder="Ex : Bâtiment B, 2ème étage"
+                            disabled={!isEditing}
+                            isRTL={isRTL}
+                          />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '1.25rem' }}>
+                          <Field
+                            label={t('settings.postalCode', 'Code postal')}
+                            value={postalCode}
+                            onChange={setPostalCode}
+                            placeholder="Ex : 75001"
+                            disabled={!isEditing}
+                            isRTL={isRTL}
+                          />
+                          <Field
+                            label={t('settings.city', 'Ville')}
+                            value={city}
+                            onChange={setCity}
+                            placeholder="Ex : Paris"
+                            disabled={!isEditing}
+                            isRTL={isRTL}
+                          />
+                          <Field
+                            label={t('settings.country', 'Pays')}
+                            value={country}
+                            onChange={setCountry}
+                            placeholder="Ex : France"
+                            disabled={!isEditing}
+                            isRTL={isRTL}
+                          />
+                        </div>
+
                         <div style={{ marginTop: '.8rem', marginBottom: '.2rem', paddingBottom: '.5rem', borderBottom: '1px solid rgba(220,38,38,.07)' }}>
                           <span style={{ fontSize: '.75rem', fontWeight: 900, letterSpacing: '.09em', textTransform: 'uppercase', color: '#1F2937' }}>
                             {t('settings.pricingGlobal', 'Tarification Globale par devise')}
@@ -607,18 +720,6 @@ export default function SuperAdminSettingsPage() {
                             hint={t('settings.thresholdHint', 'Approbation requise au-delà.')}
                             isRTL={isRTL}
                           />
-                        </div>
-
-                        <div className="ss-toggle-row" style={{ marginTop: '.5rem' }}>
-                          <div>
-                            <div className="ss-toggle-label">{t('settings.assocStatus', "Statut de l'association")}</div>
-                            <div className="ss-toggle-sub">
-                              {isActive
-                                ? t('settings.assocActiveDesc', 'Association active — les membres ont accès à la plateforme.')
-                                : t('settings.assocInactiveDesc', 'Association désactivée — tous les accès membres sont bloqués.')}
-                            </div>
-                          </div>
-                          <StatusToggle checked={isActive} onChange={setIsActive} disabled={!isEditing} />
                         </div>
                       </div>
                     </div>
@@ -839,23 +940,16 @@ export default function SuperAdminSettingsPage() {
                           </button>
                           <button type="submit" className="ss-submit-btn" disabled={secLoading || !isPasswordDirty}>
                             {secLoading
-                              ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'ssspin .7s linear infinite' }} />{t('settings.updating', 'Mise à jour...')}</>
-                              : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>{t('settings.update', 'Mettre à jour')}</>
+                              ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'ssspin .7s linear infinite' }} />{t('settings.saving', 'Enregistrement...')}</>
+                              : <><svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M5 13l4 4L19 7" /></svg>{t('settings.save', 'Enregistrer')}</>
                             }
                           </button>
                         </div>
                       </div>
                     </form>
                   ) : (
-                    <div style={{ fontSize: '0.85rem', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                      {t('settings.passwordSecureDesc', 'Votre mot de passe est sécurisé et caché. Cliquez sur "Modifier" pour le changer.')}
-                    </div>
-                  )}
-                  {secMsg?.type === 'success' && !isEditingPassword && (
-                    <div className="ss-msg-success" style={{ marginTop: '1rem' }}>
-                      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                      {secMsg.text}
+                    <div className="ss-toggle-sub" style={{ padding: '.5rem 0' }}>
+                      {t('settings.securityDesc', 'Modifie ton mot de passe régulièrement pour sécuriser ton compte.')}
                     </div>
                   )}
                 </div>

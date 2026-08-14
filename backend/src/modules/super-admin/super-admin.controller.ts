@@ -1,4 +1,4 @@
-/////// backend/src/modules/super-admin/super-admin.controller.ts
+// backend/src/modules/super-admin/super-admin.controller.ts
 import {
   Body,
   Controller,
@@ -53,6 +53,12 @@ export class SuperAdminController {
       query.q,
       query.status,
     );
+  }
+
+  // 🔥 NOUVEAU : consultation de la carte de membre (icône "œil")
+  @Get('members/:id/card')
+  getMemberCard(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.service.getMemberCard(id, actor.associationId);
   }
 
   /* ── ADMINS ── */

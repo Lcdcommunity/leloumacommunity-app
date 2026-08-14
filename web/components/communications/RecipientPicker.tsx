@@ -121,9 +121,12 @@ export function RecipientPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audienceType, antennaId]);
 
+  // 🔥 Vie privée : jamais la liste complète par défaut, uniquement après une
+  // recherche explicite — même en sélection individuelle.
+  const hasSearch = search.trim().length > 0;
   const filteredPool = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return pool;
+    if (!q) return [];
     return pool.filter((m) =>
       `${m.firstName} ${m.lastName}`.toLowerCase().includes(q) ||
       m.email.toLowerCase().includes(q) ||
@@ -244,11 +247,13 @@ export function RecipientPicker({
             onChange={(e) => setSearch(e.target.value)}
           />
           <div className="rp-list-actions">
-            <button type="button" onClick={selectAllFiltered}>Tout sélectionner{search ? ' (filtré)' : ''}</button>
+            {hasSearch && <button type="button" onClick={selectAllFiltered}>Tout sélectionner (filtré)</button>}
             <button type="button" onClick={clearSelection}>Tout désélectionner</button>
           </div>
           <div className="rp-list">
-            {loading ? (
+            {!hasSearch ? (
+              <div className="rp-empty">Tape un nom, prénom, téléphone ou email pour rechercher.</div>
+            ) : loading ? (
               <div className="rp-empty">Chargement…</div>
             ) : filteredPool.length === 0 ? (
               <div className="rp-empty">Aucun membre ne correspond.</div>
@@ -283,14 +288,8 @@ export function RecipientPicker({
         </>
       )}
 
-      {!error && selectionMode === 'BULK' && !loading && (
-        <div className="rp-preview">
-          {pool.slice(0, 8).map((m) => (
-            <span key={m.id} className="rp-preview-pill">{m.firstName} {m.lastName}</span>
-          ))}
-          {pool.length > 8 && <span className="rp-preview-pill">+{pool.length - 8} autres</span>}
-          {pool.length === 0 && <div className="rp-empty">Aucun membre dans cette audience.</div>}
-        </div>
+      {!error && selectionMode === 'BULK' && !loading && pool.length === 0 && (
+        <div className="rp-empty">Aucun membre dans cette audience.</div>
       )}
     </div>
   );

@@ -21,6 +21,11 @@
 //   contrairement à la vue "communautaire" (member.service.ts::listLateMembers)
 //   qui reste à 3.
 //
+// v1.3 — 🔥 AJOUT : getMemberCard() — permet à un admin d'antenne de
+//   consulter la carte de membre d'un membre de sa/ses propre(s) antenne(s)
+//   (icône "œil" sur la modale de détails, admin/members/page.tsx). Scope
+//   identique au reste du fichier : getAdminContext() + antennaIds.
+//
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ContributionPurpose, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType, LedgerEntryType } from '@prisma/client';
@@ -367,6 +372,61 @@ export class AdminService {
     return { items: items.map(u => memberMapper.userSummary(u)), total, page, pageSize };
   }
 
+  // 🔥 NOUVEAU (v1.3) : consultation de la carte de membre par un admin
+  // d'antenne (ou super admin), pour l'icône "œil" côté frontend. Même
+  // scope que listMembers()/updateAntennaMember() : le membre doit
+  // appartenir à l'association ET (si ANTENNA_ADMIN) à une antenne gérée
+  // par l'admin — sinon 404, jamais de fuite d'info cross-antenne.
+  async getMemberCard(memberId: string, adminId: string) {
+    const { antennaIds, associationId } = await this.getAdminContext(adminId);
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: memberId,
+        associationId,
+        role: UserRole.MEMBER,
+        ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}),
+      },
+    });
+    if (!user) throw new NotFoundException("Membre introuvable ou hors de votre périmètre.");
+
+    const virtualCard = await this.prisma.virtualCard.findUnique({
+      where: { userId: memberId },
+      include: {
+        user: {
+          include: {
+            memberships: { include: { antenna: true } },
+            profilePhoto: true,
+          },
+        },
+      },
+    });
+
+    if (!virtualCard || virtualCard.user.associationId !== associationId) {
+      throw new NotFoundException("Ce membre n'a pas encore de carte membre.");
+    }
+
+    return {
+      cardNumber: virtualCard.cardNumber,
+      isLocked: virtualCard.isLocked,
+      expiresAt: virtualCard.expiresAt ? virtualCard.expiresAt.toISOString() : null,
+      qrToken: virtualCard.qrToken,
+      antennaName: virtualCard.user.memberships[0]?.antenna?.name || 'Inconnue',
+      user: {
+        firstName: virtualCard.user.firstName,
+        lastName: virtualCard.user.lastName,
+        birthDate: virtualCard.user.birthDate ? virtualCard.user.birthDate.toISOString() : null,
+        placeOfBirth: virtualCard.user.placeOfBirth,
+        originVillage: virtualCard.user.originSubPrefecture,
+        country: virtualCard.user.country,
+        city: virtualCard.user.city,
+        profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
+        function: virtualCard.user.function,
+        professionalStatus: virtualCard.user.professionalStatus,
+      },
+    };
+  }
+
   async exportMembers(adminId: string): Promise<string> {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const members = await this.prisma.user.findMany({ 
@@ -402,8 +462,6 @@ export class AdminService {
         },
         orderBy: { lastName: 'asc' },
         include: {
-          // Historique complet des cotisations régulières/retard validées,
-          // avec les champs nécessaires à buildCoveredMonths.
           contributions: {
             where: {
               status: ContributionStatus.VALIDATED,
@@ -417,8 +475,6 @@ export class AdminService {
               amount: true,
             },
           },
-          // Dernier versement validé (toutes natures) — pour l'affichage
-          // "dernier paiement", indépendant du calcul des mois couverts.
           memberships: {
             where: { isPrimary: true },
             take: 1,
@@ -429,9 +485,6 @@ export class AdminService {
       this.getPricingMap(associationId),
     ]);
 
-    // Dernier versement validé (toutes natures confondues), par utilisateur —
-    // requête séparée car le filtre de purpose ci-dessus exclut carte
-    // membre / dons, qui doivent quand même compter pour "dernier paiement".
     const lastAnyValidated = await this.prisma.contribution.findMany({
       where: {
         associationId,
@@ -459,18 +512,10 @@ export class AdminService {
           ...memberMapper.userSummary(u),
           lateMonths,
           lastValidatedContributionAt: lastValidatedByUser.get(u.id) ?? null,
-          // 🔥 AJOUT : requis par LateMembersModal (admin/page.tsx et
-          // super-admin/page.tsx) pour estimer le montant dû (mois × tarif)
-          // — absent jusqu'ici, ce qui faisait retomber ces pages sur un
-          // repli 'GNF' silencieusement faux pour toute autre devise.
           currency: antCurrency,
           antennaName: u.memberships[0]?.antenna?.name ?? null,
         };
       })
-      // 🔥 CORRIGÉ : seuil abaissé à 1 mois — cette liste alimente
-      // /admin/late-members, consultée par ANTENNA_ADMIN et SUPER_ADMIN
-      // pour relancer tôt, contrairement à la vue "communautaire"
-      // (member.service.ts::listLateMembers) qui reste à 3.
       .filter((m) => m.lateMonths >= 1)
       .sort((a, b) => b.lateMonths - a.lateMonths);
 
@@ -496,9 +541,6 @@ export class AdminService {
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
-    // Sélecteur d'antenne (admin multi-antennes) : utilise l'antenne choisie
-    // côté front si fournie et valide, sinon retombe sur le comportement
-    // historique (première antenne gérée par l'admin).
     const targetAntennaId = await this.resolveRequiredAntennaId(antennaIds, associationId, data.antennaId);
 
     const newUser = await this.prisma.user.create({
@@ -625,7 +667,6 @@ export class AdminService {
         ...(antennaIds ? { memberships: { some: { antennaId: { in: antennaIds } } } } : {}) 
       } 
     });
-
     if (!user) throw new NotFoundException("Membre introuvable.");
 
     return this.prisma.user.update({ 
@@ -702,13 +743,6 @@ export class AdminService {
     };
   }
 
-  /**
-   * 🔥 CORRECTION : crée désormais une LedgerEntry (CONTRIBUTION_IN) dans la
-   * même transaction que le passage au statut VALIDATED, sur le modèle de
-   * contributions.service.ts::validateContribution. Sans ça, LedgerService.getBalances
-   * (qui ne lit QUE LedgerEntry) ignorait totalement les cotisations validées
-   * depuis ce panneau admin.
-   */
   async validateContribution(contributionId: string, adminId: string) {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -810,7 +844,6 @@ export class AdminService {
       type: NotificationType.CONTRIBUTION_REJECTED,
     });
 
-    // 🔥 Si c'était une carte membre, resynchroniser le verrou de la carte
     if (contribution.purpose === 'MEMBERSHIP_CARD') {
       await this._syncVirtualCardLock(contribution.memberUserId, associationId);
     }
@@ -818,12 +851,6 @@ export class AdminService {
     return updated;
   }
 
-  /**
-   * 🔥 CORRECTION : si la cotisation était déjà VALIDATED (donc reliée à une
-   * LedgerEntry), on met à jour le montant de cette écriture dans la même
-   * transaction — sinon le solde continue d'afficher l'ancien montant après
-   * une correction manuelle.
-   */
   async updateContribution(contributionId: string, adminId: string, amount: number) {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -849,12 +876,6 @@ export class AdminService {
     });
   }
 
-  /**
-   * 🔥 CORRECTION : si la cotisation était VALIDATED, on supprime aussi sa
-   * LedgerEntry associée dans la même transaction, pour ne pas laisser une
-   * écriture comptable orpheline (ou pire, une contribution supprimée dont
-   * l'argent reste compté dans le solde).
-   */
   async deleteContribution(contributionId: string, adminId: string) {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const contribution = await this.prisma.contribution.findFirst({ 
@@ -873,7 +894,6 @@ export class AdminService {
       }
     });
 
-    // 🔥 Si c'était une carte membre validée, resynchroniser le verrou
     if (contribution.purpose === 'MEMBERSHIP_CARD') {
       await this._syncVirtualCardLock(contribution.memberUserId, associationId);
     }
@@ -1090,9 +1110,6 @@ export class AdminService {
     const project = await this.prisma.project.create({
       data: {
         associationId,
-        // On garde l'antenne d'origine de la proposition (non ambigu) ; on ne
-        // retombe sur la première antenne de l'admin que si la proposition
-        // elle-même n'en avait pas (ex. proposition créée par un super admin).
         antennaId: proposal.antennaId ?? antennaIds?.[0] ?? null,
         title: proposal.title,
         description: proposal.description,

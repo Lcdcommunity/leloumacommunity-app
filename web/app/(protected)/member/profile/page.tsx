@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { AppShell } from '../../../../components/layout/AppShell';
 import { api, type FullUserProfile, type VirtualCardData } from '../../../../lib/api-client';
 import { VirtualCardWidget } from '../../../../components/member/VirtualCardWidget';
+import { DownloadCardPdfButton } from '../../../../components/member/DownloadCardPdfButton';
 
 type FlashMessage = { text: string; ok: boolean } | null;
 
@@ -77,25 +78,25 @@ export default function MemberProfilePage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
-  
+
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
   const [customOriginSubPrefecture, setCustomOriginSubPrefecture] = useState('');
 
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
-  
+
   const [birthCountry, setBirthCountry] = useState('');
   const [customBirthCountry, setCustomBirthCountry] = useState('');
 
   const [city, setCity] = useState('');
-  
+
   const [country, setCountry] = useState('');
   const [customCountry, setCustomCountry] = useState('');
 
   const [postalCode, setPostalCode] = useState('');
   const [addressLine1, setAddressLine1] = useState('');
   const [profession, setProfession] = useState('');
-  
+
   const [associationRole, setAssociationRole] = useState('');
   const [customAssociationRole, setCustomAssociationRole] = useState('');
 
@@ -136,7 +137,6 @@ export default function MemberProfilePage() {
     setAddressLine1(user.addressLine1 || '');
     setProfession(user.professionalStatus || '');
 
-    // Hydratation chirurgicale : Origine
     const uOrigin = user.originSubPrefecture || '';
     if (uOrigin && !COMMUNES_ORIGINE.includes(uOrigin)) {
       setOriginSubPrefecture('Autre');
@@ -146,7 +146,6 @@ export default function MemberProfilePage() {
       setCustomOriginSubPrefecture('');
     }
 
-    // Hydratation chirurgicale : Pays de naissance
     const uBirthCountry = user.countryOfBirth || user.birthCountry || '';
     if (uBirthCountry && !COUNTRIES.find(c => c.name === uBirthCountry)) {
       setBirthCountry('Autre');
@@ -156,7 +155,6 @@ export default function MemberProfilePage() {
       setCustomBirthCountry('');
     }
 
-    // Hydratation chirurgicale : Pays de résidence
     const uCountry = user.country || '';
     if (uCountry && !COUNTRIES.find(c => c.name === uCountry)) {
       setCountry('Autre');
@@ -166,7 +164,6 @@ export default function MemberProfilePage() {
       setCustomCountry('');
     }
 
-    // Hydratation chirurgicale : Rôle / Fonction
     const uRole = user.function || '';
     if (uRole && !ASSOCIATION_ROLES.includes(uRole)) {
       setAssociationRole('Autre');
@@ -290,7 +287,6 @@ export default function MemberProfilePage() {
   const currentCountryForCard = country === 'Autre' ? customCountry : country;
   const currentRoleForCard = associationRole === 'Autre' ? customAssociationRole : associationRole;
 
-  // Suppression de professionalStatus ici pour satisfaire le type VirtualCardData de api-client.ts
   const liveCardData: VirtualCardData | null = me ? {
     cardNumber: me.virtualCard?.cardNumber || me.cardNumber || 'EN ATTENTE',
     isLocked: isLocked,
@@ -657,6 +653,11 @@ export default function MemberProfilePage() {
           </div>
         )}
 
+        {/* ── TÉLÉCHARGEMENT PDF DE LA CARTE ── */}
+        {!isLocked && !isExpired && (
+          <DownloadCardPdfButton card={liveCardData} />
+        )}
+
         {/* ── FORMULAIRE ── */}
         <form onSubmit={handleSubmit}>
 
@@ -787,14 +788,14 @@ export default function MemberProfilePage() {
               </span>
               Adresse de résidence
             </h3>
-            
+
             <div className="mpr-grid-1">
               <div className="mpr-field">
                 <label className="mpr-label">Adresse de résidence</label>
                 <input className="mpr-input" value={addressLine1} onChange={e => setAddressLine1(e.target.value)} disabled={!isEditing} placeholder="N° et nom de rue" />
               </div>
             </div>
-            
+
             <div className="mpr-grid-2">
               <div className="mpr-field">
                 <label className="mpr-label">Code postal <span className="opt">(Optionnel)</span></label>
@@ -805,7 +806,7 @@ export default function MemberProfilePage() {
                 <input className="mpr-input" value={city} onChange={e => setCity(e.target.value)} disabled={!isEditing} />
               </div>
             </div>
-            
+
             <div className="mpr-grid-1" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
                 <label className="mpr-label">Pays</label>

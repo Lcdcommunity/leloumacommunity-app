@@ -7,6 +7,7 @@ import { api } from '../../../../lib/api-client';
 import type { UserSummary, UserStatus, UserRole } from '../../../../types/user';
 import { fullName, formatDate } from '../../../../lib/format';
 import Image from 'next/image';
+import { MemberCardPreviewModal } from '../../../../components/admin/MemberCardPreviewModal';
 
 /* ══════════════════════════════════════════════════════ CONSTANTES */
 const ASSOCIATION_ROLES = [
@@ -65,7 +66,6 @@ type ExtendedUser = UserSummary & {
   function?: string | null;
   antennaId?: string | null;
 
-  // Custom tracking fields pour l'édition chirurgicale
   customCountryOfBirth?: string;
   customOriginSubPrefecture?: string;
   customCountry?: string;
@@ -163,11 +163,12 @@ const IconReactivate= () => <svg width="14" height="14" fill="none" viewBox="0 0
 const IconDelete    = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
 const IconSave      = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>;
 const IconCancel    = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>;
+const IconEye       = () => <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.3"><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
 
 /* ══════════════════════════════════════════════════════ MODAL */
 function MemberModal({
   user, isEditing, editValues, setEditValues, onSave, onCancel, onEdit,
-  onToggleSuspend, onDelete, onApprove, busy, onClose,
+  onToggleSuspend, onDelete, onApprove, onViewCard, busy, onClose,
 }: {
   user: ExtendedUser;
   isEditing: boolean;
@@ -179,6 +180,7 @@ function MemberModal({
   onToggleSuspend: () => void;
   onDelete: () => void;
   onApprove: () => void;
+  onViewCard: () => void;
   busy: boolean;
   onClose: () => void;
 }) {
@@ -205,6 +207,7 @@ function MemberModal({
             <div>
               <h2 className="modal-title">{fullName(user)}</h2>
               <div className="sm-member-id">ID: {user.cardNumber || user.id.slice(0, 8)}</div>
+              <div className="sm-member-id">Membre depuis le {formatDate(user.createdAt)}</div>
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><IconCancel /></button>
@@ -220,6 +223,7 @@ function MemberModal({
             ) : (
               <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap' }}>
                 <IconBtn onClick={onEdit} title="Modifier" color="#2563EB" bg="#EFF6FF" border="#BFDBFE" hoverBg="#DBEAFE"><IconEdit /></IconBtn>
+                <IconBtn onClick={onViewCard} title="Voir la carte" color="#7C3AED" bg="#F5F3FF" border="#DDD6FE" hoverBg="#EDE9FE"><IconEye /></IconBtn>
                 {canApprove && <IconBtn onClick={onApprove} title="Approuver" color="#059669" bg="#ECFDF5" border="#A7F3D0" hoverBg="#D1FAE5"><IconApprove /></IconBtn>}
                 <IconBtn onClick={onToggleSuspend} title={user.status === 'SUSPENDED' ? 'Réactiver' : 'Suspendre'} color="#D97706" bg="#FFFBEB" border="#FDE68A" hoverBg="#FEF3C7">{user.status === 'SUSPENDED' ? <IconReactivate /> : <IconSuspend />}</IconBtn>
                 <IconBtn onClick={onDelete} title="Supprimer" color="#DC2626" bg="#FEF2F2" border="#FECACA" hoverBg="#FEE2E2"><IconDelete /></IconBtn>
@@ -355,12 +359,12 @@ export default function SuperAdminMembersPage() {
   const [antennas, setAntennas] = useState<{ id: string; name: string }[]>([]);
   const [q,         setQ]         = useState('');
   const [status,    setStatus]    = useState('');
-  // 🔥 FIX : antennaId est un filtre LOCAL uniquement — pas envoyé au backend
   const [antennaId, setAntennaId] = useState('');
   const [error,     setError]     = useState<string | null>(null);
   const [loading,   setLoading]   = useState(true);
 
   const [selectedUser,  setSelectedUser]  = useState<ExtendedUser | null>(null);
+  const [viewingCard,   setViewingCard]   = useState<ExtendedUser | null>(null);
   const [isEditing,     setIsEditing]     = useState(false);
   const [editValues,    setEditValues]    = useState<Partial<ExtendedUser>>({});
   const [actionBusy,    setActionBusy]    = useState(false);
@@ -374,7 +378,6 @@ export default function SuperAdminMembersPage() {
   const [exportEndMonth,  setExportEndMonth]  = useState('');
   const [pdfData,         setPdfData]         = useState<ExtendedUser[] | null>(null);
 
-  // 🔥 FIX : load() ne passe PLUS antennaId au backend — on filtre côté client
   const load = useCallback(async (qVal?: string, sVal?: string) => {
     setError(null);
     setLoading(true);
@@ -384,7 +387,6 @@ export default function SuperAdminMembersPage() {
         pageSize: 500,
         q: qVal ?? q,
         status: sVal ?? status,
-        // ← antennaId retiré intentionnellement : le DTO backend /super-admin/members ne l'accepte pas
       });
       setAllItems(res.items as ExtendedUser[]);
     } catch (err) {
@@ -394,8 +396,6 @@ export default function SuperAdminMembersPage() {
     }
   }, [q, status]);
 
-  // 🔥 FIX : filtrage par antenne entièrement côté frontend
-  // 🔥 FIX : le backend retourne memberships[0].antennaId, pas u.antennaId directement
   const getMemberAntennaId = (u: ExtendedUser): string | null => {
     const withMemberships = u as ExtendedUser & {
       memberships?: { antennaId?: string | null }[];
@@ -525,8 +525,6 @@ export default function SuperAdminMembersPage() {
       const fetchRes = await api.listMembers({ page: 1, pageSize: 10000 });
       let exportData = fetchRes.items as ExtendedUser[];
 
-      // Filtre antenne pour export
-      // 🔥 FIX : lire depuis memberships[0].antennaId (structure backend réelle)
       if (exportAntenna) exportData = exportData.filter(u => {
         const withM = u as ExtendedUser & { memberships?: { antennaId?: string | null }[] };
         const aid = withM.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
@@ -732,7 +730,6 @@ export default function SuperAdminMembersPage() {
                 <option value="SUSPENDED">Suspendus</option>
               </select>
             </div>
-            {/* 🔥 FIX : le select antenne filtre côté client — onChange sans appel API */}
             <div className="sm-t-field" style={{ flex: 0, minWidth: 150 }}>
               <select className="sm-select" value={antennaId} onChange={e => setAntennaId(e.target.value)}>
                 <option value="">Toutes antennes</option>
@@ -847,6 +844,16 @@ export default function SuperAdminMembersPage() {
           onToggleSuspend={handleToggleSuspend}
           onApprove={handleApprove}
           onDelete={handleDeleteRequest}
+          onViewCard={() => setViewingCard(selectedUser)}
+        />
+      )}
+
+      {viewingCard && (
+        <MemberCardPreviewModal
+          memberId={viewingCard.id}
+          memberName={fullName(viewingCard)}
+          scope="super-admin"
+          onClose={() => setViewingCard(null)}
         />
       )}
 

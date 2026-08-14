@@ -1,4 +1,11 @@
 // backend/src/modules/super-admin/super-admin.service.ts
+//
+// 🔥 AJOUT : getMemberCard() — permet à un super admin de consulter la
+// carte de n'importe quel membre de l'association (icône "œil" sur
+// super-admin/members/page.tsx). Pas de scope antennaIds ici (contrairement
+// à admin.service.ts) : un SUPER_ADMIN voit tous les membres de son
+// association, seul associationId sert de garde-fou.
+//
 import {
   BadRequestException,
   ConflictException,
@@ -23,9 +30,6 @@ import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
 import { memberMapper } from '../member/member.mapper';
 import { NotificationsService } from '../notifications/notifications.service';
 
-// 🔥 AJOUT : même durée que dans system-admin.service.ts pour le lien de
-// définition de mot de passe — un email de bienvenue peut être ouvert
-// plusieurs jours après réception.
 const WELCOME_SET_PASSWORD_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 type PrismaLike = PrismaService | Prisma.TransactionClient;
@@ -283,6 +287,53 @@ export class SuperAdminService {
     };
   }
 
+  // 🔥 NOUVEAU : consultation de la carte de membre par le super admin
+  // (icône "œil" sur super-admin/members/page.tsx). Pas de restriction
+  // d'antenne — un SUPER_ADMIN voit tous les membres de son association ;
+  // seul associationId protège contre une fuite cross-association.
+  async getMemberCard(memberId: string, associationId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: memberId, associationId, role: UserRole.MEMBER },
+    });
+    if (!user) throw new NotFoundException('Membre introuvable.');
+
+    const virtualCard = await this.prisma.virtualCard.findUnique({
+      where: { userId: memberId },
+      include: {
+        user: {
+          include: {
+            memberships: { include: { antenna: true } },
+            profilePhoto: true,
+          },
+        },
+      },
+    });
+
+    if (!virtualCard || virtualCard.user.associationId !== associationId) {
+      throw new NotFoundException("Ce membre n'a pas encore de carte membre.");
+    }
+
+    return {
+      cardNumber: virtualCard.cardNumber,
+      isLocked: virtualCard.isLocked,
+      expiresAt: virtualCard.expiresAt ? virtualCard.expiresAt.toISOString() : null,
+      qrToken: virtualCard.qrToken,
+      antennaName: virtualCard.user.memberships[0]?.antenna?.name || 'Inconnue',
+      user: {
+        firstName: virtualCard.user.firstName,
+        lastName: virtualCard.user.lastName,
+        birthDate: virtualCard.user.birthDate ? virtualCard.user.birthDate.toISOString() : null,
+        placeOfBirth: virtualCard.user.placeOfBirth,
+        originVillage: virtualCard.user.originSubPrefecture,
+        country: virtualCard.user.country,
+        city: virtualCard.user.city,
+        profilePhotoUrl: virtualCard.user.profilePhoto?.url || null,
+        function: virtualCard.user.function,
+        professionalStatus: virtualCard.user.professionalStatus,
+      },
+    };
+  }
+
   /* ── ANTENNA ADMIN — DÉTAIL PAR ID ── */
 
   async getAntennaAdminById(userId: string, associationId: string) {
@@ -440,7 +491,6 @@ export class SuperAdminService {
       throw new NotFoundException('Une ou plusieurs antennes sélectionnées sont introuvables.');
     }
 
-    // ⚡ VÉRIFICATION STRICTE : UN ADMIN = UNE SEULE DEVISE
     const currencies = new Set(antennas.map(a => a.defaultCurrency));
     if (currencies.size > 1) {
       throw new BadRequestException("Impossible d'assigner des antennes utilisant des devises différentes à un même administrateur.");
@@ -481,10 +531,6 @@ export class SuperAdminService {
     });
 
     if (data.sendInvite !== false) {
-      // 🔥 CORRECTION : mot de passe en clair remplacé par un lien de
-      // définition de mot de passe, et lien pointé vers le domaine propre de
-      // l'association plutôt que FRONTEND_URL global (même correctif que
-      // pour les super admins).
       const association = await this.prisma.association.findUnique({
         where: { id: associationId },
         select: { name: true, domainName: true },
@@ -495,10 +541,6 @@ export class SuperAdminService {
         : (process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
       const setPasswordUrl = `${base}/reset-password?token=${encodeURIComponent(result.rawToken)}&welcome=1`;
 
-      // 🔥 CORRECTION (erreur TS2353) : `associationDomain` retiré — ce champ
-      // n'existe pas dans la signature de sendWelcomeSetPasswordEmail, et il
-      // était de toute façon inutile ici : setPasswordUrl contient déjà le
-      // bon domaine, calculé juste au-dessus.
       await this.authMailer.sendWelcomeSetPasswordEmail({
         to: result.user.email,
         firstName: result.user.firstName,
@@ -515,18 +557,6 @@ export class SuperAdminService {
     });
   }
 
-  /**
-   * 🔥 CORRECTION : l'ancienne implémentation désactivait TOUTES les
-   * assignations actives puis recréait des lignes pour les antennes
-   * sélectionnées — y compris celles qui ne changeaient pas. Dès qu'une
-   * antenne restait dans la sélection (le cas le plus courant, quasi toujours
-   * vrai), on tentait de créer une ligne (adminUserId, antennaId) qui existait
-   * déjà en base (juste désactivée), ce qui viole la contrainte d'unicité et
-   * remonte en "Internal server error" côté front. On calcule maintenant un
-   * vrai diff : on désactive seulement ce qui sort de la sélection, on
-   * réactive ce qui existait déjà (actif ou précédemment révoqué), et on ne
-   * crée que les paires (admin, antenne) réellement nouvelles.
-   */
   async updateAntennaAdmin(userId: string, data: Partial<CreateAntennaAdminDto>, actorId: string, associationId: string) {
     const admin = await this.prisma.user.findFirst({
       where: { id: userId, associationId, role: UserRole.ANTENNA_ADMIN },
@@ -901,11 +931,6 @@ export class SuperAdminService {
     const existing = await prisma.user.findUnique({ where: { email: payload.email } });
     if (existing) throw new ConflictException('Email déjà utilisé.');
 
-    // 🔥 CORRECTION : on ne génère plus un mot de passe temporaire envoyé en
-    // clair par email. On crée un hash bcrypt d'une valeur aléatoire jamais
-    // communiquée à personne (le compte n'est utilisable qu'après passage
-    // par le lien de définition de mot de passe ci-dessous), et on émet un
-    // token de reset à usage unique.
     const randomPlaceholderPassword = randomBytes(24).toString('hex');
     const passwordHash = await bcrypt.hash(randomPlaceholderPassword, 10);
     const now = new Date();

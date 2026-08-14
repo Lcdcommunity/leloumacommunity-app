@@ -330,6 +330,15 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
   verifyPublicCard: (token: string) =>
     http<VirtualCardData>(`/public/cards/${token}`, { auth: false }),
 
+  // 🔥 NOUVEAU : consultation de la carte de membre par un admin/super admin
+  // (icône "œil", MemberCardPreviewModal). Scope appliqué côté backend
+  // (getAdminContext()/antennaIds pour l'admin, associationId pour le super admin).
+  getMemberCardAdmin: (userId: string) =>
+    http<VirtualCardData>(`/admin/members/${userId}/card`),
+
+  getMemberCardSuperAdmin: (userId: string) =>
+    http<VirtualCardData>(`/super-admin/members/${userId}/card`),
+
   // ==========================================
   // ME / PROFIL GÉNÉRAL
   // ==========================================
@@ -769,8 +778,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     addressLine1?: string;
     addressLine2?: string;
     postalCode?: string;
-    // Sélecteur d'antenne (admin multi-antennes) — optionnel, retombe sur
-    // l'antenne unique de l'admin si non fourni.
     antennaId?: string;
   }) =>
     http<{ message: string; user: UserSummary; temporaryPassword?: string }>('/admin/members', { method: 'POST', body }),
@@ -1015,8 +1022,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     startsAt?: string | null;
     endsAt?: string | null;
     photoIds?: string[];
-    // Sélecteur d'antenne (admin multi-antennes) — optionnel, projet "global"
-    // (antennaId null) si non fourni et admin sur plusieurs antennes.
     antennaId?: string;
   }) =>
     http<Project, typeof body>('/admin/projects', { method: 'POST', body }),
@@ -1160,8 +1165,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     title: string;
     description?: string;
     fileAssetId?: string | null;
-    // Sélecteur d'antenne (admin multi-antennes) — optionnel, document
-    // "global" si non fourni et admin sur plusieurs antennes.
     antennaId?: string;
   }) =>
     http<DocumentItem, typeof body>('/admin/documents', { method: 'POST', body }),
@@ -1192,8 +1195,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     content?: string;
     status?: string;
     coverImageFileId?: string | null;
-    // Sélecteur d'antenne (admin multi-antennes) — optionnel, annonce
-    // "globale" (scope GLOBAL) si non fourni et admin sur plusieurs antennes.
     antennaId?: string;
   }) =>
     http<ContentPost, typeof body>('/admin/contents', { method: 'POST', body }),
@@ -1293,7 +1294,7 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       }`
     ),
 
- // ==========================================
+  // ==========================================
   // SYSTEM ADMIN (GRAND CHEF)
   // ==========================================
   createAssociationSystemAdmin: (body: {
@@ -1322,7 +1323,7 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
         name: string;
         code: string;
         domainName: string | null;
-        isActive?: boolean; // ⚠️ à confirmer que le backend le renvoie (voir note plus bas)
+        isActive?: boolean;
         createdAt: string;
         _count: { users: number; antennas: number };
       }>;
@@ -1359,10 +1360,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
   deleteAssociationSystemAdmin: (id: string) =>
     http<{ message: string }>(`/system-admin/associations/${id}`, { method: 'DELETE' }),
 
-  // 🔥 CORRECTION : body élargi pour couvrir logo/thème/police/devise —
-  // sans ça, ces champs étaient bien envoyés par la page d'édition mais
-  // TypeScript les aurait rejetés à la compilation (ou silencieusement
-  // ignorés selon la config), puisque le type ne les déclarait pas.
   updateAssociationDetailsSystemAdmin: (id: string, body: {
     name?: string;
     code?: string;
@@ -1402,19 +1399,15 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
   // VIREMENTS INTER-ANTENNES
   // ==========================================
 
-  /** Antennes que l'admin gère — pour le sélecteur d'antenne expéditrice */
   getMyTransferAntennas: () =>
     http<MyTransferAntenna[]>('/transfers/my-antennas'),
 
-  /** Infos de l'antenne expéditrice (nom + devise) — pré-remplissage formulaire */
   getTransferSenderInfo: (antennaId?: string) =>
     http<TransferSenderInfo>(`/transfers/sender-info${antennaId ? `?antennaId=${antennaId}` : ''}`),
 
-  /** Liste des antennes disponibles comme destinations */
   getTransferDestinations: (antennaId?: string) =>
     http<TransferDestination[]>(`/transfers/destinations${antennaId ? `?antennaId=${antennaId}` : ''}`),
 
-  /** Créer un nouveau virement (statut PENDING_VALIDATION) */
   createTransfer: (body: {
     senderAntennaId?: string;
     receiverAntennaId: string;
@@ -1424,11 +1417,9 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
   }) =>
     http<AntennaTransfer, typeof body>('/transfers', { method: 'POST', body }),
 
-  /** 🔥 NOUVEAU : Modifier un virement envoyé (montants), tant qu'il n'est pas validé */
   updateTransfer: (id: string, body: { sendAmount?: number; receiveAmount?: number; notes?: string }) =>
     http<AntennaTransfer, typeof body>(`/transfers/${id}`, { method: 'PATCH', body }),
 
-  /** Virements envoyés (toutes mes antennes, filtrable par antennaId) */
   getTransfersSent: (params?: { page?: number; pageSize?: number; antennaId?: string }) =>
     http<ApiListResponse<AntennaTransfer>>(
       `/transfers/sent?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
@@ -1436,7 +1427,6 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
       }`
     ),
 
-  /** Virements reçus (toutes mes antennes, filtrable par antennaId) */
   getTransfersReceived: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string }) =>
     http<ApiListResponse<AntennaTransfer>>(
       `/transfers/received?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
@@ -1444,22 +1434,18 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
       }${params?.antennaId ? `&antennaId=${params.antennaId}` : ''}`
     ),
 
-  /** Valider un virement reçu (crée les 2 entrées ledger) */
   validateTransfer: (id: string) =>
     http<{ success: boolean }>(`/transfers/${id}/validate`, { method: 'PATCH' }),
 
-  /** Refuser un virement reçu */
   rejectTransfer: (id: string, reason: string) =>
     http<{ success: boolean }, { reason: string }>(`/transfers/${id}/reject`, {
       method: 'PATCH',
       body: { reason },
     }),
 
-  /** Annuler un virement envoyé (avant validation) */
   cancelTransfer: (id: string) =>
     http<{ success: boolean }>(`/transfers/${id}/cancel`, { method: 'PATCH' }),
 
-  /** [SUPER_ADMIN] Vue globale en lecture seule de tous les virements, toutes antennes confondues */
   getAllTransfersSuperAdmin: (params?: { page?: number; pageSize?: number; status?: string; antennaId?: string }) =>
     http<SuperAdminTransfersResponse>(
       `/super-admin/transfers?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
@@ -1467,11 +1453,9 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
       }${params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''}`
     ),
 
-  /** [SUPER_ADMIN] Modifier un virement (montants / notes), même déjà validé */
   updateTransferSuperAdmin: (id: string, body: { sendAmount?: number; receiveAmount?: number; notes?: string }) =>
     http<{ success: boolean }, typeof body>(`/super-admin/transfers/${id}`, { method: 'PATCH', body }),
 
-  /** [SUPER_ADMIN] Supprimer un virement, même déjà validé (nettoie le ledger associé) */
   deleteTransferSuperAdmin: (id: string) =>
     http<{ success: boolean }>(`/super-admin/transfers/${id}`, { method: 'DELETE' }),
 };
