@@ -50,10 +50,24 @@ export function VirtualCardWidget({
     logoUrl: null,
   });
 
-  useEffect(() => {
+  // APRÈS
+useEffect(() => {
     let cancelled = false;
+
+    // 🔥 CORRECTION : typage explicite au lieu de `any` (règle ESLint
+    // @typescript-eslint/no-explicit-any). On ne connaît pas forcément la
+    // forme exacte exportée par le type Association partagé (logoFile vs
+    // logoUrl selon les endroits du code), donc on type juste le sous-
+    // ensemble de champs réellement utilisés ici plutôt que d'importer tout
+    // le type Association.
+    type AssociationIdentity = {
+      name?: string | null;
+      logoUrl?: string | null;
+      logoFile?: { url?: string | null } | null;
+    };
+
     api.getAssociation()
-      .then((assoc: any) => {
+      .then((assoc: AssociationIdentity) => {
         if (cancelled) return;
         setOrgIdentity({
           name: assoc?.name || 'Association',
@@ -1077,6 +1091,7 @@ export function VirtualCardWidget({
 
                 {showPaymentLink && (
                   
+                  <a
                     href="/member/contributions/new"
                     className="vcw-lock-btn"
                     onPointerDown={(e) => e.stopPropagation()}>
