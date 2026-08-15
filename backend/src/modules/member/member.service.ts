@@ -1,4 +1,27 @@
 // backend/src/modules/member/member.service.ts
+//
+// v2.0 — 🔥 CORRIGÉ (15/08) : listLateMembers() (panneau "Retardataires ·
+//   +3 mois" côté membre) excluait de vrais retardataires de son antenne.
+//   Deux causes cumulées :
+//   1) getMeOrThrow() ne retenait la ligne Membership du membre connecté
+//      QUE si isPrimary===true, sans filtrer sur status. Si cette ligne
+//      était mal marquée (isPrimary=false alors qu'elle est la seule),
+//      me.antennaId retombait sur null → tout le filtrage par antenne en
+//      aval (listLateMembers, createContribution, etc.) était cassé en
+//      silence. Un membre n'ayant qu'une seule antenne de toute façon,
+//      on ne filtre plus du tout sur isPrimary ici : on la préfère si elle
+//      existe, sinon repli sur la première ligne disponible.
+//   2) listLateMembers() interrogeait Membership avec un double filtre
+//      status==='APPROVED' ET isPrimary===true — un AUTRE membre de la même
+//      antenne, dont l'adhésion est encore PENDING (pas encore validée par
+//      l'admin), disparaissait totalement de la liste alors qu'il doit au
+//      contraire y apparaître (une adhésion non validée n'est clairement
+//      pas "à jour"). Réécrit pour interroger User directement
+//      (status===ACTIVE) avec `memberships: { some: { antennaId } }`, sans
+//      condition sur isPrimary/status de cette ligne — exactement le même
+//      pattern que admin.service.ts::listLateMembers(), qui affichait
+//      déjà correctement ces mêmes membres côté admin.
+//
 import {
   BadRequestException,
   ForbiddenException,
@@ -37,9 +60,7 @@ import { LedgerService } from '../ledger/ledger.service';
 // ─── Helper 1 : construit l'ensemble des mois couverts ────────────────────────
 // Un versement peut être une SEULE ligne avec un montant global (ex. 24 € avec
 // monthReference=3) — on déduit le nombre de mois couverts depuis
-// amount/monthlyPrice plutôt que de supposer 1 mois par ligne. Voir aussi
-// createContribution() plus bas : c'est cette même logique qui permet
-// désormais d'enregistrer un versement de N mois en une seule ligne.
+// amount/monthlyPrice plutôt que de supposer 1 mois par ligne.
 function buildCoveredMonths(
   contributions: Array<{
     monthReference: number | null;
@@ -118,15 +139,6 @@ function computeLateMonths(
 }
 
 // ─── Helper 3 : plus ancien mois NON couvert ──────────────────────────────────
-// 🔥 CORRIGÉ (08/08) : ne s'arrête plus au mois courant. L'ancienne version
-// renvoyait null (→ repli sur "aujourd'hui") dès qu'elle atteignait le mois
-// en cours, même si des mois APRÈS étaient déjà couverts par une avance —
-// un membre à jour jusqu'à décembre 2026 se voyait proposer/imposer août
-// 2026 (aujourd'hui) comme borne au lieu de janvier 2027 (le vrai premier
-// mois non couvert), et un versement sans mois explicite finissait
-// silencieusement enregistré sur l'année en cours au lieu de la suivante.
-// Ici : on scanne simplement en avant depuis le mois d'adhésion jusqu'au
-// premier trou réel, qu'il soit avant, à, ou après le mois courant.
 function findEarliestUncoveredMonth(
   coveredMonths: Set<string>,
   joinDate: Date,
@@ -178,9 +190,16 @@ export class MemberService {
         role: true,
         status: true,
         associationId: true,
+        // 🔥 CORRIGÉ (v2.0) : ne filtre plus sur isPrimary — un membre (rôle
+        // MEMBER, à la différence d'un admin) n'appartient qu'à une seule
+        // antenne, donc son unique ligne Membership doit toujours être
+        // retenue, même si le flag isPrimary est mal renseigné en base.
+        // Filtrer dessus pouvait renvoyer memberships=[] et donc
+        // antennaId=null pour un membre pourtant bien rattaché à une
+        // antenne — cassant en cascade tout filtrage par antenne en aval
+        // (listLateMembers, createContribution, etc.).
         memberships: {
-          where: { isPrimary: true },
-          select: { antennaId: true },
+          select: { antennaId: true, isPrimary: true },
         },
         email: true,
         firstName: true,
@@ -207,22 +226,22 @@ export class MemberService {
       throw new NotFoundException('Utilisateur ou association introuvable');
     }
 
+    // Préfère la ligne marquée isPrimary si elle existe (utile si jamais un
+    // membre finit avec plusieurs lignes historiques), sinon repli sur la
+    // première disponible — un membre n'a de toute façon qu'une seule
+    // antenne réelle.
+    const membership = user.memberships.find((m) => m.isPrimary) ?? user.memberships[0];
+
     return {
       ...user,
       associationId: user.associationId,
-      antennaId: user.memberships[0]?.antennaId || null,
+      antennaId: membership?.antennaId || null,
     };
   }
 
   // ─── getDashboard ─────────────────────────────────────────────────────────
-  // ⚠️ NOTE (harmonisation) : cette méthode a une forme de retour différente
-  // de DashboardMemberService.getMemberDashboard() (clé "user" au lieu de
-  // "me", pas de recentContributions/projectsInProgress/latestContents/
-  // lateMembersPreview) — elle ne correspond pas à ce que le frontend
-  // member/page.tsx attend (DashboardData). Tout indique que c'est
-  // DashboardMemberService.getMemberDashboard() qui est réellement branché
-  // sur /member/dashboard (confirmé via member.controller.ts). Code mort,
-  // laissé tel quel (hors périmètre de cette correction).
+  // ⚠️ NOTE (harmonisation) : code mort, non branché sur /member/dashboard
+  // (voir DashboardMemberService.getMemberDashboard()). Laissé tel quel.
 
   async getDashboard(userId: string) {
     const me = await this.getMeOrThrow(userId);
@@ -487,9 +506,6 @@ export class MemberService {
   }
 
   // ─── searchMembers ────────────────────────────────────────────────────────
-  // Renvoie earliestUnpaidMonth/earliestUnpaidYear (plus ancien mois non
-  // couvert du membre trouvé) — nécessaire pour que le frontend applique la
-  // même borne de "Mois de référence" quand on paie pour un membre tiers.
 
   async searchMembers(userId: string, q: string) {
     const me = await this.getMeOrThrow(userId);
@@ -572,19 +588,6 @@ export class MemberService {
   }
 
   // ─── createContribution ───────────────────────────────────────────────────
-  // 🔥 CORRIGÉ (08/08) : un versement couvrant plusieurs mois (ex. 24 € pour
-  // 12 mois à 2 €) génère désormais UNE SEULE ligne (amount = montant total,
-  // monthReference/yearReference = mois de départ) au lieu d'une ligne par
-  // mois. buildCoveredMonths (déjà conçu pour ça) déduit le nombre de mois
-  // couverts à la lecture depuis amount/monthlyPrice — inutile de le
-  // pré-découper à l'écriture. Corrige au passage la perte silencieuse du
-  // reliquat : l'ancienne boucle ne créait que des lignes de exactement
-  // monthlyPrice chacune et abandonnait le reste (ex. 6,50 € / 2 € → 3
-  // lignes de 2 €, les 0,50 € jamais enregistrés) ; avec une ligne unique au
-  // montant intégral, le reliquat est conservé.
-  // monthReference/yearReference restent bornés par le plus ancien mois NON
-  // couvert du bénéficiaire (findEarliestUncoveredMonth) — un membre ne peut
-  // pas choisir un mois de référence postérieur à celui-ci.
 
   async createContribution(userId: string, dto: CreateMemberContributionDto) {
     const me = await this.getMeOrThrow(userId);
@@ -618,12 +621,6 @@ export class MemberService {
       if (primaryMembership?.antennaId) finalAntennaId = primaryMembership.antennaId;
     }
 
-    // 🔥 VERROU SÉCURITÉ : la devise n'est plus acceptée depuis dto.currency —
-    // recalculée ici à partir de l'antenne réelle du bénéficiaire
-    // (finalAntennaId), repli sur la devise par défaut de l'association puis
-    // EUR. dto.currency reste accepté (le front peut continuer à l'envoyer)
-    // mais n'est plus utilisé pour déterminer la devise réellement
-    // enregistrée — écrasé silencieusement, pas de rejet.
     const [association, finalAntenna, allPricing] = await Promise.all([
       this.prisma.association.findUnique({
         where: { id: me.associationId },
@@ -650,10 +647,6 @@ export class MemberService {
       (dto.purpose as ContributionPurpose) || ContributionPurpose.REGULAR_QUOTA;
     const totalAmount = Number(dto.amount);
 
-    // Plus ancien mois non couvert du bénéficiaire (finalMemberId). Repli
-    // par défaut sur "aujourd'hui" si le bénéficiaire n'a pas encore
-    // d'historique exploitable, ou dans le cas extrême où tout le
-    // maxLookahead (24 mois) est déjà couvert (repli acceptable, très rare).
     let boundMonth = new Date().getMonth() + 1;
     let boundYear = new Date().getFullYear();
 
@@ -694,8 +687,6 @@ export class MemberService {
       }
     }
 
-    // Un choix explicite du membre est validé contre la borne ; l'absence de
-    // choix retombe directement sur la borne (au lieu de "maintenant").
     const hasExplicitReference = dto.monthReference !== undefined || dto.yearReference !== undefined;
     const refMonth: number = dto.monthReference ?? boundMonth;
     const refYear: number = dto.yearReference ?? boundYear;
@@ -755,9 +746,6 @@ export class MemberService {
       });
       const excess = totalAmount - cardPrice;
       if (excess > 0 && monthlyPrice > 0) {
-        // Une seule ligne pour tout l'excédent, démarrant au plus ancien
-        // mois non couvert (boundMonth/boundYear) — même principe que pour
-        // REGULAR_QUOTA/LATE_QUOTA ci-dessous.
         contributionsToCreate.push({
           ...baseData,
           purpose: ContributionPurpose.REGULAR_QUOTA,
@@ -950,7 +938,19 @@ export class MemberService {
 
   // ─── listLateMembers (visible aux membres) ────────────────────────────────
   // Seuil 3 mois inchangé — c'est la vue "communautaire" volontairement
-  // moins précoce que celle des admins (cf. admin.service.ts).
+  // moins précoce que celle des admins (cf. admin.service.ts, seuil 1 mois).
+  //
+  // 🔥 RÉÉCRIT (v2.0) : même logique de récupération que
+  // admin.service.ts::listLateMembers() — interroge User (status ACTIVE)
+  // avec `memberships: { some: { antennaId: me.antennaId } }`, sans exiger
+  // isPrimary=true ni status='APPROVED' sur cette ligne Membership. Un
+  // membre de la même antenne dont l'adhésion est encore PENDING doit
+  // continuer à apparaître comme potentiellement en retard — seules les
+  // cotisations elles-mêmes VALIDÉES comptent pour "couvrir" un mois
+  // (buildCoveredMonths ne prend que ContributionStatus.VALIDATED) ; une
+  // cotisation encore PENDING_VALIDATION ne fait donc jamais sortir
+  // quelqu'un de la liste des retardataires tant qu'un admin ne l'a pas
+  // validée.
 
   async listLateMembers(
     userId: string,
@@ -961,66 +961,71 @@ export class MemberService {
     const pageSize = query.pageSize ?? 50;
     const thresholdMonths = 3;
 
-    const [memberships, allPricingLate] = await Promise.all([
-      this.prisma.membership.findMany({
+    // Un membre sans antenne détectée n'a personne à comparer — repli sûr
+    // sur une liste vide plutôt que de retomber accidentellement sur
+    // l'ensemble de l'association.
+    if (!me.antennaId) {
+      return { items: [], total: 0, page, pageSize };
+    }
+
+    const [users, allPricingLate] = await Promise.all([
+      this.prisma.user.findMany({
         where: {
           associationId: me.associationId,
-          status: 'APPROVED',
-          isPrimary: true,
-          // 🔥 AJOUT : scope à l'antenne du membre connecté — ce panneau
-          // ("Retardataires · +3 mois") ne doit lister que les retards de
-          // sa propre antenne, pas de toute l'association.
-          ...(me.antennaId ? { antennaId: me.antennaId } : {}),
+          role: 'MEMBER',
+          status: 'ACTIVE',
+          memberships: { some: { antennaId: me.antennaId } },
         },
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              createdAt: true,
-              contributions: {
-                where: {
-                  associationId: me.associationId,
-                  status: ContributionStatus.VALIDATED,
-                  purpose: {
-                    in: [
-                      ContributionPurpose.REGULAR_QUOTA,
-                      ContributionPurpose.LATE_QUOTA,
-                    ],
-                  },
-                },
-                select: {
-                  monthReference: true,
-                  yearReference: true,
-                  validatedAt: true,
-                  createdAt: true,
-                  amount: true,
-                },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          createdAt: true,
+          contributions: {
+            where: {
+              associationId: me.associationId,
+              status: ContributionStatus.VALIDATED,
+              purpose: {
+                in: [
+                  ContributionPurpose.REGULAR_QUOTA,
+                  ContributionPurpose.LATE_QUOTA,
+                ],
               },
             },
+            select: {
+              monthReference: true,
+              yearReference: true,
+              validatedAt: true,
+              createdAt: true,
+              amount: true,
+            },
           },
-          antenna: { select: { id: true, name: true, defaultCurrency: true } },
+          memberships: {
+            where: { antennaId: me.antennaId },
+            take: 1,
+            select: { antenna: { select: { name: true, defaultCurrency: true } } },
+          },
         },
       }),
       this.getPricingMap(me.associationId),
     ]);
 
-    const allLate = memberships
-      .map((m) => {
-        const antCurrency = m.antenna?.defaultCurrency ?? 'EUR';
+    const allLate = users
+      .map((u) => {
+        const antenna = u.memberships[0]?.antenna;
+        const antCurrency = antenna?.defaultCurrency ?? 'EUR';
         const mPrice =
           Number(allPricingLate[antCurrency]?.monthlyQuota) ||
           Number(allPricingLate['EUR']?.monthlyQuota)        ||
           0;
-        const covered = buildCoveredMonths(m.user.contributions, mPrice);
+        const covered = buildCoveredMonths(u.contributions, mPrice);
         return {
-          id: m.user.id,
-          firstName: m.user.firstName,
-          lastName: m.user.lastName,
-          antennaName: m.antenna?.name ?? null,
+          id: u.id,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          antennaName: antenna?.name ?? null,
           currency: antCurrency,
-          lateMonths: computeLateMonths(covered, m.user.createdAt),
+          lateMonths: computeLateMonths(covered, u.createdAt),
         };
       })
       .filter((item) => item.lateMonths >= thresholdMonths)

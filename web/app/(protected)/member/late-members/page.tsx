@@ -45,6 +45,7 @@ export default function MemberLateMembersPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement initial des données au montage, pattern volontaire (fetch), pas de risque de cascade de renders ici
     void loadData();
   }, []);
 

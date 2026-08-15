@@ -1,11 +1,19 @@
 //backend/src/modules/dashboard/dashboard-member.service.ts
 //
+// v1.7 — 🔥 CORRIGÉ (15/08) : primaryAntennaId (et primaryAntennaCurrency)
+//   ne retenaient la ligne Membership du membre connecté que si
+//   isPrimary===true. Un membre n'appartenant qu'à une seule antenne de
+//   toute façon, si cette unique ligne était mal marquée isPrimary=false,
+//   primaryAntennaId retombait sur null — cassant le scope antenne de
+//   lateMembersPreview (déjà correctement écrit via memberships.some, mais
+//   inopérant si primaryAntennaId lui-même était faux). Même correction
+//   que member.service.ts::getMeOrThrow() (v2.0) : on ne filtre plus sur
+//   isPrimary à la lecture, on le préfère seulement s'il existe.
+//
 // v1.6 — 🔥 CORRIGÉ (15/08) : lateMembersMemberships interrogeait Membership
 //   avec un double filtre status==='APPROVED' ET isPrimary===true — même
 //   famille de bug que member.service.ts::listLateMembers() (déjà corrigée
-//   là-bas, jamais reportée ici) : des membres réellement actifs
-//   (User.status===ACTIVE) mais dont la ligne Membership est désynchronisée
-//   étaient exclus silencieusement. Réécrit pour interroger User directement
+//   là-bas, jamais reportée ici). Réécrit pour interroger User directement
 //   avec status===ACTIVE, exactement comme admin.service.ts::listLateMembers()
 //   (qui affiche correctement les mêmes membres côté admin).
 //
@@ -13,28 +21,15 @@
 //   lateMembersPreview, panneau "Retardataires · +3 mois" de la page
 //   d'accueil membre) n'était pas scopé par antenne — un membre voyait les
 //   retardataires de TOUTE l'association au lieu de sa propre antenne
-//   uniquement (contrairement à admin.service.ts, déjà scopé). Ajout de
-//   `antennaId: primaryAntennaId` à la requête.
+//   uniquement. Ajout de `antennaId: primaryAntennaId` à la requête.
 //
 // v1.4 — 🔥 CORRIGÉ (08/08) : findEarliestUncoveredMonth ne s'arrête plus au
-//   mois courant. L'ancienne version renvoyait null (→ repli sur
-//   "aujourd'hui") dès qu'elle atteignait le mois en cours, même si des mois
-//   APRÈS étaient déjà couverts par une avance — un membre à jour jusqu'à
-//   décembre 2026 se voyait renvoyer earliestUnpaidMonth=aujourd'hui au lieu
-//   de janvier 2027. Ici : on scanne simplement en avant depuis le mois
-//   d'adhésion jusqu'au premier trou réel, qu'il soit avant, à, ou après le
-//   mois courant.
+//   mois courant — scan en avant depuis le mois d'adhésion jusqu'au premier
+//   trou réel.
 //
-// v1.3 — 🔥 AJOUT : stats.earliestUnpaidMonth/earliestUnpaidYear (plus ancien
-//   mois non couvert du membre). Complète le chantier v1.2 : le calcul était
-//   prévu ("cas Thierno") mais jamais réellement câblé dans la réponse.
-//   Seuil lateMembersPreview aligné sur celui de member.service.ts::listLateMembers
-//   (>= 3 au lieu de > 3).
+// v1.3 — 🔥 AJOUT : stats.earliestUnpaidMonth/earliestUnpaidYear.
 //
 // v1.2 — 🔥 CORRECTION CRITIQUE : bug des retardataires sur paiement anticipé.
-//   myLateMonths et lateMembersPreview utilisaient monthDiff(validatedAt le
-//   plus récent, maintenant) au lieu de regarder les mois réellement couverts
-//   (monthReference/yearReference). Fix : buildCoveredMonths/computeLateMonths.
 //
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -125,7 +120,6 @@ function computeLateMonths(
   return lateMonths;
 }
 
-// 🔥 CORRIGÉ (v1.4) : ne s'arrête plus au mois courant — cf. changelog.
 function findEarliestUncoveredMonth(
   coveredMonths: Set<string>,
   joinDate: Date,
@@ -186,10 +180,12 @@ export class DashboardMemberService {
         professionalStatus: true,
         originSubPrefecture: true,
         createdAt: true,
+        // 🔥 CORRIGÉ (v1.7) : ne filtre plus sur isPrimary — cf. changelog
+        // en tête de fichier / member.service.ts::getMeOrThrow() (v2.0).
         memberships: {
-          where: { isPrimary: true },
           select: { 
             antennaId: true,
+            isPrimary: true,
             antenna: { select: { defaultCurrency: true } }
           },
         },
@@ -199,8 +195,11 @@ export class DashboardMemberService {
 
     if (!me) throw new Error('Utilisateur introuvable');
 
-    const primaryAntennaId = me.memberships[0]?.antennaId ?? null;
-    const primaryAntennaCurrency = me.memberships[0]?.antenna?.defaultCurrency || 'EUR';
+    // Préfère la ligne isPrimary si elle existe, sinon repli sur la
+    // première — un membre n'a de toute façon qu'une seule antenne réelle.
+    const membership = me.memberships.find((m) => m.isPrimary) ?? me.memberships[0];
+    const primaryAntennaId = membership?.antennaId ?? null;
+    const primaryAntennaCurrency = membership?.antenna?.defaultCurrency || 'EUR';
 
     const virtualCard = await this.prisma.virtualCard.findUnique({
       where: { userId },
@@ -379,12 +378,9 @@ export class DashboardMemberService {
       }
     });
 
-    // 🔥 CORRIGÉ (v1.6) : interroge User directement (status===ACTIVE),
-    // exactement comme admin.service.ts::listLateMembers() — au lieu de
-    // Membership avec status==='APPROVED' + isPrimary===true, qui excluait
-    // silencieusement des membres actifs dont la ligne Membership était
-    // désynchronisée. Le filtre d'antenne (v1.5) est conservé, via la
-    // relation memberships.
+    // Scope à l'antenne du membre connecté, sans exiger isPrimary/APPROVED
+    // sur la ligne Membership des AUTRES membres — même logique que
+    // member.service.ts::listLateMembers() et admin.service.ts.
     const lateMembersUsers = await this.prisma.user.findMany({
       where: {
         associationId: me.associationId,
