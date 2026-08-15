@@ -1,11 +1,20 @@
 //backend/src/modules/dashboard/dashboard-member.service.ts
 //
+// v1.6 — 🔥 CORRIGÉ (15/08) : lateMembersMemberships interrogeait Membership
+//   avec un double filtre status==='APPROVED' ET isPrimary===true — même
+//   famille de bug que member.service.ts::listLateMembers() (déjà corrigée
+//   là-bas, jamais reportée ici) : des membres réellement actifs
+//   (User.status===ACTIVE) mais dont la ligne Membership est désynchronisée
+//   étaient exclus silencieusement. Réécrit pour interroger User directement
+//   avec status===ACTIVE, exactement comme admin.service.ts::listLateMembers()
+//   (qui affiche correctement les mêmes membres côté admin).
+//
 // v1.5 — 🔥 CORRIGÉ (15/08) : lateMembersMemberships (alimente
 //   lateMembersPreview, panneau "Retardataires · +3 mois" de la page
 //   d'accueil membre) n'était pas scopé par antenne — un membre voyait les
 //   retardataires de TOUTE l'association au lieu de sa propre antenne
-//   uniquement (contrairement à admin.service.ts::listLateMembers, déjà
-//   scopé). Ajout de `antennaId: primaryAntennaId` à la requête.
+//   uniquement (contrairement à admin.service.ts, déjà scopé). Ajout de
+//   `antennaId: primaryAntennaId` à la requête.
 //
 // v1.4 — 🔥 CORRIGÉ (08/08) : findEarliestUncoveredMonth ne s'arrête plus au
 //   mois courant. L'ancienne version renvoyait null (→ repli sur
@@ -370,51 +379,51 @@ export class DashboardMemberService {
       }
     });
 
-    // 🔥 CORRIGÉ (v1.5) : scope à l'antenne du membre connecté —
-    // ce panneau ne doit lister que les retardataires de sa propre
-    // antenne, pas de toute l'association.
-    const lateMembersMemberships = await this.prisma.membership.findMany({
+    // 🔥 CORRIGÉ (v1.6) : interroge User directement (status===ACTIVE),
+    // exactement comme admin.service.ts::listLateMembers() — au lieu de
+    // Membership avec status==='APPROVED' + isPrimary===true, qui excluait
+    // silencieusement des membres actifs dont la ligne Membership était
+    // désynchronisée. Le filtre d'antenne (v1.5) est conservé, via la
+    // relation memberships.
+    const lateMembersUsers = await this.prisma.user.findMany({
       where: {
         associationId: me.associationId,
-        status: 'APPROVED',
-        isPrimary: true,
-        ...(primaryAntennaId ? { antennaId: primaryAntennaId } : {}),
+        role: UserRole.MEMBER,
+        status: UserStatus.ACTIVE,
+        ...(primaryAntennaId
+          ? { memberships: { some: { antennaId: primaryAntennaId } } }
+          : {}),
       },
       take: 50,
       select: {
-        user: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        createdAt: true,
+        contributions: {
+          where: {
+            status: ContributionStatus.VALIDATED,
+            purpose: { in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA] },
+          },
           select: {
-            id: true,
-            firstName: true,
-            lastName: true,
+            monthReference: true,
+            yearReference: true,
+            validatedAt: true,
             createdAt: true,
-            contributions: {
-              where: {
-                status: ContributionStatus.VALIDATED,
-                purpose: { in: [ContributionPurpose.REGULAR_QUOTA, ContributionPurpose.LATE_QUOTA] },
-              },
-              select: {
-                monthReference: true,
-                yearReference: true,
-                validatedAt: true,
-                createdAt: true,
-                amount: true,
-              },
-            },
+            amount: true,
           },
         },
-        antenna: { select: { defaultCurrency: true } },
       },
     });
 
-    const lateMembersPreview = lateMembersMemberships
-      .map(({ user: u, antenna }) => {
-        const antCurrency = antenna?.defaultCurrency ?? 'EUR';
-        const mPrice =
-          Number(allPricing[antCurrency]?.monthlyQuota) ||
-          Number(allPricing['EUR']?.monthlyQuota)        ||
-          0;
-        const covered = buildCoveredMonths(u.contributions, mPrice);
+    const lateMembersMonthlyPrice =
+      Number(allPricing[primaryAntennaCurrency]?.monthlyQuota) ||
+      Number(allPricing['EUR']?.monthlyQuota)                  ||
+      0;
+
+    const lateMembersPreview = lateMembersUsers
+      .map((u) => {
+        const covered = buildCoveredMonths(u.contributions, lateMembersMonthlyPrice);
         return {
           id: u.id,
           firstName: u.firstName,
