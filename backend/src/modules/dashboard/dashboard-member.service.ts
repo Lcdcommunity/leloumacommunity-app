@@ -1,5 +1,12 @@
 //backend/src/modules/dashboard/dashboard-member.service.ts
 //
+// v1.5 — 🔥 CORRIGÉ (15/08) : lateMembersMemberships (alimente
+//   lateMembersPreview, panneau "Retardataires · +3 mois" de la page
+//   d'accueil membre) n'était pas scopé par antenne — un membre voyait les
+//   retardataires de TOUTE l'association au lieu de sa propre antenne
+//   uniquement (contrairement à admin.service.ts::listLateMembers, déjà
+//   scopé). Ajout de `antennaId: primaryAntennaId` à la requête.
+//
 // v1.4 — 🔥 CORRIGÉ (08/08) : findEarliestUncoveredMonth ne s'arrête plus au
 //   mois courant. L'ancienne version renvoyait null (→ repli sur
 //   "aujourd'hui") dès qu'elle atteignait le mois en cours, même si des mois
@@ -363,11 +370,15 @@ export class DashboardMemberService {
       }
     });
 
+    // 🔥 CORRIGÉ (v1.5) : scope à l'antenne du membre connecté —
+    // ce panneau ne doit lister que les retardataires de sa propre
+    // antenne, pas de toute l'association.
     const lateMembersMemberships = await this.prisma.membership.findMany({
       where: {
         associationId: me.associationId,
         status: 'APPROVED',
         isPrimary: true,
+        ...(primaryAntennaId ? { antennaId: primaryAntennaId } : {}),
       },
       take: 50,
       select: {

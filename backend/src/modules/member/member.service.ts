@@ -967,6 +967,10 @@ export class MemberService {
           associationId: me.associationId,
           status: 'APPROVED',
           isPrimary: true,
+          // 🔥 AJOUT : scope à l'antenne du membre connecté — ce panneau
+          // ("Retardataires · +3 mois") ne doit lister que les retards de
+          // sa propre antenne, pas de toute l'association.
+          ...(me.antennaId ? { antennaId: me.antennaId } : {}),
         },
         include: {
           user: {

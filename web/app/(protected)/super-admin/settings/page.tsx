@@ -8,6 +8,16 @@
 //   `api.updateAssociation()`, comme le reste de ce formulaire — rien de
 //   codé en dur, fonctionne pour n'importe quelle association du multi-tenant.
 //
+// 🔥 CORRIGÉ : "Erreur de sauvegarde" — assocPayload envoyait encore
+//   `expenseValidationThreshold` au niveau association (PATCH
+//   /associations/current), mais ce champ a été volontairement retiré du
+//   DTO backend (UpdateAssociationDto) : le seuil de dépenses est géré
+//   exclusivement par devise via la table Pricing désormais. Le backend
+//   rejetait donc la requête en 400 ("property expenseValidationThreshold
+//   should not exist"). Le bloc qui assignait ce champ est retiré ; le
+//   seuil continue d'être correctement envoyé via
+//   api.updatePricingSuperAdmin(payload) (payload[cur].expenseValidationThreshold).
+//
 'use client';
 
 import React, { type ChangeEvent, type FormEvent, useEffect, useState } from 'react';
@@ -343,12 +353,11 @@ export default function SuperAdminSettingsPage() {
         country: country.trim() || null,
       };
 
-      const rawThreshold = pricingMap[activeCurrency]?.expenseValidationThreshold || pricingMap['EUR']?.expenseValidationThreshold;
-      if (rawThreshold && rawThreshold.toString().trim() !== '') {
-         assocPayload.expenseValidationThreshold = Number(rawThreshold);
-      } else {
-         assocPayload.expenseValidationThreshold = null;
-      }
+      // 🔥 RETIRÉ (fix "Erreur de sauvegarde") : expenseValidationThreshold
+      // n'est plus accepté par UpdateAssociationDto (géré exclusivement par
+      // devise via la table Pricing, cf. api.updatePricingSuperAdmin
+      // ci-dessous) — l'envoyer ici faisait échouer toute la sauvegarde en
+      // 400 ("property expenseValidationThreshold should not exist").
 
       await Promise.all([
         api.updateAssociation(assocPayload),
