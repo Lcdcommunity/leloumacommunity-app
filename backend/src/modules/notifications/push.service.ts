@@ -17,15 +17,44 @@ interface PushPayload {
   data?: Record<string, unknown>;
 }
 
+// 🔥 AJOUT : cache mémoire courte durée pour le logo d'association (même
+// pattern que isAllowedOrigin() dans main.ts, 60s) — évite une requête
+// Prisma par destinataire quand une notification push part vers plusieurs
+// personnes d'un coup (ex. tous les admins d'une antenne).
+const LOGO_CACHE_TTL_MS = 60_000;
+
 @Injectable()
 export class PushService {
   private readonly logger = new Logger(PushService.name);
   private vapidEnabled = false;
+  private readonly logoCache = new Map<string, { url: string | null; expiresAt: number }>();
 
   constructor(private readonly prisma: PrismaService) {}
 
   setVapidEnabled(enabled: boolean): void {
     this.vapidEnabled = enabled;
+  }
+
+  /**
+   * 🔥 AJOUT : résout dynamiquement le logo de l'association pour l'utiliser
+   * comme icône de notification push — remplace le repli LCD en dur par le
+   * vrai logo de l'association concernée, sans toucher à chaque site
+   * d'appel de notifications.service.ts (tous passent déjà associationId).
+   */
+  private async getAssociationLogoUrl(associationId: string): Promise<string | null> {
+    const cached = this.logoCache.get(associationId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.url;
+    }
+
+    const association = await this.prisma.association.findUnique({
+      where: { id: associationId },
+      select: { logoFile: { select: { url: true } } },
+    });
+
+    const url = association?.logoFile?.url ?? null;
+    this.logoCache.set(associationId, { url, expiresAt: Date.now() + LOGO_CACHE_TTL_MS });
+    return url;
   }
 
   /**
@@ -41,7 +70,6 @@ export class PushService {
     },
   ): Promise<{ success: boolean; message: string }> {
     try {
-      // Vérifie que l'utilisateur existe et appartient à l'association
       const user = await this.prisma.user.findFirst({
         where: { id: userId, associationId },
       });
@@ -50,7 +78,6 @@ export class PushService {
         throw new Error('Utilisateur non trouvé');
       }
 
-      // Upsert de la subscription
       await this.prisma.pushSubscription.upsert({
         where: { endpoint: dto.endpoint },
         create: {
@@ -116,6 +143,12 @@ export class PushService {
       return { sent: 0, failed: 0 };
     }
 
+    // 🔥 AJOUT : icône dynamique par association (logo réel) si l'appelant
+    // n'en a pas fourni une explicitement — repli sur l'icône générique de
+    // la plateforme seulement si l'association n'a aucun logo.
+    const resolvedIcon =
+      payload.icon || (await this.getAssociationLogoUrl(associationId)) || '/icon-192x192.png';
+
     let sent = 0;
     let failed = 0;
 
@@ -133,7 +166,7 @@ export class PushService {
           notification: {
             title: payload.title,
             body: payload.body,
-            icon: payload.icon || '/icon-192x192.png',
+            icon: resolvedIcon,
             badge: payload.badge || '/badge-72x72.png',
             tag: payload.tag || 'default',
             requireInteraction: payload.requireInteraction ?? false,
@@ -210,7 +243,6 @@ export class PushService {
     payload: PushPayload,
     excludeUserIds?: string[],
   ): Promise<{ sent: number; failed: number }> {
-    // 🔥 CORRECTION : Recherche via la relation memberships
     const members = await this.prisma.user.findMany({
       where: {
         associationId,

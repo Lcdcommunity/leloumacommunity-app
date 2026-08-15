@@ -1,17 +1,18 @@
 // web/app/layout.tsx
 import './globals.css';
-import '../lib/i18n'; 
 import type { Metadata, Viewport } from 'next';
 import { ThemeProvider } from '../components/theme-provider';
+import { I18nProvider } from '../components/i18n-provider';
 import { cookies } from 'next/headers';
 
 // Configuration des métadonnées de l'application
 export const metadata: Metadata = {
   title: 'Grand Chef',
   description: 'Plateforme de gestion d’association communautaire - Multi-tenant',
-  manifest: '/manifest.json',
-  // La référence manuelle à 'apple: /icon-192x192.png' a été retirée pour éviter l'erreur 404.
-  // Next.js génère automatiquement les métadonnées grâce à web/app/icon.jpg
+  // 🔥 RETIRÉ : manifest: '/manifest.json' — écrasait le lien <link
+  // rel="manifest"> auto-généré par Next.js à partir de app/manifest.ts
+  // (dynamique par association) en le repointant vers l'ancien fichier
+  // statique public/manifest.json.
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -43,14 +44,16 @@ export default async function RootLayout({
   return (
     <html lang={lang} suppressHydrationWarning>
       <body suppressHydrationWarning={true} className="antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <I18nProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
+        </I18nProvider>
       </body>
     </html>
   );

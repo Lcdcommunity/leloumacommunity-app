@@ -1,0 +1,57 @@
+// web/app/manifest.ts
+import type { MetadataRoute } from 'next';
+import { headers } from 'next/headers';
+import { api } from '../lib/api-client';
+
+function guessMimeType(url: string): string {
+  const lower = url.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const headersList = await headers();
+  const hostname = (headersList.get('host') || '').split(':')[0];
+
+  // Valeurs de repli neutres — utilisées en local, sur les previews Vercel,
+  // ou si l'association n'a pas pu être résolue.
+  let name = 'Lelouma Community';
+  let themeColor = '#059669';
+  let iconUrl = '/assets/images/logolcd.jpg';
+
+  const isGenericHost = !hostname || hostname === 'localhost' || hostname.endsWith('.vercel.app');
+
+  if (!isGenericHost) {
+    try {
+      const theme = await api.getPublicTheme(hostname);
+      if (theme) {
+        name = theme.name || name;
+        themeColor = theme.themeColors?.primary || themeColor;
+        iconUrl = theme.logoUrl || iconUrl;
+      }
+    } catch {
+      // Repli silencieux sur les valeurs par défaut — jamais de blocage
+      // du manifest si l'association n'est pas résolue (erreur réseau,
+      // domaine inconnu, etc.)
+    }
+  }
+
+  const shortName = name.length > 12 ? name.slice(0, 12) : name;
+  const iconType = guessMimeType(iconUrl);
+
+  return {
+    name,
+    short_name: shortName,
+    description: "Plateforme de gestion d'association communautaire",
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#ffffff',
+    theme_color: themeColor,
+    icons: [
+      { src: iconUrl, sizes: '192x192', type: iconType, purpose: 'any' },
+      { src: iconUrl, sizes: '192x192', type: iconType, purpose: 'maskable' },
+    ],
+  };
+}
