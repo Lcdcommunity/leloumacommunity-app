@@ -73,10 +73,25 @@ export class DocumentsService {
     return { message: 'Document supprimé.' };
   }
 
+  // 🔥 CORRIGÉ : renvoyait fileUrl/fileName à plat au lieu d'un objet
+  // fileAsset imbriqué — le frontend (et les mappers admin/membre
+  // équivalents, ex. member.mapper.ts::documentItem()) lisent tous
+  // doc.fileAsset?.url/fileName/mimeType/sizeBytes. Résultat : le bouton
+  // Télécharger, "Fichier original" et "Taille" restaient vides côté
+  // super-admin même quand un fichier était bien attaché, et la stat
+  // "Avec fichier" comptait toujours 0. sizeBytes est un BigInt côté Prisma
+  // (file-assets.service.ts) — converti explicitement en Number, sinon
+  // JSON.stringify plante dessus (BigInt non sérialisable nativement).
   private toItem(document: {
     id: string; title: string; description: string | null; visibility: string;
     isPinned: boolean; publishedAt: Date | null; createdAt: Date;
-    file: { url: string | null; originalFilename: string } | null;
+    file: {
+      id: string;
+      url: string | null;
+      originalFilename: string;
+      mimeType: string;
+      sizeBytes: bigint | number | null;
+    } | null;
   }) {
     return {
       id: document.id,
@@ -86,8 +101,15 @@ export class DocumentsService {
       isPinned: document.isPinned,
       publishedAt: document.publishedAt?.toISOString() ?? null,
       createdAt: document.createdAt.toISOString(),
-      fileUrl: document.file?.url ?? null,
-      fileName: document.file?.originalFilename ?? null,
+      fileAsset: document.file
+        ? {
+            id: document.file.id,
+            url: document.file.url ?? null,
+            fileName: document.file.originalFilename ?? null,
+            mimeType: document.file.mimeType ?? null,
+            sizeBytes: document.file.sizeBytes != null ? Number(document.file.sizeBytes) : null,
+          }
+        : null,
     };
   }
 }

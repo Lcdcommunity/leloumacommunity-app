@@ -223,13 +223,20 @@ export const api = {
   return http<{
     id: string;
     name: string;
+    legalName: string | null;
+    code: string;
     logoUrl: string | null;
     themeColors: { primary: string; secondary: string };
     fontFamily: string;
     phone: string | null;
     email: string | null;
+    websiteUrl: string | null;
     city: string | null;
     country: string | null;
+    addressLine1: string | null;
+    addressLine2: string | null;
+    postalCode: string | null;
+    registrationNumber: string | null;
   }>(`/public/theme?${params.toString()}`, { auth: false });
 },
 

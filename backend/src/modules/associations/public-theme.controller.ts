@@ -35,13 +35,20 @@ export class PublicThemeController {
     return {
       id: association.id,
       name: association.name,
+      legalName: association.legalName || null,
+      code: association.code,
       logoUrl: association.logoFile?.url || null,
       themeColors: association.themeColors || { primary: '#111827', secondary: '#10B981' },
       fontFamily: association.fontFamily || "'DM Sans', sans-serif",
       phone: association.phone || null,
       email: association.email || null,
+      websiteUrl: association.websiteUrl || null,
       city: association.city || null,
       country: association.country || null,
+      addressLine1: association.addressLine1 || null,
+      addressLine2: association.addressLine2 || null,
+      postalCode: association.postalCode || null,
+      registrationNumber: association.registrationNumber || null,
     };
   }
 }

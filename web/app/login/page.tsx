@@ -43,18 +43,22 @@ export default function LoginPage() {
   const isRTL = currentLang === 'ar';
 
   const [theme, setTheme] = useState<{
-    name: string; logoUrl: string | null;
+    name: string; legalName: string | null; code: string | null; logoUrl: string | null;
     primary: string; secondary: string; fontFamily: string;
-    phone: string | null; email: string | null; city: string | null; country: string | null;
+    phone: string | null; email: string | null; websiteUrl: string | null;
+    addressLine1: string | null; addressLine2: string | null; postalCode: string | null;
+    city: string | null; country: string | null;
   }>({
     name: 'Console Grand Chef',
+    legalName: null,
+    code: null,
     logoUrl: null,
     primary: '#1A56DB', secondary: '#1E40AF',
     fontFamily: "'DM Sans', sans-serif",
-    phone: null, email: null, city: null, country: null,
+    phone: null, email: null, websiteUrl: null,
+    addressLine1: null, addressLine2: null, postalCode: null,
+    city: null, country: null,
   });
-
-  const [docs, setDocs] = useState<Array<{ id: string; title: string; url: string }>>([]);
 
   useEffect(() => {
     queueMicrotask(() => setMounted(true));
@@ -80,7 +84,7 @@ export default function LoginPage() {
   }, [handleLanguageChanged]);
 
   useEffect(() => {
-    const fetchThemeAndDocs = async () => {
+    const fetchTheme = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const codeParam   = urlParams.get('code')   || undefined;
       const domainParam = urlParams.get('domain') || undefined;
@@ -92,12 +96,18 @@ export default function LoginPage() {
         if (data) {
           setTheme({
             name: data.name,
+            legalName: data.legalName || null,
+            code: data.code || null,
             logoUrl: data.logoUrl || null,
             primary: data.themeColors?.primary || '#1A56DB',
             secondary: data.themeColors?.secondary || '#1E40AF',
             fontFamily: data.fontFamily || "'DM Sans', sans-serif",
             phone: data.phone,
             email: data.email,
+            websiteUrl: data.websiteUrl,
+            addressLine1: data.addressLine1,
+            addressLine2: data.addressLine2,
+            postalCode: data.postalCode,
             city: data.city,
             country: data.country,
           });
@@ -107,15 +117,11 @@ export default function LoginPage() {
         // instance sans domaine configuré) — identité neutre conservée.
         console.warn('Thème personnalisé non trouvé.', err);
       }
-
-      try {
-        const publicDocs = await api.getPublicDocuments(domainParam || currentDomain, codeParam);
-        setDocs(publicDocs || []);
-      } catch (err) {
-        console.warn('Documents publics non trouvés.', err);
-      }
+      // 🔥 RETIRÉ : chargement des documents publics (api.getPublicDocuments).
+      // Les documents ne sont désormais accessibles qu'une fois connecté,
+      // via /member/documents — plus aucune fuite sur la page de connexion.
     };
-    fetchThemeAndDocs();
+    fetchTheme();
   }, []);
 
   useEffect(() => {
@@ -160,8 +166,14 @@ export default function LoginPage() {
     return { id: i, goLeft, openDelay: distCenter * 0.12 };
   });
 
-  const hasContactInfo = Boolean(theme.email || theme.phone || theme.city || theme.country);
-  const hasDocs = docs.length > 0;
+  const fullAddress = [theme.addressLine1, theme.addressLine2, theme.postalCode, theme.city, theme.country]
+    .filter(Boolean)
+    .join(', ');
+
+  const hasContactInfo = Boolean(
+    theme.email || theme.phone || fullAddress || theme.websiteUrl || theme.code ||
+    (theme.legalName && theme.legalName !== theme.name)
+  );
 
   if (!mounted) return null;
 
@@ -351,7 +363,7 @@ export default function LoginPage() {
           transition: max-height 0.3s ease, opacity 0.25s ease;
         }
         .lp-help-panel.open {
-          max-height: 200px;
+          max-height: 340px;
           opacity: 1;
         }
         .lp-help-panel-inner {
@@ -377,18 +389,6 @@ export default function LoginPage() {
           transition: color .15s;
         }
         .lp-contact-link:hover { color: var(--floa-blue); }
-
-        .lp-help-docs {
-          display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-        }
-        .lp-doc-btn {
-          display: inline-flex; align-items: center; gap: 5px;
-          padding: 0.4rem 0.85rem; border-radius: 10px;
-          font-family: var(--font-main); font-size: 0.72rem; font-weight: 700;
-          text-decoration: none; transition: background .15s;
-          background: rgba(30,58,138,0.06); border: 1px solid rgba(30,58,138,0.15); color: #1E3A8A;
-        }
-        .lp-doc-btn:hover { background: rgba(30,58,138,0.1); }
 
         .spinner {
           width: 20px; height: 20px;
@@ -561,83 +561,97 @@ export default function LoginPage() {
             </Link>
           </footer>
 
-          {(hasContactInfo || hasDocs) && (
+          {hasContactInfo && (
             <div className="lp-help-section">
+              <button
+                className={`lp-help-toggle ${helpOpen ? 'open' : ''}`}
+                onClick={() => setHelpOpen(v => !v)}
+                aria-expanded={helpOpen}
+                aria-label="Aide et assistance"
+              >
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
+                </svg>
+                {t('login.helpBtn', 'Aide & Assistance')}
+                <svg className="lp-help-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M19 9l-7 7-7-7"/>
+                </svg>
+              </button>
 
-              {hasContactInfo && (
-                <>
-                  <button
-                    className={`lp-help-toggle ${helpOpen ? 'open' : ''}`}
-                    onClick={() => setHelpOpen(v => !v)}
-                    aria-expanded={helpOpen}
-                    aria-label="Aide et assistance"
-                  >
-                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="12" cy="12" r="10"/>
-                      <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
-                    </svg>
-                    {t('login.helpBtn', 'Aide & Assistance')}
-                    <svg className="lp-help-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                      <path d="M19 9l-7 7-7-7"/>
-                    </svg>
-                  </button>
+              <div className={`lp-help-panel ${helpOpen ? 'open' : ''}`} aria-hidden={!helpOpen}>
+                <div className="lp-help-panel-inner">
 
-                  <div className={`lp-help-panel ${helpOpen ? 'open' : ''}`} aria-hidden={!helpOpen}>
-                    <div className="lp-help-panel-inner">
-
-                      {theme.email && (
-                        <div className="lp-contact-row">
-                          <span className="lp-contact-icon">
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
-                          </span>
-                          <a href={`mailto:${theme.email}`} className="lp-contact-link">{theme.email}</a>
-                        </div>
-                      )}
-
-                      {theme.phone && (
-                        <div className="lp-contact-row">
-                          <span className="lp-contact-icon">
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498A1 1 0 0121 15.72V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
-                            </svg>
-                          </span>
-                          <a href={`tel:${theme.phone}`} className="lp-contact-link">{theme.phone}</a>
-                        </div>
-                      )}
-
-                      {(theme.city || theme.country) && (
-                        <div className="lp-contact-row">
-                          <span className="lp-contact-icon">
-                            <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                            </svg>
-                          </span>
-                          <span style={{ color: 'var(--text-deep)', fontWeight: 500 }}>
-                            {[theme.city, theme.country].filter(Boolean).join(', ')}
-                          </span>
-                        </div>
-                      )}
-
+                  {theme.legalName && theme.legalName !== theme.name && (
+                    <div className="lp-contact-row">
+                      <span className="lp-contact-icon">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M15 9h.01M15 13h.01"/>
+                        </svg>
+                      </span>
+                      <span style={{ color: 'var(--text-deep)', fontWeight: 600 }}>{theme.legalName}</span>
                     </div>
-                  </div>
-                </>
-              )}
+                  )}
 
-              {hasDocs && (
-                <div className="lp-help-docs">
-                  {docs.map((doc) => (
-                    <a key={doc.id} href={doc.url} target="_blank" rel="noopener noreferrer" className="lp-doc-btn">
-                      <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                      </svg>
-                      {doc.title}
-                    </a>
-                  ))}
+                  {theme.code && (
+                    <div className="lp-contact-row">
+                      <span className="lp-contact-icon">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                        </svg>
+                      </span>
+                      <span style={{ color: 'var(--text-deep)', fontWeight: 600 }}>{theme.code}</span>
+                    </div>
+                  )}
+
+                  {theme.email && (
+                    <div className="lp-contact-row">
+                      <span className="lp-contact-icon">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                      </span>
+                      <a href={`mailto:${theme.email}`} className="lp-contact-link">{theme.email}</a>
+                    </div>
+                  )}
+
+                  {theme.phone && (
+                    <div className="lp-contact-row">
+                      <span className="lp-contact-icon">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498A1 1 0 0121 15.72V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
+                        </svg>
+                      </span>
+                      <a href={`tel:${theme.phone}`} className="lp-contact-link">{theme.phone}</a>
+                    </div>
+                  )}
+
+                  {theme.websiteUrl && (
+                    <div className="lp-contact-row">
+                      <span className="lp-contact-icon">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" strokeLinejoin="round" d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
+                        </svg>
+                      </span>
+                      <a href={theme.websiteUrl} target="_blank" rel="noopener noreferrer" className="lp-contact-link">
+                        {theme.websiteUrl.replace(/^https?:\/\//, '')}
+                      </a>
+                    </div>
+                  )}
+
+                  {fullAddress && (
+                    <div className="lp-contact-row">
+                      <span className="lp-contact-icon">
+                        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                      </span>
+                      <span style={{ color: 'var(--text-deep)', fontWeight: 500 }}>{fullAddress}</span>
+                    </div>
+                  )}
+
                 </div>
-              )}
-
+              </div>
             </div>
           )}
 
