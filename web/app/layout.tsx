@@ -3,12 +3,16 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import { ThemeProvider } from '../components/theme-provider';
 import { I18nProvider } from '../components/i18n-provider';
+import StructuredData from '../components/StructuredData';
 import { cookies } from 'next/headers';
 
 // Configuration des métadonnées de l'application
 export const metadata: Metadata = {
   title: 'Grand Chef',
   description: 'Plateforme de gestion d’association communautaire - Multi-tenant',
+  authors: [{ name: 'Thierno Doniko' }],
+  creator: 'Thierno Doniko',
+  publisher: 'Thierno Doniko',
   // 🔥 RETIRÉ : manifest: '/manifest.json' — écrasait le lien <link
   // rel="manifest"> auto-généré par Next.js à partir de app/manifest.ts
   // (dynamique par association) en le repointant vers l'ancien fichier
@@ -16,7 +20,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Grand Chef',
+  title: 'AssoGlobal',
   },
 };
 
@@ -44,6 +48,7 @@ export default async function RootLayout({
   return (
     <html lang={lang} suppressHydrationWarning>
       <body suppressHydrationWarning={true} className="antialiased">
+        <StructuredData />
         <I18nProvider>
           <ThemeProvider
             attribute="class"
