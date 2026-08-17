@@ -10,13 +10,16 @@
 //   ...
 //   <ProposalSuperAdminActions
 //     proposal={proposal}          // { id, title, description, estimatedBudget, status }
-//     isSuperAdmin={user?.role === 'SUPER_ADMIN' || user?.role === 'SYSTEM_ADMIN'}
+//     canManage={true} // route déjà réservée admin/super-admin par le layout protégé
 //     onClose={onClose}            // ferme le modal de détail (utilisé après suppression)
 //     onChanged={() => void reload()} // recharge la liste des propositions
 //   />
 //
+// 🔥 v1.2 : prop renommée isSuperAdmin -> canManage — l'ANTENNA_ADMIN peut
+// désormais lui aussi modifier/supprimer les propositions de sa propre
+// antenne (portée appliquée côté backend), plus seulement le Super Admin.
 // 🔥 v1.1 : les boutons s'affichent désormais quel que soit le statut de la
-// proposition (y compris Approuvée/Rejetée) — seule condition : isSuperAdmin.
+// proposition (y compris Approuvée/Rejetée) — seule condition : canManage.
 'use client';
 
 import { useState } from 'react';
@@ -45,12 +48,12 @@ const BTN_BASE: React.CSSProperties = {
 
 export function ProposalSuperAdminActions({
   proposal,
-  isSuperAdmin,
+  canManage,
   onClose,
   onChanged,
 }: {
   proposal: ProposalForAdminActions;
-  isSuperAdmin: boolean;
+  canManage: boolean;
   onClose?: () => void;
   onChanged?: () => void;
 }) {
@@ -63,7 +66,7 @@ export function ProposalSuperAdminActions({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (!isSuperAdmin) {
+  if (!canManage) {
     return null;
   }
 

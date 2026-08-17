@@ -439,7 +439,7 @@ export default function SuperAdminProjectProposalsPage() {
                   estimatedBudget: selectedProposal.estimatedBudget ?? selectedProposal.expectedBudget ?? null,
                   status: selectedProposal.status,
                 }}
-                isSuperAdmin={true}
+                canManage={true}
                 onClose={() => setSelectedProposal(null)}
                 onChanged={() => void load()}
               />

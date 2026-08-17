@@ -1,4 +1,17 @@
 // web/app/(protected)/admin/project-proposals/page.tsx
+// 🔥 AJOUT : boutons Modifier/Supprimer dans le modal de détail, via le
+// composant isolé <ProposalSuperAdminActions canManage={true} /> — cette
+// route est déjà réservée ANTENNA_ADMIN/SUPER_ADMIN par le layout protégé,
+// donc canManage est fixé à true directement (pas de re-vérification de
+// rôle ici). Fonctionne quel que soit le statut de la proposition (y
+// compris déjà Approuvée/Rejetée) — la portée par antenne (un admin
+// d'antenne ne peut agir que sur les propositions de sa propre antenne)
+// est appliquée côté backend (project-proposals-admin.service.ts).
+// 🔥 CORRIGÉ : ESLint react-hooks/set-state-in-effect — `load` était un
+// async/await direct, ce qui exécute setLoading(true) de façon synchrone
+// au moment où l'effet l'invoque. Remplacé par une chaîne
+// .then()/.catch()/.finally() explicite (même pattern que
+// super-admin/projects/page.tsx et super-admin/project-proposals/page.tsx).
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -6,6 +19,7 @@ import { AppShell } from '../../../../components/layout/AppShell';
 import { api } from '../../../../lib/api-client';
 import type { ProjectProposal } from '../../../../types/project-proposal';
 import { formatDate } from '../../../../lib/format';
+import { ProposalSuperAdminActions } from '../../../../components/projects/ProposalSuperAdminActions';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ExtendedProposal extends ProjectProposal {
@@ -51,21 +65,24 @@ export default function AdminProjectProposalsPage() {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewError, setReviewError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await api.listProjectProposals({
+  const load = useCallback(() => {
+    return Promise.resolve()
+      .then(() => setLoading(true))
+      .then(() => api.listProjectProposals({
         page: 1,
         pageSize: 100,
         status: statusFilter || undefined,
+      }))
+      .then((res) => {
+        setItems((res?.items as unknown as ExtendedProposal[]) || []);
+        setError(null);
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Erreur chargement');
+      })
+      .finally(() => {
+        setLoading(false);
       });
-      setItems((res?.items as unknown as ExtendedProposal[]) || []);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur chargement');
-    } finally {
-      setLoading(false);
-    }
   }, [statusFilter]);
 
   useEffect(() => { void load(); }, [load]);
@@ -397,6 +414,24 @@ export default function AdminProjectProposalsPage() {
                   <div className="pp-detail-txt">{selectedProposal.reviewComment}</div>
                 </div>
               )}
+
+              {/* 🔥 AJOUT : boutons Modifier/Supprimer — canManage fixé à true,
+                  la route est déjà réservée admin/super-admin par le layout
+                  protégé. La portée par antenne (un admin d'antenne ne peut
+                  agir que sur les propositions de sa propre antenne) est
+                  appliquée côté backend. */}
+              <ProposalSuperAdminActions
+                proposal={{
+                  id: selectedProposal.id,
+                  title: selectedProposal.title,
+                  description: selectedProposal.description,
+                  estimatedBudget: selectedProposal.estimatedBudget ?? selectedProposal.expectedBudget ?? null,
+                  status: selectedProposal.status,
+                }}
+                canManage={true}
+                onClose={() => setSelectedProposal(null)}
+                onChanged={() => void load()}
+              />
             </div>
 
             {(selectedProposal.status === 'SUBMITTED' || selectedProposal.status === 'UNDER_REVIEW') && (
