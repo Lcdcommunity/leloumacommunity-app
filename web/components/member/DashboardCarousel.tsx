@@ -72,7 +72,12 @@ function translateStatus(status: string): string {
 
 export function DashboardCarousel({
   projects = [],
-  news = [],
+  // 🔥 CORRIGÉ : les actualités (news) ne doivent plus apparaître dans ce
+  // carrousel photo — elles défilent déjà dans la section "Informations
+  // récentes" juste en dessous (doublon supprimé). Le prop reste accepté
+  // (renommé en _news) pour ne pas casser les appels existants dans les
+  // pages membre/admin/super-admin, mais n'est plus consommé ici.
+  news: _news = [],
   events = [],
 }: {
   projects?: CarouselProject[];
@@ -98,14 +103,6 @@ export function DashboardCarousel({
         location: p.locationText,
       };
     }),
-    ...news.map(n => ({
-      id: `news-${n.id}`,
-      type: 'NEWS' as const,
-      title: n.title,
-      subtitle: n.content ? n.content.substring(0, 80) + '...' : null,
-      date: n.publishedAt || n.createdAt,
-      imageUrls: [n.coverImageFile?.url || n.coverImageFileId].filter(Boolean) as string[],
-    })),
     ...events.map(e => ({
       id: `evt-${e.id}`,
       type: 'EVENT' as const,
