@@ -1,4 +1,25 @@
 // web/app/(protected)/super-admin/projects/page.tsx
+// v2.1 — CHANGELOG :
+// 🔥 CORRIGÉ (galerie photos, édition) : la modification d'un projet ouvrait
+//    toujours une galerie vide — les photos déjà enregistrées (côté serveur)
+//    n'étaient jamais chargées dans le formulaire, qui ne gérait que des
+//    fichiers tout juste sélectionnés (File + URL objet locale). Nouveau
+//    type PhotoItem (id + previewUrl + fileName, "file" optionnel = photo
+//    pas encore uploadée) unifiant photos existantes et nouvelles ; la
+//    galerie d'édition affiche désormais les photos existantes et permet de
+//    les supprimer individuellement.
+// 🔥 CORRIGÉ (suppression de photo non prise en compte) : à l'enregistrement,
+//    photoIds n'était renvoyé au backend QUE si de nouvelles photos étaient
+//    ajoutées (`...(photoIds.length > 0 && { photoIds })`) — retirer une
+//    photo sans en ajouter n'était donc jamais transmis, et il n'existait
+//    même pas de logique de récupération des photos existantes. photoIds
+//    (existantes conservées + nouvelles) est maintenant toujours envoyé,
+//    reflet exact de ce qui reste affiché dans la galerie.
+// 🔥 CORRIGÉ (champs coupés sur mobile) : les lignes Statut/Promoteur,
+//    Budget prévu/dépensé et Début/Fin utilisaient une grille fixe à 2
+//    colonnes sans repli — texte tronqué à droite sur écran étroit.
+//    Nouvelle classe .pp-grid2 (grid 2 colonnes → 1 colonne sous 480px).
+//
 // v2.0 — CHANGELOG :
 // 🔥 CORRIGÉ (ProjectModal) : project.summary dans le header n'avait aucune
 //    limite de lignes, pouvait écraser la zone défilante en dessous sur un
@@ -150,6 +171,32 @@ function fmtSize(bytes?: number | null) {
   if (bytes < 1024) return `${bytes} o`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} Ko`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+}
+
+// 🔥 AJOUT : reconstitue la liste des photos déjà enregistrées pour un
+// projet (mêmes sources que ProjectModal : champ dédié "photos" + pièces
+// jointes de type image, dédupliquées par URL), sous la forme PhotoItem
+// utilisée par le formulaire d'édition. Seules les entrées possédant un
+// "id" (fileAsset id, nécessaire pour photoIds à l'enregistrement) sont
+// retenues.
+function getExistingPhotoItems(project: Project): PhotoItem[] {
+  type AttachmentWithId = Attachment & { id?: string };
+  const dedicatedPhotos = ((project as Project & { photos?: AttachmentWithId[] }).photos ?? []) as AttachmentWithId[];
+  const allAttachments = (project.attachments ?? []) as AttachmentWithId[];
+  const attachmentImages = allAttachments.filter(isImageAttachment);
+  const combined = [
+    ...dedicatedPhotos,
+    ...attachmentImages.filter((ai) => !dedicatedPhotos.some((dp) => dp.url === ai.url)),
+  ];
+
+  return combined
+    .filter((a): a is AttachmentWithId & { id: string } => Boolean(a.id))
+    .slice(0, MAX_PHOTOS)
+    .map((a) => ({
+      id: a.id,
+      previewUrl: a.url,
+      fileName: a.fileName,
+    }));
 }
 
 /* ══════════════════════════════════════════════════════ DETAIL ROW */
@@ -772,19 +819,28 @@ function DeleteModal({
 }
 
 /* ══════════════════════════════════════════════════════ PHOTO DROP ZONE */
-interface PhotoFile {
-  file: File;
-  preview: string;
-  id: string;
+// 🔥 CORRIGÉ : PhotoItem (remplace l'ancien PhotoFile) représente aussi
+// bien une photo déjà enregistrée côté serveur (previewUrl = URL distante,
+// pas de "file") qu'un fichier tout juste sélectionné, pas encore uploadé
+// (previewUrl = URL objet locale, "file" présent). Cette unification
+// permet d'afficher et de retirer les photos existantes dans le
+// formulaire d'édition, ce qui était impossible avant.
+interface PhotoItem {
+  id: string;          // fileAsset id (photo existante) ou id local (nouveau fichier)
+  previewUrl: string;  // URL distante (existante) ou URL objet locale (nouveau fichier)
+  fileName?: string;
+  file?: File;          // présent uniquement pour les photos pas encore uploadées
 }
 
-function UploadSlot({ photo, onRemove, onAdd, disabled }: { photo?: PhotoFile; onRemove?: () => void; onAdd?: () => void; disabled?: boolean; }) {
+function UploadSlot({ photo, onRemove, onAdd, disabled }: { photo?: PhotoItem; onRemove?: () => void; onAdd?: () => void; disabled?: boolean; }) {
   if (photo) {
     return (
       <div style={{ position: 'relative', aspectRatio: '1 / 1', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(37,99,235,.15)', background: '#F8FAFC', boxShadow: '0 1px 3px rgba(15,23,42,.04)' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={photo.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '.3rem .4rem', background: 'linear-gradient(to top, rgba(15,23,42,.72), rgba(15,23,42,0))', color: 'white', fontSize: '.58rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={photo.file.name}>{photo.file.name}</div>
+        <img src={photo.previewUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+        {photo.fileName && (
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '.3rem .4rem', background: 'linear-gradient(to top, rgba(15,23,42,.72), rgba(15,23,42,0))', color: 'white', fontSize: '.58rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={photo.fileName}>{photo.fileName}</div>
+        )}
         <button type="button" onClick={onRemove} style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: 'rgba(15,23,42,.68)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}>
           <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="3"><path strokeLinecap="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
@@ -800,7 +856,7 @@ function UploadSlot({ photo, onRemove, onAdd, disabled }: { photo?: PhotoFile; o
   );
 }
 
-function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p: PhotoFile[]) => void }) {
+function PhotoDropZone({ photos, onChange }: { photos: PhotoItem[]; onChange: (p: PhotoItem[]) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -808,7 +864,7 @@ function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p
   function addFiles(files: FileList | File[]) {
     setErr(null);
     const arr = Array.from(files);
-    const valid: PhotoFile[] = [];
+    const valid: PhotoItem[] = [];
 
     for (const f of arr) {
       if (!ACCEPT.includes(f.type)) { setErr('Format non accepté (PNG, JPG, WEBP).'); continue; }
@@ -816,9 +872,10 @@ function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p
       if (photos.length + valid.length >= MAX_PHOTOS) { setErr(`Maximum ${MAX_PHOTOS} photos.`); break; }
 
       valid.push({
+        id: `new-${f.name}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        previewUrl: URL.createObjectURL(f),
+        fileName: f.name,
         file: f,
-        preview: URL.createObjectURL(f),
-        id: `${f.name}-${f.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       });
     }
 
@@ -827,7 +884,9 @@ function PhotoDropZone({ photos, onChange }: { photos: PhotoFile[]; onChange: (p
 
   function remove(id: string) {
     const p = photos.find((x) => x.id === id);
-    if (p) URL.revokeObjectURL(p.preview);
+    // On ne révoque l'URL objet que pour les nouveaux fichiers — les photos
+    // existantes utilisent une URL distante, pas un blob local.
+    if (p?.file) URL.revokeObjectURL(p.previewUrl);
     onChange(photos.filter((x) => x.id !== id));
   }
 
@@ -892,20 +951,38 @@ interface FormValues {
 }
 const EMPTY: FormValues = { title: '', summary: '', description: '', locationText: '', promoterName: '', status: 'PROPOSED', budgetPlanned: '', budgetSpent: '', startsAt: '', endsAt: '', targetBeneficiaries: '', populationImpact: '', environmentalImpact: '', risksAndMitigation: '', implementationMethod: '', specificObjectives: '', expectedResults: '', successIndicators: '' };
 
-function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploadProgress }: { initial?: FormValues; onSave: (v: FormValues, p: File[]) => void; onCancel: () => void; submitting: boolean; submitLabel: string; uploadProgress: string | null; }) {
+function ProjectForm({ initial, initialPhotos, onSave, onCancel, submitting, submitLabel, uploadProgress }: {
+  initial?: FormValues;
+  // 🔥 AJOUT : photos déjà enregistrées du projet en cours d'édition —
+  // préremplit la galerie au lieu de démarrer toujours vide.
+  initialPhotos?: PhotoItem[];
+  // 🔥 CORRIGÉ : onSave reçoit maintenant explicitement les ids des photos
+  // existantes CONSERVÉES (celles encore présentes dans la galerie) et les
+  // nouveaux fichiers à uploader.
+  onSave: (v: FormValues, existingPhotoIds: string[], newFiles: File[]) => void;
+  onCancel: () => void;
+  submitting: boolean;
+  submitLabel: string;
+  uploadProgress: string | null;
+}) {
   const [v, setV] = useState<FormValues>(initial ?? EMPTY);
-  const [photos, setPhotos] = useState<PhotoFile[]>([]);
+  const [photos, setPhotos] = useState<PhotoItem[]>(initialPhotos ?? []);
   const f = (k: keyof FormValues) => ({ value: v[k], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setV((p) => ({ ...p, [k]: e.target.value })) });
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); onSave(v, photos.map((p) => p.file)); }}>
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      const existingPhotoIds = photos.filter((p) => !p.file).map((p) => p.id);
+      const newFiles = photos.filter((p) => p.file).map((p) => p.file as File);
+      onSave(v, existingPhotoIds, newFiles);
+    }}>
       <div style={{ display: 'grid', gap: '1.2rem' }}>
         <div className="pp-form-section">
           <h3 className="pp-form-section-title"><svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Informations Générales</h3>
           <div style={{ display: 'grid', gap: '.85rem' }}>
             <div><label style={LS}>Titre du projet <span style={{ color: '#EF4444' }}>*</span></label><input style={IS} placeholder="Nom officiel du projet" required {...f('title')} /></div>
             <div><label style={LS}>Résumé court</label><input style={IS} placeholder="Une phrase d'accroche ou résumé rapide" {...f('summary')} /></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+            <div className="pp-grid2">
               <div><label style={LS}>Statut</label><select style={SS} value={v.status} onChange={(e) => setV((p) => ({ ...p, status: e.target.value as ProjectStatus }))}>{STATUS_FORM_OPTIONS.map((o) => (<option key={o.value} value={o.value}>{o.label}</option>))}</select></div>
               <div><label style={LS}>Promoteur / Porteur</label><input style={IS} placeholder="Nom du responsable" {...f('promoterName')} /></div>
             </div>
@@ -936,11 +1013,11 @@ function ProjectForm({ initial, onSave, onCancel, submitting, submitLabel, uploa
               <div><label style={LS}>Méthode d&apos;implémentation</label><textarea style={TA} placeholder="Étapes de réalisation..." {...f('implementationMethod')} /></div>
               <div><label style={LS}>Risques &amp; Mitigations</label><textarea style={TA} placeholder="Dangers potentiels et solutions..." {...f('risksAndMitigation')} /></div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+            <div className="pp-grid2">
               <div><label style={LS}>Début prévu</label><input style={IS} type="date" {...f('startsAt')} /></div>
               <div><label style={LS}>Fin prévue</label><input style={IS} type="date" {...f('endsAt')} /></div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.85rem' }}>
+            <div className="pp-grid2">
               <div><label style={LS}>Budget prévu (GNF)</label><input style={IS} type="number" min="0" placeholder="0" {...f('budgetPlanned')} /></div>
               <div><label style={LS}>Budget dépensé (GNF)</label><input style={IS} type="number" min="0" placeholder="0" {...f('budgetSpent')} /></div>
             </div>
@@ -1014,14 +1091,18 @@ export default function SuperAdminProjectsPage() {
   function openEdit(p: Project) { setEditing(p); setSaveError(null); setFormMode('edit'); setDetailProject(null); }
   function closeForm() { setFormMode('hidden'); setEditing(null); setSaveError(null); }
 
-  async function handleSave(values: FormValues, photos: File[]) {
+  // 🔥 CORRIGÉ : signature mise à jour — existingPhotoIds vient directement
+  // de l'état de la galerie côté formulaire (photos existantes encore
+  // présentes après d'éventuelles suppressions), newFiles ne contient que
+  // les fichiers pas encore uploadés.
+  async function handleSave(values: FormValues, existingPhotoIds: string[], newFiles: File[]) {
     setSaveError(null); setSubmitting(true);
     try {
-      const photoIds: string[] = [];
-      for (let i = 0; i < photos.length; i++) {
-        setUploadProgress(`Upload photo ${i + 1}\u202f/\u202f${photos.length}\u2026`);
-        const up = await api.uploadFile(photos[i], { category: 'PROJECT_IMAGE', folder: 'projects' });
-        photoIds.push(up.id);
+      const newPhotoIds: string[] = [];
+      for (let i = 0; i < newFiles.length; i++) {
+        setUploadProgress(`Upload photo ${i + 1}\u202f/\u202f${newFiles.length}\u2026`);
+        const up = await api.uploadFile(newFiles[i], { category: 'PROJECT_IMAGE', folder: 'projects' });
+        newPhotoIds.push(up.id);
       }
       setUploadProgress('Finalisation\u2026');
 
@@ -1034,7 +1115,13 @@ export default function SuperAdminProjectsPage() {
         expectedResults: values.expectedResults || undefined, successIndicators: values.successIndicators || undefined,
         budgetPlanned: values.budgetPlanned ? Number(values.budgetPlanned) : undefined,
         budgetSpent: values.budgetSpent ? Number(values.budgetSpent) : undefined,
-        startsAt: values.startsAt || null, endsAt: values.endsAt || null, ...(photoIds.length > 0 && { photoIds }),
+        startsAt: values.startsAt || null, endsAt: values.endsAt || null,
+        // 🔥 CORRIGÉ : photoIds (existantes conservées + nouvelles) envoyé
+        // systématiquement, même sans nouvel ajout — avant, il n'était
+        // inclus que si de nouvelles photos étaient uploadées, et il
+        // n'existait même pas de logique de récupération des photos
+        // existantes. Reflet exact de ce qui reste affiché dans la galerie.
+        photoIds: [...existingPhotoIds, ...newPhotoIds],
       };
 
       if (editing) {
@@ -1072,6 +1159,10 @@ export default function SuperAdminProjectsPage() {
     expectedResults: typeof editing.expectedResults === 'string' ? editing.expectedResults : JSON.stringify(editing.expectedResults ?? ''),
     successIndicators: typeof editing.successIndicators === 'string' ? editing.successIndicators : JSON.stringify(editing.successIndicators ?? ''),
   } : undefined;
+
+  // 🔥 AJOUT : photos déjà enregistrées du projet en cours d'édition,
+  // transmises au formulaire pour préremplir la galerie.
+  const editingPhotos: PhotoItem[] = editing ? getExistingPhotoItems(editing) : [];
 
   const draftCount = items.filter((i) => i.status === 'PROPOSED').length;
   const approvedCount = items.filter((i) => i.status === 'APPROVED').length;
@@ -1161,6 +1252,12 @@ export default function SuperAdminProjectsPage() {
 
         .pp-form-section { background: rgba(255,255,255,.6); border: 1px solid rgba(37,99,235,.1); padding: 1.2rem; border-radius: 14px; margin-bottom: 1rem; }
         .pp-form-section-title { margin: 0 0 1rem; font-size: .8rem; font-weight: 800; color: #1D4ED8; text-transform: uppercase; letter-spacing: .05em; display: flex; align-items: center; gap: .4rem; border-bottom: 1px dashed rgba(37,99,235,.15); padding-bottom: .6rem; }
+
+        /* 🔥 AJOUT : grille 2 colonnes avec repli en 1 colonne sous 480px —
+           corrige le texte tronqué à droite sur écran étroit (Statut /
+           Promoteur, Début / Fin, Budget prévu / dépensé). */
+        .pp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
+        @media (max-width: 480px) { .pp-grid2 { grid-template-columns: 1fr; } }
 
         .pp-edit-banner{display:flex;align-items:center;gap:.4rem;font-size:.72rem;font-weight:800;color:#2563EB;margin-bottom:.7rem;padding:.5rem .75rem;background:rgba(239,246,255,.9);border:1px solid rgba(37,99,235,.2);border-radius:9px}
         .pp-edit-dot{width:6px;height:6px;border-radius:50%;background:#2563EB;animation:pppulse 1.5s infinite;flex-shrink:0}
@@ -1254,7 +1351,8 @@ export default function SuperAdminProjectsPage() {
               <ProjectForm
                 key={editing?.id ?? 'new'}
                 initial={editingInitial}
-                onSave={(v, p) => void handleSave(v, p)}
+                initialPhotos={editingPhotos}
+                onSave={(v, existingIds, files) => void handleSave(v, existingIds, files)}
                 onCancel={closeForm}
                 submitting={submitting}
                 submitLabel={formMode === 'edit' ? 'Mettre à jour' : 'Créer le projet'}

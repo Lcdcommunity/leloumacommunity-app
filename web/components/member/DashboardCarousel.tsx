@@ -199,39 +199,27 @@ export function DashboardCarousel({
           width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0;
         }
 
-        /* ── Haut droit : indicateurs ── */
-        .carousel-indicators {
-          position: absolute; top: 0.9rem; right: 0.9rem;
-          display: flex; gap: 0.35rem; z-index: 10; align-items: center;
-        }
-        .carousel-dot {
-          width: 5px; height: 5px; border-radius: 50%;
-          background: rgba(255,255,255,0.38); transition: all 0.3s;
-        }
-        .carousel-dot.active {
-          background: white; width: 16px; border-radius: 99px;
-          box-shadow: 0 0 6px rgba(255,255,255,0.8);
-        }
-
-        /* ── Centre : titre ── */
+        /* ── Haut droit : titre ── */
+        /* 🔥 CORRIGÉ : le titre, qui occupait tout le centre en grand, est
+           déplacé en haut à droite avec une taille alignée sur celle de la
+           localisation (0.65rem) — il masquait les photos du carrousel. */
         .carousel-title-wrap {
-          position: absolute; inset: 0; z-index: 5;
-          display: flex; align-items: center; justify-content: center;
-          /* Légèrement tiré vers le bas pour équilibrer visuellement avec le footer */
-          padding: 2rem 1.5rem 3.5rem;
-          pointer-events: none;
+          position: absolute; top: 0.85rem; right: 0.9rem; z-index: 10;
+          max-width: 62%;
+          text-align: right;
         }
         .carousel-title {
           font-family: 'Cormorant Garamond', serif;
-          font-size: 1.25rem; font-weight: 700;
-          color: white; text-align: center;
-          line-height: 1.25; max-width: 88%;
+          font-size: 0.65rem; font-weight: 700;
+          color: white; text-align: right;
+          line-height: 1.35;
           display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
           overflow: hidden;
           text-shadow: 0 2px 14px rgba(0,0,0,0.65), 0 1px 3px rgba(0,0,0,0.4);
+          margin: 0;
         }
 
-        /* ── Bas : date gauche / lieu droit ── */
+        /* ── Bas : date gauche / lieu droit (inchangé, comme à l'origine) ── */
         .carousel-footer {
           position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
           display: flex; align-items: center; justify-content: space-between;
@@ -275,16 +263,7 @@ export function DashboardCarousel({
         </div>
       )}
 
-      {/* ── Haut droit : indicateurs de slides ── */}
-      {sortedItems.length > 1 && (
-        <div className="carousel-indicators">
-          {sortedItems.map((_, idx) => (
-            <div key={idx} className={`carousel-dot ${idx === currentItemIdx ? 'active' : ''}`} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Centre : titre ── */}
+      {/* ── Haut droit : titre ── */}
       <div className="carousel-title-wrap">
         <h3 className="carousel-title">{current.title}</h3>
       </div>
