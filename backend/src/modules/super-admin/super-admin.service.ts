@@ -6,6 +6,22 @@
 // à admin.service.ts) : un SUPER_ADMIN voit tous les membres de son
 // association, seul associationId sert de garde-fou.
 //
+// 🔥 CORRIGÉ (updateProject) : deux bugs distincts.
+//   1) photoIds n'était pas du tout géré ici (contrairement à
+//      admin.service.ts::updateProject) — aucune photo ajoutée ou
+//      supprimée depuis l'édition Super Admin n'était jamais persistée.
+//   2) La méthode lisait data.budgetAmount / data.amountSpent /
+//      data.startDate / data.endDate, alors que le formulaire d'édition
+//      (super-admin/projects/page.tsx) envoie budgetPlanned / budgetSpent /
+//      startsAt / endsAt — ces champs restaient donc toujours undefined et
+//      n'étaient jamais enregistrés. Il manquait aussi entièrement
+//      locationText, promoterName, targetBeneficiaries, populationImpact,
+//      environmentalImpact, implementationMethod, risksAndMitigation,
+//      specificObjectives, expectedResults, successIndicators — tous
+//      silencieusement ignorés à chaque modification. Corrigé pour
+//      correspondre exactement à ce qu'envoie le formulaire, comme le fait
+//      déjà admin.service.ts::updateProject.
+//
 import {
   BadRequestException,
   ConflictException,
@@ -731,25 +747,54 @@ export class SuperAdminService {
     };
   }
 
+  // 🔥 CORRIGÉ : deux bugs distincts (cf. commentaire en tête de fichier).
+  // 1) noms de champs alignés sur ce qu'envoie réellement le formulaire
+  //    d'édition (budgetPlanned/budgetSpent/startsAt/endsAt, pas
+  //    budgetAmount/amountSpent/startDate/endDate) + tous les champs texte
+  //    manquants (locationText, promoterName, targetBeneficiaries, etc.).
+  // 2) photoIds désormais géré : deleteMany s'exécute dès que photoIds est
+  //    fourni, même vide (toutes les photos retirées) — même correctif que
+  //    admin.service.ts::updateProject.
   async updateProject(id: string, data: any, associationId: string) {
     let safeStatus = data.status;
-    if (safeStatus === 'DRAFT') safeStatus = ProjectStatus.PROPOSED;
+    if (safeStatus === 'DRAFT')            safeStatus = ProjectStatus.PROPOSED;
     if (safeStatus === 'PENDING_APPROVAL') safeStatus = ProjectStatus.UNDER_REVIEW;
-    if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
+    if (safeStatus === 'SUSPENDED')        safeStatus = ProjectStatus.ON_HOLD;
 
-    return this.prisma.project.update({
+    const updated = await this.prisma.project.update({
       where: { id, associationId },
       data: {
-        title: data.title,
-        summary: data.summary,
-        description: data.description,
+        title:                data.title,
+        summary:              data.summary,
+        description:          data.description,
+        locationText:         data.locationText,
+        promoterName:         data.promoterName,
+        targetBeneficiaries:  data.targetBeneficiaries,
+        populationImpact:     data.populationImpact,
+        environmentalImpact:  data.environmentalImpact,
+        implementationMethod: data.implementationMethod,
+        risksAndMitigation:   data.risksAndMitigation,
+        specificObjectives:   data.specificObjectives,
+        expectedResults:      data.expectedResults,
+        successIndicators:    data.successIndicators,
         status: safeStatus,
-        budgetAmount: data.budgetAmount,
-        amountSpent: data.amountSpent,
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        endDate: data.endDate ? new Date(data.endDate) : undefined,
+        startDate: data.startsAt !== undefined ? (data.startsAt ? new Date(data.startsAt) : null) : undefined,
+        endDate:   data.endsAt   !== undefined ? (data.endsAt   ? new Date(data.endsAt)   : null) : undefined,
+        budgetAmount: data.budgetPlanned !== undefined ? (data.budgetPlanned ? new Prisma.Decimal(data.budgetPlanned) : null) : undefined,
+        amountSpent:  data.budgetSpent   !== undefined ? (data.budgetSpent   ? new Prisma.Decimal(data.budgetSpent)   : null) : undefined,
       },
     });
+
+    if (Array.isArray(data.photoIds)) {
+      await this.prisma.projectAttachment.deleteMany({ where: { projectId: id } });
+      if (data.photoIds.length > 0) {
+        await this.prisma.projectAttachment.createMany({
+          data: data.photoIds.map((fileId: string) => ({ projectId: id, fileId })),
+        });
+      }
+    }
+
+    return updated;
   }
 
   async deleteProject(id: string, associationId: string) {

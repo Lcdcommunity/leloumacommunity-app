@@ -26,6 +26,16 @@
 //   (icône "œil" sur la modale de détails, admin/members/page.tsx). Scope
 //   identique au reste du fichier : getAdminContext() + antennaIds.
 //
+// v1.4 — 🔥 CORRIGÉ (updateProject) : deleteMany des pièces jointes ne
+//   s'exécutait que si `data.photoIds.length > 0`. Quand on supprimait la
+//   dernière photo restante d'un projet, photoIds arrivait vide ([]) —
+//   `Array.isArray` était vrai mais `length > 0` faux, donc tout le bloc
+//   (deleteMany ET createMany) était sauté : l'ancienne pièce jointe restait
+//   en base et réapparaissait au chargement suivant, alors que l'écran
+//   l'affichait comme supprimée (état local optimiste côté front). Le
+//   deleteMany s'exécute désormais dès que photoIds est fourni (tableau,
+//   même vide) ; seul le createMany reste conditionné à un tableau non vide.
+//
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ContributionPurpose, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType, LedgerEntryType } from '@prisma/client';
@@ -1225,6 +1235,8 @@ export class AdminService {
     return project;
   }
 
+  // 🔥 CORRIGÉ (v1.4) : cf. commentaire en tête de fichier — le bloc
+  // deleteMany/createMany des pièces jointes est désormais correct.
   async updateProject(projectId: string, adminId: string, data: any) {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
     const project = await this.prisma.project.findFirst({
@@ -1265,11 +1277,19 @@ export class AdminService {
       },
     });
 
-    if (Array.isArray(data.photoIds) && data.photoIds.length > 0) {
+    // 🔥 CORRIGÉ (v1.4) : deleteMany doit s'exécuter dès que photoIds est
+    // fourni, même vide (= toutes les photos ont été retirées). Avant, la
+    // condition `data.photoIds.length > 0` sautait tout le bloc quand on
+    // supprimait la dernière photo restante — l'ancienne pièce jointe
+    // restait en base et réapparaissait au chargement suivant. Seul le
+    // createMany (recréation) reste conditionné à un tableau non vide.
+    if (Array.isArray(data.photoIds)) {
       await this.prisma.projectAttachment.deleteMany({ where: { projectId } });
-      await this.prisma.projectAttachment.createMany({
-        data: data.photoIds.map((fileId: string) => ({ projectId, fileId })),
-      });
+      if (data.photoIds.length > 0) {
+        await this.prisma.projectAttachment.createMany({
+          data: data.photoIds.map((fileId: string) => ({ projectId, fileId })),
+        });
+      }
     }
 
     return updated;
