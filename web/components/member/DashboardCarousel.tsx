@@ -160,7 +160,14 @@ export function DashboardCarousel({
     <div className="carousel-container">
       <style>{`
         .carousel-container {
-          width: 100%; height: 220px;
+          width: 100%;
+          /* 🔥 CORRIGÉ : hauteur fixe (220px) trop courte pour la largeur
+             réelle sur PC — le ratio devenait extrême (~6:1), forçant
+             object-fit: cover à zoomer et rogner très fort l'image pour
+             remplir la boîte. clamp() garde 220px sur mobile (viewport
+             étroit) mais laisse la hauteur grandir progressivement sur
+             grand écran, pour un ratio plus raisonnable et moins de crop. */
+          height: clamp(220px, 22vw, 380px);
           border-radius: 20px; overflow: hidden;
           position: relative; margin-bottom: 1.5rem;
           background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%);
@@ -170,8 +177,10 @@ export function DashboardCarousel({
         .carousel-bg {
           position: absolute; inset: 0; width: 100%; height: 100%;
           object-fit: cover;
-          transition: transform 6s ease-out;
-          transform: scale(1.05);
+          /* 🔥 CORRIGÉ : l'ancien "transform: scale(1.05)" était appliqué en
+             permanence (aucun déclencheur, ni survol ni animation) — il ne
+             faisait qu'ajouter 5% de zoom/rognage inutile en plus du crop
+             déjà causé par object-fit: cover. Supprimé. */
         }
 
         /* Voile : léger en haut pour laisser respirer l'image, dense en bas pour lisibilité */
@@ -200,9 +209,6 @@ export function DashboardCarousel({
         }
 
         /* ── Haut droit : titre ── */
-        /* 🔥 CORRIGÉ : le titre, qui occupait tout le centre en grand, est
-           déplacé en haut à droite avec une taille alignée sur celle de la
-           localisation (0.65rem) — il masquait les photos du carrousel. */
         .carousel-title-wrap {
           position: absolute; top: 0.85rem; right: 0.9rem; z-index: 10;
           max-width: 62%;
