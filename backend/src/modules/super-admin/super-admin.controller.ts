@@ -1,4 +1,11 @@
 // backend/src/modules/super-admin/super-admin.controller.ts
+//
+// 🔥 AJOUT : route GET projects/:id/export — le frontend appelait déjà
+// cette route (super-admin/projects/page.tsx), mais elle n'existait pas
+// ici, uniquement côté admin.controller.ts. D'où l'échec systématique du
+// téléchargement PDF depuis le compte Super Admin ("Impossible de
+// télécharger le PDF"), alors que l'équivalent Admin fonctionnait.
+//
 import {
   Body,
   Controller,
@@ -9,6 +16,7 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { SuperAdminService } from './super-admin.service';
@@ -21,6 +29,7 @@ import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { ListAntennasQueryDto } from './dto/list-antennas-query.dto';
 import { CreateAntennaDto } from './dto/create-antenna.dto';
 import { CreateAntennaAdminDto } from './dto/create-antenna-admin.dto';
+import { Response } from 'express';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -171,6 +180,18 @@ export class SuperAdminController {
   @Get('projects')
   listProjects(@CurrentUser() actor: AuthUser, @Query() query: PaginationQueryDto) {
     return this.service.listProjects(actor.associationId, query.page, query.pageSize, query.q);
+  }
+
+  // 🔥 AJOUT : route manquante — cf. commentaire en tête de fichier.
+  @Get('projects/:id/export')
+  async exportProjectPdf(@Param('id') id: string, @CurrentUser() actor: AuthUser, @Res() res: Response) {
+    const pdfBuffer = await this.service.exportProjectPdf(id, actor.associationId);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="projet-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
   }
 
   @Patch('projects/:id')

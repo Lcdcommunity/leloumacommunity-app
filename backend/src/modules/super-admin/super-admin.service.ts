@@ -747,6 +747,103 @@ export class SuperAdminService {
     };
   }
 
+  // 🔥 AJOUT : export PDF d'un projet — route manquante côté Super Admin.
+  // Le frontend (super-admin/projects/page.tsx) appelait déjà
+  // GET /super-admin/projects/:id/export, mais ni le controller ni le
+  // service n'exposaient cette méthode : la requête tombait sur une route
+  // inexistante (404), d'où "Impossible de télécharger le PDF. Vérifiez
+  // votre connexion." alors que l'équivalent Admin fonctionnait. Même
+  // génération que admin.service.ts::exportProjectPdf, adaptée au scope
+  // Super Admin (associationId seul, pas de restriction antennaIds — un
+  // SUPER_ADMIN peut exporter n'importe quel projet de son association).
+  async exportProjectPdf(projectId: string, associationId: string): Promise<Buffer> {
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, associationId },
+      include: { attachments: { include: { file: true } } },
+    });
+
+    if (!project) throw new NotFoundException('Projet introuvable.');
+
+    const PDFDocument = require('pdfkit');
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        const buffers: Buffer[] = [];
+        doc.on('data', buffers.push.bind(buffers));
+        doc.on('end', () => resolve(Buffer.concat(buffers)));
+        doc.on('error', reject);
+
+        const addSection = (title: string, content: string | null | undefined) => {
+          if (!content) return;
+          doc.moveDown();
+          doc.fontSize(14).font('Helvetica-Bold').fillColor('#1D4ED8').text(title);
+          doc.moveDown(0.5);
+          doc.fontSize(11).font('Helvetica').fillColor('#374151').text(content, { align: 'justify' });
+        };
+
+        const safeStringify = (val: any) => typeof val === 'string' ? val : JSON.stringify(val, null, 2);
+
+        doc.fontSize(24).font('Helvetica-Bold').fillColor('#0F172A').text(project.title, { align: 'center' });
+        doc.moveDown();
+
+        doc.fontSize(12).font('Helvetica').fillColor('#6B7280');
+        if (project.promoterName) doc.text(`Promoteur: ${project.promoterName}`, { align: 'center' });
+        if (project.locationText) doc.text(`Localisation: ${project.locationText}`, { align: 'center' });
+        doc.text(`Statut: ${project.status}`, { align: 'center' });
+        doc.moveDown(2);
+
+        addSection('Résumé', project.summary);
+        addSection('Description Complète', project.description);
+        addSection('Bénéficiaires Cibles', project.targetBeneficiaries);
+        addSection('Impact sur la Population', project.populationImpact);
+        addSection('Impact Environnemental', project.environmentalImpact);
+
+        if (project.specificObjectives) addSection('Objectifs Spécifiques', safeStringify(project.specificObjectives));
+        if (project.expectedResults) addSection('Résultats Attendus', safeStringify(project.expectedResults));
+        if (project.successIndicators) addSection('Indicateurs de Succès', safeStringify(project.successIndicators));
+
+        addSection("Méthode d'Implémentation", project.implementationMethod);
+        addSection('Risques et Mitigations', project.risksAndMitigation);
+
+        doc.moveDown();
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#1D4ED8').text('Budget & Exécution');
+        doc.moveDown(0.5);
+        doc.fontSize(11).font('Helvetica').fillColor('#374151');
+        doc.text(`Budget Prévu: ${project.budgetAmount ? project.budgetAmount.toString() : 'Non défini'}`);
+        doc.text(`Budget Dépensé: ${project.amountSpent ? project.amountSpent.toString() : '0'}`);
+        if (project.startDate) doc.text(`Date de début: ${project.startDate.toLocaleDateString('fr-FR')}`);
+        if (project.endDate) doc.text(`Date de fin: ${project.endDate.toLocaleDateString('fr-FR')}`);
+
+        if (project.attachments && project.attachments.length > 0) {
+          doc.addPage();
+          doc.fontSize(18).font('Helvetica-Bold').fillColor('#1D4ED8').text('Galerie Photos', { align: 'center' });
+          doc.moveDown();
+
+          for (const att of project.attachments) {
+            if (att.file && att.file.url) {
+              try {
+                const response = await fetch(att.file.url);
+                if (response.ok) {
+                  const arrayBuffer = await response.arrayBuffer();
+                  const buffer = Buffer.from(arrayBuffer);
+                  doc.moveDown();
+                  doc.image(buffer, { fit: [450, 350], align: 'center' });
+                  doc.moveDown(2);
+                }
+              } catch (e) {
+                console.error('Erreur image PDF:', e);
+              }
+            }
+          }
+        }
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
   // 🔥 CORRIGÉ : deux bugs distincts (cf. commentaire en tête de fichier).
   // 1) noms de champs alignés sur ce qu'envoie réellement le formulaire
   //    d'édition (budgetPlanned/budgetSpent/startsAt/endsAt, pas
