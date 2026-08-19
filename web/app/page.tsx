@@ -6,6 +6,10 @@
 //          strictement inchangée. Ce fichier ne fait que : résoudre
 //          l'association via le host, générer un title/description/Open
 //          Graph propres à chaque domaine, puis rendre le composant client.
+//
+// v3.1.0 — Ajout d'un `alternates.canonical` propre à CETTE page (déplacé
+//          depuis app/layout.tsx, où il était à tort appliqué par défaut à
+//          toutes les pages du site, y compris /login et /signup).
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { env } from '../lib/env';
@@ -28,10 +32,14 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = (headersList.get('host') || '').replace(/^www\./, '');
   const org = await getOrgData(host);
 
+  // Canonical fixe sur le domaine officiel de LCD, pour cette page précisément.
+  const canonical = 'https://www.leloumacommunity.com/';
+
   if (!org?.name) {
     return {
       title: 'AssoGlobal — Plateforme de gestion d’association communautaire',
       description: "Rejoignez votre communauté, suivez les projets, réglez vos cotisations et restez informé — le tout au même endroit.",
+      alternates: { canonical },
     };
   }
 
@@ -44,6 +52,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: { canonical },
     openGraph: {
       title,
       description,

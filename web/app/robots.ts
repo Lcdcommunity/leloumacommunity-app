@@ -1,18 +1,16 @@
 //web/app/robots.ts
 import type { MetadataRoute } from 'next'
-import { headers } from 'next/headers'
 
-export default async function robots(): Promise<MetadataRoute.Robots> {
-  const headersList = await headers()
-  const host = headersList.get('host') || 'leloumacommunity.com'
-  const protocol = host.includes('localhost') ? 'http' : 'https'
+// Même correction que sitemap.ts : URL fixe plutôt que dérivée du Host reçu.
+const BASE_URL = 'https://www.leloumacommunity.com'
 
+export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: '*',
       allow: '/',
       disallow: ['/admin', '/super-admin', '/system-admin', '/api'],
     },
-    sitemap: `${protocol}://${host}/sitemap.xml`,
+    sitemap: `${BASE_URL}/sitemap.xml`,
   }
 }

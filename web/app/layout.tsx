@@ -18,10 +18,20 @@ import { cookies } from 'next/headers';
  * - Conserver "Grand Chef" comme nom de la plateforme.
  * - Optimiser l'affichage dans Google, Facebook, WhatsApp,
  *   LinkedIn et autres moteurs/plateformes.
+ *
+ * IMPORTANT (fix indexation) :
+ * Le `alternates.canonical` qui était ici (fixé sur la racine
+ * "https://www.leloumacommunity.com/") a été retiré : posé au niveau
+ * du layout racine, il s'appliquait par défaut à TOUTES les pages
+ * (login, signup, etc.), leur faisant déclarer la page d'accueil
+ * comme leur propre URL canonique. Le canonical doit être posé
+ * page par page (voir generateMetadata dans app/page.tsx pour la
+ * page d'accueil ; à ajouter de la même façon dans login/page.tsx,
+ * signup/page.tsx, etc.).
  */
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://leloumacommunity.com'),
+  metadataBase: new URL('https://www.leloumacommunity.com'),
 
   title: {
     default: 'Lélouma Communauté pour le Développement (LCD) | Site officiel',
@@ -36,7 +46,7 @@ export const metadata: Metadata = {
   authors: [
     {
       name: 'Lélouma Communauté pour le Développement',
-      url: 'https://leloumacommunity.com',
+      url: 'https://www.leloumacommunity.com',
     },
     {
       name: 'Thierno Doniko',
@@ -65,10 +75,6 @@ export const metadata: Metadata = {
 
   category: 'organization',
 
-  alternates: {
-    canonical: 'https://leloumacommunity.com/',
-  },
-
   robots: {
     index: true,
     follow: true,
@@ -93,7 +99,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
 
-    url: 'https://leloumacommunity.com/',
+    url: 'https://www.leloumacommunity.com/',
 
     siteName: 'Lélouma Communauté pour le Développement',
 
