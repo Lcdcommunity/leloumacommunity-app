@@ -54,6 +54,10 @@ type CarouselItem = {
   location?: string | null;
 };
 
+// Nombre de photos affichées simultanément, côte à côte, avant de devoir
+// faire défiler pour voir les suivantes.
+const VISIBLE_PHOTOS = 3;
+
 // ─── Traduction des statuts ───────────────────────────────────────────────────
 function translateStatus(status: string): string {
   const map: Record<string, string> = {
@@ -126,32 +130,36 @@ export function DashboardCarousel({
     .slice(0, 10);
 
   const [currentItemIdx, setCurrentItemIdx] = useState(0);
-  const [currentImgIdx, setCurrentImgIdx] = useState(0);
 
+  // 🔥 CORRIGÉ : l'ancien système faisait défiler les photos d'un même
+  // projet UNE À LA FOIS (currentImgIdx + setInterval), affichée seule avec
+  // un fond flouté autour — trop d'espace vide. Désormais toutes les photos
+  // (jusqu'à VISIBLE_PHOTOS) d'un même projet s'affichent d'un coup côte à
+  // côte, remplissant tout le bandeau ; seul le passage d'un projet au
+  // suivant reste minuté.
   useEffect(() => {
-    if (sortedItems.length === 0) return;
-
-    const currentItem = sortedItems[currentItemIdx];
-    const imgCount = Math.max(1, currentItem.imageUrls.length);
-
+    if (sortedItems.length <= 1) return;
     const timer = setInterval(() => {
-      setCurrentImgIdx(prevImg => {
-        if (prevImg + 1 < imgCount) {
-          return prevImg + 1;
-        } else {
-          setCurrentItemIdx(prevItem => (prevItem + 1) % sortedItems.length);
-          return 0;
-        }
-      });
-    }, 3000);
-
+      setCurrentItemIdx(prev => (prev + 1) % sortedItems.length);
+    }, 6000);
     return () => clearInterval(timer);
-  }, [currentItemIdx, sortedItems]);
+  }, [sortedItems.length]);
 
   if (sortedItems.length === 0) return null;
 
   const current = sortedItems[currentItemIdx];
-  const activeImageUrl = current.imageUrls[currentImgIdx] || null;
+  const imageUrls = current.imageUrls;
+
+  // Au-delà de VISIBLE_PHOTOS, on duplique la liste et on anime une
+  // translation de 0 à -50% : comme le doublon fait exactement deux fois la
+  // largeur du jeu de photos d'origine, -50% correspond pile à un cycle
+  // complet — la boucle est donc parfaitement continue, sans à-coup ni
+  // retour brusque au début.
+  const hasOverflow = imageUrls.length > VISIBLE_PHOTOS;
+  const displayImages = hasOverflow ? [...imageUrls, ...imageUrls] : imageUrls;
+  const trackWidthPercent = hasOverflow ? (displayImages.length / VISIBLE_PHOTOS) * 100 : 100;
+  const itemBasisPercent = displayImages.length > 0 ? 100 / displayImages.length : 100;
+  const scrollDurationSec = Math.max(imageUrls.length * 4, 8);
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -168,12 +176,6 @@ export function DashboardCarousel({
       <style>{`
         .carousel-container {
           width: 100%;
-          /* 🔥 CORRIGÉ : hauteur fixe (220px) trop courte pour la largeur
-             réelle sur PC — le ratio devenait extrême (~6:1), forçant
-             object-fit: cover à zoomer et rogner très fort l'image pour
-             remplir la boîte. clamp() garde 220px sur mobile (viewport
-             étroit) mais laisse la hauteur grandir progressivement sur
-             grand écran, pour un ratio plus raisonnable et moins de crop. */
           height: clamp(220px, 22vw, 380px);
           border-radius: 20px; overflow: hidden;
           position: relative; margin-bottom: 1.5rem;
@@ -181,27 +183,30 @@ export function DashboardCarousel({
           box-shadow: 0 10px 30px rgba(37,99,235,0.15);
         }
 
-        /* 🔥 CORRIGÉ : object-fit: cover rognait toujours une partie de la
-           photo (têtes/jambes coupées), quelle que soit la hauteur de la
-           boîte, dès que le ratio de la photo ne correspondait pas
-           exactement à celui du conteneur. Remplacé par object-fit: contain
-           (photo entière toujours visible, plus aucun rognage) + une
-           version floutée de la même image en arrière-plan pour remplir
-           joliment l'espace autour au lieu de laisser juste le dégradé bleu
-           uni. L'ancien "transform: scale(1.05)" (zoom fixe, sans
-           déclencheur) est supprimé.
-        */
-        .carousel-bg-blur {
-          position: absolute; inset: 0; width: 100%; height: 100%;
-          object-fit: cover;
-          filter: blur(28px) brightness(0.65) saturate(1.15);
-          transform: scale(1.15);
-          pointer-events: none;
+        /* 🔥 CORRIGÉ : remplace l'ancien fond "une photo + flou autour"
+           (trop d'espace vide) par une bande de photos côte à côte qui
+           remplit tout le bandeau. Au-delà de VISIBLE_PHOTOS, la bande
+           défile en continu de la droite vers la gauche. */
+        .carousel-photos-viewport {
+          position: absolute; inset: 0; overflow: hidden;
         }
-        .carousel-bg {
-          position: absolute; inset: 0; width: 100%; height: 100%;
-          object-fit: contain;
-          pointer-events: none;
+        .carousel-photos-track {
+          display: flex; height: 100%;
+        }
+        .carousel-photos-track.scrolling {
+          animation-name: carouselPhotosScroll;
+          animation-timing-function: linear;
+          animation-iteration-count: infinite;
+        }
+        @keyframes carouselPhotosScroll {
+          from { transform: translateX(0); }
+          to   { transform: translateX(-50%); }
+        }
+        .carousel-photo-item {
+          flex: 0 0 auto;
+          height: 100%;
+          object-fit: cover;
+          display: block;
         }
 
         /* Voile : léger en haut pour laisser respirer l'image, dense en bas pour lisibilité */
@@ -266,28 +271,30 @@ export function DashboardCarousel({
         }
       `}</style>
 
-      {/* ── Image de fond ── */}
-      {activeImageUrl ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={activeImageUrl}
-            alt=""
-            aria-hidden="true"
-            className="carousel-bg-blur"
-            key={`blur-${activeImageUrl}`}
-          />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={activeImageUrl}
-            alt={current.title}
-            className="carousel-bg"
-            key={activeImageUrl}
-          />
-        </>
-      ) : (
-        <div className="carousel-bg" />
-      )}
+      {/* ── Bande de photos ── */}
+      <div className="carousel-photos-viewport">
+        {imageUrls.length > 0 && (
+          <div
+            key={current.id}
+            className={`carousel-photos-track${hasOverflow ? ' scrolling' : ''}`}
+            style={{
+              width: `${trackWidthPercent}%`,
+              animationDuration: hasOverflow ? `${scrollDurationSec}s` : undefined,
+            }}
+          >
+            {displayImages.map((url, idx) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={`${current.id}-${idx}`}
+                src={url}
+                alt={idx === 0 ? current.title : ''}
+                className="carousel-photo-item"
+                style={{ width: `${itemBasisPercent}%` }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Voile ── */}
       <div className="carousel-overlay" />
