@@ -54,9 +54,16 @@ type CarouselItem = {
   location?: string | null;
 };
 
-// Nombre de photos affichées simultanément, côte à côte, avant de devoir
-// faire défiler pour voir les suivantes.
+// Nombre de photos affichées simultanément côte à côte sur PC/desktop,
+// avant de devoir faire défiler pour voir les suivantes.
 const VISIBLE_PHOTOS = 3;
+
+// 🔥 AJOUT : seuil PC/desktop vs mobile — cf. useEffect isDesktop plus bas.
+// La bande de plusieurs photos ne concerne que les écrans larges ; en
+// dessous, on revient à l'affichage d'une seule photo à la fois (comme à
+// l'origine), les écrans mobiles étant trop étroits pour montrer plusieurs
+// photos lisiblement.
+const DESKTOP_BREAKPOINT = '(min-width: 768px)';
 
 // ─── Traduction des statuts ───────────────────────────────────────────────────
 function translateStatus(status: string): string {
@@ -130,26 +137,68 @@ export function DashboardCarousel({
     .slice(0, 10);
 
   const [currentItemIdx, setCurrentItemIdx] = useState(0);
+  // 🔥 AJOUT : ne sert que sur mobile — index de la photo affichée seule au
+  // sein de l'item courant (comportement d'origine, réintroduit).
+  const [currentImgIdx, setCurrentImgIdx] = useState(0);
 
-  // 🔥 CORRIGÉ : l'ancien système faisait défiler les photos d'un même
-  // projet UNE À LA FOIS (currentImgIdx + setInterval), affichée seule avec
-  // un fond flouté autour — trop d'espace vide. Désormais toutes les photos
-  // (jusqu'à VISIBLE_PHOTOS) d'un même projet s'affichent d'un coup côte à
-  // côte, remplissant tout le bandeau ; seul le passage d'un projet au
-  // suivant reste minuté.
+  // 🔥 AJOUT : détecte PC/desktop (≥768px) vs mobile. Initialisé
+  // directement à la bonne valeur au premier rendu client (évite un flash),
+  // et mis à jour si la fenêtre est redimensionnée / la rotation change.
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return window.matchMedia(DESKTOP_BREAKPOINT).matches;
+  });
+
   useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_BREAKPOINT);
+    const handler = () => setIsDesktop(mq.matches);
+    handler();
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // 🔥 CORRIGÉ : la bande de plusieurs photos (avec défilement continu) ne
+  // concerne que le PC/desktop — cet effet ne cycle donc QUE l'item courant
+  // (projet/événement), chaque item affichant toutes ses photos d'un coup.
+  useEffect(() => {
+    if (!isDesktop) return;
     if (sortedItems.length <= 1) return;
     const timer = setInterval(() => {
       setCurrentItemIdx(prev => (prev + 1) % sortedItems.length);
     }, 6000);
     return () => clearInterval(timer);
-  }, [sortedItems.length]);
+  }, [isDesktop, sortedItems.length]);
+
+  // 🔥 AJOUT : comportement d'origine réintroduit pour mobile — une seule
+  // photo à la fois, on cycle photo par photo au sein de l'item courant,
+  // puis on passe à l'item suivant une fois toutes ses photos vues.
+  useEffect(() => {
+    if (isDesktop) return;
+    if (sortedItems.length === 0) return;
+
+    const currentItem = sortedItems[currentItemIdx];
+    const imgCount = Math.max(1, currentItem.imageUrls.length);
+
+    const timer = setInterval(() => {
+      setCurrentImgIdx(prevImg => {
+        if (prevImg + 1 < imgCount) {
+          return prevImg + 1;
+        } else {
+          setCurrentItemIdx(prevItem => (prevItem + 1) % sortedItems.length);
+          return 0;
+        }
+      });
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [isDesktop, currentItemIdx, sortedItems]);
 
   if (sortedItems.length === 0) return null;
 
   const current = sortedItems[currentItemIdx];
   const imageUrls = current.imageUrls;
 
+  // ── PC/Desktop : bande de photos ──
   // Au-delà de VISIBLE_PHOTOS, on duplique la liste et on anime une
   // translation de 0 à -50% : comme le doublon fait exactement deux fois la
   // largeur du jeu de photos d'origine, -50% correspond pile à un cycle
@@ -159,9 +208,10 @@ export function DashboardCarousel({
   const displayImages = hasOverflow ? [...imageUrls, ...imageUrls] : imageUrls;
   const trackWidthPercent = hasOverflow ? (displayImages.length / VISIBLE_PHOTOS) * 100 : 100;
   const itemBasisPercent = displayImages.length > 0 ? 100 / displayImages.length : 100;
-  // 🔥 CORRIGÉ : encore un peu rapide — durée augmentée (10s/photo, min
-  // 24s au lieu de 7s/photo, min 18s).
   const scrollDurationSec = Math.max(imageUrls.length * 10, 24);
+
+  // ── Mobile : une seule photo ──
+  const activeImageUrl = imageUrls[currentImgIdx] || null;
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -185,10 +235,8 @@ export function DashboardCarousel({
           box-shadow: 0 10px 30px rgba(37,99,235,0.15);
         }
 
-        /* 🔥 CORRIGÉ : remplace l'ancien fond "une photo + flou autour"
-           (trop d'espace vide) par une bande de photos côte à côte qui
-           remplit tout le bandeau. Au-delà de VISIBLE_PHOTOS, la bande
-           défile en continu de la droite vers la gauche. */
+        /* ── PC/Desktop uniquement : bande de photos côte à côte, avec
+           défilement continu au-delà de VISIBLE_PHOTOS. ── */
         .carousel-photos-viewport {
           position: absolute; inset: 0; overflow: hidden;
         }
@@ -209,14 +257,19 @@ export function DashboardCarousel({
           height: 100%;
           object-fit: cover;
           display: block;
-          /* 🔥 CORRIGÉ : l'ombre interne (inset box-shadow) trop fine et
-             trop transparente ne se voyait quasiment pas sur des photos
-             chargées — remplacée par une vraie bordure blanche solide et
-             bien visible. box-sizing: border-box garantit que la bordure
-             est absorbée dans la largeur déjà calculée (pas de dépassement,
-             pas de décalage de la mise en page). */
+          /* Bordure blanche solide et bien visible entre chaque photo,
+             pour qu'elles ne se confondent pas. box-sizing: border-box
+             garde la largeur déjà calculée (pas de dépassement). */
           box-sizing: border-box;
           border-right: 3px solid rgba(255,255,255,0.92);
+        }
+
+        /* 🔥 AJOUT : Mobile uniquement — une seule photo à la fois,
+           comportement d'origine (avant l'introduction de la bande de
+           photos, qui ne concerne que le PC/desktop). */
+        .carousel-bg-mobile {
+          position: absolute; inset: 0; width: 100%; height: 100%;
+          object-fit: cover;
         }
 
         /* Voile : léger en haut pour laisser respirer l'image, dense en bas pour lisibilité */
@@ -281,30 +334,42 @@ export function DashboardCarousel({
         }
       `}</style>
 
-      {/* ── Bande de photos ── */}
-      <div className="carousel-photos-viewport">
-        {imageUrls.length > 0 && (
-          <div
-            key={current.id}
-            className={`carousel-photos-track${hasOverflow ? ' scrolling' : ''}`}
-            style={{
-              width: `${trackWidthPercent}%`,
-              animationDuration: hasOverflow ? `${scrollDurationSec}s` : undefined,
-            }}
-          >
-            {displayImages.map((url, idx) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={`${current.id}-${idx}`}
-                src={url}
-                alt={idx === 0 ? current.title : ''}
-                className="carousel-photo-item"
-                style={{ width: `${itemBasisPercent}%` }}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      {/* ── Image(s) de fond : bande sur PC/desktop, une seule photo sur mobile ── */}
+      {isDesktop ? (
+        <div className="carousel-photos-viewport">
+          {imageUrls.length > 0 && (
+            <div
+              key={current.id}
+              className={`carousel-photos-track${hasOverflow ? ' scrolling' : ''}`}
+              style={{
+                width: `${trackWidthPercent}%`,
+                animationDuration: hasOverflow ? `${scrollDurationSec}s` : undefined,
+              }}
+            >
+              {displayImages.map((url, idx) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={`${current.id}-${idx}`}
+                  src={url}
+                  alt={idx === 0 ? current.title : ''}
+                  className="carousel-photo-item"
+                  style={{ width: `${itemBasisPercent}%` }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : activeImageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={activeImageUrl}
+          alt={current.title}
+          className="carousel-bg-mobile"
+          key={activeImageUrl}
+        />
+      ) : (
+        <div className="carousel-bg-mobile" />
+      )}
 
       {/* ── Voile ── */}
       <div className="carousel-overlay" />
