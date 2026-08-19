@@ -84,6 +84,13 @@ export function DashboardCarousel({
   news?: CarouselNews[];
   events?: CarouselEvent[];
 }) {
+  // 🔥 CORRIGÉ (ESLint) : _news n'est plus consommé dans le corps de la
+  // fonction (cf. commentaire ci-dessus) — @typescript-eslint/no-unused-vars
+  // ne reconnaît pas le préfixe "_" pour un paramètre déstructuré ici, d'où
+  // le warning. "void _news;" le marque explicitement comme utilisé sans
+  // aucun effet de bord.
+  void _news;
+
   const items: CarouselItem[] = [
     ...projects.map(p => {
       const imgs = [
@@ -174,13 +181,27 @@ export function DashboardCarousel({
           box-shadow: 0 10px 30px rgba(37,99,235,0.15);
         }
 
-        .carousel-bg {
+        /* 🔥 CORRIGÉ : object-fit: cover rognait toujours une partie de la
+           photo (têtes/jambes coupées), quelle que soit la hauteur de la
+           boîte, dès que le ratio de la photo ne correspondait pas
+           exactement à celui du conteneur. Remplacé par object-fit: contain
+           (photo entière toujours visible, plus aucun rognage) + une
+           version floutée de la même image en arrière-plan pour remplir
+           joliment l'espace autour au lieu de laisser juste le dégradé bleu
+           uni. L'ancien "transform: scale(1.05)" (zoom fixe, sans
+           déclencheur) est supprimé.
+        */
+        .carousel-bg-blur {
           position: absolute; inset: 0; width: 100%; height: 100%;
           object-fit: cover;
-          /* 🔥 CORRIGÉ : l'ancien "transform: scale(1.05)" était appliqué en
-             permanence (aucun déclencheur, ni survol ni animation) — il ne
-             faisait qu'ajouter 5% de zoom/rognage inutile en plus du crop
-             déjà causé par object-fit: cover. Supprimé. */
+          filter: blur(28px) brightness(0.65) saturate(1.15);
+          transform: scale(1.15);
+          pointer-events: none;
+        }
+        .carousel-bg {
+          position: absolute; inset: 0; width: 100%; height: 100%;
+          object-fit: contain;
+          pointer-events: none;
         }
 
         /* Voile : léger en haut pour laisser respirer l'image, dense en bas pour lisibilité */
@@ -247,13 +268,23 @@ export function DashboardCarousel({
 
       {/* ── Image de fond ── */}
       {activeImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={activeImageUrl}
-          alt={current.title}
-          className="carousel-bg"
-          key={activeImageUrl}
-        />
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={activeImageUrl}
+            alt=""
+            aria-hidden="true"
+            className="carousel-bg-blur"
+            key={`blur-${activeImageUrl}`}
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={activeImageUrl}
+            alt={current.title}
+            className="carousel-bg"
+            key={activeImageUrl}
+          />
+        </>
       ) : (
         <div className="carousel-bg" />
       )}
