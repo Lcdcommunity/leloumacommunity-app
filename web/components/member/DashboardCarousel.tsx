@@ -159,7 +159,9 @@ export function DashboardCarousel({
   const displayImages = hasOverflow ? [...imageUrls, ...imageUrls] : imageUrls;
   const trackWidthPercent = hasOverflow ? (displayImages.length / VISIBLE_PHOTOS) * 100 : 100;
   const itemBasisPercent = displayImages.length > 0 ? 100 / displayImages.length : 100;
-  const scrollDurationSec = Math.max(imageUrls.length * 4, 8);
+  // 🔥 CORRIGÉ : défilement trop rapide — durée augmentée (7s/photo, min
+  // 18s au lieu de 4s/photo, min 8s).
+  const scrollDurationSec = Math.max(imageUrls.length * 7, 18);
 
   const getTypeConfig = (type: string) => {
     switch (type) {
@@ -207,6 +209,11 @@ export function DashboardCarousel({
           height: 100%;
           object-fit: cover;
           display: block;
+          /* 🔥 AJOUT : fin liseré autour de chaque photo pour bien les
+             distinguer les unes des autres — inset (ne prend pas de place,
+             pas de décalage de largeur/reflow, contrairement à un border
+             classique). */
+          box-shadow: inset 0 0 0 1.5px rgba(255,255,255,0.4);
         }
 
         /* Voile : léger en haut pour laisser respirer l'image, dense en bas pour lisibilité */
