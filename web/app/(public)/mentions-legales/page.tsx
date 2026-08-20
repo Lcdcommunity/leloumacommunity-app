@@ -16,6 +16,8 @@ export default function MentionsLegalesPage() {
         .legal-strong { color: #0F172A; font-weight: 700; }
         .legal-back { display: inline-flex; align-items: center; gap: 0.5rem; color: #2563EB; font-weight: 700; text-decoration: none; margin-bottom: 2rem; font-size: 0.9rem; transition: transform 0.2s; }
         .legal-back:hover { transform: translateX(-4px); }
+        .legal-link { color: #1D4ED8; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+        .legal-link:hover { color: #1E40AF; }
       `}</style>
 
       <div className="legal-container">
@@ -32,18 +34,24 @@ export default function MentionsLegalesPage() {
             La présente plateforme web est éditée et gérée par l&apos;association <span className="legal-strong">LELOUMA COMMUNAUTE POUR LE DEVELOPPEMENT (L.C.D.)</span>, une association à but non lucratif et apolitique œuvrant pour le développement durable.
           </p>
           <ul className="legal-list">
-            <li><span className="legal-strong">Siège social :</span> LELOUMA, République de Guinée.</li>
+            <li><span className="legal-strong">Siège social :</span> Bâtiment de la mairie de la commune Urbaine, à Pétel, préfecture de Lélouma, République de Guinée.</li>
             <li><span className="legal-strong">Déclaration officielle :</span> DECISION N°050/MATD/RAL/PREF/LMA/CAB/2025 du 17 juillet 2025.</li>
-            <li><span className="legal-strong">Contact :</span> [Adresse email de contact à insérer]</li>
+            <li><span className="legal-strong">Téléphone :</span> +224 628 40 00 56</li>
+            <li><span className="legal-strong">Contact :</span> lelouma.community@gmail.com</li>
+            <li><span className="legal-strong">Présidente :</span> Fatoumata Binta Diallo (France – Paris)</li>
+            <li><span className="legal-strong">Développeur / Webmaster :</span> <Link href="/equipe/thierno-doniko" className="legal-link">Thierno Doniko</Link> (France – Paris)</li>
           </ul>
         </div>
 
         <div className="legal-section">
           <h2 className="legal-h2">2. Hébergement</h2>
-          <p className="legal-p">
-            Le site est hébergé par <span className="legal-strong">[Nom de l&apos;hébergeur, ex: Vercel Inc.]</span>.<br/>
-            Adresse : <span className="legal-strong">[Adresse de l&apos;hébergeur]</span>.<br/>
-          </p>
+          <p className="legal-p">Le site et ses services reposent sur les prestataires techniques suivants :</p>
+          <ul className="legal-list">
+            <li><span className="legal-strong">Nom de domaine (DNS) :</span> OVH SAS — 2 rue Kellermann, 59100 Roubaix, France.</li>
+            <li><span className="legal-strong">Hébergement de l&apos;application web :</span> Vercel Inc. — 650 California St, San Francisco, CA 94108, États-Unis.</li>
+            <li><span className="legal-strong">Hébergement du backend / API :</span> Render — Render Services Inc., San Francisco, États-Unis.</li>
+            <li><span className="legal-strong">Envoi des emails transactionnels :</span> Resend (Plus Five Five, Inc.) — 2261 Market Street #5039, San Francisco, CA 94114, États-Unis.</li>
+          </ul>
         </div>
 
         <div className="legal-section">
@@ -56,7 +64,7 @@ export default function MentionsLegalesPage() {
         <div className="legal-section">
           <h2 className="legal-h2">4. Responsabilité</h2>
           <p className="legal-p">
-            L&apos;association L.C.D. met tout en œuvre pour assurer l&apos;exactitude des informations financières et associatives diffusées sur la plateforme (transparence des cotisations, projets, etc.). Toutefois, elle ne saurait être tenue responsable des éventuelles omissions ou erreurs de saisie. En cas de litige, un traitement à l&apos;amiable sera privilégié avant tout recours aux juridictions compétentes.
+            L&apos;association L.C.D. met tout en œuvre pour assurer l&apos;exactitude des informations financières et associatives diffusées sur la plateforme (transparence des cotisations, projets, etc.). Toutefois, elle ne saurait être tenue responsable des éventuelles omissions ou erreurs de saisie, ni d&apos;une interruption ou indisponibilité du service liée à ses prestataires techniques (OVH, Vercel, Render, Resend). En cas de litige, un traitement à l&apos;amiable sera privilégié avant tout recours aux juridictions compétentes.
           </p>
         </div>
       </div>
