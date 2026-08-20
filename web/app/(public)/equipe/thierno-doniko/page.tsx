@@ -62,6 +62,16 @@ export default function BiographieThiernoDonikoPage() {
         </div>
 
         <div className="legal-section">
+          <h2 className="legal-h2">Formation continue &amp; certifications</h2>
+          <ul className="legal-list">
+            <li>Développement d&apos;outils de gestion &amp; bases de données (No-Code/IA : Glide, Softr, Airtable) — ALEGRIA Group, 2024.</li>
+            <li>Titre Développeur Web Front-end &amp; Back-end — STUDI, 2024.</li>
+            <li>Gestion administrative (secrétariat, plannings, paie) — LPDE, 2023.</li>
+            <li>Agent d&apos;escale polyvalent (Amadeus, Altéa/Air France, sûreté DGAC, DGR9 IATA, PMR/PHMR) — AIRSUP, 2021.</li>
+          </ul>
+        </div>
+
+        <div className="legal-section">
           <h2 className="legal-h2">Parcours professionnel</h2>
           <div className="timeline-item">
             <div className="timeline-period">Mai 2024 – juillet 2026</div>
