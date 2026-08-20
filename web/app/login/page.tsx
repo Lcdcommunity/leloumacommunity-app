@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { AdaptiveLogo } from '../../components/AdaptiveLogo';
+import PageHero from '../../components/PageHero';
 import { login } from '../../lib/auth';
 import { api } from '../../lib/api-client';
 import { useTranslation } from 'react-i18next';
@@ -200,10 +201,10 @@ export default function LoginPage() {
 
         .lp-root {
           font-family: var(--font-main);
-          min-height: 100svh;
+          min-height: 70svh;
           background: linear-gradient(160deg, var(--floa-sky) 0%, var(--floa-bg) 35%, #BFDBFE 65%, #93C5FD 100%);
-          display: flex; align-items: center; justify-content: center;
-          position: relative; overflow: hidden; padding: 1.5rem;
+          display: flex; align-items: flex-start; justify-content: center;
+          position: relative; overflow: hidden; padding: 3rem 1.5rem 3rem;
         }
 
         .lp-orb { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0; }
@@ -451,13 +452,23 @@ export default function LoginPage() {
         }
 
         @media (max-width: 480px) {
-          .lp-root { padding: 0; background: linear-gradient(160deg, var(--floa-sky) 0%, #BFDBFE 50%, #93C5FD 100%); }
-          .lp-card { border-radius: 28px; min-height: 100svh; background: rgba(255,255,255,0.95); box-shadow: none; display: flex; flex-direction: column; justify-content: center; margin: 0; }
+          .lp-root { padding: 2rem 0 3rem; background: linear-gradient(160deg, var(--floa-sky) 0%, #BFDBFE 50%, #93C5FD 100%); }
+          .lp-card { border-radius: 28px; background: rgba(255,255,255,0.95); box-shadow: none; margin: 0 1rem; }
           .lp-orb { display: none; }
           .tc-logo-wrap { width: 110px; height: 110px; }
           .tc-text { font-size: 2.2rem; }
         }
       `}</style>
+
+      <PageHero
+        crumbs={[{ label: 'Accueil', href: '/' }, { label: 'Connexion' }]}
+        title={t('login.heroTitle', 'Bienvenue')}
+        description={t('login.heroDesc', `Accédez à votre espace sécurisé ${theme.name}.`)}
+        primaryColor={theme.primary}
+        secondaryColor={theme.secondary}
+        waveColor="#EFF6FF"
+        logoUrl={theme.logoUrl}
+      />
 
       {showCurtain && (
         <div className="tc-container" aria-hidden>

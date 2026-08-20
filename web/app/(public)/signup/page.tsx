@@ -1,49 +1,10 @@
 // web/app/(public)/signup/page.tsx
 // v2.0.0 — Refonte complète : formulaire pas-à-pas (1 question par écran, style conversationnel)
-//
-// CHANGELOG v2.0.0 (vs v1.x — formulaire en 4 macro-étapes) :
-// - [STRUCTURE] Remplacement des 4 macro-étapes par 23 écrans individuels (1 champ = 1 écran),
-//        définis dans STEP_KEYS, dans le même ordre que l'ancien formulaire.
-// - [NAV] Ajout de shouldSkip() + goToStep() pour gérer automatiquement les écrans conditionnels
-//        ("Précisez votre commune / pays / poste" n'apparaît que si "Autre" a été choisi juste avant).
-// - [UI] Remplacement du stepper à puces (4 points) par une barre de progression dynamique
-//        ("Question X sur Y"), seule option lisible avec 23 écrans.
-// - [UI] Ajout d'un bloc d'explication très visible (sp-explain, fond coloré) avec un exemple concret
-//        sur CHAQUE écran, rédigé en français simple, sans jargon, pour des membres n'ayant pas
-//        forcément fait d'études.
-// - [UX] Étape photo : ajout d'un bouton "Passer cette étape" distinct du bouton "Continuer"
-//        (visible uniquement si aucune photo n'a encore été choisie), comme demandé.
-// - [UX] Ajout de l'avance au clavier : la touche Entrée dans un champ texte/liste déclenche
-//        "Continuer" au lieu de risquer une soumission prématurée du formulaire.
-// - [UX] Petite animation d'apparition (fondu + glissement) à chaque changement d'écran.
-// - [VALIDATION] validateStep() éclatée en validateField(key) — validation déclenchée à chaque
-//        clic sur "Continuer", champ par champ, au lieu d'un bloc de 5 à 10 champs à la fois.
-//        Tous les messages d'erreur et clés i18n d'origine sont conservés à l'identique.
-// - [SUPPRIMÉ] STEPS (labels du stepper à 4 puces) et le composant <Req/> (astérisque) ne sont
-//        plus utilisés avec ce nouveau design — remplacés par la barre de progression et un tag
-//        "Facultatif" sur les 2 seuls champs non obligatoires (code postal, photo).
-// - [DONNÉES] Aucun changement de modèle de données ni du payload envoyé à l'API (FormData
-//        identique). Aucun changement côté backend nécessaire.
-// - [PERSISTANCE] sessionStorage conservé (clé "signupFormState", mêmes champs sauvegardés,
-//        mot de passe et photo toujours exclus pour des raisons de sécurité comme avant).
-//        Ajout d'une vérification de sécurité : si l'écran restauré ne correspond plus à un écran
-//        valide (ex. une étape "Précisez" devenue obsolète), on avance automatiquement.
-// - [INTACT] Logique de thème dynamique, i18n/RTL, auto-remplissage de l'indicatif téléphonique,
-//        calcul de force du mot de passe, et écran de succès final : strictement inchangés.
-//
-// CHANGELOG v2.1.0 :
-// - [DYNAMIQUE] Suppression de COMMUNES_ORIGINE (liste figée des sous-préfectures de Lélouma).
-//        La liste des communes/villages d'origine est maintenant chargée par association via
-//        un nouvel appel api.getPublicOriginLocalities(domain, code) — voir note en bas de fichier.
-//        Si l'association n'a configuré aucune liste, l'écran bascule automatiquement en champ
-//        texte libre (plus de dépendance à une liste guinéenne pour les autres associations).
-// - [DYNAMIQUE] Identité par défaut alignée sur celle du login ('Console Grand Chef' au lieu de
-//        'Lélouma') tant qu'aucun thème d'association n'est résolu.
-// - [DYNAMIQUE] Texte d'explication de la commune d'origine généralisé (retrait de "en Guinée").
-//
-// CHANGELOG v2.2.0 :
-// - [UI] Logo du header remplacé par <AdaptiveLogo> : anneau coloré auto-détecté depuis le
-//        logo de l'association, fond blanc fixe pour garantir le contraste dans tous les cas.
+// v2.2.0 — Logo du header remplacé par <AdaptiveLogo>
+// v2.3.0 — Ajout d'un bandeau visuel <PageHero> en tête de page, câblé sur le thème
+//          dynamique de l'association (mêmes couleurs que la carte plus bas).
+//          Réduction du min-height du root pour éviter un double effet plein écran
+//          maintenant qu'un bandeau occupe déjà de la hauteur au-dessus.
 
 'use client';
 
@@ -51,6 +12,7 @@ import { ChangeEvent, FormEvent, KeyboardEvent, ReactNode, useEffect, useRef, us
 import Link from 'next/link';
 import Image from 'next/image';
 import { AdaptiveLogo } from '../../../components/AdaptiveLogo';
+import PageHero from '../../../components/PageHero';
 import { api } from '../../../lib/api-client';
 import { useTranslation } from 'react-i18next';
 import i18n from '../../../lib/i18n';
@@ -714,7 +676,7 @@ export default function MemberSignupPage() {
 
         .sp-root {
           font-family: var(--font-main);
-          min-height: 100svh;
+          min-height: 60svh;
           background: linear-gradient(150deg, #F0F4F8 0%, #E2E8F0 40%, ${getLightColor(theme.primary, 0.15)} 100%);
           display: flex; align-items: flex-start; justify-content: center;
           position: relative; overflow: hidden;
@@ -866,6 +828,16 @@ export default function MemberSignupPage() {
           .sp-question-title { font-size: 1.25rem; }
         }
       `}</style>
+
+      <PageHero
+        crumbs={[{ label: 'Accueil', href: '/' }, { label: 'Créer un compte' }]}
+        title={t('signup.heroTitle', 'Rejoindre')}
+        description={t('signup.heroDesc', `Devenez membre de ${theme.name} en quelques questions simples.`)}
+        primaryColor={theme.primary}
+        secondaryColor={theme.secondary}
+        waveColor="#F0F4F8"
+        logoUrl={theme.logoUrl}
+      />
 
       <div className="sp-root" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="sp-bg-grid" />

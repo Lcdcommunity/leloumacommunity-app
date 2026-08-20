@@ -1,4 +1,14 @@
 // web/components/OnboardingClient.tsx
+// v3.1.0 — Ajout d'un sceau décoratif discret (composant partagé HeroSeal, importé
+//          depuis PageHero.tsx — pas de duplication de SVG) en filigrane dans la
+//          zone haute du hero, pour un echo visuel léger avec les autres pages
+//          (mentions légales, bio, login, signup) sans dupliquer tout un bandeau.
+//          Reste constant à travers les slides (posé hors de la boucle de slides,
+//          contrairement à l'icône décorative qui change à chaque slide).
+//
+// Tout le reste de ce fichier (v2.1.0 et versions précédentes) est strictement
+// inchangé — voir le changelog complet plus bas.
+//
 // v2.1.0 — Mise en page desktop dédiée (responsive complet)
 //
 // CHANGELOG v2.1.0 (vs v2.0.0) :
@@ -67,6 +77,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '../lib/api-client';
+import { HeroSeal } from './PageHero';
 
 // ─── Clé localStorage ────────────────────────────────────────────────────────
 const SEEN_KEY = 'onboarding_seen_v1';
@@ -342,6 +353,12 @@ export default function OnboardingClient() {
             );
         }
 
+        /* ══ Sceau discret, en filigrane, constant à travers les slides ══════ */
+        .ob-seal-mark {
+          position: absolute; z-index: 1;
+          top: 4.75rem; left: 1.5rem;
+        }
+
         /* ══ Interface ════════════════════════════════════════════════════════ */
         .ob-ui {
           position: absolute; inset: 0; z-index: 2;
@@ -586,6 +603,8 @@ export default function OnboardingClient() {
             height: min(26vw, 380px);
           }
 
+          .ob-seal-mark { top: 5.5rem; left: 3.5rem; }
+
           /* Dégradé de contraste réorienté : accent à gauche (où se trouve le
              texte) plutôt qu'en bas de l'écran comme sur mobile. */
           .ob-overlay {
@@ -645,6 +664,13 @@ export default function OnboardingClient() {
               </div>
             );
           })}
+
+          {/* Sceau discret, constant à travers les slides (pas de duplication :
+              même composant HeroSeal que sur mentions légales / bio / login / signup). */}
+          <div className="ob-seal-mark">
+            <HeroSeal primaryColor={theme.primary} secondaryColor={theme.secondary} size={34} opacity={0.4} />
+          </div>
+
           <div className="ob-overlay" />
         </div>
 
