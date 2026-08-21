@@ -32,6 +32,7 @@ export default function MentionsLegalesPage() {
         crumbs={[{ label: 'Accueil', href: '/' }, { label: 'Mentions légales' }]}
         title="Mentions Légales"
         description="Cadre officiel de la plateforme numérique de Lélouma Communauté pour le Développement."
+        logoUrl="https://res.cloudinary.com/dz8ymtvjz/image/upload/v1776521259/lelouma_community/jovsruxyobwb1aqz9zae.jpg"
       />
 
       <div className="legal-page-body">

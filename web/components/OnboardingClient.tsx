@@ -78,6 +78,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { api } from '../lib/api-client';
 import { HeroSeal } from './PageHero';
+import HomeShowcase from './HomeShowcase';
 
 // ─── Clé localStorage ────────────────────────────────────────────────────────
 const SEEN_KEY = 'onboarding_seen_v1';
@@ -199,6 +200,7 @@ const SLIDES = [
 export default function OnboardingClient() {
   const router = useRouter();
   const [mounted, setMounted]   = useState(false);
+  const [alreadySeen, setAlreadySeen] = useState(false);
   const [slide, setSlide]       = useState(0);
   const touchStartX             = useRef<number | null>(null);
 
@@ -214,16 +216,19 @@ export default function OnboardingClient() {
     secondary: '#059669',
   });
 
-  // ── Vérification : onboarding déjà vu ? ──────────────────────────────────
+  // ── Vérification : onboarding déjà vu ? Auparavant redirigé directement vers
+  //    /login ; désormais affiche la vitrine d'accueil (HomeShowcase) à la place,
+  //    pour que "Accueil" montre un vrai contenu plutôt qu'un aller-retour login. ──
   useEffect(() => {
+    let seen = false;
     try {
-      if (typeof localStorage !== 'undefined' && localStorage.getItem(SEEN_KEY) === 'true') {
-        router.replace('/login');
-        return;
-      }
+      seen = typeof localStorage !== 'undefined' && localStorage.getItem(SEEN_KEY) === 'true';
     } catch { /* SSR / incognito */ }
-    queueMicrotask(() => setMounted(true));
-  }, [router]);
+    queueMicrotask(() => {
+      if (seen) setAlreadySeen(true);
+      setMounted(true);
+    });
+  }, []);
 
   // ── Charge l'identité (nom + logo + couleurs) de l'association résolue par
   //    le domaine/code courant — même convention que login/signup/logout. ──
@@ -292,6 +297,7 @@ export default function OnboardingClient() {
   }, [goNext, goPrev]);
 
   if (!mounted) return null;
+  if (alreadySeen) return <HomeShowcase theme={theme} />;
 
   const isLast  = slide === SLIDES.length - 1;
   const current = SLIDES[slide];

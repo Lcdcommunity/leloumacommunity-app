@@ -1,16 +1,11 @@
 // web/components/PageHero.tsx
-// Bandeau visuel réutilisable pour les pages publiques. Reprend l'identité déjà en
-// place sur le site (fond marine #06103A, orbes de dégradé, Cormorant Garamond).
+// Bandeau visuel réutilisable pour les pages publiques.
 //
-// v2 — Couleurs (orbes + sceau) et couleur de la vague de transition rendues
-//      dynamiques via props, pour pouvoir être réutilisé sur les pages qui
-//      chargent un thème par association (login, signup) sans casser les pages
-//      fixes (mentions légales, bio) qui continuent d'utiliser les valeurs par
-//      défaut de LCD.
-// v3 — Le sceau (logo ou motif couronne/étoiles) est extrait en composant
-//      exporté séparément (HeroSeal), pour être réutilisé seul en overlay sur
-//      des pages qui ont déjà leur propre hero (ex. l'onboarding), sans dupliquer
-//      le SVG ni importer tout le bandeau.
+// v4 — Le sceau/logo est désormais dans la même rangée que le fil d'Ariane
+//      (en haut à droite), au lieu d'un bloc séparé en dessous : supprime le
+//      vide vertical inutile sur mobile et donne un vrai header en un coup
+//      d'œil. Largeur de contenu et paddings révisés pour mieux respirer sur
+//      grand écran (desktop) sans rester figés dans une colonne étroite.
 import React from 'react';
 import Link from 'next/link';
 
@@ -23,15 +18,9 @@ interface PageHeroProps {
   crumbs: HeroCrumb[];
   title: string;
   description?: string;
-  /** Couleur primaire du thème (association). Défaut : vert LCD. */
   primaryColor?: string;
-  /** Couleur secondaire du thème (association). Défaut : bleu LCD. */
   secondaryColor?: string;
-  /** Couleur de la vague de transition en bas du bandeau — à faire correspondre
-   *  au fond de la section qui suit le bandeau. Défaut : parchemin des pages légales. */
   waveColor?: string;
-  /** Si fourni, affiche le logo de l'association dans le sceau plutôt que le
-   *  motif couronne/étoiles par défaut (utile en contexte multi-tenant). */
   logoUrl?: string | null;
 }
 
@@ -40,15 +29,9 @@ export interface HeroSealProps {
   secondaryColor?: string;
   logoUrl?: string | null;
   size?: number;
-  /** Opacité globale du sceau — utile pour un usage en filigrane discret. */
   opacity?: number;
 }
 
-/**
- * Sceau décoratif : logo de l'association si fourni, sinon motif couronne +
- * étoiles en écho au logo officiel de LCD. Utilisé par PageHero, et réutilisable
- * seul (ex. en overlay discret sur une page qui a déjà son propre hero).
- */
 export function HeroSeal({
   primaryColor = '#059669',
   secondaryColor = '#1A56DB',
@@ -57,7 +40,7 @@ export function HeroSeal({
   opacity = 1,
 }: HeroSealProps) {
   return (
-    <div style={{ width: size, height: size, opacity }} aria-hidden="true">
+    <div style={{ width: size, height: size, opacity, flexShrink: 0 }} aria-hidden="true">
       {logoUrl ? (
         <div style={{
           width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden',
@@ -97,7 +80,7 @@ export default function PageHero({
           position: relative;
           background: #06103A;
           overflow: hidden;
-          padding: 3.25rem 1.5rem 5.5rem;
+          padding: 2.25rem 1.5rem 5rem;
         }
         .ph-orb { position: absolute; border-radius: 50%; filter: blur(90px); pointer-events: none; }
         .ph-orb-1 {
@@ -116,61 +99,77 @@ export default function PageHero({
         @keyframes phDrift2 { from { transform: translate(0,0); } to { transform: translate(20px, -20px); } }
         @media (prefers-reduced-motion: reduce) {
           .ph-orb-1, .ph-orb-2 { animation: none; }
+          .ph-reveal { animation: none !important; opacity: 1 !important; transform: none !important; }
         }
 
-        .ph-inner { position: relative; z-index: 2; max-width: 800px; margin: 0 auto; }
+        .ph-inner { position: relative; z-index: 2; max-width: 960px; margin: 0 auto; }
 
+        /* ── Rangée de tête : fil d'Ariane à gauche, sceau/logo à droite ── */
+        .ph-topbar {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 1rem; margin-bottom: 1.5rem;
+        }
         .ph-crumbs {
           display: flex; align-items: center; flex-wrap: wrap; gap: 0.4rem;
           font-family: 'DM Sans', sans-serif;
           font-size: 0.75rem; font-weight: 700; letter-spacing: 0.03em;
-          color: rgba(255,255,255,0.5); margin-bottom: 1.75rem;
+          color: rgba(255,255,255,0.5);
         }
         .ph-crumb-link { color: rgba(255,255,255,0.78); text-decoration: none; }
         .ph-crumb-link:hover { color: #fff; }
         .ph-crumb-sep { color: rgba(255,255,255,0.3); }
         .ph-crumb-current { color: #fff; }
 
-        .ph-seal { margin-bottom: 1.1rem; }
-
         .ph-title {
           font-family: 'Cormorant Garamond', serif; font-weight: 700;
-          font-size: clamp(2.1rem, 6vw, 3.2rem); color: #fff; line-height: 1.05;
+          font-size: clamp(2.1rem, 5.5vw, 3.4rem); color: #fff; line-height: 1.05;
           letter-spacing: -0.01em; text-shadow: 0 4px 30px rgba(0,0,0,0.4);
           margin-bottom: 0.6rem;
         }
         .ph-desc {
           font-family: 'DM Sans', sans-serif; font-size: 0.95rem;
-          color: rgba(255,255,255,0.68); max-width: 520px; line-height: 1.65;
+          color: rgba(255,255,255,0.68); max-width: 560px; line-height: 1.65;
         }
+
+        .ph-reveal { animation: phFadeUp 0.6s cubic-bezier(.22,1,.36,1) both; }
+        .ph-reveal.ph-delay-1 { animation-delay: 0.08s; }
+        @keyframes phFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
 
         .ph-wave { position: absolute; left: 0; right: 0; bottom: -1px; z-index: 1; line-height: 0; }
         .ph-wave svg { display: block; width: 100%; height: auto; }
+
+        @media (min-width: 768px) {
+          .ph-hero { padding: 3rem 2.5rem 6rem; }
+        }
+        @media (min-width: 1200px) {
+          .ph-hero { padding: 3.5rem 3rem 7rem; }
+          .ph-inner { max-width: 1080px; }
+        }
       `}</style>
 
       <div className="ph-orb ph-orb-1" aria-hidden="true" />
       <div className="ph-orb ph-orb-2" aria-hidden="true" />
 
       <div className="ph-inner">
-        <nav className="ph-crumbs" aria-label="Fil d'Ariane">
-          {crumbs.map((c, i) => (
-            <React.Fragment key={`${c.label}-${i}`}>
-              {i > 0 && <span className="ph-crumb-sep">/</span>}
-              {c.href ? (
-                <Link href={c.href} className="ph-crumb-link">{c.label}</Link>
-              ) : (
-                <span className="ph-crumb-current">{c.label}</span>
-              )}
-            </React.Fragment>
-          ))}
-        </nav>
+        <div className="ph-topbar">
+          <nav className="ph-crumbs" aria-label="Fil d'Ariane">
+            {crumbs.map((c, i) => (
+              <React.Fragment key={`${c.label}-${i}`}>
+                {i > 0 && <span className="ph-crumb-sep">/</span>}
+                {c.href ? (
+                  <Link href={c.href} className="ph-crumb-link">{c.label}</Link>
+                ) : (
+                  <span className="ph-crumb-current">{c.label}</span>
+                )}
+              </React.Fragment>
+            ))}
+          </nav>
 
-        <div className="ph-seal">
-          <HeroSeal primaryColor={primaryColor} secondaryColor={secondaryColor} logoUrl={logoUrl} size={52} />
+          <HeroSeal primaryColor={primaryColor} secondaryColor={secondaryColor} logoUrl={logoUrl} size={48} />
         </div>
 
-        <h1 className="ph-title">{title}</h1>
-        {description && <p className="ph-desc">{description}</p>}
+        <h1 className="ph-title ph-reveal">{title}</h1>
+        {description && <p className="ph-desc ph-reveal ph-delay-1">{description}</p>}
       </div>
 
       <div className="ph-wave" aria-hidden="true">

@@ -8,135 +8,146 @@ export default function BiographieThiernoDonikoPage() {
     <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#FAF7F2', minHeight: '100vh', color: '#334155' }}>
       <style>{`
         .legal-page-body { padding: 0 1rem clamp(2rem, 5vw, 4rem); }
-        .legal-container { max-width: 800px; margin: -3rem auto 0; position: relative; z-index: 3; background: white; padding: clamp(1.5rem, 4vw, 3rem); border-radius: 24px; box-shadow: 0 10px 40px rgba(15,23,42,0.08); }
-        .legal-section { margin-bottom: 2rem; }
-        .legal-h2 { font-size: 1.1rem; font-weight: 800; color: #1D4ED8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
-        .legal-list { padding-left: 1.5rem; margin-bottom: 1rem; }
-        .legal-list li { font-size: 0.95rem; line-height: 1.7; margin-bottom: 0.5rem; color: #475569; }
-        .legal-strong { color: #0F172A; font-weight: 700; }
-        .timeline-item { margin-bottom: 1rem; padding-left: 1rem; border-left: 2px solid #E2E8F0; }
-        .timeline-period { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: #64748B; margin-bottom: 0.2rem; }
-        .timeline-role { font-size: 0.95rem; font-weight: 700; color: #0F172A; margin-bottom: 0.2rem; }
-        .timeline-desc { font-size: 0.88rem; line-height: 1.6; color: #475569; }
-        .legal-external-link { color: #1D4ED8; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+        .legal-container { max-width: 860px; margin: -3rem auto 0; position: relative; z-index: 3; background: white; padding: clamp(1.5rem, 4vw, 3.25rem); border-radius: 24px; box-shadow: 0 10px 40px rgba(15,23,42,0.08); }
+
+        .bio-back { display: inline-flex; align-items: center; gap: 0.5rem; color: #2563EB; font-weight: 700; text-decoration: none; margin-bottom: 2rem; font-size: 0.85rem; }
+
+        .bio-lede {
+          font-family: 'Cormorant Garamond', serif; font-style: italic;
+          font-size: clamp(1.2rem, 2.4vw, 1.5rem); line-height: 1.5; color: #0F172A;
+          margin-bottom: 2.25rem; padding-bottom: 2rem; border-bottom: 1px solid #E2E8F0;
+        }
+
+        .bio-section { margin-bottom: 2.25rem; }
+        .bio-h2 {
+          font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+          color: #1D4ED8; margin-bottom: 0.85rem;
+        }
+        .bio-p { font-size: 0.98rem; line-height: 1.8; color: #475569; margin-bottom: 1rem; }
+        .bio-p strong { color: #0F172A; }
+
+        .bio-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.75rem 0 2.25rem; }
+        @media (max-width: 560px) { .bio-stats { grid-template-columns: 1fr 1fr; } }
+        .bio-stat { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 16px; padding: 1.1rem 1rem; text-align: center; }
+        .bio-stat-num { font-family: 'Cormorant Garamond', serif; font-size: 2rem; font-weight: 700; color: #1D4ED8; line-height: 1; margin-bottom: 0.3rem; }
+        .bio-stat-label { font-size: 0.72rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em; line-height: 1.4; }
+
+        .bio-highlights { display: flex; flex-direction: column; gap: 0.9rem; }
+        .bio-highlight { display: flex; gap: 0.85rem; align-items: flex-start; }
+        .bio-highlight-dot { width: 8px; height: 8px; border-radius: 50%; background: #059669; margin-top: 0.5rem; flex-shrink: 0; }
+        .bio-highlight-text { font-size: 0.95rem; line-height: 1.7; color: #475569; }
+        .bio-highlight-text strong { color: #0F172A; }
+
+        .bio-projects { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.9rem; }
+        @media (max-width: 700px) { .bio-projects { grid-template-columns: 1fr; } }
+        .bio-project-card {
+          border-radius: 16px; padding: 1.1rem 1.15rem; color: #fff;
+          background: linear-gradient(135deg, var(--pc1), var(--pc2));
+          box-shadow: 0 10px 26px rgba(15,23,42,0.14);
+        }
+        .bio-project-name { font-weight: 800; font-size: 0.95rem; margin-bottom: 0.35rem; }
+        .bio-project-desc { font-size: 0.8rem; line-height: 1.55; opacity: 0.92; margin-bottom: 0.7rem; }
+        .bio-project-link { font-size: 0.75rem; font-weight: 700; color: #fff; text-decoration: underline; text-underline-offset: 2px; opacity: 0.95; }
+
+        .bio-reveal { opacity: 0; animation: bioFadeUp 0.7s cubic-bezier(.22,1,.36,1) forwards; }
+        .bio-reveal.bd-1 { animation-delay: 0.05s; }
+        .bio-reveal.bd-2 { animation-delay: 0.15s; }
+        .bio-reveal.bd-3 { animation-delay: 0.25s; }
+        .bio-reveal.bd-4 { animation-delay: 0.35s; }
+        .bio-reveal.bd-5 { animation-delay: 0.45s; }
+        @keyframes bioFadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+        @media (prefers-reduced-motion: reduce) { .bio-reveal { animation: none; opacity: 1; } }
       `}</style>
 
       <PageHero
         crumbs={[{ label: 'Accueil', href: '/' }, { label: 'Mentions légales', href: '/mentions-legales' }, { label: 'Thierno Doniko' }]}
-        title="Thierno Saïdou Diallo"
-        description={'Connu sous le nom "Thierno Doniko" · Développeur & Webmaster de la plateforme'}
+        title="Thierno Doniko"
+        description="Ingénieur agronome devenu bâtisseur de plateformes numériques — développeur et webmaster de la plateforme LCD."
       />
 
       <div className="legal-page-body">
         <div className="legal-container">
-          <Link href="/mentions-legales" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#2563EB', fontWeight: 700, textDecoration: 'none', marginBottom: '1.75rem', fontSize: '0.85rem' }}>
+          <Link href="/mentions-legales" className="bio-back">
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             Retour aux mentions légales
           </Link>
 
-          <div className="legal-section">
-            <h2 className="legal-h2">Parcours scolaire</h2>
-            <div className="timeline-item">
-              <div className="timeline-period">1991 – 1996</div>
-              <div className="timeline-role">Études primaires</div>
-              <div className="timeline-desc">École primaire de Kénéry, Lélouma, République de Guinée.</div>
+          <p className="bio-lede bio-reveal bd-1">
+            De Lélouma à la logistique aéroportuaire francilienne, puis du terrain vers le code : Thierno Doniko incarne cette génération de la diaspora qui met ses compétences au service de sa communauté d&apos;origine — en construisant, seul, l&apos;outil numérique qui la relie.
+          </p>
+
+          <div className="bio-stats bio-reveal bd-2">
+            <div className="bio-stat">
+              <div className="bio-stat-num">8+</div>
+              <div className="bio-stat-label">ans d&apos;expérience professionnelle</div>
             </div>
-            <div className="timeline-item">
-              <div className="timeline-period">1997 – 2000</div>
-              <div className="timeline-role">Études secondaires (collège)</div>
-              <div className="timeline-desc">Collège Soloprimo, Koloma, Conakry.</div>
+            <div className="bio-stat">
+              <div className="bio-stat-num">4</div>
+              <div className="bio-stat-label">continents coordonnés en logistique</div>
             </div>
-            <div className="timeline-item">
-              <div className="timeline-period">2001 – 2003</div>
-              <div className="timeline-role">Études secondaires (lycée)</div>
-              <div className="timeline-desc">Lycée de Kipé, Conakry.</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">2004</div>
-              <div className="timeline-role">Concours d&apos;accès aux institutions supérieures</div>
-              <div className="timeline-desc">Conakry, République de Guinée.</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">2004 – 2008</div>
-              <div className="timeline-role">Diplôme d&apos;Ingénieur Agronome – Zootechnie (équivalent Master)</div>
-              <div className="timeline-desc">Institut Supérieur Agronomique et Vétérinaire Valery Giscard d&apos;Estaing de Faranah, Guinée.</div>
+            <div className="bio-stat">
+              <div className="bio-stat-num">3</div>
+              <div className="bio-stat-label">plateformes SaaS conçues et déployées</div>
             </div>
           </div>
 
-          <div className="legal-section">
-            <h2 className="legal-h2">Formation continue &amp; certifications</h2>
-            <ul className="legal-list">
-              <li>Développement d&apos;outils de gestion &amp; bases de données (No-Code/IA : Glide, Softr, Airtable) — ALEGRIA Group, 2024.</li>
-              <li>Titre Développeur Web Front-end &amp; Back-end — STUDI, 2024.</li>
-              <li>Gestion administrative (secrétariat, plannings, paie) — LPDE, 2023.</li>
-              <li>Agent d&apos;escale polyvalent (Amadeus, Altéa/Air France, sûreté DGAC, DGR9 IATA, PMR/PHMR) — AIRSUP, 2021.</li>
-            </ul>
+          <div className="bio-section bio-reveal bd-2">
+            <div className="bio-h2">Portrait</div>
+            <p className="bio-p">
+              Né à Lélouma, en République de Guinée, Thierno grandit entre l&apos;école Elémentaire de Kénéry et les bancs de l&apos;Institut Supérieur Agronomique et Vétérinaire de Faranah, où il décroche en 2008 un diplôme d&apos;ingénieur agronome. Mais c&apos;est ailleurs qu&apos;il trouvera sa véritable trajectoire : dans la coordination internationale, puis dans le code.
+            </p>
+            <p className="bio-p">
+              Installé en France depuis 2019, il construit un parcours professionnel dense et exigeant — de la microfinance en Guinée à la logistique aéroportuaire de Roissy-CDG, en passant par la coordination d&apos;expéditions industrielles pour l&apos;automobile sur quatre continents. Un fil conducteur traverse chacune de ces expériences : <strong>la rigueur documentaire, la gestion de flux complexes, et le sens du service</strong>.
+            </p>
           </div>
 
-          <div className="legal-section">
-            <h2 className="legal-h2">Parcours professionnel</h2>
-            <div className="timeline-item">
-              <div className="timeline-period">Mai 2024 – juillet 2026</div>
-              <div className="timeline-role">Technicien automobile &amp; logistique — Renault Technocentre, Guyancourt (France)</div>
-              <div className="timeline-desc">Analyse et traitement des pièces incidentées, organisation et coordination d&apos;expéditions internationales (Europe, Afrique, Amérique, Asie), gestion des retours et recours fournisseurs.</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">Fév. – Mars 2024</div>
-              <div className="timeline-role">Logisticien — Veolia (Technocentre Renault), Guyancourt (France)</div>
-              <div className="timeline-desc">Etudes technique et proposition des solutions en vue de la fluidité des opérations</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">Août 2022 – Janvier 2024</div>
-              <div className="timeline-role">Agent d&apos;accueil et d&apos;Escale aéroportuaire — Aéroport de Roissy-CDG (ADECCO)</div>
-              <div className="timeline-desc">Checking, embarquement, assistance et accompagnement des passagers.</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">Sept. 2021 – Juil. 2022</div>
-              <div className="timeline-role">Agent d&apos;appui aux équipes enseignantes — DSDEN, Académie de Versailles (France)</div>
-              <div className="timeline-desc">Appui opérationnel aux équipes pédagogiques pendant la crise sanitaire (Covid-19).</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">Juin 2021 – Août 2022</div>
-              <div className="timeline-role">Agent logistique &amp; support administratif — FFSS</div>
-              <div className="timeline-desc">Gestion documentaire et appui logistique/administratif aux équipes de terrain à Orly Aéroport.</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">Juin – Août 2021</div>
-              <div className="timeline-role">Agent d&apos;Escale CDG (ADECCO)</div>
-              <div className="timeline-desc">Checking, embarquement, assistance et accompagnement des passagers.</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">2016 – 2019</div>
-              <div className="timeline-role">Coordinateur &amp; Superviseur général — Cash Moov, Sénégal</div>
-              <div className="timeline-desc">Gestion et coordination de l&apos;entreprise au Sénégal, en Gambie et en Guinée-Bissau : recherche de partenaires, gestion de points de vente, relation clientèle et gestion de caisse (2 employés directs, 12 partenaires).</div>
-            </div>
-            <div className="timeline-item">
-              <div className="timeline-period">2010 – 2016</div>
-              <div className="timeline-role">Agent de crédit — CRG, Institution de microfinance, Guinée</div>
-              <div className="timeline-desc">Octroi de crédits, suivi de comptes clients, gestion de portefeuilles et émission de rapports financiers.</div>
+          <div className="bio-section bio-reveal bd-3">
+            <div className="bio-h2">Le tournant numérique</div>
+            <p className="bio-p">
+              En 2024, Thierno se forme en autodidacte au développement web — front-end, back-end, bases de données — et transforme cette double culture (terrain + technique) en un métier à part entière. Il ne se contente pas d&apos;apprendre à coder : <strong>il conçoit et déploie, seul, des plateformes complètes</strong>, de la modélisation de la base de données jusqu&apos;à la mise en production.
+            </p>
+            <div className="bio-highlights">
+              <div className="bio-highlight">
+                <div className="bio-highlight-dot" />
+                <div className="bio-highlight-text"><strong>Pilote de bout en bout</strong> la conception d&apos;une plateforme SaaS de gestion associative : cartes membres à QR Code, module financier, gouvernance avec votes et calcul de quorum.</div>
+              </div>
+              <div className="bio-highlight">
+                <div className="bio-highlight-dot" />
+                <div className="bio-highlight-text">Conçoit et livre <strong>seul</strong> un portail RH interne sécurisé, du recueil des besoins jusqu&apos;au déploiement en production.</div>
+              </div>
+              <div className="bio-highlight">
+                <div className="bio-highlight-dot" />
+                <div className="bio-highlight-text">Développe une plateforme SaaS de transfert d&apos;argent international, pensée pour les besoins spécifiques de la diaspora ouest-africaine.</div>
+              </div>
             </div>
           </div>
 
-          <div className="legal-section">
-            <h2 className="legal-h2">Projets personnels &amp; transformation digitale</h2>
-            <ul className="legal-list">
-              <li>
-                <span className="legal-strong">AssoGlobal (Grand Chef)</span> — plateforme SaaS multi-tenant de création et de gestion d&apos;associations, août 2026 —{' '}
-                <a href="https://www.dkmoney.store" className="legal-external-link" target="_blank" rel="noopener noreferrer">dkmoney.store</a>
-              </li>
-              <li>
-                <span className="legal-strong">Direct Transf&apos;air</span> — plateforme SaaS de transfert d&apos;argent international, juil. 2026 —{' '}
-                <a href="https://direct-transfair.eu" className="legal-external-link" target="_blank" rel="noopener noreferrer">direct-transfair.eu</a>
-              </li>
-              <li>
-                <span className="legal-strong">Lélouma Communauté</span> — plateforme SaaS de gestion associative (ERP), jan. 2026 —{' '}
-                <a href="https://www.leloumacommunity.com" className="legal-external-link" target="_blank" rel="noopener noreferrer">leloumacommunity.com</a>
-              </li>
-              <li>
-                <span className="legal-strong">Work Pay</span> — portail RH &amp; gestion des congés, juil. 2025 —{' '}
-                <a href="https://socass-rma.fr" className="legal-external-link" target="_blank" rel="noopener noreferrer">socass-rma.fr</a>
-              </li>
-            </ul>
+          <div className="bio-section bio-reveal bd-4">
+            <div className="bio-h2">Au service de sa communauté</div>
+            <p className="bio-p">
+              C&apos;est cette expertise que Thierno met bénévolement au service de <strong>Lélouma Communauté pour le Développement</strong>, en tant que développeur et webmaster de la plateforme que vous consultez actuellement — un engagement qui relie directement ses compétences numériques à ses racines guinéennes.
+            </p>
+          </div>
+
+          <div className="bio-section bio-reveal bd-5">
+            <div className="bio-h2">Projets</div>
+            <div className="bio-projects">
+              <div className="bio-project-card" style={{ '--pc1': '#1D4ED8', '--pc2': '#0F172A' } as React.CSSProperties}>
+                <div className="bio-project-name">AssoGlobal (Grand Chef)</div>
+                <div className="bio-project-desc">Plateforme SaaS multi-tenant de création et gestion d&apos;associations.</div>
+                <a href="https://www.dkmoney.store" target="_blank" rel="noopener noreferrer" className="bio-project-link">dkmoney.store</a>
+              </div>
+              <div className="bio-project-card" style={{ '--pc1': '#059669', '--pc2': '#0F172A' } as React.CSSProperties}>
+                <div className="bio-project-name">Direct Transf&apos;air</div>
+                <div className="bio-project-desc">Plateforme SaaS de transfert d&apos;argent international (Direct-Transfair).</div>
+                <a href="https://direct-transfair.eu" target="_blank" rel="noopener noreferrer" className="bio-project-link">direct-transfair.eu</a>
+              </div>
+              <div className="bio-project-card" style={{ '--pc1': '#B45309', '--pc2': '#0F172A' } as React.CSSProperties}>
+                <div className="bio-project-name">Work Pay</div>
+                <div className="bio-project-desc">Portail RH &amp; gestion des congés et des RMA (Rélévés d&apos;Heures Mensuels) en entreprise.</div>
+                <a href="https://socass-rma.fr" target="_blank" rel="noopener noreferrer" className="bio-project-link">socass-rma.fr</a>
+              </div>
+            </div>
           </div>
         </div>
       </div>
