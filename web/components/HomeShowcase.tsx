@@ -25,33 +25,36 @@ interface Project {
   status: 'En cours' | 'À venir' | 'Terminé';
   description: string;
   photoUrl?: string | null;
-  icon: 'book' | 'water' | 'tree' | 'health';
+  icon: 'book' | 'water' | 'tree' | 'health' | 'leaf' | 'shield';
 }
 
-// ⚠️ Contenu d'exemple — à remplacer par les projets réels de l'association.
+// ⚠️ Contenu inspiré des vrais projets de l'association (ex. "Lélouma Verte — Un jeune,
+// un arbre", en cours) — formulé de façon générale, sans citer un village en particulier,
+// pour couvrir l'ensemble des communes de la préfecture. À ajuster librement depuis la
+// console d'administration au fur et à mesure de l'avancement réel des projets.
 const PROJECTS: Project[] = [
   {
-    id: 'ecole-kenery',
-    title: "Réhabilitation de l'école de Kénéry",
+    id: 'ecoles',
+    title: 'Réhabilitation des écoles dans le besoin',
     category: 'Éducation',
     status: 'En cours',
-    description: "Rénovation des salles de classe et équipement en mobilier scolaire pour améliorer les conditions d'apprentissage des enfants de Kénéry.",
+    description: "Rénovation des salles de classe et équipement en mobilier scolaire dans les établissements les plus vétustes de la préfecture, pour améliorer durablement les conditions d'apprentissage des enfants de Lélouma.",
     icon: 'book',
   },
   {
-    id: 'eau-petel',
-    title: 'Point d\'eau potable — Pétel',
+    id: 'eau-potable',
+    title: 'Point d\'eau potable aux villages reculés de Lélouma',
     category: 'Infrastructure',
     status: 'En cours',
-    description: "Forage et installation d'un point d'eau potable pour réduire les distances de collecte et améliorer l'accès à l'eau dans la sous-préfecture.",
+    description: "Forage et installation de points d'eau potable dans les villages les plus isolés de la préfecture, pour réduire les distances de collecte et sécuriser durablement l'accès à l'eau des familles.",
     icon: 'water',
   },
   {
-    id: 'reboisement',
-    title: 'Campagne de reboisement du Fouta Djallon',
+    id: 'lelouma-verte',
+    title: 'Lélouma Verte — Un jeune, un arbre',
     category: 'Environnement',
-    status: 'À venir',
-    description: "Plantation d'arbres et sensibilisation contre les feux de brousse pour préserver la biodiversité de la préfecture de Lélouma.",
+    status: 'En cours',
+    description: "Reboisement des têtes de source menacées et plantation d'arbres fruitiers dans les écoles primaires : chaque élève plante et entretient son propre arbre, pour ancrer une véritable culture de protection de la nature dès le plus jeune âge.",
     icon: 'tree',
   },
   {
@@ -59,8 +62,24 @@ const PROJECTS: Project[] = [
     title: 'Appui au centre de santé communautaire',
     category: 'Santé',
     status: 'À venir',
-    description: "Dotation en matériel médical de première nécessité pour améliorer la prise en charge des soins de base dans les sous-préfectures.",
+    description: "Dotation en matériel médical de première nécessité et appui logistique pour améliorer la prise en charge des soins de base dans les centres de santé des sous-préfectures de Lélouma.",
     icon: 'health',
+  },
+  {
+    id: 'ressources-naturelles',
+    title: 'Comment protéger nos ressources naturelles ?',
+    category: 'Sensibilisation',
+    status: 'À venir',
+    description: "Campagne de sensibilisation communautaire sur la préservation des forêts, des sols et des cours d'eau de la préfecture, pour construire une prise de conscience collective durable.",
+    icon: 'leaf',
+  },
+  {
+    id: 'protection-jeunes-filles',
+    title: 'Protection et éducation des jeunes filles',
+    category: 'Protection',
+    status: 'À venir',
+    description: "Programme de sensibilisation en milieu scolaire pour l'épanouissement, la protection et le maintien des jeunes filles de la préfecture dans leur parcours éducatif.",
+    icon: 'shield',
   },
 ];
 
@@ -74,6 +93,12 @@ function ProjectIcon({ type }: { type: Project['icon'] }) {
   );
   if (type === 'tree') return (
     <svg {...common}><path d="M12 22v-7" /><path d="M12 15c-3.5 0-6-2.5-6-5.5S8.5 3 12 3s6 2.5 6 5.5S15.5 15 12 15z" /></svg>
+  );
+  if (type === 'leaf') return (
+    <svg {...common}><path d="M5 21c8 0 14-6 14-14V5h-2C9 5 5 11 5 19v2z" /><path d="M5 21c3-6 6-9 12-12" /></svg>
+  );
+  if (type === 'shield') return (
+    <svg {...common}><path d="M12 3l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V6l7-3z" /><path d="M9 12l2 2 4-4" /></svg>
   );
   return (
     <svg {...common}><path d="M4 12h3l2-5 4 10 2-5h5" /></svg>
@@ -157,9 +182,9 @@ export default function HomeShowcase({ theme }: HomeShowcaseProps) {
         .hs-projects-kicker { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #1D4ED8; margin-bottom: 0.5rem; }
         .hs-projects-title { font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.3rem); color: #0F172A; }
 
-        .hs-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
-        @media (min-width: 900px) { .hs-grid { grid-template-columns: repeat(4, 1fr); } }
-        @media (max-width: 600px) { .hs-grid { grid-template-columns: 1fr; } }
+        .hs-grid { display: grid; grid-template-columns: 1fr; gap: 1.1rem; }
+        @media (min-width: 620px) { .hs-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (min-width: 960px) { .hs-grid { grid-template-columns: repeat(3, 1fr); gap: 1.3rem; } }
 
         .hs-card {
           background: #fff; border-radius: 20px; padding: 1.4rem 1.3rem;
@@ -179,7 +204,10 @@ export default function HomeShowcase({ theme }: HomeShowcaseProps) {
         }
         .hs-card-title { font-size: 0.95rem; font-weight: 800; color: #0F172A; line-height: 1.35; margin-bottom: 0.4rem; }
         .hs-card-category { font-size: 0.7rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 0.6rem; }
-        .hs-card-desc { font-size: 0.82rem; line-height: 1.6; color: #64748B; }
+        .hs-card-desc {
+          font-size: 0.8rem; line-height: 1.55; color: #64748B;
+          display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+        }
 
         /* ── Footer ──────────────────────────────────────────────────────── */
         .hs-footer { text-align: center; padding: 2rem 1.5rem 3rem; font-size: 0.8rem; color: #94A3B8; }
