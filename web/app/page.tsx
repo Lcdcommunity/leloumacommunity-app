@@ -7,13 +7,26 @@
 //          l'association via le host, générer un title/description/Open
 //          Graph propres à chaque domaine, puis rendre le composant client.
 //
-// v3.1.0 — Ajout d'un `alternates.canonical` propre à CETTE page (déplacé
-//          depuis app/layout.tsx, où il était à tort appliqué par défaut à
-//          toutes les pages du site, y compris /login et /signup).
+// v3.2.0 — CORRECTIF SEO CRITIQUE : le `alternates.canonical` était codé en
+//          dur sur "https://www.leloumacommunity.com/", copié par erreur
+//          depuis le dépôt mono-tenant du client lors du fast-forward. Dans
+//          CE dépôt (multi-tenant : dkmoney.store, ajvk.site, et toute
+//          future association), ce canonical fixe indiquait à Google que
+//          TOUTES les instances étaient des doublons du site de Lélouma —
+//          risque réel de désindexation des autres domaines. Le canonical
+//          est désormais calculé dynamiquement à partir du domaine réel :
+//          - association résolue → son propre domaine (org.domainName si
+//            disponible, sinon le host de la requête) ;
+//          - aucune association (Grand Chef lui-même) → le domaine
+//            officiel de la plateforme (www.dkmoney.store, confirmé
+//            Production dans Vercel → Domains).
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { env } from '../lib/env';
 import OnboardingClient from '../components/OnboardingClient';
+
+// Domaine officiel de la plateforme Grand Chef elle-même (hors association).
+const PLATFORM_CANONICAL_HOST = 'www.dkmoney.store';
 
 async function getOrgData(domain: string) {
   try {
@@ -29,19 +42,28 @@ async function getOrgData(domain: string) {
 
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers();
-  const host = (headersList.get('host') || '').replace(/^www\./, '');
-  const org = await getOrgData(host);
-
-  // Canonical fixe sur le domaine officiel de LCD, pour cette page précisément.
-  const canonical = 'https://www.leloumacommunity.com/';
+  const rawHost = (headersList.get('host') || '').replace(/^www\./, '');
+  const org = await getOrgData(rawHost);
 
   if (!org?.name) {
+    // Aucune association résolue pour ce domaine : c'est Grand Chef lui-même.
     return {
       title: 'AssoGlobal — Plateforme de gestion d’association communautaire',
       description: "Rejoignez votre communauté, suivez les projets, réglez vos cotisations et restez informé — le tout au même endroit.",
-      alternates: { canonical },
+      alternates: { canonical: `https://${PLATFORM_CANONICAL_HOST}/` },
+      openGraph: {
+        title: 'AssoGlobal — Plateforme multi-tenant pour associations',
+        description: "Chaque association crée sa propre plateforme numérique : membres, cotisations, projets, événements et gouvernance.",
+        images: ['https://res.cloudinary.com/gltn9eo4/image/upload/v1787347750/logo.png'],
+        type: 'website',
+      },
     };
   }
+
+  // Canonical propre à CETTE association : son domaine personnalisé si elle
+  // en a un, sinon le domaine réellement visité pour cette requête.
+  const canonicalHost = org.domainName || rawHost;
+  const canonical = `https://${canonicalHost}/`;
 
   const title = `${org.name} — Espace membre`;
   const description =
