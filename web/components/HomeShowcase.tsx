@@ -128,12 +128,6 @@ export default function HomeShowcase({ theme }: HomeShowcaseProps) {
         .hs-nav-actions { display: flex; align-items: center; gap: 0.6rem; }
         .hs-nav-login { color: rgba(255,255,255,0.85); font-size: 0.82rem; font-weight: 700; text-decoration: none; padding: 0.5rem 0.9rem; }
         .hs-nav-login:hover { color: #fff; }
-        .hs-nav-signup {
-          background: #fff; color: #06103A; font-size: 0.82rem; font-weight: 800;
-          padding: 0.5rem 1.1rem; border-radius: 99px; text-decoration: none;
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .hs-nav-signup:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
 
         /* ── Hero ────────────────────────────────────────────────────────── */
         .hs-hero { position: relative; background: #06103A; overflow: hidden; padding: 3rem 1.5rem 6rem; }
@@ -154,7 +148,7 @@ export default function HomeShowcase({ theme }: HomeShowcaseProps) {
         }
         .hs-hero-title {
           font-family: 'Cormorant Garamond', serif; font-weight: 700; color: #fff;
-          font-size: clamp(2.2rem, 6vw, 3.4rem); line-height: 1.08; margin-bottom: 1rem;
+          font-size: clamp(2rem, 9vw, 3.4rem); line-height: 1.12; margin-bottom: 1rem;
           text-shadow: 0 4px 30px rgba(0,0,0,0.4);
         }
         .hs-hero-desc { color: rgba(255,255,255,0.72); font-size: 1rem; line-height: 1.7; max-width: 540px; margin: 0 auto 2rem; }
@@ -177,7 +171,7 @@ export default function HomeShowcase({ theme }: HomeShowcaseProps) {
         .hs-wave svg { display: block; width: 100%; height: auto; }
 
         /* ── Section Projets ─────────────────────────────────────────────── */
-        .hs-projects { max-width: 1080px; margin: -3rem auto 0; padding: 0 1.5rem 4rem; position: relative; z-index: 3; }
+        .hs-projects { max-width: 1080px; margin: 0.5rem auto 0; padding: 0 1.5rem 4rem; position: relative; z-index: 3; }
         .hs-projects-head { text-align: center; margin-bottom: 2rem; }
         .hs-projects-kicker { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #1D4ED8; margin-bottom: 0.5rem; }
         .hs-projects-title { font-family: 'Cormorant Garamond', serif; font-weight: 700; font-size: clamp(1.7rem, 4vw, 2.3rem); color: #0F172A; }
@@ -232,7 +226,6 @@ export default function HomeShowcase({ theme }: HomeShowcaseProps) {
         </div>
         <div className="hs-nav-actions">
           <Link href="/login" className="hs-nav-login">Connexion</Link>
-          <Link href="/signup" className="hs-nav-signup">Créer un compte</Link>
         </div>
       </nav>
 
@@ -241,7 +234,7 @@ export default function HomeShowcase({ theme }: HomeShowcaseProps) {
         <div className="hs-orb hs-orb-2" aria-hidden="true" />
         <div className="hs-hero-inner">
           <div className="hs-hero-tag hs-reveal">🌍 Bienvenue</div>
-          <h1 className="hs-hero-title hs-reveal hd-1">Votre communauté, en action</h1>
+          <h1 className="hs-hero-title hs-reveal hd-1">Votre communauté,<br />en action</h1>
           <p className="hs-hero-desc hs-reveal hd-2">
             Suivez les projets menés par {theme.name} pour la préfecture de Lélouma, rejoignez la communauté et participez à son développement.
           </p>

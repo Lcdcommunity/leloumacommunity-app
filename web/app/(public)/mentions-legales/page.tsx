@@ -142,12 +142,12 @@ export default function MentionsLegalesPage() {
           <div className="legal-section">
             <h2 className="legal-h2">8. L&apos;antenne LCD France</h2>
             <p className="legal-p">
-              Afin de mieux structurer l&apos;engagement de la diaspora, une antenne dédiée — <span className="legal-strong">« Lélouma Communauté pour le Développement – France » (LCD France)</span> — a été constituée en France sous le régime de la loi du 1er juillet 1901, lors de l&apos;Assemblée Générale constitutive tenue à Trappes le 19 août 2026. Il s&apos;agit d&apos;une association distincte, actuellement en cours de formalités de déclaration auprès de la préfecture des Yvelines.
+              Afin de mieux structurer l&apos;engagement de la diaspora, une antenne dédiée — <span className="legal-strong">« Lélouma Communauté pour le Développement – France » (LCD France)</span> — a été constituée en France sous le régime de la loi du 1er juillet 1901, lors de l&apos;Assemblée Générale constitutive tenue sur WhatsApp, le 19 août 2026. Il s&apos;agit d&apos;une association distincte, actuellement en cours de formalités de déclaration auprès de la préfecture des Yvelines.
             </p>
             <div className="legal-highlight">
-              <p className="legal-p" style={{ marginBottom: '0.5rem' }}><span className="legal-strong">Siège social :</span> 41 Square Jean Macé, 78190 Trappes, France.</p>
+              <p className="legal-p" style={{ marginBottom: '0.5rem' }}><span className="legal-strong">Siège social :</span> Mairie de Lélouma, Guinée.</p>
               <p className="legal-p" style={{ marginBottom: 0 }}>
-                <span className="legal-strong">Conseil d&apos;administration :</span> Présidente — Fatoumata Binta Diallo · Trésorier — Alpha Diallo · Secrétaire général — Thierno Diallo · Secrétaire à la communication — Mazid Diallo.
+                <span className="legal-strong">Conseil d&apos;administration :</span> Présidente — Fatoumata Binta DIALLO · Trésorier — Elhadj Cellou DIALLO · Secrétaire général — Alpha DIALLO·
               </p>
             </div>
           </div>
