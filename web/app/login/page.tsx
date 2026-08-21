@@ -226,9 +226,9 @@ export default function LoginPage() {
         .lp-card.visible { opacity: 1; transform: translateY(0); }
 
         .lp-lang-corner {
-          position: absolute; top: 1.5rem;
-          ${isRTL ? 'left: 1.5rem;' : 'right: 1.5rem;'}
-          z-index: 20;
+          display: flex;
+          justify-content: ${isRTL ? 'flex-start' : 'flex-end'};
+          margin-bottom: 1.25rem;
         }
         .lp-lang-select {
           appearance: none;
