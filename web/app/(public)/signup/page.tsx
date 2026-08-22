@@ -152,7 +152,10 @@ export default function MemberSignupPage() {
     fontFamily: string;
   }>({
     name: 'Console Grand Chef',
-    logoUrl: null,
+    // Valeur par défaut avant résolution du thème (ou si aucune association
+    // ne correspond au domaine, ex. dkmoney.store lui-même) : le logo
+    // AssoGlobal plutôt qu'un cercle vide/placeholder cassé.
+    logoUrl: 'https://res.cloudinary.com/gltn9eo4/image/upload/c_crop,g_north,w_700,h_700/v1787347750/logo.png',
     primary: '#2563EB',
     secondary: '#059669',
     fontFamily: "'DM Sans', sans-serif",

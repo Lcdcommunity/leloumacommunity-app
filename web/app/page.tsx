@@ -24,9 +24,13 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { env } from '../lib/env';
 import OnboardingClient from '../components/OnboardingClient';
+import AssoGlobalHome from '../components/AssoGlobalHome';
 
 // Domaine officiel de la plateforme Grand Chef elle-même (hors association).
 const PLATFORM_CANONICAL_HOST = 'www.dkmoney.store';
+// host (après retrait du "www.") sur lequel on affiche la vitrine AssoGlobal
+// statique au lieu du flux d'onboarding générique des associations.
+const GRAND_CHEF_HOST = 'dkmoney.store';
 
 async function getOrgData(domain: string) {
   try {
@@ -90,6 +94,17 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function Page() {
+export default async function Page() {
+  const headersList = await headers();
+  const rawHost = (headersList.get('host') || '').replace(/^www\./, '');
+
+  // dkmoney.store est le domaine de la plateforme elle-même, pas d'une
+  // association : on affiche la vitrine statique AssoGlobal directement,
+  // côté serveur — pas de flash de l'onboarding avant redirection, et pas
+  // besoin de logique côté client pour distinguer ce cas.
+  if (rawHost === GRAND_CHEF_HOST) {
+    return <AssoGlobalHome />;
+  }
+
   return <OnboardingClient />;
 }

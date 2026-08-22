@@ -53,7 +53,10 @@ export default function LoginPage() {
     name: 'Console Grand Chef',
     legalName: null,
     code: null,
-    logoUrl: null,
+    // Valeur par défaut avant résolution du thème (ou si aucune association
+    // ne correspond au domaine, ex. dkmoney.store lui-même) : le logo
+    // AssoGlobal plutôt qu'un cercle vide/placeholder cassé.
+    logoUrl: 'https://res.cloudinary.com/gltn9eo4/image/upload/c_crop,g_north,w_700,h_700/v1787347750/logo.png',
     primary: '#1A56DB', secondary: '#1E40AF',
     fontFamily: "'DM Sans', sans-serif",
     phone: null, email: null, websiteUrl: null,
@@ -175,6 +178,11 @@ export default function LoginPage() {
     theme.email || theme.phone || fullAddress || theme.websiteUrl || theme.code ||
     (theme.legalName && theme.legalName !== theme.name)
   );
+
+  // Grand Chef n'est pas une association à "rejoindre" — le CTA d'inscription
+  // ne concerne que les vraies associations utilisant la plateforme.
+  const isGrandChefDomain = mounted && typeof window !== 'undefined' &&
+    ['dkmoney.store', 'www.dkmoney.store'].includes(window.location.hostname);
 
   if (!mounted) return null;
 
@@ -565,12 +573,14 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <footer className="lp-footer">
-            <p>{t('login.notMember', 'Pas encore membre ?')}</p>
-            <Link href="/signup" className="lp-signup-link">
-              {t('login.joinCommunity', 'Rejoindre la communauté')}
-            </Link>
-          </footer>
+          {!isGrandChefDomain && (
+            <footer className="lp-footer">
+              <p>{t('login.notMember', 'Pas encore membre ?')}</p>
+              <Link href="/signup" className="lp-signup-link">
+                {t('login.joinCommunity', 'Rejoindre la communauté')}
+              </Link>
+            </footer>
+          )}
 
           {hasContactInfo && (
             <div className="lp-help-section">
