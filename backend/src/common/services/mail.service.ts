@@ -30,6 +30,7 @@ type SendEventInvitationParams = {
   lastName: string;
   associationName: string; // nom dynamique de l'association concernée (multi-tenant)
   eventTitle: string;
+  eventType: string; // enum EventType côté Prisma, passé en string pour ne pas coupler ce service au client Prisma
   eventDescription?: string | null;
   startsAt: Date | string;
   isOnline: boolean;
@@ -100,14 +101,67 @@ export class MailService {
   }
 
   // 🔥 AJOUT : formatage de date/heure en français, sans dépendance externe.
-  // Remarque multi-tenant : aucun fuseau horaire n'est forcé ici (comme pour
-  // le formatage déjà utilisé côté front) — si tu ajoutes un jour un fuseau
-  // par association, c'est ici qu'il faudrait le brancher.
   private formatEventDateTime(date: Date | string): string {
     const d = typeof date === 'string' ? new Date(date) : date;
     const datePart = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const timePart = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     return `${datePart} à ${timePart}`;
+  }
+
+  // 🔥 AJOUT : construit la formule d'introduction avec le bon article selon
+  // le type d'événement ("à une réunion", "à une assemblée générale", "à une
+  // collecte de fonds", "à un événement"). Le titre n'est ajouté entre
+  // guillemets que s'il apporte une information en plus du type — sinon
+  // "vous convie à une réunion : « Réunion »" sonnerait redondant.
+  private buildEventIntroPhrase(eventType: string, eventTitle: string): string {
+    const TYPE_BASE_LABEL: Record<string, string> = {
+      GENERAL_ASSEMBLY: 'assemblée générale',
+      ANTENNA_MEETING: 'réunion',
+      FUNDRAISER: 'collecte de fonds',
+      OTHER: 'événement',
+    };
+    const TYPE_ARTICLE: Record<string, string> = {
+      GENERAL_ASSEMBLY: 'à une',
+      ANTENNA_MEETING: 'à une',
+      FUNDRAISER: 'à une',
+      OTHER: 'à un',
+    };
+
+    const baseLabel = TYPE_BASE_LABEL[eventType] || 'événement';
+    const article = TYPE_ARTICLE[eventType] || 'à un';
+    const normalizedTitle = eventTitle.trim().toLowerCase();
+
+    if (normalizedTitle === baseLabel.toLowerCase()) {
+      return `${article} ${baseLabel}`;
+    }
+    return `${article} ${baseLabel} : « ${eventTitle} »`;
+  }
+
+  // 🔥 AJOUT : rendu de l'ordre du jour. Si le texte saisi contient plusieurs
+  // lignes (un sujet par ligne dans le formulaire), chacune devient un point
+  // de liste distinct — sans ça, le HTML écrase les retours à la ligne et
+  // colle tous les sujets ensemble dans un même paragraphe.
+  private formatAgendaHtml(description?: string | null): string {
+    if (!description || !description.trim()) return '';
+    const lines = description.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    if (lines.length <= 1) {
+      return `<p style="margin:0 0 14px 0;"><strong>Ordre du jour :</strong> ${description.trim()}</p>`;
+    }
+
+    const items = lines.map(l => `<li style="margin-bottom:4px;">${l}</li>`).join('');
+    return `<p style="margin:0 0 8px 0;"><strong>Ordre du jour :</strong></p><ul style="margin:0 0 14px 0;padding-left:20px;">${items}</ul>`;
+  }
+
+  private formatAgendaText(description?: string | null): string {
+    if (!description || !description.trim()) return '';
+    const lines = description.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    if (lines.length <= 1) {
+      return `Ordre du jour : ${description.trim()}`;
+    }
+
+    return ['Ordre du jour :', ...lines.map(l => `- ${l}`)].join('\n');
   }
 
   async sendAntennaAdminInvitation(
@@ -263,6 +317,7 @@ export class MailService {
     const subject = `Invitation : ${params.eventTitle}`;
     const dateLabel = this.formatEventDateTime(params.startsAt);
     const loginUrl = this.getLoginUrl(params.associationDomain);
+    const introPhrase = this.buildEventIntroPhrase(params.eventType, params.eventTitle);
 
     const modalityHtml = params.isOnline
       ? `en ligne${params.meetingLink ? ` (<a href="${params.meetingLink}" style="color:#1D4ED8;">${params.meetingLink}</a>)` : ''}`
@@ -272,13 +327,8 @@ export class MailService {
       ? `en ligne${params.meetingLink ? ` (${params.meetingLink})` : ''}`
       : `en présentiel${params.locationText ? ` (${params.locationText})` : ''}`;
 
-    const agendaHtml = params.eventDescription
-      ? `<p style="margin:0 0 14px 0;"><strong>Ordre du jour :</strong> ${params.eventDescription}</p>`
-      : '';
-
-    const agendaText = params.eventDescription
-      ? `Ordre du jour : ${params.eventDescription}`
-      : '';
+    const agendaHtml = this.formatAgendaHtml(params.eventDescription);
+    const agendaText = this.formatAgendaText(params.eventDescription);
 
     const logoHtml = params.logoUrl
       ? `<div style="text-align:center; margin-bottom: 24px;">
@@ -291,12 +341,17 @@ export class MailService {
         ${logoHtml}
         <h2 style="margin:0 0 16px 0;color:#1D4ED8;">Bonjour ${params.firstName} ${params.lastName},</h2>
         <p style="margin:0 0 14px 0;">
-          Le bureau de la coordination de <strong>${params.associationName}</strong> vous convie à
-          « <strong>${params.eventTitle}</strong> », ${modalityHtml}, le <strong>${dateLabel}</strong>.
+          Le bureau de la coordination de <strong>${params.associationName}</strong> a le plaisir de vous convier ${introPhrase}, ${modalityHtml}, le <strong>${dateLabel}</strong>.
         </p>
         ${agendaHtml}
+        <p style="margin:0 0 14px 0;">
+          Votre présence compte plus que vous ne l'imaginez. C'est ensemble, autour d'échanges comme celui-ci, que nous faisons avancer les projets qui nous tiennent à cœur et que notre communauté continue de grandir.
+        </p>
         <p style="margin:0 0 14px 0;">Compte tenu de l'importance de l'ordre du jour, votre participation est vivement souhaitée.</p>
-        <p style="margin:0 0 20px 0;">Nous vous remercions de tout le sacrifice que vous accordez à notre communauté.</p>
+        <p style="margin:0 0 20px 0;">Nous vous remercions du fond du cœur pour tout le sacrifice et le dévouement que vous accordez, jour après jour, à notre communauté.</p>
+        <p style="margin:0 0 8px 0;font-size:14px;color:#4B5563;">
+          Veuillez confirmer votre participation en vous connectant à votre espace membre (onglet « Événements »).
+        </p>
         <p style="margin:8px 0 20px 0;">
           <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px; font-weight: bold;">
             Confirmer ma participation
@@ -309,12 +364,16 @@ export class MailService {
     const text = [
       `Bonjour ${params.firstName} ${params.lastName},`,
       '',
-      `Le bureau de la coordination de ${params.associationName} vous convie à « ${params.eventTitle} », ${modalityText}, le ${dateLabel}.`,
+      `Le bureau de la coordination de ${params.associationName} a le plaisir de vous convier ${introPhrase}, ${modalityText}, le ${dateLabel}.`,
       '',
       agendaText,
       '',
+      "Votre présence compte plus que vous ne l'imaginez. C'est ensemble, autour d'échanges comme celui-ci, que nous faisons avancer les projets qui nous tiennent à cœur et que notre communauté continue de grandir.",
+      '',
       "Compte tenu de l'importance de l'ordre du jour, votre participation est vivement souhaitée.",
-      'Nous vous remercions de tout le sacrifice que vous accordez à notre communauté.',
+      'Nous vous remercions du fond du cœur pour tout le sacrifice et le dévouement que vous accordez, jour après jour, à notre communauté.',
+      '',
+      'Veuillez confirmer votre participation en vous connectant à votre espace membre (onglet « Événements »).',
       '',
       `Confirmer ma participation : ${loginUrl}`,
       '',

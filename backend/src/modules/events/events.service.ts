@@ -11,7 +11,7 @@ export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
-    private readonly mailService: MailService, // 🔥 AJOUT
+    private readonly mailService: MailService,
   ) {}
 
   // ==========================================
@@ -335,8 +335,6 @@ export class EventsService {
       }).catch(err => console.error(`[EventsService] Échec notif pour user ${userId}:`, err))
     );
 
-    // 🔥 AJOUT : envoi d'un email de convocation à chacun des membres ciblés,
-    // en parallèle des notifications push/in-app existantes.
     await Promise.all([
       Promise.all(notifyPromises),
       this.sendEventInvitationEmails(associationId, event, Array.from(targetUserIds)),
@@ -344,9 +342,6 @@ export class EventsService {
   }
 
   // 🔥 AJOUT : envoie l'email de convocation à chaque membre ciblé.
-  // Dynamique multi-tenant : le nom, le logo et le domaine de connexion sont
-  // relus depuis l'association concernée à chaque envoi — aucune valeur
-  // n'est codée en dur, donc ça fonctionne pour toutes tes associations.
   private async sendEventInvitationEmails(associationId: string, event: any, targetUserIds: string[]) {
     if (targetUserIds.length === 0) return;
 
@@ -370,7 +365,6 @@ export class EventsService {
     const logoUrl = association?.logoFile?.url ?? undefined;
     const associationDomain = association?.domainName ?? undefined;
 
-    // On retire le préfixe [TypePersonnalisé] utilisé en interne pour le type "Autre"
     const displayTitle = typeof event.title === 'string'
       ? event.title.replace(/^\[.*?\]\s*/, '')
       : event.title;
@@ -384,6 +378,7 @@ export class EventsService {
           lastName: u.lastName,
           associationName,
           eventTitle: displayTitle,
+          eventType: event.type, // 🔥 AJOUT : nécessaire pour construire "à une réunion" / "à une assemblée générale" / etc.
           eventDescription: event.description,
           startsAt: event.startsAt,
           isOnline: event.isOnline,
