@@ -18,6 +18,13 @@ interface AttendanceItem {
   };
 }
 
+interface MemberItem {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+}
+
 const TYPE_MAP: Record<string, string> = { GENERAL_ASSEMBLY: 'A.G.', ANTENNA_MEETING: 'Réunion', FUNDRAISER: 'Levée de fonds', OTHER: 'Autre' };
 const STATUS_MAP: Record<string, { label: string, color: string, bg: string }> = {
   DRAFT: { label: 'Brouillon', color: '#6B7280', bg: '#F3F4F6' },
@@ -46,20 +53,67 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
   const [isOnline, setIsOnline] = useState(event?.isOnline || false);
   const [meetingLink, setMeetingLink] = useState(event?.meetingLink || '');
 
+  const [inviteAll, setInviteAll] = useState(true);
+  const [availableMembers, setAvailableMembers] = useState<MemberItem[]>([]);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [memberSearchQuery, setMemberSearchQuery] = useState('');
+
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // 👇 CORRECTION : Blocage du scroll de l'arrière-plan quand le modal est ouvert
   useEffect(() => {
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = 'unset'; };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    if (!isEditing) return;
+
+    async function fetchMembers() {
+      setLoadingMembers(true);
+      try {
+        const res = await api.listAntennaMembers({ page: 1, pageSize: 1000, status: 'ACTIVE' });
+        if (!isMounted) return;
+        setAvailableMembers((res.items || []) as unknown as MemberItem[]);
+      } catch (err) {
+        console.error('Erreur de récupération des membres:', err);
+      } finally {
+        if (isMounted) setLoadingMembers(false);
+      }
+    }
+    void fetchMembers();
+
+    return () => { isMounted = false; };
+  }, [isEditing]);
+
+  const handleInviteAllChange = (checked: boolean) => {
+    setInviteAll(checked);
+    if (checked) {
+      setSelectedMemberIds([]);
+    }
+  };
+
+  const toggleMember = (id: string) => {
+    setSelectedMemberIds(prev => prev.includes(id) ? prev.filter(mId => mId !== id) : [...prev, id]);
+  };
+
+  const filteredMembers = availableMembers.filter(m =>
+    `${m.firstName} ${m.lastName} ${m.email}`.toLowerCase().includes(memberSearchQuery.toLowerCase())
+  );
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
     try {
-      const payload = { title, description, type, status, startsAt: new Date(startsAt).toISOString(), locationText, isOnline, meetingLink };
+      const payload = { 
+        title, description, type, status, 
+        startsAt: new Date(startsAt).toISOString(), 
+        locationText, isOnline, meetingLink,
+        inviteAll,
+        memberIds: inviteAll ? [] : selectedMemberIds
+      };
       if (event) await api.updateEvent(event.id, payload);
       else await api.createEvent(payload);
       onSuccess();
@@ -190,9 +244,58 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
               )}
             </div>
 
+            <div style={{ marginTop: '1rem', background: '#EFF6FF', padding: '1rem', borderRadius: 12, border: '1px solid #BFDBFE' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input type="checkbox" id="cb-inviteall" checked={inviteAll} onChange={e => handleInviteAllChange(e.target.checked)} style={{ width: 16, height: 16, accentColor: '#2563EB' }} />
+                <label htmlFor="cb-inviteall" style={{ fontWeight: 700, color: '#1D4ED8', cursor: 'pointer', textTransform: 'none', fontSize: '0.9rem' }}>Inviter TOUS les membres actifs de mon antenne</label>
+              </div>
+
+              {!inviteAll && (
+                <div style={{ marginTop: '1rem', borderTop: '1px dashed #BFDBFE', paddingTop: '1rem' }}>
+                  <label style={{ fontSize: '0.68rem', fontWeight: 800, textTransform: 'uppercase', color: '#1D4ED8', display: 'block', marginBottom: '0.35rem' }}>
+                    Membres invités individuellement
+                  </label>
+                  <span style={{ fontSize: '0.75rem', color: '#64748B', display: 'block', marginBottom: '0.6rem', fontStyle: 'italic' }}>
+                    Recherche et sélectionne des membres de ton antenne par nom, prénom ou email. * Seuls les membres avec un compte actif s&apos;affichent ici.
+                  </span>
+
+                  <input
+                    type="text"
+                    placeholder="Rechercher par nom, prénom ou email..."
+                    className="aev-input"
+                    style={{ height: 38, fontSize: '0.85rem', marginBottom: '0.6rem' }}
+                    value={memberSearchQuery}
+                    onChange={e => setMemberSearchQuery(e.target.value)}
+                    disabled={loadingMembers || availableMembers.length === 0}
+                  />
+
+                  <div style={{ maxHeight: 180, overflowY: 'auto', background: 'white', border: '1px solid #D1D5DB', borderRadius: 10, padding: '0.4rem' }}>
+                    {loadingMembers ? (
+                      <div style={{ fontSize: '0.8rem', color: '#94A3B8', textAlign: 'center', padding: '1rem' }}>Chargement...</div>
+                    ) : availableMembers.length === 0 ? (
+                      <div style={{ fontSize: '0.8rem', color: '#94A3B8', textAlign: 'center', padding: '1rem' }}>Aucun membre actif trouvé.</div>
+                    ) : filteredMembers.length === 0 ? (
+                      <div style={{ fontSize: '0.8rem', color: '#94A3B8', textAlign: 'center', padding: '1rem' }}>Aucun résultat pour cette recherche.</div>
+                    ) : (
+                      filteredMembers.map(m => (
+                        <label key={m.id} className="aev-member-item">
+                          <input type="checkbox" checked={selectedMemberIds.includes(m.id)} onChange={() => toggleMember(m.id)} style={{ accentColor: '#2563EB' }} />
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1E293B' }}>{m.firstName} {m.lastName}</span>
+                          <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>({m.email})</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '0.4rem', textAlign: 'right', fontWeight: 700 }}>
+                    {selectedMemberIds.length} sélectionné(s)
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', borderTop: '1px solid #E2E8F0', paddingTop: '1.25rem' }}>
               <button type="button" className="aev-btn-cancel" onClick={() => event ? setIsEditing(false) : onClose()} disabled={saving}>Annuler</button>
-              <button type="submit" className="aev-btn-submit" disabled={saving}>{saving ? 'Sauvegarde...' : 'Enregistrer'}</button>
+              <button type="submit" className="aev-btn-submit" disabled={saving || (!inviteAll && selectedMemberIds.length === 0)}>{saving ? 'Sauvegarde...' : 'Enregistrer'}</button>
             </div>
           </form>
         )}
@@ -205,7 +308,6 @@ function EventModal({ event, onClose, onSuccess }: { event?: EventItem | null; o
 // MODAL : GESTION DES PRÉSENCES (FILTRE OUI / NON) - ADMIN ANTENNE
 // ----------------------------------------------------------------------
 function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => void }) {
-  // 👇 ICI: MAJUSCULES
   const [filter, setFilter] = useState<'ALL' | 'ATTENDING' | 'ABSENT'>('ALL');
   const [attendances, setAttendances] = useState<AttendanceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,7 +344,6 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
 
         <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
           <div className="aev-tabs">
-            {/* 👇 ICI: MAJUSCULES */}
             <button className={`aev-tab ${filter === 'ALL' ? 'active' : ''}`} onClick={() => setFilter('ALL')}>Toutes les réponses</button>
             <button className={`aev-tab ${filter === 'ATTENDING' ? 'active' : ''}`} onClick={() => setFilter('ATTENDING')} style={filter === 'ATTENDING' ? { color: '#059669', borderColor: '#059669', background: '#ECFDF5' } : {}}>✅ Présents</button>
             <button className={`aev-tab ${filter === 'ABSENT' ? 'active' : ''}`} onClick={() => setFilter('ABSENT')} style={filter === 'ABSENT' ? { color: '#DC2626', borderColor: '#DC2626', background: '#FEF2F2' } : {}}>❌ Absents</button>
@@ -263,7 +364,6 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
                     <div style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: 2 }}>{att.user.email} {att.user.phone ? `• ${att.user.phone}` : ''}</div>
                   </div>
                   <div>
-                    {/* 👇 ICI: MAJUSCULES (FIN DU BUG ABSENT) */}
                     {att.status === 'ATTENDING' ? (
                       <span style={{ display: 'inline-block', padding: '0.3rem 0.8rem', background: '#D1FAE5', color: '#065F46', borderRadius: 99, fontSize: '0.75rem', fontWeight: 800 }}>Participent</span>
                     ) : (
@@ -286,25 +386,40 @@ function AttendanceModal({ event, onClose }: { event: EventItem; onClose: () => 
 export default function AdminEventsPage() {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
+  // 👇 CORRECTION LINT (react-hooks/set-state-in-effect), par cohérence avec
+  // la page super-admin : la fonction de chargement est déclarée ET appelée
+  // entièrement à l'intérieur de l'effet, qui ne dépend plus que d'un
+  // compteur `reloadKey` — jamais d'une fonction externe passée en dépendance.
+  const [reloadKey, setReloadKey] = useState(0);
+
   // États des modaux
   const [modalState, setModalState] = useState<{ isOpen: boolean; event?: EventItem | null }>({ isOpen: false });
   const [attendanceModal, setAttendanceModal] = useState<{ isOpen: boolean; event?: EventItem | null }>({ isOpen: false });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try { 
-      const res = await api.listEvents(); 
-      setItems(res?.items || []); 
-    } catch (err) { 
-      console.error(err); 
-      setItems([]); 
-    } finally { 
-      setLoading(false); 
-    }
-  }, []);
+  useEffect(() => {
+    let ignore = false;
 
-  useEffect(() => { void load(); }, [load]);
+    async function loadEvents() {
+      try {
+        const res = await api.listEvents();
+        if (!ignore) setItems(res?.items || []);
+      } catch (err) {
+        console.error(err);
+        if (!ignore) setItems([]);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    void loadEvents();
+    return () => { ignore = true; };
+  }, [reloadKey]);
+
+  const reload = useCallback(() => {
+    setLoading(true);
+    setReloadKey(k => k + 1);
+  }, []);
 
   return (
     <AppShell title="Événements">
@@ -346,7 +461,7 @@ export default function AdminEventsPage() {
             -webkit-overflow-scrolling: touch;
           }
 
-          .aev-table { width: 100%; border-collapse: collapse; /* Suppression du min-width: 400px pour éviter le scroll */ }
+          .aev-table { width: 100%; border-collapse: collapse; }
           .aev-table th { padding: 0.75rem 0.75rem; font-size: 0.65rem; font-weight: 900; text-transform: uppercase; color: #6B7280; text-align: left; white-space: nowrap; }
           .aev-row { border-top: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; } 
           .aev-row:hover { background: #F8FAFC; }
@@ -377,7 +492,11 @@ export default function AdminEventsPage() {
           .aev-input:focus, .aev-select:focus { border-color: #2563EB; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
           
           .aev-btn-submit { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; }
+          .aev-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
           .aev-btn-cancel { background: white; border: 1px solid #D1D5DB; color: #4B5563; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+
+          .aev-member-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.4rem; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+          .aev-member-item:hover { background: #F1F5F9; }
           
           @media (max-width: 600px) { 
             .aev-grid-2 { grid-template-columns: 1fr; } 
@@ -449,7 +568,7 @@ export default function AdminEventsPage() {
           </div>
         </div>
         
-        {modalState.isOpen && <EventModal event={modalState.event} onClose={() => setModalState({ isOpen: false })} onSuccess={() => { setModalState({ isOpen: false }); void load(); }} />}
+        {modalState.isOpen && <EventModal event={modalState.event} onClose={() => setModalState({ isOpen: false })} onSuccess={() => { setModalState({ isOpen: false }); reload(); }} />}
         {attendanceModal.isOpen && attendanceModal.event && <AttendanceModal event={attendanceModal.event} onClose={() => setAttendanceModal({ isOpen: false })} />}
       </div>
     </AppShell>

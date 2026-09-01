@@ -4,12 +4,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEventDto, UpdateEventDto, RegisterAttendanceDto } from './dto/event.dto';
 import { EventStatus, UserRole, Prisma, EventType, AttendanceStatus, NotificationType } from '@prisma/client';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailService } from '../../common/services/mail.service';
 
 @Injectable()
 export class EventsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly mailService: MailService, // 🔥 AJOUT
   ) {}
 
   // ==========================================
@@ -292,7 +294,7 @@ export class EventsService {
   }
 
   // ==========================================
-  // 🔥 UTILS : PROPULSION DES NOTIFICATIONS
+  // 🔥 UTILS : PROPULSION DES NOTIFICATIONS (push/in-app + email)
   // ==========================================
   private async notifyEventPublished(
     associationId: string, 
@@ -333,6 +335,65 @@ export class EventsService {
       }).catch(err => console.error(`[EventsService] Échec notif pour user ${userId}:`, err))
     );
 
-    await Promise.all(notifyPromises);
+    // 🔥 AJOUT : envoi d'un email de convocation à chacun des membres ciblés,
+    // en parallèle des notifications push/in-app existantes.
+    await Promise.all([
+      Promise.all(notifyPromises),
+      this.sendEventInvitationEmails(associationId, event, Array.from(targetUserIds)),
+    ]);
+  }
+
+  // 🔥 AJOUT : envoie l'email de convocation à chaque membre ciblé.
+  // Dynamique multi-tenant : le nom, le logo et le domaine de connexion sont
+  // relus depuis l'association concernée à chaque envoi — aucune valeur
+  // n'est codée en dur, donc ça fonctionne pour toutes tes associations.
+  private async sendEventInvitationEmails(associationId: string, event: any, targetUserIds: string[]) {
+    if (targetUserIds.length === 0) return;
+
+    const [association, users] = await Promise.all([
+      this.prisma.association.findUnique({
+        where: { id: associationId },
+        select: {
+          name: true,
+          legalName: true,
+          domainName: true,
+          logoFile: { select: { url: true } }
+        }
+      }),
+      this.prisma.user.findMany({
+        where: { id: { in: targetUserIds } },
+        select: { id: true, email: true, firstName: true, lastName: true }
+      })
+    ]);
+
+    const associationName = association?.legalName || association?.name || 'votre association';
+    const logoUrl = association?.logoFile?.url ?? undefined;
+    const associationDomain = association?.domainName ?? undefined;
+
+    // On retire le préfixe [TypePersonnalisé] utilisé en interne pour le type "Autre"
+    const displayTitle = typeof event.title === 'string'
+      ? event.title.replace(/^\[.*?\]\s*/, '')
+      : event.title;
+
+    const emailPromises = users
+      .filter(u => !!u.email)
+      .map(u =>
+        this.mailService.sendEventInvitation({
+          to: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          associationName,
+          eventTitle: displayTitle,
+          eventDescription: event.description,
+          startsAt: event.startsAt,
+          isOnline: event.isOnline,
+          meetingLink: event.meetingLink,
+          locationText: event.locationText,
+          logoUrl,
+          associationDomain,
+        }).catch(err => console.error(`[EventsService] Échec email d'invitation pour user ${u.id}:`, err))
+      );
+
+    await Promise.all(emailPromises);
   }
 }

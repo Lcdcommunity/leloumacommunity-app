@@ -23,6 +23,22 @@ type SendSuperAdminWelcomeParams = {
   associationDomain?: string | null; // 🔥 AJOUT (cohérence, probablement plus appelé depuis system-admin.service.ts qui utilise désormais AuthMailerService)
 };
 
+// 🔥 AJOUT : email d'invitation à un événement (convocation)
+type SendEventInvitationParams = {
+  to: string;
+  firstName: string;
+  lastName: string;
+  associationName: string; // nom dynamique de l'association concernée (multi-tenant)
+  eventTitle: string;
+  eventDescription?: string | null;
+  startsAt: Date | string;
+  isOnline: boolean;
+  meetingLink?: string | null;
+  locationText?: string | null;
+  logoUrl?: string | null;
+  associationDomain?: string | null;
+};
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -81,6 +97,17 @@ export class MailService {
       return `https://${associationDomain.replace(/^https?:\/\//, '').replace(/\/+$/, '')}/login`;
     }
     return `${this.getFrontendBaseUrl()}/login`;
+  }
+
+  // 🔥 AJOUT : formatage de date/heure en français, sans dépendance externe.
+  // Remarque multi-tenant : aucun fuseau horaire n'est forcé ici (comme pour
+  // le formatage déjà utilisé côté front) — si tu ajoutes un jour un fuseau
+  // par association, c'est ici qu'il faudrait le brancher.
+  private formatEventDateTime(date: Date | string): string {
+    const d = typeof date === 'string' ? new Date(date) : date;
+    const datePart = d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timePart = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    return `${datePart} à ${timePart}`;
   }
 
   async sendAntennaAdminInvitation(
@@ -210,6 +237,92 @@ export class MailService {
       '',
       'Pour des raisons de sécurité, nous vous recommandons de modifier ce mot de passe dès votre première connexion.',
     ].join('\n');
+
+    await transporter.sendMail({
+      from: this.getFromAddress(),
+      to: params.to,
+      subject,
+      text,
+      html,
+    });
+  }
+
+  // 🔥 AJOUT : email de convocation/invitation à un événement.
+  // 100% dynamique par association (nom, logo, domaine de connexion) pour
+  // fonctionner correctement dans un contexte multi-tenant.
+  async sendEventInvitation(params: SendEventInvitationParams): Promise<void> {
+    const transporter = this.getTransporter();
+
+    if (!transporter) {
+      this.logger.warn(
+        `SMTP non configuré. Email d'invitation non envoyé à ${params.to} pour l'événement "${params.eventTitle}".`,
+      );
+      return;
+    }
+
+    const subject = `Invitation : ${params.eventTitle}`;
+    const dateLabel = this.formatEventDateTime(params.startsAt);
+    const loginUrl = this.getLoginUrl(params.associationDomain);
+
+    const modalityHtml = params.isOnline
+      ? `en ligne${params.meetingLink ? ` (<a href="${params.meetingLink}" style="color:#1D4ED8;">${params.meetingLink}</a>)` : ''}`
+      : `en présentiel${params.locationText ? ` (${params.locationText})` : ''}`;
+
+    const modalityText = params.isOnline
+      ? `en ligne${params.meetingLink ? ` (${params.meetingLink})` : ''}`
+      : `en présentiel${params.locationText ? ` (${params.locationText})` : ''}`;
+
+    const agendaHtml = params.eventDescription
+      ? `<p style="margin:0 0 14px 0;"><strong>Ordre du jour :</strong> ${params.eventDescription}</p>`
+      : '';
+
+    const agendaText = params.eventDescription
+      ? `Ordre du jour : ${params.eventDescription}`
+      : '';
+
+    const logoHtml = params.logoUrl
+      ? `<div style="text-align:center; margin-bottom: 24px;">
+           <img src="${params.logoUrl}" alt="${params.associationName}" style="max-height: 80px; width: auto; border-radius: 8px;" />
+         </div>`
+      : '';
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:640px;margin:0 auto;padding:24px;background:#ffffff;color:#111827; border: 1px solid #E5E7EB; border-radius: 12px;">
+        ${logoHtml}
+        <h2 style="margin:0 0 16px 0;color:#1D4ED8;">Bonjour ${params.firstName} ${params.lastName},</h2>
+        <p style="margin:0 0 14px 0;">
+          Le bureau de la coordination de <strong>${params.associationName}</strong> vous convie à
+          « <strong>${params.eventTitle}</strong> », ${modalityHtml}, le <strong>${dateLabel}</strong>.
+        </p>
+        ${agendaHtml}
+        <p style="margin:0 0 14px 0;">Compte tenu de l'importance de l'ordre du jour, votre participation est vivement souhaitée.</p>
+        <p style="margin:0 0 20px 0;">Nous vous remercions de tout le sacrifice que vous accordez à notre communauté.</p>
+        <p style="margin:8px 0 20px 0;">
+          <a href="${loginUrl}" style="display:inline-block;background:#1D4ED8;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px; font-weight: bold;">
+            Confirmer ma participation
+          </a>
+        </p>
+        <p style="margin:0;">Bien cordialement,<br/>Le bureau de la coordination de ${params.associationName}</p>
+      </div>
+    `;
+
+    const text = [
+      `Bonjour ${params.firstName} ${params.lastName},`,
+      '',
+      `Le bureau de la coordination de ${params.associationName} vous convie à « ${params.eventTitle} », ${modalityText}, le ${dateLabel}.`,
+      '',
+      agendaText,
+      '',
+      "Compte tenu de l'importance de l'ordre du jour, votre participation est vivement souhaitée.",
+      'Nous vous remercions de tout le sacrifice que vous accordez à notre communauté.',
+      '',
+      `Confirmer ma participation : ${loginUrl}`,
+      '',
+      'Bien cordialement,',
+      `Le bureau de la coordination de ${params.associationName}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     await transporter.sendMail({
       from: this.getFromAddress(),

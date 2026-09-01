@@ -74,12 +74,16 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
   const [availableMembers, setAvailableMembers] = useState<MemberItem[]>([]);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  
+
   const [memberSearchQuery, setMemberSearchQuery] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Un événement peut désormais n'avoir aucune antenne ciblée : dans ce cas,
+  // seuls les membres sélectionnés individuellement ci-dessous seront invités.
+  const hasAntennas = selectedAntennaIds.length > 0;
 
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -96,21 +100,19 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
     if (isEditing) void fetchAntennas();
   }, [isEditing]);
 
+  // Liste des membres actifs (toutes antennes confondues), chargée dès l'entrée
+  // en édition — plus besoin de sélectionner une antenne au préalable pour
+  // pouvoir inviter des membres individuellement.
   useEffect(() => {
     let isMounted = true;
-
-    if (inviteAll || selectedAntennaIds.length === 0) {
-      setAvailableMembers([]);
-      return;
-    }
+    if (!isEditing) return;
 
     async function fetchMembers() {
       setLoadingMembers(true);
       try {
         const res = await api.listMembers({ page: 1, pageSize: 1000, status: 'ACTIVE' });
         if (!isMounted) return;
-        const allMembers = res.items || [];
-        setAvailableMembers(allMembers as unknown as MemberItem[]);
+        setAvailableMembers((res.items || []) as unknown as MemberItem[]);
       } catch (err) { 
         console.error("Erreur de récupération des membres:", err); 
       } finally { 
@@ -120,11 +122,22 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
     void fetchMembers();
 
     return () => { isMounted = false; };
-  }, [selectedAntennaIds, inviteAll]);
+  }, [isEditing]);
 
   const toggleAntenna = (id: string) => {
+    if (!hasAntennas && inviteAll) {
+      setSelectedMemberIds([]);
+    }
     setSelectedAntennaIds(prev => prev.includes(id) ? prev.filter(aId => aId !== id) : [...prev, id]);
   };
+
+  const handleInviteAllChange = (checked: boolean) => {
+    setInviteAll(checked);
+    if (checked) {
+      setSelectedMemberIds([]);
+    }
+  };
+
   const toggleMember = (id: string) => {
     setSelectedMemberIds(prev => prev.includes(id) ? prev.filter(mId => mId !== id) : [...prev, id]);
   };
@@ -141,6 +154,11 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
         ? `[${customType.trim()}] ${title}` 
         : title;
 
+      // Si aucune antenne n'est ciblée, on ne peut pas "inviter tous les membres
+      // de ces antennes" — dans ce cas, seuls les membres choisis individuellement
+      // sont invités.
+      const effectiveInviteAll = hasAntennas ? inviteAll : false;
+
       const payload = { 
         title: finalTitle, 
         description: description.trim() || undefined, 
@@ -151,8 +169,8 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
         isOnline, 
         meetingLink: (isOnline && meetingLink.trim()) ? meetingLink.trim() : undefined,
         antennaIds: selectedAntennaIds,
-        inviteAll,
-        memberIds: inviteAll ? [] : selectedMemberIds
+        inviteAll: effectiveInviteAll,
+        memberIds: effectiveInviteAll ? [] : selectedMemberIds
       };
 
       if (selectedEvent) {
@@ -336,7 +354,12 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
             </div>
 
             <div className="lux-field">
-              <label>Antennes ciblées <span>*</span></label>
+              <label>
+                Antennes ciblées{' '}
+                <span style={{ color: '#94A3B8', fontSize: '0.65rem', fontWeight: 700, textTransform: 'none', letterSpacing: 'normal' }}>
+                  (optionnel)
+                </span>
+              </label>
               <div className="lux-antennas-grid">
                 {availableAntennas.map(a => (
                   <label key={a.id} className={`lux-antenna-cb ${selectedAntennaIds.includes(a.id) ? 'active' : ''}`}>
@@ -345,57 +368,63 @@ function EventModal({ selectedEvent, onClose, onSuccess }: { selectedEvent?: Eve
                   </label>
                 ))}
               </div>
+              <span className="lux-hint">
+                Sélectionne une ou plusieurs antennes pour diffuser l&apos;événement à leurs membres, ou laisse vide pour n&apos;inviter que des membres choisis individuellement ci-dessous.
+              </span>
 
-              {selectedAntennaIds.length > 0 && (
+              {hasAntennas && (
                 <div className="lux-highlight-box blue" style={{ marginTop: '1rem' }}>
                   <div className="lux-checkbox-group">
-                    <input type="checkbox" id="cb-inviteall" checked={inviteAll} onChange={e => setInviteAll(e.target.checked)} />
+                    <input type="checkbox" id="cb-inviteall" checked={inviteAll} onChange={e => handleInviteAllChange(e.target.checked)} />
                     <label htmlFor="cb-inviteall">Inviter TOUS les membres de ces antennes</label>
                   </div>
-
-                  {!inviteAll && (
-                    <div className="lux-invite-specific">
-                      <label>Sélectionnez les participants</label>
-                      <span className="lux-hint">* Seuls les membres avec un compte actif s&apos;affichent ici.</span>
-
-                      <input 
-                        type="text" 
-                        placeholder="Rechercher par nom, prénom ou email..." 
-                        className="lux-input search" 
-                        value={memberSearchQuery}
-                        onChange={e => setMemberSearchQuery(e.target.value)}
-                        disabled={loadingMembers || availableMembers.length === 0}
-                      />
-
-                      <div className="lux-members-list">
-                        {loadingMembers ? (
-                           <div className="lux-empty-state">Chargement...</div> 
-                        ) : availableMembers.length === 0 ? (
-                           <div className="lux-empty-state">Aucun membre actif trouvé.</div> 
-                        ) : filteredMembers.length === 0 ? (
-                           <div className="lux-empty-state">Aucun résultat pour cette recherche.</div>
-                        ) : (
-                          filteredMembers.map(m => (
-                            <label key={m.id} className="lux-member-item">
-                              <input type="checkbox" checked={selectedMemberIds.includes(m.id)} onChange={() => toggleMember(m.id)} />
-                              <span className="name">{m.firstName} {m.lastName}</span>
-                              <span className="email">({m.email})</span>
-                            </label>
-                          ))
-                        )}
-                      </div>
-                      <div className="lux-selection-count">
-                        {selectedMemberIds.length} sélectionné(s)
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
 
+            {(!hasAntennas || !inviteAll) && (
+              <div className="lux-field">
+                <label>Membres invités individuellement</label>
+                <span className="lux-hint">
+                  Recherche et sélectionne des membres par nom, prénom ou email, quelle que soit leur antenne. * Seuls les membres avec un compte actif s&apos;affichent ici.
+                </span>
+
+                <input 
+                  type="text" 
+                  placeholder="Rechercher par nom, prénom ou email..." 
+                  className="lux-input search" 
+                  style={{ marginTop: '0.75rem' }}
+                  value={memberSearchQuery}
+                  onChange={e => setMemberSearchQuery(e.target.value)}
+                  disabled={loadingMembers || availableMembers.length === 0}
+                />
+
+                <div className="lux-members-list">
+                  {loadingMembers ? (
+                     <div className="lux-empty-state">Chargement...</div> 
+                  ) : availableMembers.length === 0 ? (
+                     <div className="lux-empty-state">Aucun membre actif trouvé.</div> 
+                  ) : filteredMembers.length === 0 ? (
+                     <div className="lux-empty-state">Aucun résultat pour cette recherche.</div>
+                  ) : (
+                    filteredMembers.map(m => (
+                      <label key={m.id} className="lux-member-item">
+                        <input type="checkbox" checked={selectedMemberIds.includes(m.id)} onChange={() => toggleMember(m.id)} />
+                        <span className="name">{m.firstName} {m.lastName}</span>
+                        <span className="email">({m.email})</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+                <div className="lux-selection-count">
+                  {selectedMemberIds.length} sélectionné(s)
+                </div>
+              </div>
+            )}
+
             <div className="lux-modal-footer">
               <button type="button" className="lux-btn-outline" onClick={() => selectedEvent ? setIsEditing(false) : onClose()} disabled={saving}>Annuler</button>
-              <button type="submit" className="lux-btn-primary" disabled={saving || selectedAntennaIds.length === 0}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
+              <button type="submit" className="lux-btn-primary" disabled={saving || (!hasAntennas && selectedMemberIds.length === 0)}>{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
             </div>
           </form>
         )}
@@ -480,15 +509,44 @@ function AttendanceModal({ selectedEvent, onClose }: { selectedEvent: EventItem;
 export default function SuperAdminEventsPage() {
   const [items, setItems] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(true);
+  // 👇 CORRECTION LINT (react-hooks/set-state-in-effect) : la règle
+  // signale toute fonction référencée en dépendance d'effet dont le corps
+  // contient un setState, même après un await. `load` était une useCallback
+  // externe passée en dépendance ([load]) — signalée pour cette raison. La
+  // fonction de chargement est désormais déclarée ET appelée entièrement à
+  // l'intérieur de l'effet (comme fetchAntennas/fetchMembers dans
+  // EventModal, jamais signalées), et l'effet ne dépend plus que d'un
+  // compteur `reloadKey` — une primitive, pas une fonction.
+  const [reloadKey, setReloadKey] = useState(0);
   const [eventModal, setEventModal] = useState<{ isOpen: boolean; event?: EventItem | null }>({ isOpen: false });
   const [attendanceModal, setAttendanceModal] = useState<{ isOpen: boolean; event?: EventItem | null }>({ isOpen: false });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try { const res = await api.listEvents(); setItems(res?.items || []); } catch (err) { console.error(err); setItems([]); } finally { setLoading(false); }
-  }, []);
+  useEffect(() => {
+    let ignore = false;
 
-  useEffect(() => { void load(); }, [load]);
+    async function loadEvents() {
+      try {
+        const res = await api.listEvents();
+        if (!ignore) setItems(res?.items || []);
+      } catch (err) {
+        console.error(err);
+        if (!ignore) setItems([]);
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    void loadEvents();
+    return () => { ignore = true; };
+  }, [reloadKey]);
+
+  // Appelé depuis des gestionnaires d'événements (jamais depuis un effet) :
+  // setLoading(true) ici est un setState ordinaire, hors effet — non concerné
+  // par la règle.
+  const reload = useCallback(() => {
+    setLoading(true);
+    setReloadKey(k => k + 1);
+  }, []);
 
   return (
     <AppShell title="Événements Globaux">
@@ -782,7 +840,7 @@ export default function SuperAdminEventsPage() {
           </div>
         </div>
 
-        {eventModal.isOpen && <EventModal selectedEvent={eventModal.event} onClose={() => setEventModal({ isOpen: false })} onSuccess={() => { setEventModal({ isOpen: false }); void load(); }} />}
+        {eventModal.isOpen && <EventModal selectedEvent={eventModal.event} onClose={() => setEventModal({ isOpen: false })} onSuccess={() => { setEventModal({ isOpen: false }); reload(); }} />}
         {attendanceModal.isOpen && attendanceModal.event && <AttendanceModal selectedEvent={attendanceModal.event} onClose={() => setAttendanceModal({ isOpen: false })} />}
       </div>
     </AppShell>
