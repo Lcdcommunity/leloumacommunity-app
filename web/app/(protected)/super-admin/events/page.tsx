@@ -601,13 +601,13 @@ export default function SuperAdminEventsPage() {
           .lux-dot { width: 6px; height: 6px; border-radius: 50%; }
 
           .lux-ro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; background: #F8FAFC; padding: 1.5rem; border-radius: 16px; border: 1px solid #E2E8F0; }
-          .lux-ro-item { display: flex; flex-direction: column; gap: 0.4rem; }
+          .lux-ro-item { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
           .lux-ro-item.full { grid-column: 1 / -1; }
           .lux-ro-item label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #64748B; }
-          .lux-ro-item p { margin: 0; font-size: 0.9rem; color: #334155; line-height: 1.5; }
+          .lux-ro-item p { margin: 0; font-size: 0.9rem; color: #334155; line-height: 1.5; overflow-wrap: anywhere; word-break: break-word; }
           .lux-ro-item p.lux-strong { font-weight: 700; color: #0F172A; }
           .lux-muted { color: #94A3B8; font-style: italic; }
-          .lux-link { color: #2563EB; font-weight: 600; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+          .lux-link { color: #2563EB; font-weight: 600; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; overflow-wrap: anywhere; word-break: break-word; }
           .lux-link:hover { border-color: #2563EB; }
           
           .lux-tag-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
