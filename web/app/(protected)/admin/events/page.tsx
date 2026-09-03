@@ -486,6 +486,15 @@ export default function AdminEventsPage() {
           .aev-modal-body { padding: 1.5rem; overflow-y: auto; -webkit-overflow-scrolling: touch; }
           
           .aev-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+          /* 👇 AJOUT : styles manquants pour le bloc "lecture seule" (Détails de l'événement) —
+             ces 4 règles n'existaient pas du tout, d'où le texte collé (label+valeur sur
+             une seule ligne) et le lien qui débordait sans aucune limite de largeur. */
+          .aev-info-box { display: flex; flex-direction: column; gap: 0.35rem; background: #F8FAFC; padding: 1rem; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 1rem; min-width: 0; }
+          .aev-grid-2 .aev-info-box { margin-bottom: 0; }
+          .aev-info-lbl { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B; }
+          .aev-info-val { font-size: 0.9rem; font-weight: 600; color: #111827; line-height: 1.5; overflow-wrap: anywhere; word-break: break-word; }
+
           .aev-field { display: flex; flex-direction: column; gap: 0.35rem; }
           .aev-field label { font-size: 0.68rem; font-weight: 800; text-transform: uppercase; color: #1D4ED8; }
           .aev-input, .aev-select { width: 100%; box-sizing: border-box; height: 42px; border-radius: 10px; border: 1px solid #D1D5DB; padding: 0 1rem; font-family: 'DM Sans'; font-size: 0.88rem; font-weight: 600; outline: none; }
@@ -494,6 +503,13 @@ export default function AdminEventsPage() {
           .aev-btn-submit { background: linear-gradient(135deg, #1D4ED8, #3B82F6); color: white; border: none; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 800; cursor: pointer; }
           .aev-btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
           .aev-btn-cancel { background: white; border: 1px solid #D1D5DB; color: #4B5563; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 700; cursor: pointer; }
+
+          /* 👇 AJOUT : bouton "Supprimer" du bloc lecture seule, utilisé dans le JSX
+             (className="aev-btn-del") mais jamais défini — sans ce style il héritait
+             d'un rendu par défaut du navigateur, incohérent avec le reste. */
+          .aev-btn-del { background: white; border: 1px solid #FECACA; color: #DC2626; padding: 0 1.4rem; height: 42px; border-radius: 10px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+          .aev-btn-del:hover { background: #FEF2F2; }
+          .aev-btn-del:disabled { opacity: 0.6; cursor: not-allowed; }
 
           .aev-member-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.4rem; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
           .aev-member-item:hover { background: #F1F5F9; }
