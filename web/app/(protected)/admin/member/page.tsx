@@ -584,6 +584,16 @@ export default function AdminMembersDirectoryPage() {
         @keyframes aaFadeInUp { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
         @keyframes aaFadeIn { 0% { opacity: 0; } 100% { opacity: 1; } }
         @keyframes aaScaleUp { 0% { transform: scale(0.95) translateY(10px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+
+        /* 🔥 AJOUT : manquait entièrement — sans cette règle, l'aperçu
+           d'impression (window.print()) affichait la page normale au lieu
+           du tableau .printable-export-area (masqué en display:none hors
+           impression). Même règle que super-admin/members/page.tsx. */
+        @media print {
+          body * { visibility: hidden; }
+          .printable-export-area, .printable-export-area * { visibility: visible; }
+          .printable-export-area { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+        }
       `}</style>
 
       {pdfData && (
