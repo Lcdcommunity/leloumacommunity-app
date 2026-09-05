@@ -175,7 +175,14 @@ export default function AdminMembersDirectoryPage() {
   const [exportStartMonth, setExportStartMonth] = useState('');
   const [exportEndMonth, setExportEndMonth] = useState('');
   const [exportStatus, setExportStatus] = useState('');
-  const [pdfData, setPdfData] = useState<ExtendedMember[] | null>(null);
+  // 🔥 AJOUT : filtre "retardataires" — réutilise la route existante
+  // GET /admin/late-members (admin.service.ts::listLateMembers, déjà
+  // scopée sur la/les antenne(s) de cet admin, seuil 1 mois). Pas de
+  // filtre devise ici : toutes les antennes d'un même admin partagent
+  // obligatoirement la même devise (cf. createAntennaAdmin côté backend).
+  const [exportLateOnly, setExportLateOnly] = useState(false);
+  const [pdfData, setPdfData] = useState<Array<ExtendedMember & { lateMonths?: number; antennaName?: string | null }> | null>(null);
+  const [pdfIsLateExport, setPdfIsLateExport] = useState(false);
 
   const loadMembers = useCallback(async (qVal?: string, sVal?: string) => {
     setError(null); 
@@ -400,13 +407,23 @@ export default function AdminMembersDirectoryPage() {
   const executeExport = async () => {
     try {
       setActionLoading('EXPORT');
-      const fetchRes = await api.listAntennaMembers({
-        page: 1,
-        pageSize: 10000,
-        status: exportStatus || undefined
-      });
 
-      let exportData = fetchRes.items as ExtendedMember[];
+      let exportData: Array<ExtendedMember & { lateMonths?: number; antennaName?: string | null }> = [];
+
+      if (exportLateOnly) {
+        // 🔥 AJOUT : export "Retardataires" — réutilise telle quelle la
+        // route déjà existante GET /admin/late-members (pageSize élevé
+        // pour récupérer la liste complète plutôt qu'une page).
+        const lateRes = await api.listLateMembersOver3Months({ page: 1, pageSize: 10000 });
+        exportData = lateRes.items as unknown as Array<ExtendedMember & { lateMonths?: number; antennaName?: string | null }>;
+      } else {
+        const fetchRes = await api.listAntennaMembers({
+          page: 1,
+          pageSize: 10000,
+          status: exportStatus || undefined
+        });
+        exportData = fetchRes.items as ExtendedMember[];
+      }
 
       if (exportStartMonth) {
         const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
@@ -419,25 +436,28 @@ export default function AdminMembersDirectoryPage() {
       }
 
       if (exportData.length === 0) {
-        alert("Aucun membre ne correspond à ces critères d'exportation.");
+        alert(exportLateOnly ? "Aucun retardataire ne correspond à ces critères." : "Aucun membre ne correspond à ces critères d'exportation.");
         return;
       }
 
       if (exportModalType === 'EXCEL') {
-        let csv = "Nom;Prenom;Email;Telephone;Role;Statut;Date Inscription\n";
+        let csv = exportLateOnly
+          ? "Nom;Prenom;Email;Telephone;Antenne;Mois de retard;Date Inscription\n"
+          : "Nom;Prenom;Email;Telephone;Role;Statut;Date Inscription\n";
         exportData.forEach(u => {
-          const roleLbl = ROLE_MAP[u.role] || u.role;
-          const statLbl = USER_STATUS_MAP[u.status]?.label || u.status;
-          csv += `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${roleLbl}";"${statLbl}";"${formatDate(u.createdAt)}"\n`;
+          csv += exportLateOnly
+            ? `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${u.antennaName || ''}";"${u.lateMonths ?? ''}";"${formatDate(u.createdAt)}"\n`
+            : `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${ROLE_MAP[u.role] || u.role}";"${USER_STATUS_MAP[u.status]?.label || u.status}";"${formatDate(u.createdAt)}"\n`;
         });
         const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `Export_Membres_${new Date().toISOString().slice(0,10)}.csv`;
+        link.download = `Export_${exportLateOnly ? 'Retardataires' : 'Membres'}_${new Date().toISOString().slice(0,10)}.csv`;
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
         setExportModalType(null);
       } else if (exportModalType === 'PDF') {
+        setPdfIsLateExport(exportLateOnly);
         setPdfData(exportData);
         setTimeout(() => {
           window.print();
@@ -571,24 +591,32 @@ export default function AdminMembersDirectoryPage() {
           <table>
             <thead>
               <tr>
-                <th>Nom</th><th>Email</th><th>Téléphone</th><th>Rôle</th><th>Statut</th><th>Date Inscription</th>
+                {(pdfIsLateExport
+                  ? ['Nom', 'Email', 'Téléphone', 'Antenne', 'Mois de retard', 'Date Inscription']
+                  : ['Nom', 'Email', 'Téléphone', 'Rôle', 'Statut', 'Date Inscription']
+                ).map(h => <th key={h}>{h}</th>)}
               </tr>
             </thead>
             <tbody>
-              {pdfData.map(u => {
-                const roleLbl = ROLE_MAP[u.role] || u.role;
-                const statLbl = USER_STATUS_MAP[u.status]?.label || u.status;
-                return (
-                  <tr key={u.id}>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold' }}>{u.firstName} {u.lastName}</td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{u.email}</td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{u.phone || '-'}</td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{roleLbl}</td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{statLbl}</td>
-                    <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDate(u.createdAt)}</td>
-                  </tr>
-                );
-              })}
+              {pdfData.map(u => (
+                <tr key={u.id}>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold' }}>{u.firstName} {u.lastName}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{u.email}</td>
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{u.phone || '-'}</td>
+                  {pdfIsLateExport ? (
+                    <>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{u.antennaName || '-'}</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '8px', fontWeight: 'bold', color: '#DC2626' }}>{u.lateMonths ?? '-'}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{ROLE_MAP[u.role] || u.role}</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{USER_STATUS_MAP[u.status]?.label || u.status}</td>
+                    </>
+                  )}
+                  <td style={{ border: '1px solid #cbd5e1', padding: '8px' }}>{formatDate(u.createdAt)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -741,8 +769,25 @@ export default function AdminMembersDirectoryPage() {
 
               <div className="export-flex-row">
                 <div className="export-flex-item full">
+                  <label
+                    htmlFor="export-late-only-admin"
+                    style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '.7rem .9rem', cursor: 'pointer' }}
+                  >
+                    <input
+                      id="export-late-only-admin"
+                      type="checkbox"
+                      checked={exportLateOnly}
+                      onChange={e => setExportLateOnly(e.target.checked)}
+                      style={{ width: 18, height: 18, flexShrink: 0, accentColor: '#D97706' }}
+                    />
+                    <span style={{ fontSize: '.8rem', fontWeight: 800, color: '#92400E' }}>
+                      Uniquement les retardataires (≥ 1 mois)
+                    </span>
+                  </label>
+                </div>
+                <div className="export-flex-item full">
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Filtrer par Statut</label>
-                  <select className="md-edit-select" value={exportStatus} onChange={e => setExportStatus(e.target.value)} style={{ width: '100%', height: '42px', background: '#F8FAFC' }}>
+                  <select className="md-edit-select" value={exportStatus} onChange={e => setExportStatus(e.target.value)} disabled={exportLateOnly} style={{ width: '100%', height: '42px', background: exportLateOnly ? '#F1F5F9' : '#F8FAFC', opacity: exportLateOnly ? 0.55 : 1, cursor: exportLateOnly ? 'not-allowed' : 'pointer' }}>
                     <option value="">Tous les statuts</option>
                     <option value="ACTIVE">Actifs</option>
                     <option value="PENDING_APPROVAL">En attente d&apos;approbation</option>
@@ -750,6 +795,11 @@ export default function AdminMembersDirectoryPage() {
                     <option value="SUSPENDED">Suspendus</option>
                     <option value="REJECTED">Rejetés</option>
                   </select>
+                  {exportLateOnly && (
+                    <p style={{ fontSize: '.68rem', color: '#94A3B8', marginTop: '.35rem', fontStyle: 'italic' }}>
+                      Ignoré en mode "retardataires" (toujours limité aux membres actifs).
+                    </p>
+                  )}
                 </div>
                 <div className="export-flex-item">
                   <label style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '0.4rem', textTransform: 'uppercase' }}>Inscrits depuis</label>

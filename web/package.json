@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "html-to-image": "^1.11.13",
     "i18next": "^26.0.3",
     "i18next-browser-languagedetector": "^8.2.1",

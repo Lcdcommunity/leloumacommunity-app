@@ -353,6 +353,199 @@ function MemberModal({
   );
 }
 
+/* ══════════════════════════════════════════════════════ HELPERS EXPORT */
+// Déplacés au niveau module (fonctions pures, pas de hooks) pour être
+// utilisables à la fois par le composant et par generateStyledExcel().
+const getMemberAntennaId = (u: ExtendedUser): string | null => {
+  const withMemberships = u as ExtendedUser & {
+    memberships?: { antennaId?: string | null }[];
+  };
+  return withMemberships.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
+};
+
+// 🔥 AJOUT : filtre par devise — dérivée de l'antenne principale du membre
+// (memberships[0].antenna.defaultCurrency), déjà incluse par le backend
+// (super-admin.service.ts::listUsersByRole → include memberships.antenna).
+// Aucun appel réseau supplémentaire nécessaire.
+const getMemberCurrency = (u: ExtendedUser): string | null => {
+  const withMemberships = u as ExtendedUser & {
+    memberships?: { antenna?: { defaultCurrency?: string | null } | null }[];
+  };
+  return withMemberships.memberships?.[0]?.antenna?.defaultCurrency ?? null;
+};
+
+type ExportRowUser = ExtendedUser & {
+  lateMonths?: number;
+  antennaName?: string | null;
+  currency?: string | null;
+};
+
+// 🔥 CORRECTION ESLint : types minimaux pour la portion d'ExcelJS réellement
+// utilisée ici, à la place de `any` — le paquet est chargé via son build
+// navigateur (exceljs/dist/exceljs.min.js), qui n'expose pas de
+// déclarations de types pour ce sous-chemin, d'où le seul @ts-expect-error
+// nécessaire, sur l'import dynamique lui-même.
+interface ExcelCellStyle {
+  font?: Record<string, unknown>;
+  fill?: Record<string, unknown>;
+  alignment?: Record<string, unknown>;
+  border?: Record<string, unknown>;
+}
+
+type ExcelCell = ExcelCellStyle;
+
+interface ExcelRow {
+  height?: number;
+  eachCell: (callback: (cell: ExcelCell) => void) => void;
+  getCell: (key: string) => ExcelCell;
+}
+
+interface ExcelWorksheet {
+  columns: Array<{ header: string; key: string; width: number }>;
+  autoFilter?: { from: string; to: string };
+  getRow: (index: number) => ExcelRow;
+  addRow: (data: Record<string, unknown>) => ExcelRow;
+}
+
+interface ExcelWorkbook {
+  creator: string;
+  created: Date;
+  addWorksheet: (
+    name: string,
+    options?: { views?: Array<{ state: string; ySplit: number }> },
+  ) => ExcelWorksheet;
+  xlsx: { writeBuffer: () => Promise<ArrayBuffer> };
+}
+
+interface ExcelJSModuleShape {
+  Workbook: new () => ExcelWorkbook;
+}
+
+// 🔥 AJOUT : export Excel réellement mis en forme (.xlsx), à la place du
+// CSV brut précédent (qui s'ouvrait sans aucune mise en forme). Utilise
+// ExcelJS, chargé dynamiquement uniquement au moment du clic sur
+// "Télécharger" — n'alourdit pas le bundle initial de la page. Import
+// depuis 'exceljs/dist/exceljs.min.js' (build navigateur officiel du
+// paquet) plutôt que 'exceljs' directement, pour éviter les erreurs de
+// bundler Next.js liées aux dépendances Node (fs/stream) du build serveur.
+async function generateStyledExcel(rows: ExportRowUser[], isLateExport: boolean) {
+  // @ts-expect-error — build navigateur d'ExcelJS, sans déclarations de types pour ce sous-chemin
+  const ExcelJSModule: unknown = await import('exceljs/dist/exceljs.min.js');
+  const ExcelJS = ((ExcelJSModule as { default?: ExcelJSModuleShape }).default ??
+    ExcelJSModule) as ExcelJSModuleShape;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'AssoGlobal';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet(isLateExport ? 'Retardataires' : 'Membres', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+
+  const columns = isLateExport
+    ? [
+        { header: 'Nom',             key: 'lastName',    width: 18 },
+        { header: 'Prénom',          key: 'firstName',   width: 18 },
+        { header: 'Email',           key: 'email',       width: 30 },
+        { header: 'Téléphone',       key: 'phone',       width: 16 },
+        { header: 'Antenne',         key: 'antennaName', width: 18 },
+        { header: 'Devise',          key: 'currency',    width: 10 },
+        { header: 'Mois de retard',  key: 'lateMonths',  width: 14 },
+        { header: 'Date Inscription',key: 'createdAt',   width: 16 },
+      ]
+    : [
+        { header: 'Nom',             key: 'lastName',  width: 18 },
+        { header: 'Prénom',          key: 'firstName', width: 18 },
+        { header: 'Email',           key: 'email',     width: 30 },
+        { header: 'Téléphone',       key: 'phone',     width: 16 },
+        { header: 'Rôle',            key: 'role',      width: 14 },
+        { header: 'Statut',          key: 'status',    width: 14 },
+        { header: 'Devise',          key: 'currency',  width: 10 },
+        { header: 'Date Inscription',key: 'createdAt', width: 16 },
+      ];
+
+  sheet.columns = columns;
+
+  const headerRow = sheet.getRow(1);
+  headerRow.height = 22;
+  headerRow.eachCell((cell) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDC2626' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FFB91C1C' } },
+      bottom: { style: 'thin', color: { argb: 'FFB91C1C' } },
+    };
+  });
+
+  rows.forEach((u, idx) => {
+    const rowData: Record<string, unknown> = isLateExport
+      ? {
+          lastName: u.lastName,
+          firstName: u.firstName,
+          email: u.email,
+          phone: u.phone || '-',
+          antennaName: u.antennaName || '-',
+          currency: u.currency || '-',
+          lateMonths: u.lateMonths ?? 0,
+          createdAt: formatDate(u.createdAt),
+        }
+      : {
+          lastName: u.lastName,
+          firstName: u.firstName,
+          email: u.email,
+          phone: u.phone || '-',
+          role: ROLE_MAP[u.role]?.label || u.role,
+          status: STATUS_MAP[u.status]?.label || u.status,
+          currency: getMemberCurrency(u) || '-',
+          createdAt: formatDate(u.createdAt),
+        };
+
+    const row = sheet.addRow(rowData);
+    const isEven = idx % 2 === 1;
+
+    row.eachCell((cell) => {
+      cell.border = {
+        top:    { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left:   { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right:  { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+      cell.alignment = { vertical: 'middle' };
+      if (isEven) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      }
+    });
+
+    if (isLateExport) {
+      const months = u.lateMonths ?? 0;
+      const severity = months >= 12 ? 'FFDC2626' : months >= 6 ? 'FFD97706' : 'FF2563EB';
+      row.getCell('lateMonths').font = { bold: true, color: { argb: severity } };
+    } else {
+      const st = STATUS_MAP[u.status];
+      if (st) {
+        row.getCell('status').font = { bold: true, color: { argb: `FF${st.color.replace('#', '')}` } };
+      }
+    }
+  });
+
+  const lastColLetter = String.fromCharCode(64 + columns.length);
+  sheet.autoFilter = { from: 'A1', to: `${lastColLetter}1` };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Export_${isLateExport ? 'Retardataires' : 'Membres'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 /* ══════════════════════════════════════════════════════ MAIN PAGE */
 export default function SuperAdminMembersPage() {
   const [allItems, setAllItems] = useState<ExtendedUser[]>([]);
@@ -400,24 +593,6 @@ export default function SuperAdminMembersPage() {
       setLoading(false);
     }
   }, [q, status]);
-
-  const getMemberAntennaId = (u: ExtendedUser): string | null => {
-    const withMemberships = u as ExtendedUser & {
-      memberships?: { antennaId?: string | null }[];
-    };
-    return withMemberships.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
-  };
-
-  // 🔥 AJOUT : filtre par devise — dérivée de l'antenne principale du membre
-  // (memberships[0].antenna.defaultCurrency), déjà incluse par le backend
-  // (super-admin.service.ts::listUsersByRole → include memberships.antenna).
-  // Aucun appel réseau supplémentaire nécessaire.
-  const getMemberCurrency = (u: ExtendedUser): string | null => {
-    const withMemberships = u as ExtendedUser & {
-      memberships?: { antenna?: { defaultCurrency?: string | null } | null }[];
-    };
-    return withMemberships.memberships?.[0]?.antenna?.defaultCurrency ?? null;
-  };
 
   // Liste des devises réellement utilisées par l'association, déduite des
   // membres chargés — évite de dépendre d'un champ supplémentaire côté
@@ -590,20 +765,9 @@ export default function SuperAdminMembersPage() {
       }
 
       if (exportModalType === 'EXCEL') {
-        let csv = exportLateOnly
-          ? "Nom;Prenom;Email;Telephone;Antenne;Devise;Mois de retard;Date Inscription\n"
-          : "Nom;Prenom;Email;Telephone;Role;Statut;Devise;Date Inscription\n";
-        exportData.forEach(u => {
-          csv += exportLateOnly
-            ? `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${u.antennaName || ''}";"${u.currency || ''}";"${u.lateMonths ?? ''}";"${formatDate(u.createdAt)}"\n`
-            : `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${u.role}";"${u.status}";"${getMemberCurrency(u) || ''}";"${formatDate(u.createdAt)}"\n`;
-        });
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `Export_${exportLateOnly ? 'Retardataires' : 'Membres'}_${new Date().toISOString().slice(0, 10)}.csv`;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        // 🔥 AJOUT : vrai fichier .xlsx mis en forme (ExcelJS), à la place
+        // du CSV brut précédent — cf. generateStyledExcel() plus haut.
+        await generateStyledExcel(exportData, exportLateOnly);
         setExportModalType(null);
       } else if (exportModalType === 'PDF') {
         setPdfIsLateExport(exportLateOnly);
