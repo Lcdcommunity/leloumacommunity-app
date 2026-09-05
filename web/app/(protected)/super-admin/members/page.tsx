@@ -374,9 +374,14 @@ export default function SuperAdminMembersPage() {
 
   const [exportModalType, setExportModalType] = useState<'PDF' | 'EXCEL' | null>(null);
   const [exportAntenna,   setExportAntenna]   = useState('');
+  const [exportCurrency,  setExportCurrency]  = useState('');
   const [exportStartMonth,setExportStartMonth]= useState('');
   const [exportEndMonth,  setExportEndMonth]  = useState('');
-  const [pdfData,         setPdfData]         = useState<ExtendedUser[] | null>(null);
+  const [exportLateOnly,  setExportLateOnly]  = useState(false);
+  const [pdfData,         setPdfData]         = useState<Array<ExtendedUser & { lateMonths?: number; antennaName?: string | null; currency?: string | null }> | null>(null);
+  const [pdfIsLateExport, setPdfIsLateExport] = useState(false);
+
+  const [currencyFilter, setCurrencyFilter] = useState('');
 
   const load = useCallback(async (qVal?: string, sVal?: string) => {
     setError(null);
@@ -403,9 +408,27 @@ export default function SuperAdminMembersPage() {
     return withMemberships.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
   };
 
-  const items = antennaId
-    ? allItems.filter(u => getMemberAntennaId(u) === antennaId)
-    : allItems;
+  // 🔥 AJOUT : filtre par devise — dérivée de l'antenne principale du membre
+  // (memberships[0].antenna.defaultCurrency), déjà incluse par le backend
+  // (super-admin.service.ts::listUsersByRole → include memberships.antenna).
+  // Aucun appel réseau supplémentaire nécessaire.
+  const getMemberCurrency = (u: ExtendedUser): string | null => {
+    const withMemberships = u as ExtendedUser & {
+      memberships?: { antenna?: { defaultCurrency?: string | null } | null }[];
+    };
+    return withMemberships.memberships?.[0]?.antenna?.defaultCurrency ?? null;
+  };
+
+  // Liste des devises réellement utilisées par l'association, déduite des
+  // membres chargés — évite de dépendre d'un champ supplémentaire côté
+  // antennas ou d'un nouvel appel API.
+  const currencies = Array.from(
+    new Set(allItems.map(u => getMemberCurrency(u)).filter((c): c is string => !!c))
+  ).sort();
+
+  const items = allItems
+    .filter(u => !antennaId || getMemberAntennaId(u) === antennaId)
+    .filter(u => !currencyFilter || getMemberCurrency(u) === currencyFilter);
 
   useEffect(() => {
     const init = async () => {
@@ -522,14 +545,34 @@ export default function SuperAdminMembersPage() {
   const executeExport = async () => {
     try {
       setActionBusy(true);
-      const fetchRes = await api.listMembers({ page: 1, pageSize: 10000 });
-      let exportData = fetchRes.items as ExtendedUser[];
 
-      if (exportAntenna) exportData = exportData.filter(u => {
-        const withM = u as ExtendedUser & { memberships?: { antennaId?: string | null }[] };
-        const aid = withM.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
-        return aid === exportAntenna;
-      });
+      let exportData: Array<ExtendedUser & { lateMonths?: number; antennaName?: string | null; currency?: string | null }> = [];
+
+      if (exportLateOnly) {
+        // 🔥 AJOUT : export "Retardataires" — route isolée dédiée
+        // (GET /super-admin/late-members), déjà filtrée par antenne côté
+        // backend si exportAntenna est renseigné (globalement sinon).
+        const lateItems = await api.listLateMembersSuperAdmin(exportAntenna || undefined);
+        exportData = lateItems as unknown as Array<ExtendedUser & { lateMonths?: number; antennaName?: string | null; currency?: string | null }>;
+
+        // 🔥 AJOUT : filtre par devise — le backend renvoie déjà `currency`
+        // par retardataire (devise de son antenne), simple filtre côté client.
+        if (exportCurrency) exportData = exportData.filter(u => u.currency === exportCurrency);
+      } else {
+        const fetchRes = await api.listMembers({ page: 1, pageSize: 10000 });
+        exportData = fetchRes.items as ExtendedUser[];
+
+        if (exportAntenna) exportData = exportData.filter(u => {
+          const withM = u as ExtendedUser & { memberships?: { antennaId?: string | null }[] };
+          const aid = withM.memberships?.[0]?.antennaId ?? u.antennaId ?? null;
+          return aid === exportAntenna;
+        });
+
+        // 🔥 AJOUT : filtre par devise — dérivée de l'antenne principale de
+        // chaque membre (memberships[0].antenna.defaultCurrency), déjà
+        // présente dans la réponse de listMembers, sans appel supplémentaire.
+        if (exportCurrency) exportData = exportData.filter(u => getMemberCurrency(u) === exportCurrency);
+      }
 
       if (exportStartMonth) {
         const start = new Date(`${exportStartMonth}-01T00:00:00Z`);
@@ -541,21 +584,29 @@ export default function SuperAdminMembersPage() {
         exportData = exportData.filter(u => new Date(u.createdAt) < end);
       }
 
-      if (exportData.length === 0) { alert("Aucun membre ne correspond à ces critères."); return; }
+      if (exportData.length === 0) {
+        alert(exportLateOnly ? "Aucun retardataire ne correspond à ces critères." : "Aucun membre ne correspond à ces critères.");
+        return;
+      }
 
       if (exportModalType === 'EXCEL') {
-        let csv = "Nom;Prenom;Email;Telephone;Role;Statut;Date Inscription\n";
+        let csv = exportLateOnly
+          ? "Nom;Prenom;Email;Telephone;Antenne;Devise;Mois de retard;Date Inscription\n"
+          : "Nom;Prenom;Email;Telephone;Role;Statut;Devise;Date Inscription\n";
         exportData.forEach(u => {
-          csv += `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${u.role}";"${u.status}";"${formatDate(u.createdAt)}"\n`;
+          csv += exportLateOnly
+            ? `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${u.antennaName || ''}";"${u.currency || ''}";"${u.lateMonths ?? ''}";"${formatDate(u.createdAt)}"\n`
+            : `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${u.role}";"${u.status}";"${getMemberCurrency(u) || ''}";"${formatDate(u.createdAt)}"\n`;
         });
         const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `Export_Membres_${new Date().toISOString().slice(0, 10)}.csv`;
+        link.download = `Export_${exportLateOnly ? 'Retardataires' : 'Membres'}_${new Date().toISOString().slice(0, 10)}.csv`;
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
         setExportModalType(null);
       } else if (exportModalType === 'PDF') {
+        setPdfIsLateExport(exportLateOnly);
         setPdfData(exportData);
         setTimeout(() => { window.print(); }, 800);
       }
@@ -589,9 +640,12 @@ export default function SuperAdminMembersPage() {
 
         .sm-toolbar { display:flex; flex-wrap:wrap; gap:.5rem; padding:1rem; border-bottom:1px solid #f1f5f9; align-items:center; }
         .sm-t-field { flex:1; min-width:150px; }
+        .sm-toolbar-filters-row { display:flex; flex-wrap:nowrap; gap:.4rem; width:100%; align-items:center; }
+        .sm-toolbar-filters-row .sm-select-field { flex:1 1 0; min-width:0; }
         .sm-input { width:100%; height:38px; border-radius:10px; border:1px solid #e2e8f0; padding:0 .75rem; font-size:.85rem; outline:none; }
-        .sm-select { width:100%; height:38px; border-radius:10px; border:1px solid #e2e8f0; font-size:.75rem; font-weight:700; outline:none; padding:0 .5rem; background:#f8fafc; }
-        .sm-filter-btn { width:44px; height:38px; border-radius:10px; background:#111827; color:white; border:none; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        .sm-select { width:100%; height:38px; border-radius:10px; border:1px solid #e2e8f0; font-size:.72rem; font-weight:700; outline:none; padding:0 .4rem; background:#f8fafc; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .sm-filter-btn { flex:0 0 auto; width:40px; height:38px; border-radius:10px; background:#111827; color:white; border:none; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        @media(max-width:380px){ .sm-select { font-size:.65rem; padding:0 .3rem; } .sm-filter-btn { width:36px; } }
 
         .sm-tw { display:none; }
         @media(min-width:768px){ .sm-tw { display:block; overflow-x:auto; } }
@@ -659,11 +713,16 @@ export default function SuperAdminMembersPage() {
       {/* Zone imprimable PDF */}
       {pdfData && (
         <div className="printable-export-area">
-          <h2 style={{ textAlign: 'center', marginBottom: 20, fontFamily: "'Cormorant Garamond',serif" }}>Liste des Membres</h2>
+          <h2 style={{ textAlign: 'center', marginBottom: 20, fontFamily: "'Cormorant Garamond',serif" }}>
+            {pdfIsLateExport ? 'Liste des Retardataires' : 'Liste des Membres'}
+          </h2>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontFamily: "'DM Sans',sans-serif" }}>
             <thead>
               <tr style={{ background: '#f1f5f9' }}>
-                {['Nom & Prénom', 'Email', 'Téléphone', 'Rôle', 'Statut', 'Date Inscription'].map(h => (
+                {(pdfIsLateExport
+                  ? ['Nom & Prénom', 'Email', 'Téléphone', 'Antenne', 'Devise', 'Mois de retard', 'Date Inscription']
+                  : ['Nom & Prénom', 'Email', 'Téléphone', 'Rôle', 'Statut', 'Devise', 'Date Inscription']
+                ).map(h => (
                   <th key={h} style={{ border: '1px solid #cbd5e1', padding: 8, textAlign: 'left' }}>{h}</th>
                 ))}
               </tr>
@@ -674,8 +733,19 @@ export default function SuperAdminMembersPage() {
                   <td style={{ border: '1px solid #cbd5e1', padding: 8, fontWeight: 'bold' }}>{u.firstName} {u.lastName}</td>
                   <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{u.email}</td>
                   <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{u.phone || '-'}</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{ROLE_MAP[u.role]?.label || u.role}</td>
-                  <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{STATUS_MAP[u.status]?.label || u.status}</td>
+                  {pdfIsLateExport ? (
+                    <>
+                      <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{u.antennaName || '-'}</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{u.currency || '-'}</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: 8, fontWeight: 'bold', color: '#DC2626' }}>{u.lateMonths ?? '-'}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{ROLE_MAP[u.role]?.label || u.role}</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{STATUS_MAP[u.status]?.label || u.status}</td>
+                      <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{getMemberCurrency(u) || '-'}</td>
+                    </>
+                  )}
                   <td style={{ border: '1px solid #cbd5e1', padding: 8 }}>{formatDate(u.createdAt)}</td>
                 </tr>
               ))}
@@ -722,23 +792,33 @@ export default function SuperAdminMembersPage() {
             <div className="sm-t-field">
               <input className="sm-input" placeholder="Nom, prénom ou email..." value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && void load()} />
             </div>
-            <div className="sm-t-field" style={{ flex: 0, minWidth: 130 }}>
-              <select className="sm-select" value={status} onChange={e => setStatus(e.target.value)}>
-                <option value="">Tous statuts</option>
-                <option value="ACTIVE">Actifs</option>
-                <option value="PENDING_APPROVAL">Attente</option>
-                <option value="SUSPENDED">Suspendus</option>
-              </select>
+            <div className="sm-toolbar-filters-row">
+              <div className="sm-select-field">
+                <select className="sm-select" value={status} onChange={e => setStatus(e.target.value)}>
+                  <option value="">Tous statuts</option>
+                  <option value="ACTIVE">Actifs</option>
+                  <option value="PENDING_APPROVAL">Attente</option>
+                  <option value="SUSPENDED">Suspendus</option>
+                </select>
+              </div>
+              <div className="sm-select-field">
+                <select className="sm-select" value={antennaId} onChange={e => setAntennaId(e.target.value)}>
+                  <option value="">Toutes antennes</option>
+                  {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <button className="sm-filter-btn" onClick={() => void load()}>
+                {loading ? '...' : <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" /></svg>}
+              </button>
             </div>
-            <div className="sm-t-field" style={{ flex: 0, minWidth: 150 }}>
-              <select className="sm-select" value={antennaId} onChange={e => setAntennaId(e.target.value)}>
-                <option value="">Toutes antennes</option>
-                {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            </div>
-            <button className="sm-filter-btn" onClick={() => void load()}>
-              {loading ? '...' : <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path d="M21 21l-4.35-4.35M19 11a8 8 0 11-16 0 8 8 0 0116 0z" /></svg>}
-            </button>
+            {currencies.length > 0 && (
+              <div className="sm-t-field">
+                <select className="sm-select" style={{ height: 38 }} value={currencyFilter} onChange={e => setCurrencyFilter(e.target.value)}>
+                  <option value="">Toutes devises</option>
+                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           {/* Vue tableau desktop */}
@@ -805,10 +885,34 @@ export default function SuperAdminMembersPage() {
             <h2 className="modal-title" style={{ marginBottom: '1.5rem' }}>Exporter en {exportModalType === 'EXCEL' ? 'Excel' : 'PDF'}</h2>
             <div className="export-flex-row">
               <div className="export-flex-item full">
+                <label
+                  htmlFor="export-late-only"
+                  style={{ display: 'flex', alignItems: 'center', gap: '.6rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 10, padding: '.7rem .9rem', cursor: 'pointer' }}
+                >
+                  <input
+                    id="export-late-only"
+                    type="checkbox"
+                    checked={exportLateOnly}
+                    onChange={e => setExportLateOnly(e.target.checked)}
+                    style={{ width: 18, height: 18, flexShrink: 0, accentColor: '#D97706' }}
+                  />
+                  <span style={{ fontSize: '.8rem', fontWeight: 800, color: '#92400E' }}>
+                    Uniquement les retardataires (≥ 1 mois)
+                  </span>
+                </label>
+              </div>
+              <div className="export-flex-item">
                 <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.4rem' }}>Filtrer par Antenne</label>
                 <select className="sm-input" value={exportAntenna} onChange={e => setExportAntenna(e.target.value)} style={{ width: '100%', height: 42, background: '#f8fafc' }}>
                   <option value="">Toutes les antennes (Global)</option>
                   {antennas.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div className="export-flex-item">
+                <label style={{ fontSize: '.75rem', fontWeight: 800, color: '#475569', display: 'block', marginBottom: '.4rem' }}>Filtrer par Devise</label>
+                <select className="sm-input" value={exportCurrency} onChange={e => setExportCurrency(e.target.value)} style={{ width: '100%', height: 42, background: '#f8fafc' }}>
+                  <option value="">Toutes les devises</option>
+                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
               <div className="export-flex-item">

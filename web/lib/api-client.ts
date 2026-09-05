@@ -6,7 +6,7 @@ import type { Contribution } from '../types/contribution';
 import type { Project } from '../types/project';
 import type { DocumentItem } from '../types/document';
 import type { NotificationItem } from '../types/notification';
-import type { UserSummary } from '../types/user';
+import type { UserSummary, UserRole, UserStatus } from '../types/user';
 import type { ApiListResponse } from '../types/api';
 import type { Antenna } from '../types/antenna';
 import type { AuditItem } from '../types/audit';
@@ -204,6 +204,25 @@ export interface SuperAdminTransfersResponse {
     rejected: number;
     total: number;
   };
+}
+
+// 🔥 AJOUT : type de retour de l'export "Retardataires" Super Admin
+// (route isolée GET /super-admin/late-members, cf.
+// super-admin-late-members.service.ts). Utilisé par la modale d'export
+// de super-admin/members/page.tsx.
+export interface SuperAdminLateMemberExportItem {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: string;
+  antennaId: string | null;
+  antennaName: string | null;
+  currency: string;
+  lateMonths: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -755,7 +774,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
         params?.q ? `&q=${encodeURIComponent(params.q)}` : ''
       }${params?.status ? `&status=${encodeURIComponent(params.status)}` : ''}`
     ),
-
   listPendingMemberApprovalsAntenna: (params?: { page?: number; pageSize?: number }) =>
     http<ApiListResponse<UserSummary>>(
       `/admin/member-approvals?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}`
@@ -830,6 +848,16 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       antennaName?: string | null;
       lateMonths?: number;
     }>>(`/member/late-members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
+
+  // 🔥 AJOUT : export "Retardataires" Super Admin (globalement ou par
+  // antenne), route isolée GET /super-admin/late-members. Utilisé
+  // uniquement par la modale d'export PDF/Excel de
+  // super-admin/members/page.tsx — pas de pagination, la route renvoie la
+  // liste complète triée par mois de retard décroissant.
+  listLateMembersSuperAdmin: (antennaId?: string) =>
+    http<SuperAdminLateMemberExportItem[]>(
+      `/super-admin/late-members${antennaId ? `?antennaId=${antennaId}` : ''}`
+    ),
 
   // ==========================================
   // COTISATIONS
@@ -1048,7 +1076,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
       }${params?.q ? `&q=${encodeURIComponent(params.q)}` : ''}`
     ),
-
   createProjectProposalMember: (body: {
     title: string;
     description: string;
@@ -1300,7 +1327,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
         params?.action ? `&action=${encodeURIComponent(params.action)}` : ''
       }`
     ),
-
   // ==========================================
   // SYSTEM ADMIN (GRAND CHEF)
   // ==========================================
@@ -1438,7 +1464,7 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
     http<ApiListResponse<AntennaTransfer>>(
       `/transfers/received?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 20}${
         params?.status ? `&status=${encodeURIComponent(params.status)}` : ''
-      }${params?.antennaId ? `&antennaId=${params.antennaId}` : ''}`
+      }${params?.antennaId ? `&antennaId=${encodeURIComponent(params.antennaId)}` : ''}`
     ),
 
   validateTransfer: (id: string) =>
