@@ -124,6 +124,131 @@ const COUNTRIES = [
   'Cameroun', 'Niger', 'Afrique du Sud', 'Mozambique', 'Portugal', 'Autre'
 ].sort();
 
+/* ══════════════════════════════════════════════════════ EXPORT EXCEL STYLÉ */
+// 🔥 AJOUT : remplace le CSV brut précédent (aucune mise en forme à
+// l'ouverture) par un vrai .xlsx mis en forme, même approche que
+// super-admin/members/page.tsx::generateStyledExcel — ExcelJS chargé
+// dynamiquement uniquement au clic sur "Télécharger" (n'alourdit pas le
+// bundle initial), build navigateur du paquet pour éviter les soucis de
+// bundler Next.js (fs/stream).
+type ExportRowMember = ExtendedMember & {
+  lateMonths?: number;
+  antennaName?: string | null;
+};
+
+async function generateStyledExcel(rows: ExportRowMember[], isLateExport: boolean) {
+  // @ts-ignore — build navigateur d'ExcelJS, sans déclarations de types pour ce sous-chemin
+  const ExcelJSModule: any = await import('exceljs/dist/exceljs.min.js');
+  const ExcelJS = ExcelJSModule.default ?? ExcelJSModule;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'AssoGlobal';
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet(isLateExport ? 'Retardataires' : 'Membres', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+
+  const columns = isLateExport
+    ? [
+        { header: 'Nom',              key: 'lastName',    width: 18 },
+        { header: 'Prénom',           key: 'firstName',   width: 18 },
+        { header: 'Email',            key: 'email',       width: 30 },
+        { header: 'Téléphone',        key: 'phone',       width: 16 },
+        { header: 'Antenne',          key: 'antennaName', width: 18 },
+        { header: 'Mois de retard',   key: 'lateMonths',  width: 14 },
+        { header: 'Date Inscription', key: 'createdAt',   width: 16 },
+      ]
+    : [
+        { header: 'Nom',              key: 'lastName',  width: 18 },
+        { header: 'Prénom',           key: 'firstName', width: 18 },
+        { header: 'Email',            key: 'email',     width: 30 },
+        { header: 'Téléphone',        key: 'phone',     width: 16 },
+        { header: 'Rôle',             key: 'role',      width: 14 },
+        { header: 'Statut',           key: 'status',    width: 14 },
+        { header: 'Date Inscription', key: 'createdAt', width: 16 },
+      ];
+
+  sheet.columns = columns as any;
+
+  const headerRow = sheet.getRow(1);
+  headerRow.height = 22;
+  headerRow.eachCell((cell: any) => {
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'left' };
+    cell.border = {
+      top:    { style: 'thin', color: { argb: 'FF1D4ED8' } },
+      bottom: { style: 'thin', color: { argb: 'FF1D4ED8' } },
+    };
+  });
+
+  rows.forEach((u, idx) => {
+    const rowData: Record<string, any> = isLateExport
+      ? {
+          lastName: u.lastName,
+          firstName: u.firstName,
+          email: u.email,
+          phone: u.phone || '-',
+          antennaName: u.antennaName || '-',
+          lateMonths: u.lateMonths ?? 0,
+          createdAt: formatDate(u.createdAt),
+        }
+      : {
+          lastName: u.lastName,
+          firstName: u.firstName,
+          email: u.email,
+          phone: u.phone || '-',
+          role: ROLE_MAP[u.role] || u.role,
+          status: USER_STATUS_MAP[u.status]?.label || u.status,
+          createdAt: formatDate(u.createdAt),
+        };
+
+    const row = sheet.addRow(rowData);
+    const isEven = idx % 2 === 1;
+
+    row.eachCell((cell: any) => {
+      cell.border = {
+        top:    { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left:   { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right:  { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+      cell.alignment = { vertical: 'middle' };
+      if (isEven) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+      }
+    });
+
+    if (isLateExport) {
+      const months = u.lateMonths ?? 0;
+      const severity = months >= 12 ? 'FFDC2626' : months >= 6 ? 'FFD97706' : 'FF2563EB';
+      row.getCell('lateMonths').font = { bold: true, color: { argb: severity } };
+    } else {
+      const st = USER_STATUS_MAP[u.status];
+      if (st) {
+        row.getCell('status').font = { bold: true, color: { argb: `FF${st.color.replace('#', '')}` } };
+      }
+    }
+  });
+
+  const lastColLetter = String.fromCharCode(64 + columns.length);
+  sheet.autoFilter = { from: 'A1', to: `${lastColLetter}1` };
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Export_${isLateExport ? 'Retardataires' : 'Membres'}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 /* ══════════════════════════════════════════════════════ PAGE PRINCIPALE */
 export default function AdminMembersDirectoryPage() {
   const [members, setMembers] = useState<UserSummary[]>([]);
@@ -441,20 +566,9 @@ export default function AdminMembersDirectoryPage() {
       }
 
       if (exportModalType === 'EXCEL') {
-        let csv = exportLateOnly
-          ? "Nom;Prenom;Email;Telephone;Antenne;Mois de retard;Date Inscription\n"
-          : "Nom;Prenom;Email;Telephone;Role;Statut;Date Inscription\n";
-        exportData.forEach(u => {
-          csv += exportLateOnly
-            ? `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${u.antennaName || ''}";"${u.lateMonths ?? ''}";"${formatDate(u.createdAt)}"\n`
-            : `"${u.lastName}";"${u.firstName}";"${u.email}";"${u.phone || ''}";"${ROLE_MAP[u.role] || u.role}";"${USER_STATUS_MAP[u.status]?.label || u.status}";"${formatDate(u.createdAt)}"\n`;
-        });
-        const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Export_${exportLateOnly ? 'Retardataires' : 'Membres'}_${new Date().toISOString().slice(0,10)}.csv`;
-        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        // 🔥 AJOUT : vrai fichier .xlsx mis en forme (ExcelJS), à la place
+        // du CSV brut précédent — cf. generateStyledExcel() plus haut.
+        await generateStyledExcel(exportData, exportLateOnly);
         setExportModalType(null);
       } else if (exportModalType === 'PDF') {
         setPdfIsLateExport(exportLateOnly);
