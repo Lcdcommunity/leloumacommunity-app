@@ -132,7 +132,7 @@ async function bootstrap() {
   pushService.setVapidEnabled(vapidEnabled);
 
   // Prefix API
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api'); 
 
   // Middlewares
   app.use(cookieParser());
