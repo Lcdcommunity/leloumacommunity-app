@@ -454,10 +454,22 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     language?: 'fr' | 'en' | 'es' | 'pt' | 'ar' | 'ff' | string;
     theme?: 'light' | 'dark' | 'system' | string;
   }) => {
-    if (body.language) {
-      document.cookie = `i18next=${body.language}; path=/; max-age=31536000; SameSite=Lax`;
+    // 🔥 CORRIGÉ : i18n.language peut renvoyer une variante régionale
+    // détectée automatiquement par le navigateur (ex. "fr-FR") au lieu du
+    // code à 2 lettres attendu par UpdatePreferencesDto côté backend
+    // (@IsIn(['fr','en','es','pt','ff','ar'])) — la requête était alors
+    // rejetée en 400 dès le premier enregistrement, sans que l'utilisateur
+    // ait jamais touché le sélecteur de langue. Normalisé ici, au seul
+    // point d'entrée de cet appel, pour ne dépendre d'aucune config i18next.
+    const normalizedBody = {
+      ...body,
+      ...(body.language ? { language: body.language.split('-')[0].toLowerCase() } : {}),
+    };
+
+    if (normalizedBody.language) {
+      document.cookie = `i18next=${normalizedBody.language}; path=/; max-age=31536000; SameSite=Lax`;
     }
-    return http<{ ok: boolean }, typeof body>('/member/preferences', { method: 'PATCH', body });
+    return http<{ ok: boolean }, typeof normalizedBody>('/member/preferences', { method: 'PATCH', body: normalizedBody });
   },
 
   subscribeToPushNotifications: (subscription: PushSubscriptionPayload) =>
