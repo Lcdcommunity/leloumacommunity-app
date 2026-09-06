@@ -1,5 +1,30 @@
 //backend/src/modules/member/member.controller.ts
 //
+// 🔥 CORRIGÉ (05/09) : @Patch('preferences') RETIRÉ — ce contrôleur
+//   (@Controller('member'), @Roles(MEMBER) hérité par la classe) définissait
+//   EXACTEMENT la même route que preferences.controller.ts
+//   (@Controller('member/preferences'), aucune restriction de rôle) :
+//   PATCH /member/preferences était donc mappée deux fois, sur deux
+//   services différents écrivant chacun dans une table différente
+//   (MemberService::updatePreferences → UserNotificationPreference,
+//   email/sms/push seulement ; PreferencesService::update →
+//   UserPreference, email/sms/push + langue + thème). Selon l'ordre
+//   d'enregistrement des modules, l'une des deux routes devenait du code
+//   mort inatteignable — et c'était visiblement celle-ci qui interceptait
+//   la requête, avec son @Roles(MEMBER) hérité qui renvoyait un 403 pour
+//   tout SUPER_ADMIN/ANTENNA_ADMIN essayant d'enregistrer ses préférences
+//   (super-admin/settings, "Erreur lors de l'enregistrement des
+//   préférences."). Même dans le cas d'un vrai MEMBRE, la sauvegarde
+//   écrivait dans la mauvaise table : invisible au rechargement, puisque
+//   GET /member/preferences (uniquement défini dans
+//   preferences.controller.ts, aucun doublon sur le GET) relit toujours
+//   UserPreference. preferences.controller.ts reste donc la seule source
+//   de vérité pour /member/preferences (lecture ET écriture) — accessible
+//   à tous les rôles, ce qui est le comportement voulu pour des
+//   préférences d'affichage personnelles. MemberService::updatePreferences
+//   n'est plus appelé depuis nulle part ; laissé tel quel dans le service
+//   (code mort inoffensif), à retirer lors d'un futur nettoyage si voulu.
+//
 // 🔥 CORRIGÉ (09/08) : listContents (/member/contents) et
 //   listProjectsForMembers (/member/projects) n'avaient aucun @Roles propre
 //   — elles héritaient donc du @Roles(MEMBER) posé sur la classe entière.
@@ -45,7 +70,6 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
 import { MemberProfileUpdateDto } from './dto/member-profile-update.dto';
-import { MemberPreferencesUpdateDto } from './dto/member-preferences-update.dto';
 import { CreateMemberContributionDto } from './dto/create-member-contribution.dto';
 import { MemberContributionsQueryDto } from './dto/member-contributions-query.dto';
 import { LateMembersQueryDto } from './dto/late-members-query.dto';
@@ -74,11 +98,6 @@ export class MemberController {
   @Patch('profile')
   updateProfile(@CurrentUser() user: AuthUser, @Body() dto: MemberProfileUpdateDto) {
     return this.service.updateProfile(user.id, dto);
-  }
-
-  @Patch('preferences')
-  updatePreferences(@CurrentUser() user: AuthUser, @Body() dto: MemberPreferencesUpdateDto) {
-    return this.service.updatePreferences(user.id, dto);
   }
 
   @Post('push-subscription')
