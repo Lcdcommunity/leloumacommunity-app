@@ -16,8 +16,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { LogoutDto } from './dto/logout.dto';
 import { LoginDto } from './dto/login.dto';
-import { NotificationsService } from '../notifications/notifications.service'; 
-import { NotificationType } from '@prisma/client'; 
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
@@ -26,7 +26,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly tokens: AuthTokensService,
     private readonly authMailer: AuthMailerService,
-    private readonly notifications: NotificationsService, 
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -71,6 +71,18 @@ export class AuthService {
     throw new BadRequestException(
       'Configuration manquante : FRONTEND_URL ou APP_URL est requis en production.',
     );
+  }
+
+  // 🔥 AJOUT : même logique que super-admin.service.ts::createAntennaAdmin()
+  // pour l'email de bienvenue — priorité au domaine personnalisé de
+  // l'association (ex. ajvk.site), repli sur FRONTEND_URL/APP_URL
+  // uniquement si l'association n'a pas de domaine propre (ou compte sans
+  // association, ex. SYSTEM_ADMIN).
+  private getAssociationBaseUrl(associationDomain?: string | null): string {
+    if (associationDomain) {
+      return `https://${this.normalizeUrl(associationDomain)}`;
+    }
+    return this.getFrontendBaseUrl();
   }
 
   /**
@@ -175,7 +187,7 @@ export class AuthService {
         if (!isLocal && dbDomain !== requestDomain) {
           // Log de sécurité utile dans la console de Render
           console.warn(`[Auth-Blocked] Tentative de connexion hors domaine. Attendu: ${dbDomain}, Reçu: ${requestDomain}`);
-          throw new UnauthorizedException('Identifiants invalides pour cet espace.'); 
+          throw new UnauthorizedException('Identifiants invalides pour cet espace.');
         }
       }
     }
@@ -276,7 +288,15 @@ export class AuthService {
       },
     });
 
-    const front = this.getFrontendBaseUrl();
+    // 🔥 CORRIGÉ : utilisait getFrontendBaseUrl() (FRONTEND_URL/APP_URL —
+    // domaine GLOBAL de la plateforme, dkmoney.store), quelle que soit
+    // l'association du membre. Un membre de ajvk.site recevait donc un
+    // lien de réinitialisation pointant vers dkmoney.store au lieu de son
+    // propre domaine. Corrigé pour utiliser en priorité
+    // user.association.domainName, exactement comme
+    // super-admin.service.ts::createAntennaAdmin() le fait déjà pour
+    // l'email de bienvenue.
+    const front = this.getAssociationBaseUrl(user.association?.domainName);
     const resetUrl = `${front}/reset-password?token=${encodeURIComponent(rawToken)}`;
 
     // Le token existe déjà en base à ce stade. Un incident SMTP ne doit ni

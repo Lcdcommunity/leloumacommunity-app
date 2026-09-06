@@ -58,9 +58,21 @@ const customDomainCache = new Map<string, { valid: boolean; expiresAt: number }>
 const CUSTOM_DOMAIN_CACHE_TTL_MS = 60_000;
 
 async function isCustomDomainRegistered(
-  hostname: string,
+  hostnameRaw: string,
   prisma: PrismaService,
 ): Promise<boolean> {
+  // 🔥 CORRIGÉ : Association.domainName est toujours stocké SANS "www."
+  // (ex. "ajvk.site"), comme partout ailleurs dans le code (getLoginUrl,
+  // isAllowedOrigin::leloumacommunity/dkmoney via endsWith, etc.). Cette
+  // fonction comparait le hostname brut par égalité stricte — une origine
+  // "www.ajvk.site" ne matchait donc jamais "ajvk.site" en base, et CORS
+  // bloquait silencieusement tout appel /public/theme (et le reste de
+  // l'API) émis depuis le sous-domaine www d'un domaine client. Normalisé
+  // ici, dès l'entrée de la fonction, pour que la clé de cache et la
+  // requête Prisma utilisent systématiquement la forme sans www — un seul
+  // point de normalisation, quel que soit l'appelant.
+  const hostname = hostnameRaw.replace(/^www\./, '');
+
   const cached = customDomainCache.get(hostname);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.valid;
@@ -114,7 +126,8 @@ async function isAllowedOrigin(
 
   // 🔥 domaines personnalisés des clients (ex: ajvk.site) — vérifiés en
   // base plutôt que dans une liste statique, sinon chaque nouveau domaine
-  // provisionné casse le CORS tant qu'on n'a pas redéployé.
+  // provisionné casse le CORS tant qu'on n'a pas redéployé. La normalisation
+  // du "www." se fait désormais à l'intérieur de isCustomDomainRegistered().
   return isCustomDomainRegistered(hostname, prisma);
 }
 
