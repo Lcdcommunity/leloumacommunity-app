@@ -51,6 +51,10 @@ import { DomainProvisioningModule } from './domain-provisioning/domain-provision
 // 🔥 NOUVEAU : page de communication email/SMS (admin/super-admin), module
 // neuf et isolé — voir backend/src/modules/communications/
 import { CommunicationsModule } from './modules/communications/communications.module';
+// 🔥 NOUVEAU : cotisation enregistrée par un admin au nom d'un membre
+// (membres illettrés) — module neuf et isolé, voir
+// backend/src/modules/admin-member-contributions/
+import { AdminMemberContributionsModule } from './modules/admin-member-contributions/admin-member-contributions.module';
 
 @Module({
   imports: [
@@ -106,6 +110,7 @@ import { CommunicationsModule } from './modules/communications/communications.mo
     ElectionsModule,
     DomainProvisioningModule, // 🔥 NOUVEAU
     CommunicationsModule, // 🔥 NOUVEAU : communication email/SMS admin/super-admin
+    AdminMemberContributionsModule, // 🔥 NOUVEAU : cotiser au nom d'un membre (admin)
   ],
   controllers: [],
   providers: [

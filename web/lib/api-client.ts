@@ -225,6 +225,25 @@ export interface SuperAdminLateMemberExportItem {
   lateMonths: number;
 }
 
+// 🔥 AJOUT : résultat de recherche de membre côté admin (formulaire
+// "Cotiser pour un membre" — cf. AdminContributionCreateForm.tsx), scopé
+// aux antennes gérées par l'admin.
+export interface AdminTargetMemberResult {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  antennaId?: string | null;
+  antennaName?: string | null;
+  currency?: string | null;
+  monthlyQuota?: number | null;
+  membershipCardPrice?: number | null;
+  lateMonths?: number;
+  earliestUnpaidMonth?: number | null;
+  earliestUnpaidYear?: number | null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // API CLIENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -454,13 +473,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     language?: 'fr' | 'en' | 'es' | 'pt' | 'ar' | 'ff' | string;
     theme?: 'light' | 'dark' | 'system' | string;
   }) => {
-    // 🔥 CORRIGÉ : i18n.language peut renvoyer une variante régionale
-    // détectée automatiquement par le navigateur (ex. "fr-FR") au lieu du
-    // code à 2 lettres attendu par UpdatePreferencesDto côté backend
-    // (@IsIn(['fr','en','es','pt','ff','ar'])) — la requête était alors
-    // rejetée en 400 dès le premier enregistrement, sans que l'utilisateur
-    // ait jamais touché le sélecteur de langue. Normalisé ici, au seul
-    // point d'entrée de cet appel, pour ne dépendre d'aucune config i18next.
     const normalizedBody = {
       ...body,
       ...(body.language ? { language: body.language.split('-')[0].toLowerCase() } : {}),
@@ -774,6 +786,12 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
        earliestUnpaidYear?: number | null;
      }>>(`/member/search-users?q=${encodeURIComponent(q)}`),
 
+  // 🔥 AJOUT : recherche de membre côté admin (formulaire "Cotiser pour un
+  // membre"), scopée aux antennes gérées par l'admin (SUPER_ADMIN : toute
+  // l'association) — GET /admin/contributions/target-members.
+  searchTargetMembersAdmin: (q: string) =>
+    http<AdminTargetMemberResult[]>(`/admin/contributions/target-members?q=${encodeURIComponent(q)}`),
+
   approveMemberAccount: (userId: string) =>
     http(`/super-admin/users/${userId}/approve`, { method: 'PATCH' }),
 
@@ -861,11 +879,6 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       lateMonths?: number;
     }>>(`/member/late-members?page=${params?.page ?? 1}&pageSize=${params?.pageSize ?? 50}`),
 
-  // 🔥 AJOUT : export "Retardataires" Super Admin (globalement ou par
-  // antenne), route isolée GET /super-admin/late-members. Utilisé
-  // uniquement par la modale d'export PDF/Excel de
-  // super-admin/members/page.tsx — pas de pagination, la route renvoie la
-  // liste complète triée par mois de retard décroissant.
   listLateMembersSuperAdmin: (antennaId?: string) =>
     http<SuperAdminLateMemberExportItem[]>(
       `/super-admin/late-members${antennaId ? `?antennaId=${antennaId}` : ''}`
@@ -914,6 +927,23 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
     targetMemberId?: string;
   }) =>
     http<Contribution, typeof body>('/member/contributions', { method: 'POST', body }),
+
+  // 🔥 AJOUT : cotisation enregistrée par un admin au nom d'un membre
+  // (membres illettrés) — POST /admin/contributions/for-member, validée
+  // directement côté backend (statut VALIDATED + écriture comptable
+  // immédiate, cf. admin-member-contributions.service.ts).
+  createContributionForMemberAdmin: (body: {
+    memberId: string;
+    amount: number;
+    currency?: string;
+    method?: string;
+    depositedAt?: string;
+    note?: string;
+    purpose?: string;
+    monthReference?: number;
+    yearReference?: number;
+  }) =>
+    http<Contribution, typeof body>('/admin/contributions/for-member', { method: 'POST', body }),
 
   listMyContributions: (params?: { page?: number; pageSize?: number; status?: string }) =>
     http<ApiListResponse<Contribution>>(

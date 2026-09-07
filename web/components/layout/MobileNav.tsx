@@ -114,6 +114,11 @@ const adminItems: NavItem[] = [
   { href: '/admin/approvals',             label: 'Validations comptes',    ico: E.shield,       section: 'Principal' },
   { href: '/admin/members',               label: 'Membres',                ico: E.members,      section: 'Principal' },
   { href: '/admin/contributions',         label: 'Cotisations',            ico: E.contribution, section: 'Finances'  },
+  // 🔥 NOUVEAU : formulaire permettant à l'admin d'enregistrer une
+  // cotisation (carte membre, régulière, don, retard) au nom d'un membre
+  // qui ne peut pas utiliser l'outil lui-même (illettrisme) — cotisation
+  // validée directement, cf. admin-member-contributions.service.ts.
+  { href: '/admin/contributions/new',     label: 'Cotiser pour un membre', ico: E.plus,         section: 'Finances'  },
   { href: '/admin/contributions/history', label: 'Historique cotisations', ico: E.history,      section: 'Finances'  },
   { href: '/admin/expenses',              label: 'Dépenses',               ico: E.creditCard,   section: 'Finances'  },
   { href: '/admin/projections',           label: 'Projections',            ico: E.chart,        section: 'Finances'  },
@@ -122,7 +127,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/project-proposals',     label: 'Propositions membres',   ico: E.project,      section: 'Contenu'   },
   { href: '/admin/elections',             label: 'Élections',              ico: E.vote,         section: 'Contenu'   },
   { href: '/admin/events',                label: 'Événements',             ico: E.calendar,     section: 'Contenu'   },
-  { href: '/admin/documents',             label: 'Documents & photos',     ico: E.document,     section: 'Contenu'   },
+  { href: '/admin/documents',              label: 'Documents & photos',     ico: E.document,     section: 'Contenu'   },
   { href: '/admin/contents',              label: 'Informations',           ico: E.news,         section: 'Contenu'   },
   { href: '/admin/late-members',          label: 'Retardataires +3 mois',  ico: E.clock,        section: 'Contenu'   },
   { href: '/admin/sponsors',              label: 'Partenaires',            ico: E.star,         section: 'Contenu'   },

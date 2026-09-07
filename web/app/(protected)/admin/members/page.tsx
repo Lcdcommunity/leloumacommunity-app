@@ -136,9 +136,38 @@ type ExportRowMember = ExtendedMember & {
   antennaName?: string | null;
 };
 
+// Types minimalistes pour la portion d'ExcelJS utilisée ici
+// (le sous-chemin importé dynamiquement n'a pas de déclarations de types)
+type ExcelCell = Record<string, unknown>;
+
+interface ExcelRow {
+  height?: number;
+  eachCell: (callback: (cell: ExcelCell) => void) => void;
+  getCell: (key: string) => ExcelCell;
+}
+
+interface ExcelWorksheet {
+  columns: unknown;
+  autoFilter?: unknown;
+  addRow: (data: Record<string, unknown>) => ExcelRow;
+  getRow: (index: number) => ExcelRow;
+}
+
+interface ExcelWorkbookInstance {
+  creator: string;
+  created: Date;
+  addWorksheet: (name: string, options?: Record<string, unknown>) => ExcelWorksheet;
+  xlsx: { writeBuffer: () => Promise<ArrayBuffer> };
+}
+
+interface ExcelJSNamespace {
+  Workbook: new () => ExcelWorkbookInstance;
+}
+
 async function generateStyledExcel(rows: ExportRowMember[], isLateExport: boolean) {
-  // @ts-ignore — build navigateur d'ExcelJS, sans déclarations de types pour ce sous-chemin
-  const ExcelJSModule: any = await import('exceljs/dist/exceljs.min.js');
+  // @ts-expect-error — build navigateur d'ExcelJS, sans déclarations de types pour ce sous-chemin
+  const ExcelJSModule = (await import('exceljs/dist/exceljs.min.js')) as unknown as
+    ExcelJSNamespace & { default?: ExcelJSNamespace };
   const ExcelJS = ExcelJSModule.default ?? ExcelJSModule;
 
   const workbook = new ExcelJS.Workbook();
@@ -169,11 +198,11 @@ async function generateStyledExcel(rows: ExportRowMember[], isLateExport: boolea
         { header: 'Date Inscription', key: 'createdAt', width: 16 },
       ];
 
-  sheet.columns = columns as any;
+  sheet.columns = columns;
 
   const headerRow = sheet.getRow(1);
   headerRow.height = 22;
-  headerRow.eachCell((cell: any) => {
+  headerRow.eachCell((cell: ExcelCell) => {
     cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
     cell.alignment = { vertical: 'middle', horizontal: 'left' };
@@ -184,7 +213,7 @@ async function generateStyledExcel(rows: ExportRowMember[], isLateExport: boolea
   });
 
   rows.forEach((u, idx) => {
-    const rowData: Record<string, any> = isLateExport
+    const rowData: Record<string, unknown> = isLateExport
       ? {
           lastName: u.lastName,
           firstName: u.firstName,
@@ -207,7 +236,7 @@ async function generateStyledExcel(rows: ExportRowMember[], isLateExport: boolea
     const row = sheet.addRow(rowData);
     const isEven = idx % 2 === 1;
 
-    row.eachCell((cell: any) => {
+    row.eachCell((cell: ExcelCell) => {
       cell.border = {
         top:    { style: 'thin', color: { argb: 'FFE2E8F0' } },
         left:   { style: 'thin', color: { argb: 'FFE2E8F0' } },
@@ -921,7 +950,7 @@ export default function AdminMembersDirectoryPage() {
                   </select>
                   {exportLateOnly && (
                     <p style={{ fontSize: '.68rem', color: '#94A3B8', marginTop: '.35rem', fontStyle: 'italic' }}>
-                      Ignoré en mode "retardataires" (toujours limité aux membres actifs).
+                      Ignoré en mode &quot;retardataires&quot; (toujours limité aux membres actifs).
                     </p>
                   )}
                 </div>

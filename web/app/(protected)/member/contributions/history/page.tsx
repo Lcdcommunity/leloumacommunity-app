@@ -83,7 +83,10 @@ export default function MemberContributionsHistoryPage() {
     }
   }, [status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const timer = setTimeout(() => { void load(); }, 0);
+    return () => clearTimeout(timer);
+  }, [load]);
 
   // 🔥 Récupérer le prix de la carte membre depuis les settings de l'antenne
   useEffect(() => {

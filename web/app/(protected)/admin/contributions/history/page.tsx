@@ -348,7 +348,15 @@ export default function AdminContributionsHistoryPage() {
     } finally { setLoading(false); }
   }, [status, q]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // 🔧 Fix ESLint react-hooks/set-state-in-effect :
+    // `load()` déclenche `setLoading(true)` de façon synchrone (avant le premier
+    // `await` de la fonction async), ce qui revient à appeler setState de manière
+    // synchrone à l'intérieur de l'effet. On reporte l'appel via queueMicrotask
+    // pour sortir du flux d'exécution synchrone de l'effet, sans changer le
+    // comportement (le fetch se déclenche toujours immédiatement après le rendu).
+    queueMicrotask(() => { void load(); });
+  }, [load]);
 
   async function handleAction(mode: ModalMode, value: string) {
     if (mode !== 'view' && modal.mode === 'view') {

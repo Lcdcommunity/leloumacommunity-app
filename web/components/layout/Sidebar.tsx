@@ -88,6 +88,11 @@ const adminItems: NavItem[] = [
   { href: '/admin/approvals',                 label: 'Validations comptes',    icon: <Ico d={ICO.check} /> },
   { href: '/admin/members',                   label: 'Membres',                icon: <Ico d={ICO.group} /> },
   { href: '/admin/contributions',             label: 'Cotisations',            icon: <Ico d={ICO.coin} /> },
+  // 🔥 NOUVEAU : formulaire permettant à l'admin d'enregistrer une
+  // cotisation (carte membre, régulière, don, retard) au nom d'un membre
+  // qui ne peut pas utiliser l'outil lui-même (illettrisme) — cotisation
+  // validée directement, cf. admin-member-contributions.service.ts.
+  { href: '/admin/contributions/new',         label: 'Cotiser pour un membre', icon: <Ico d={ICO.plus} /> },
   { href: '/admin/contributions/history',     label: 'Historique cotisations', icon: <Ico d={ICO.history} /> },
   { href: '/admin/expenses',                  label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
   { href: '/admin/projections',               label: 'Projections',            icon: <Ico d={ICO.chart} /> },
