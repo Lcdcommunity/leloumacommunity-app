@@ -453,7 +453,6 @@ export default function SuperAdminSettingsPage() {
     <AppShell title={t('settings.superAdminTitle', 'Paramètres Généraux')}>
       <div dir={isRTL ? 'rtl' : 'ltr'}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
           .ss-wrap{font-family:'DM Sans',sans-serif;padding:clamp(1.25rem,3vw,2rem);max-width:1050px;margin:0 auto}
           .ss-header{margin-bottom:1.5rem;opacity:0;transform:translateY(10px);animation:ssin .5s .04s cubic-bezier(.22,1,.36,1) forwards}
           .ss-eyebrow{font-size:.67rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:#DC2626;margin-bottom:.35rem;display:flex;align-items:center;gap:.4rem}

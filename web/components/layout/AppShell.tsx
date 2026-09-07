@@ -21,7 +21,15 @@ export function AppShell({
   const router = useRouter();
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const lastActivityRef = useRef<number>(Date.now());
+  // 🔥 CORRIGÉ : Date.now() appelé directement pendant le rendu pour
+  // initialiser le ref déclenchait l'erreur ESLint react-hooks/purity
+  // ("Cannot call impure function during render"). Initialisé à 0 à la
+  // place : resetTimer() (appelé en tout premier dans le useEffect
+  // ci-dessous, avant tout listener) écrase immédiatement cette valeur
+  // avec Date.now() au montage — la valeur initiale n'est donc jamais
+  // réellement lue ni utilisée, ce changement est sans effet sur le
+  // comportement.
+  const lastActivityRef = useRef<number>(0);
 
   const TIMEOUT_IN_MS = 15 * 60 * 1000; // 15 minutes
 

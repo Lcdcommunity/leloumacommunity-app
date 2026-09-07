@@ -420,8 +420,6 @@ export default function SuperAdminExpensesPage() {
   return (
     <AppShell title="Contrôle des dépenses">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@500;600&display=swap');
-        
         .sae-wrap { font-family: 'DM Sans', sans-serif; padding: clamp(1rem, 3vw, 2rem); max-width: 1000px; margin: 0 auto; box-sizing: border-box; }
         
         .sae-header-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }

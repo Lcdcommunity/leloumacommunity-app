@@ -308,8 +308,6 @@ export default function AdminSettingsPage() {
     <AppShell title={`${t('settings.pageTitle', 'Paramètres &')} ${t('settings.pageTitleHighlight', 'Règles')}`}>
       <div dir={isRTL ? 'rtl' : 'ltr'}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
-
           .ast-wrap {
             font-family: 'DM Sans', sans-serif;
             padding: clamp(1.25rem, 3vw, 2rem);

@@ -211,8 +211,6 @@ export function Sidebar() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
-
         .sidebar {
           width: 224px; min-width: 224px;
           height: 100vh; position: sticky; top: 0;

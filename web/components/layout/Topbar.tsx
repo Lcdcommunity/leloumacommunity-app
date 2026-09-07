@@ -118,8 +118,6 @@ export function Topbar({ title }: { title: string }) {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700&display=swap');
-
         /* ══════════════════════════════════
            DESKTOP TOPBAR
         ══════════════════════════════════ */

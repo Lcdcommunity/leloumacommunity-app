@@ -111,7 +111,14 @@ export default function MemberSettingsPage() {
   const [secMsg, setSecMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
-    setMounted(true);
+    // 🔥 CORRIGÉ : setMounted(true) appelé de façon synchrone dans le corps
+    // de l'effet déclenchait l'erreur ESLint react-hooks/set-state-in-effect
+    // ("Calling setState synchronously within an effect can trigger
+    // cascading renders"). Différé via queueMicrotask, même correctif que
+    // super-admin/settings/page.tsx — sans impact sur le comportement
+    // (toujours résolu avant le rendu suivant, juste plus tard que la
+    // synchronisation immédiate).
+    queueMicrotask(() => setMounted(true));
 
     // 🔥 CORRECTION : Charger les préférences utilisateur depuis le backend
     const loadPreferences = async () => {
@@ -289,8 +296,6 @@ export default function MemberSettingsPage() {
     <AppShell title={t('settings.pageTitleShort', 'Paramètres')}>
       <div dir={isRTL ? 'rtl' : 'ltr'}>
         <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=DM+Sans:wght@300;400;500;600;700;800;900&display=swap');
-
           .ms-wrap {
             font-family: 'DM Sans', sans-serif;
             padding: clamp(1.25rem, 3vw, 2rem);

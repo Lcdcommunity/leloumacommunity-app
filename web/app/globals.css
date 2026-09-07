@@ -1,3 +1,28 @@
+/*globals.css*/
+/* 🔥 AJOUT : import Google Fonts unique et consolidé pour toute l'appli.
+   Remplace 8 imports @import dupliqués — Sidebar.tsx, Topbar.tsx,
+   MobileNav.tsx, super-admin/settings, super-admin/expenses,
+   super-admin/contributions, member/settings, admin/settings, tous
+   vérifiés mot pour mot dans cette conversation — qui se chargeaient
+   chacun séparément sur chaque page où AppShell est rendu (donc jusqu'à
+   4 requêtes simultanées vers fonts.googleapis.com sur une même page
+   comme super-admin/settings), provoquant des échecs de chargement
+   intermittents en course de requêtes. super-admin/transfers n'avait
+   lui-même aucun @import et dépendait déjà silencieusement de celui
+   d'une autre page chargée avant lui — il bénéficie donc aussi de cette
+   consolidation. Chantier complet : plus aucun @import Google Fonts
+   local dans le codebase, tout passe par cette unique ligne. Poids
+   retenus : union de tous les poids demandés par ces imports (aucun
+   poids perdu — member/settings et admin/settings n'apportaient aucun
+   poids supplémentaire à l'union déjà calculée). Seule simplification :
+   l'axe optique variable "opsz" de DM Sans, demandé uniquement par
+   MobileNav.tsx (opsz,wght@9..40,...), est abandonné au profit de l'axe
+   de graisse simple (:wght@...) déjà utilisé partout ailleurs —
+   différence de rendu non perceptible, et un seul axe permet de
+   fusionner proprement tous les poids DM Sans en un seul family= .
+   Placé en tout premier, avant @tailwind, car un @import CSS doit
+   précéder toute autre règle dans la feuille de style finale. */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

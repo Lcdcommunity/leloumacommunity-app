@@ -302,8 +302,6 @@ export function MobileNav() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=DM+Sans:opsz,wght@9..40,400;500;600;700;800&display=swap');
-
         @media (min-width: 769px) {
           .mn-safe-area, .mn-container, .mn-overlay, .mn-drawer { display: none !important; }
         }
