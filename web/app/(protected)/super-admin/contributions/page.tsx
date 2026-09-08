@@ -1,4 +1,5 @@
 // web/app/(protected)/super-admin/contributions/page.tsx
+// v1.1 - Fix: titre panneau + nom/email membre non tronqués (cartes mobile + tableau desktop)
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -358,7 +359,7 @@ export default function SuperAdminContributionsPage() {
         .sc-panel-titlerow { display: flex; align-items: center; gap: .55rem; min-width: 0; }
         .sc-panel-ico { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg,#991B1B,#DC2626); display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(220,38,38,.3); }
         
-        .sc-panel-title { font-size: clamp(0.7rem, 2.5vw, 0.75rem); font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: #1F2937; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sc-panel-title { font-size: clamp(0.7rem, 2.5vw, 0.75rem); font-weight: 900; letter-spacing: .05em; text-transform: uppercase; color: #1F2937; overflow-wrap: break-word; line-height: 1.3; }
         .sc-count-chip { font-size: .68rem; font-weight: 900; padding: .2rem .6rem; border-radius: 99px; background: #FEF2F2; color: #B91C1C; border: 1px solid #FECACA; flex-shrink: 0; }
 
         /* 🔥 NOUVEAU : toolbar en flex-wrap pour accueillir 2 champs de filtre supplémentaires sans casser sur mobile */
@@ -411,8 +412,8 @@ export default function SuperAdminContributionsPage() {
         .sct-member-cell { display: flex; align-items: center; gap: 0.75rem; }
         .sct-avatar { width: 34px; height: 34px; border-radius: 50%; background: linear-gradient(135deg, #DC2626, #991B1B); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900; color: white; flex-shrink: 0; }
         .sct-member { display: flex; flex-direction: column; gap: .18rem; min-width: 0; }
-        .sct-member-name { font-size: .87rem; font-weight: 800; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .sct-member-email { font-size: .72rem; color: #9CA3AF; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sct-member-name { font-size: .87rem; font-weight: 800; color: #111827; overflow-wrap: break-word; line-height: 1.3; }
+        .sct-member-email { font-size: .72rem; color: #9CA3AF; font-weight: 500; overflow-wrap: anywhere; }
         
         .sct-amount { font-family: 'DM Mono', monospace; font-size: .84rem; font-weight: 800; color: #111827; white-space: nowrap; }
         .sct-date { white-space: nowrap; font-size: .78rem; font-weight: 600; color: #374151; }

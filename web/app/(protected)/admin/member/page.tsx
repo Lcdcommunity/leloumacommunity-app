@@ -1,4 +1,5 @@
 // web/app/(protected)/admin/members/page.tsx
+// v1.1 - Fix: nom/email non tronqués (colonne Membre + colonne Email) + badge de statut non tronqué
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -92,9 +93,9 @@ const ROLE_MAP: Record<string, string> = {
 function UserStatusBadge({ status }: { status: string }) {
   const s = USER_STATUS_MAP[status] ?? USER_STATUS_MAP['PENDING_APPROVAL'];
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontSize: 'clamp(0.6rem, 2vw, 0.68rem)', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '.15rem .45rem', whiteSpace: 'nowrap', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem', fontSize: 'clamp(0.6rem, 2vw, 0.68rem)', fontWeight: 800, color: s.color, background: s.bg, border: `1px solid ${s.border}`, borderRadius: 99, padding: '.15rem .45rem', lineHeight: 1.3 }}>
       <span style={{ width: 5, height: 5, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.label}</span>
+      <span>{s.label}</span>
     </span>
   );
 }
@@ -880,17 +881,17 @@ export default function AdminMembersDirectoryPage() {
                       className="aa-row-clickable"
                       onClick={() => openMemberModal(u)} 
                     >
-                      <td style={{ ...tdStyle, maxWidth: '200px' }}>
+                      <td style={tdStyle}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '.55rem' }}>
                           <Initials name={fullName(u)} />
                           <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{ fontWeight: 700, fontSize: '.82rem', color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{fullName(u)}</div>
-                            <div className="hide-desktop" style={{ fontSize: '.68rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
+                            <div style={{ fontWeight: 700, fontSize: '.82rem', color: '#0F172A', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{fullName(u)}</div>
+                            <div className="hide-desktop" style={{ fontSize: '.68rem', color: '#6B7280', overflowWrap: 'anywhere' }}>{u.email}</div>
                           </div>
                         </div>
                       </td>
                       <td className="hide-mobile" style={tdStyle}>
-                        <div style={{ fontSize: '.8rem', color: '#6B7280', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.email}</div>
+                        <div style={{ fontSize: '.8rem', color: '#6B7280', overflowWrap: 'anywhere' }}>{u.email}</div>
                       </td>
                       <td style={tdStyle}>
                         <UserStatusBadge status={u.status} />

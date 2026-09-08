@@ -1,4 +1,5 @@
 // web/app/(protected)/admin/contributions/history/page.tsx
+// v1.1 - Fix: nom du membre non tronqué (liste) + email non tronqué (modal détails)
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -172,9 +173,9 @@ function ContributionDetailModal({
             </div>
 
             <div className="ach-grid-2">
-              <div className="ach-info-box" style={{ overflow: 'hidden' }}>
+              <div className="ach-info-box">
                 <label>Email</label>
-                <span title={member?.email || ''} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                <span style={{ display: 'block', wordBreak: 'break-word' }}>
                   {member?.email || '—'}
                 </span>
               </div>
@@ -511,7 +512,7 @@ export default function AdminContributionsHistoryPage() {
         .ach-avatar { width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #DBEAFE, #EFF6FF); color: #1D4ED8; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0; border: 1px solid #BFDBFE; }
         
         .ach-card-content { flex: 1; min-width: 0; }
-        .ach-card-name { font-weight: 700; font-size: 1.05rem; color: #0F172A; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.01em; }
+        .ach-card-name { font-weight: 700; font-size: 1.05rem; color: #0F172A; margin-bottom: 3px; letter-spacing: -0.01em; line-height: 1.25; overflow-wrap: break-word; }
         .ach-card-ref { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: #94A3B8; font-weight: 600; margin-bottom: 4px; }
         .ach-card-purpose { color: #64748B; font-size: 0.8rem; font-weight: 500; }
         
