@@ -45,6 +45,16 @@ export interface VirtualCardData {
   };
 }
 
+// 🔥 AJOUT : compteurs "actions requises" pour le dashboard membre.
+export interface MemberPendingActionsSummary {
+  eventsToRespond: number;
+  contributionsBySomeoneElse: number;
+  recentExpenses: number;
+  recentDocuments: number;
+  recentContents: number;
+  unreadCommunications: number;
+}
+
 export interface FullUserProfile extends UserSummary {
   phone?: string | null;
   addressLine1?: string | null;
@@ -1569,6 +1579,9 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
   // ==========================================
   listSuperAdminRecentEventResponses: (take = 10) =>
     http<SuperAdminEventResponseEntry[]>(`/super-admin/activity/event-responses?take=${take}`),
+  
+    getMemberPendingActions: () =>
+    http<MemberPendingActionsSummary>('/member/activity/pending'),
 
   listSuperAdminRecentCommunications: (take = 10) =>
     http<SuperAdminCommunicationLogEntry[]>(`/super-admin/activity/communications?take=${take}`),

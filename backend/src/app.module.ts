@@ -59,6 +59,11 @@ import { AdminMemberContributionsModule } from './modules/admin-member-contribut
 // aux événements, communications envoyées) pour le dashboard super-admin —
 // module neuf et isolé, voir backend/src/modules/super-admin-activity/
 import { SuperAdminActivityModule } from './modules/super-admin-activity/super-admin-activity.module';
+// 🔥 NOUVEAU : bandeau "actions requises" côté membre (cotisation payée par
+// un tiers, événement à confirmer, communication reçue, dépenses/documents/
+// informations récents) — module neuf et isolé, voir
+// backend/src/modules/member-activity/
+import { MemberActivityModule } from './modules/member-activity/member-activity.module';
 
 @Module({
   imports: [
@@ -116,6 +121,7 @@ import { SuperAdminActivityModule } from './modules/super-admin-activity/super-a
     CommunicationsModule, // 🔥 NOUVEAU : communication email/SMS admin/super-admin
     AdminMemberContributionsModule, // 🔥 NOUVEAU : cotiser au nom d'un membre (admin)
     SuperAdminActivityModule, // 🔥 NOUVEAU : dashboard super-admin — actions requises + visibilité
+    MemberActivityModule, // 🔥 NOUVEAU : dashboard membre — actions requises + visibilité
   ],
   controllers: [],
   providers: [

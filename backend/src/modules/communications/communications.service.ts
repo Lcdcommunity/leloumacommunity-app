@@ -1,5 +1,14 @@
 // backend/src/modules/communications/communications.service.ts
 //
+// v1.1 — 🔥 AJOUT : chaque communication envoyée crée désormais aussi une
+//   notification in-app (+ push si activé) pour chaque destinataire,
+//   indépendamment du succès de l'envoi email/SMS — le message reste
+//   consultable dans l'app même si le canal externe a échoué. Payload
+//   { kind: 'communication', reminderRunLogId } pour que
+//   member-activity.service.ts (nouveau module) puisse compter précisément
+//   les communications NON LUES par le membre, sans fenêtre de récence
+//   arbitraire (la carte se vide d'elle-même quand il les consulte).
+//
 // v1.0 — Fichier neuf, isolé (module communications). Ne modifie ni
 //   n'importe AdminService : `getAdminContext()` y est privée (donc non
 //   réutilisable depuis l'extérieur), et buildCoveredMonths/computeLateMonths
@@ -29,10 +38,12 @@ import {
   ContributionPurpose,
   ReminderKind,
   NotificationChannel,
+  NotificationType,
 } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CommunicationsMailerService, CommunicationAssociationBranding } from './communications-mailer.service';
 import { TwilioSmsService } from './twilio-sms.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   SendCommunicationDto,
   CommunicationAudienceType,
@@ -136,6 +147,7 @@ export class CommunicationsService {
     private readonly prisma: PrismaService,
     private readonly mailer: CommunicationsMailerService,
     private readonly sms: TwilioSmsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ─── Scope (dupliqué depuis AdminService.getAdminContext — privée,
@@ -328,14 +340,6 @@ export class CommunicationsService {
     let recipients: Array<{ id: string; email: string; phone: string | null }>;
 
     if (dto.selectionMode === CommunicationSelectionMode.INDIVIDUAL) {
-      // Sélection manuelle : s'applique aussi bien à l'audience retardataires
-      // qu'à l'audience "tous les membres" — la liste vient de ce que
-      // l'utilisateur a coché dans l'un ou l'autre pool côté frontend.
-      // `audienceType` reste conservé pour la journalisation (ReminderKind)
-      // mais n'est pas re-vérifié ici : re-filtrer strictement sur "toujours
-      // en retard au moment précis de l'envoi" ajouterait une fenêtre de
-      // course sans bénéfice réel — le scope multi-tenant (association +
-      // antenne) reste, lui, strictement vérifié.
       if (!dto.recipientUserIds || dto.recipientUserIds.length === 0) {
         throw new BadRequestException('Aucun destinataire sélectionné.');
       }
@@ -448,7 +452,7 @@ export class CommunicationsService {
           ? NotificationChannel.SMS
           : null;
 
-    await this.prisma.reminderRunLog.create({
+    const logEntry = await this.prisma.reminderRunLog.create({
       data: {
         associationId,
         antennaId: effectiveAntennaIds && effectiveAntennaIds.length === 1 ? effectiveAntennaIds[0] : null,
@@ -468,6 +472,27 @@ export class CommunicationsService {
         triggeredByUserId: userId,
       },
     });
+
+    // 🔥 AJOUT (v1.1) : trace in-app pour chaque destinataire — cf.
+    // changelog en tête de fichier. Ne bloque jamais la réponse de
+    // sendCampaign() si une notification échoue (.catch silencieux) : la
+    // campagne elle-même (email/SMS) est déjà envoyée à ce stade.
+    await Promise.all(
+      recipients.map((r) =>
+        this.notifications
+          .createForUserWithPush({
+            associationId,
+            userId: r.id,
+            type: NotificationType.SYSTEM_ALERT,
+            title: dto.title,
+            message: dto.body,
+            metadata: { kind: 'communication', reminderRunLogId: logEntry.id } as unknown as Prisma.InputJsonValue,
+            pushTitle: `📨 ${dto.title}`,
+            pushBody: dto.body,
+          })
+          .catch(() => undefined),
+      ),
+    );
 
     return { recipientsCount: recipients.length, successCount, failedCount };
   }
