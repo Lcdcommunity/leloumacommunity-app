@@ -1,27 +1,22 @@
 // backend/src/modules/admin-member-contributions/admin-member-contributions.service.ts
 //
-// v1.0 — NOUVEAU : permet à un ANTENNA_ADMIN (ou SUPER_ADMIN) d'enregistrer
-// une cotisation (carte membre, cotisation régulière, don, retard) au nom
-// d'un membre qui ne peut pas utiliser l'outil lui-même (illettrisme).
+// v1.1 — 🔥 AJOUT : blocage d'un second paiement de carte membre pour un
+// membre qui en a déjà une valide. La carte n'a pas de champ "montant déjà
+// payé cumulé" en base (c'est un forfait unique, pas une cotisation
+// mensuelle) — la source de vérité fiable est VirtualCard.expiresAt (posé
+// à validatedAt + 1 an à chaque paiement de carte validé, cf. bloc
+// MEMBERSHIP_CARD plus bas et admin.service.ts::validateContribution).
+// Tant que expiresAt est dans le futur et que la carte n'est pas
+// verrouillée, on refuse un nouveau paiement MEMBERSHIP_CARD pour ce
+// membre — corrige le bug de doublons observé (plusieurs clics sur
+// "Soumettre" faute de retour visuel créaient chacun une cotisation
+// carte validée). hasValidMembershipCard/membershipCardExpiresAt sont
+// aussi renvoyés par searchTargetMembers pour que le frontend désactive
+// l'option "Carte membre annuelle" avant même la tentative de soumission.
 //
-// Décision confirmée par l'utilisateur : la cotisation créée par l'admin
-// est VALIDÉE DIRECTEMENT (l'admin a déjà vérifié le paiement) — pas de
-// passage par le circuit PENDING_VALIDATION. L'écriture comptable
-// (LedgerEntry) est donc créée immédiatement, comme le fait
-// admin.service.ts::validateContribution() pour une cotisation classique.
-//
-// Traçabilité demandée : memberUserId = le membre bénéficiaire (donc
-// l'écriture apparaît dans SON historique comme si c'était lui qui l'avait
-// passée), submitterUserId = l'admin (donc son nom apparaît dans les
-// détails, via memberMapper.contribution().submitter — déjà affiché tel
-// quel par ContributionHistoryTable et les pages admin existantes, pas de
-// changement nécessaire côté mapping/affichage).
-//
-// Fichier volontairement isolé (nouveau module) : ne modifie ni
-// admin.service.ts/admin.controller.ts, ni member.service.ts/
-// member.controller.ts. Les helpers de calcul de mois couverts sont
-// dupliqués ici, comme partout ailleurs dans ce backend (même convention
-// que member.service.ts / admin.service.ts / dashboard-member.service.ts).
+// v1.0 — NOUVEAU : cf. changelog d'origine (permet à un ANTENNA_ADMIN ou
+// SUPER_ADMIN d'enregistrer une cotisation validée au nom d'un membre qui
+// ne peut pas utiliser l'outil lui-même).
 //
 import {
   BadRequestException,
@@ -136,6 +131,12 @@ function findEarliestUncoveredMonth(
   return null;
 }
 
+// ─── Helper : carte membre encore valide ? ────────────────────────────────
+function hasValidCard(virtualCard: { expiresAt: Date | null; isLocked: boolean } | null | undefined): boolean {
+  if (!virtualCard || !virtualCard.expiresAt || virtualCard.isLocked) return false;
+  return virtualCard.expiresAt.getTime() > Date.now();
+}
+
 @Injectable()
 export class AdminMemberContributionsService {
   constructor(
@@ -157,8 +158,6 @@ export class AdminMemberContributionsService {
     return map;
   }
 
-  // Même pattern que admin.service.ts::getAdminContext() — dupliqué
-  // volontairement pour garder ce module totalement isolé.
   private async getAdminContext(adminId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: adminId },
@@ -240,6 +239,9 @@ export class AdminMemberContributionsService {
             amount: true,
           },
         },
+        // 🔥 AJOUT (v1.1) : pour désactiver côté frontend l'option "Carte
+        // membre annuelle" quand ce membre en a déjà une valide.
+        virtualCard: { select: { expiresAt: true, isLocked: true } },
       },
     });
 
@@ -249,6 +251,7 @@ export class AdminMemberContributionsService {
       const pricing = allPricing[currency] || { monthlyQuota: 0, membershipCard: 0 };
       const covered = buildCoveredMonths(u.contributions, pricing.monthlyQuota);
       const earliest = findEarliestUncoveredMonth(covered, u.createdAt);
+      const cardValid = hasValidCard(u.virtualCard);
 
       return {
         id: u.id,
@@ -261,6 +264,8 @@ export class AdminMemberContributionsService {
         currency,
         monthlyQuota: pricing.monthlyQuota,
         membershipCardPrice: pricing.membershipCard,
+        hasValidMembershipCard: cardValid,
+        membershipCardExpiresAt: u.virtualCard?.expiresAt?.toISOString() ?? null,
         lateMonths: computeLateMonths(covered, u.createdAt),
         earliestUnpaidMonth: earliest?.month ?? null,
         earliestUnpaidYear: earliest?.year ?? null,
@@ -298,6 +303,8 @@ export class AdminMemberContributionsService {
             amount: true,
           },
         },
+        // 🔥 AJOUT (v1.1) : nécessaire pour le blocage carte membre ci-dessous.
+        virtualCard: { select: { expiresAt: true, isLocked: true } },
       },
     });
 
@@ -309,6 +316,19 @@ export class AdminMemberContributionsService {
     const finalAntennaId = membership?.antennaId;
     if (!finalAntennaId) {
       throw new BadRequestException("Ce membre n'est rattaché à aucune antenne.");
+    }
+
+    const purpose = dto.purpose || ContributionPurpose.REGULAR_QUOTA;
+
+    // 🔥 AJOUT (v1.1) : blocage — un membre ne peut pas payer une deuxième
+    // fois sa carte membre tant que celle en cours n'est pas expirée.
+    // Corrige le bug observé : sans retour visuel de succès, plusieurs
+    // clics créaient chacun une cotisation "carte membre" validée.
+    if (purpose === ContributionPurpose.MEMBERSHIP_CARD && hasValidCard(target.virtualCard)) {
+      const expiry = target.virtualCard!.expiresAt!.toLocaleDateString('fr-FR');
+      throw new BadRequestException(
+        `${target.firstName} ${target.lastName} a déjà une carte membre valide jusqu'au ${expiry}. Impossible d'enregistrer un nouveau paiement de carte avant cette date.`,
+      );
     }
 
     const association = await this.prisma.association.findUnique({
@@ -324,7 +344,6 @@ export class AdminMemberContributionsService {
     const monthlyPrice = Number(localPricing.monthlyQuota) || 0;
     const cardPrice = Number(localPricing.membershipCard) || 0;
 
-    const purpose = dto.purpose || ContributionPurpose.REGULAR_QUOTA;
     const totalAmount = Number(dto.amount);
 
     let boundMonth = new Date().getMonth() + 1;

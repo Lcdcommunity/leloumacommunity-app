@@ -55,6 +55,10 @@ import { CommunicationsModule } from './modules/communications/communications.mo
 // (membres illettrés) — module neuf et isolé, voir
 // backend/src/modules/admin-member-contributions/
 import { AdminMemberContributionsModule } from './modules/admin-member-contributions/admin-member-contributions.module';
+// 🔥 NOUVEAU : bandeau "actions requises" + panneaux de visibilité (réponses
+// aux événements, communications envoyées) pour le dashboard super-admin —
+// module neuf et isolé, voir backend/src/modules/super-admin-activity/
+import { SuperAdminActivityModule } from './modules/super-admin-activity/super-admin-activity.module';
 
 @Module({
   imports: [
@@ -111,6 +115,7 @@ import { AdminMemberContributionsModule } from './modules/admin-member-contribut
     DomainProvisioningModule, // 🔥 NOUVEAU
     CommunicationsModule, // 🔥 NOUVEAU : communication email/SMS admin/super-admin
     AdminMemberContributionsModule, // 🔥 NOUVEAU : cotiser au nom d'un membre (admin)
+    SuperAdminActivityModule, // 🔥 NOUVEAU : dashboard super-admin — actions requises + visibilité
   ],
   controllers: [],
   providers: [

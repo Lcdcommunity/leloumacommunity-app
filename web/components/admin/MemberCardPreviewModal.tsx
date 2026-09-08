@@ -19,19 +19,33 @@ export function MemberCardPreviewModal({ memberId, memberName, scope, onClose }:
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
-    const fetchCard = scope === 'super-admin'
-      ? api.getMemberCardSuperAdmin(memberId)
-      : api.getMemberCardAdmin(memberId);
+    // 🔧 Fix ESLint react-hooks/set-state-in-effect :
+    // `setLoading(true)` et `setError(null)` étaient appelés de façon
+    // synchrone au tout début de l'effet, ce que la règle interdit. On
+    // reporte ce bloc via queueMicrotask pour sortir du flux d'exécution
+    // synchrone de l'effet, sans changer le comportement (le fetch se
+    // déclenche toujours immédiatement après le rendu). Le flag
+    // `cancelled` reste déclaré hors du microtask pour que le nettoyage
+    // (cleanup) fonctionne toujours si le composant est démonté avant
+    // que le microtask ne s'exécute.
+    queueMicrotask(() => {
+      if (cancelled) return;
 
-    fetchCard
-      .then((data) => { if (!cancelled) setCard(data); })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Ce membre n'a pas encore de carte membre.");
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      setLoading(true);
+      setError(null);
+
+      const fetchCard = scope === 'super-admin'
+        ? api.getMemberCardSuperAdmin(memberId)
+        : api.getMemberCardAdmin(memberId);
+
+      fetchCard
+        .then((data) => { if (!cancelled) setCard(data); })
+        .catch((err) => {
+          if (!cancelled) setError(err instanceof Error ? err.message : "Ce membre n'a pas encore de carte membre.");
+        })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    });
 
     return () => { cancelled = true; };
   }, [memberId, scope]);

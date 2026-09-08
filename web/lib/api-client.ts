@@ -225,6 +225,36 @@ export interface SuperAdminLateMemberExportItem {
   lateMonths: number;
 }
 
+// 🔥 AJOUT : réponses de présence aux événements, toutes antennes
+// confondues (dashboard super-admin — visibilité seule, pas de validation).
+export interface SuperAdminEventResponseEntry {
+  id: string;
+  status: string;
+  updatedAt: string;
+  memberId: string;
+  memberName: string;
+  eventId: string;
+  eventTitle: string;
+  eventStartsAt: string;
+  antennaName: string | null;
+}
+
+// 🔥 AJOUT : historique des communications envoyées (email/SMS), toutes
+// antennes confondues.
+export interface SuperAdminCommunicationLogEntry {
+  id: string;
+  title: string | null;
+  audienceType: string | null;
+  kind: string;
+  channel: string | null;
+  recipientsCount: number;
+  successCount: number;
+  failedCount: number;
+  triggeredAt: string;
+  antennaName: string | null;
+  sentByName: string | null;
+}
+
 // 🔥 AJOUT : résultat de recherche de membre côté admin (formulaire
 // "Cotiser pour un membre" — cf. AdminContributionCreateForm.tsx), scopé
 // aux antennes gérées par l'admin.
@@ -1533,4 +1563,13 @@ updateSystemSettings: (body: { platformName?: string; contactEmail?: string; mai
 
   deleteTransferSuperAdmin: (id: string) =>
     http<{ success: boolean }>(`/super-admin/transfers/${id}`, { method: 'DELETE' }),
+
+  // ==========================================
+  // ACTIVITÉ SUPER ADMIN (dashboard — visibilité)
+  // ==========================================
+  listSuperAdminRecentEventResponses: (take = 10) =>
+    http<SuperAdminEventResponseEntry[]>(`/super-admin/activity/event-responses?take=${take}`),
+
+  listSuperAdminRecentCommunications: (take = 10) =>
+    http<SuperAdminCommunicationLogEntry[]>(`/super-admin/activity/communications?take=${take}`),
 };

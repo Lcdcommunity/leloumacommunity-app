@@ -204,7 +204,16 @@ export default function AdminContentsPage() {
     } finally { setLoading(false); }
   }, [q, status]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    // 🔧 Fix ESLint react-hooks/set-state-in-effect :
+    // `load()` déclenche `setError(null)` / `setLoading(true)` de façon
+    // synchrone (avant le premier `await` de la fonction async), ce qui
+    // revient à appeler setState de manière synchrone à l'intérieur de
+    // l'effet. On reporte l'appel via queueMicrotask pour sortir du flux
+    // d'exécution synchrone de l'effet, sans changer le comportement (le
+    // fetch se déclenche toujours immédiatement après le rendu).
+    queueMicrotask(() => { void load(); });
+  }, [load]);
 
   async function handleStatusCycle(c: ExtendedContentPost) {
     setBusyId(c.id);

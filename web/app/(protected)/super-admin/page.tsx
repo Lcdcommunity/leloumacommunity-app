@@ -1,4 +1,16 @@
 /////// web/app/(protected)/super-admin/page.tsx
+// v2.3 — CHANGELOG :
+// ── AJOUTÉ : bandeau "Actions requises" (PendingActionsAlertBar, même
+//    composant isolé que côté admin d'antenne) — comptes en attente,
+//    dépenses en attente (dépassements de seuil remontés au super-admin),
+//    projets en attente (statut UNDER_REVIEW). Tous les endpoints existaient
+//    déjà (listSuperAdminExpenses, listProjects, dashboardSuperAdmin) — un
+//    seul .total ajouté par appel, dans la même volée Promise.allSettled.
+// ── AJOUTÉ : 3 nouveaux panneaux de VISIBILITÉ seule (pas d'action) :
+//    "Virements récents" (getAllTransfersSuperAdmin, déjà existant),
+//    "Réponses aux événements" et "Communications envoyées" (nouveau
+//    module backend isolé super-admin-activity/).
+//
 // v2.2 — CHANGELOG :
 // ── CORRIGÉ (12/08) : "Taux de cotisation" utilisait
 //    (membres - pendingAccounts)/membres — un calcul de "comptes non en
@@ -18,8 +30,10 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DashboardCarousel, CarouselProject } from '../../../components/member/DashboardCarousel';
+import { PendingActionsAlertBar, PendingActionItem } from '../../../components/admin/PendingActionsAlertBar';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, formatDate, fullName } from '../../../lib/format';
 import type { UserSummary } from '../../../types/user';
@@ -60,6 +74,47 @@ type LateMemberEntry = {
   antennaName?: string;
   currency?: string;
 };
+
+// 🔥 AJOUT : forme minimale d'un virement pour le panneau "Virements récents".
+interface SuperAdminTransferEntry {
+  id: string;
+  status: string;
+  sendAmount: number;
+  sendCurrency: string;
+  receiveAmount: number;
+  receiveCurrency: string;
+  senderAntenna?: { name: string } | null;
+  receiverAntenna?: { name: string } | null;
+  createdAt: string;
+}
+
+// 🔥 AJOUT : réponse de présence à un événement.
+interface EventResponseEntry {
+  id: string;
+  status: string;
+  updatedAt: string;
+  memberId: string;
+  memberName: string;
+  eventId: string;
+  eventTitle: string;
+  eventStartsAt: string;
+  antennaName: string | null;
+}
+
+// 🔥 AJOUT : entrée d'historique de communication.
+interface CommunicationLogEntry {
+  id: string;
+  title: string | null;
+  audienceType: string | null;
+  kind: string;
+  channel: string | null;
+  recipientsCount: number;
+  successCount: number;
+  failedCount: number;
+  triggeredAt: string;
+  antennaName: string | null;
+  sentByName: string | null;
+}
 
 type RawApiProject = Omit<Project, 'updatedAt'> & {
   updatedAt?: string | null;
@@ -120,6 +175,29 @@ function getInitials(name: string) {
   if (!name) return '??';
   const parts = name.trim().split(' ');
   return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase();
+}
+
+// 🔥 AJOUT : libellés/couleurs pour les statuts de présence événement.
+const ATTENDANCE_LABEL: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  ATTENDING: { label: 'Participe',  color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  ATTENDED:  { label: 'Présent',    color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  DECLINED:  { label: 'Décline',    color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  ABSENT:    { label: 'Absent',     color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+};
+
+// 🔥 AJOUT : libellés pour l'audience d'une communication.
+const AUDIENCE_LABEL: Record<string, string> = {
+  LATE_PAYERS: 'Retardataires',
+  ALL_MEMBERS: 'Tous les membres',
+};
+
+function timeAgo(dateStr: string) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "Aujourd'hui";
+  if (days === 1) return "Hier";
+  if (days < 7) return `Il y a ${days} jours`;
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -476,6 +554,7 @@ const FIXED_CURRENCIES = [
 ];
 
 export default function SuperAdminDashboardPage() {
+  const router = useRouter(); // 🔥 AJOUT : pour les redirections du bandeau "Actions requises"
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
@@ -490,16 +569,39 @@ export default function SuperAdminDashboardPage() {
   const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
   const [pricing, setPricing] = useState<PricingMap | null>(null);
 
+  // 🔥 AJOUT : compteurs pour le bandeau "Actions requises".
+  const [pendingExpensesCount, setPendingExpensesCount] = useState(0);
+  const [pendingProjectsCount, setPendingProjectsCount] = useState(0);
+
+  // 🔥 AJOUT : panneaux de visibilité seule.
+  const [recentTransfers, setRecentTransfers] = useState<SuperAdminTransferEntry[]>([]);
+  const [recentEventResponses, setRecentEventResponses] = useState<EventResponseEntry[]>([]);
+  const [recentCommunications, setRecentCommunications] = useState<CommunicationLogEntry[]>([]);
+
   useEffect(() => {
     let isMounted = true;
     void (async () => {
       try {
-        const [dashRes, lateRes, projectsRes, contentsRes, pricingRes] = await Promise.allSettled([
+        const [
+          dashRes, lateRes, projectsRes, contentsRes, pricingRes,
+          expensesRes, pendingProjectsRes, transfersRes, eventResponsesRes, communicationsRes,
+        ] = await Promise.allSettled([
           api.dashboardSuperAdmin(),
           api.listLateMembersOver3Months({ page: 1, pageSize: 100 }),
           api.listProjectsForMembers({ page: 1, pageSize: 6 }),
           api.listContentsForMembers({ page: 1, pageSize: 5 }),
           api.getAssociationPricing(),
+          // 🔥 AJOUT : dépenses en attente (dépassements de seuil remontés au super-admin).
+          api.listSuperAdminExpenses({ page: 1, pageSize: 1, status: 'PENDING_VALIDATION' }),
+          // 🔥 AJOUT : projets en attente de validation (statut UNDER_REVIEW,
+          // mappé depuis "En attente d'approbation" côté formulaire).
+          api.listProjects({ page: 1, pageSize: 1, status: 'UNDER_REVIEW' }),
+          // 🔥 AJOUT : virements récents, toutes antennes (visibilité seule).
+          api.getAllTransfersSuperAdmin({ page: 1, pageSize: 5 }),
+          // 🔥 AJOUT : réponses de présence aux événements (nouveau endpoint isolé).
+          api.listSuperAdminRecentEventResponses(),
+          // 🔥 AJOUT : historique des communications envoyées (nouveau endpoint isolé).
+          api.listSuperAdminRecentCommunications(),
         ]);
         if (!isMounted) return;
 
@@ -548,6 +650,26 @@ export default function SuperAdminDashboardPage() {
         if (pricingRes.status === 'fulfilled') {
           setPricing(pricingRes.value as PricingMap);
         }
+
+        if (expensesRes.status === 'fulfilled') {
+          setPendingExpensesCount(expensesRes.value.total ?? 0);
+        }
+
+        if (pendingProjectsRes.status === 'fulfilled') {
+          setPendingProjectsCount(pendingProjectsRes.value.total ?? 0);
+        }
+
+        if (transfersRes.status === 'fulfilled') {
+          setRecentTransfers((transfersRes.value.items ?? []) as unknown as SuperAdminTransferEntry[]);
+        }
+
+        if (eventResponsesRes.status === 'fulfilled') {
+          setRecentEventResponses(eventResponsesRes.value);
+        }
+
+        if (communicationsRes.status === 'fulfilled') {
+          setRecentCommunications(communicationsRes.value);
+        }
       } catch (err) {
         if (isMounted) setError(err instanceof Error ? err.message : 'Erreur inattendue');
       }
@@ -565,6 +687,52 @@ export default function SuperAdminDashboardPage() {
       return acc;
     }, {} as Record<string, { total: number; antennas: AntennaBalance[] }>);
   }, [data]);
+
+  // 🔥 AJOUT : items du bandeau "Actions requises" — comptes, dépenses et
+  // projets en attente. Volontairement pas de virements ni de cotisations
+  // ici (le super-admin ne les valide pas — voir panneaux de visibilité
+  // plus bas).
+  const pendingActionItems: PendingActionItem[] = useMemo(() => {
+    if (!data) return [];
+    return [
+      {
+        id: 'accounts',
+        label: data.stats.pendingAccounts > 1 ? 'Comptes à valider' : 'Compte à valider',
+        count: data.stats.pendingAccounts,
+        color: '#D97706', bg: '#FFFBEB', border: '#FDE68A',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
+        ),
+        onClick: () => router.push('/super-admin/approvals'),
+      },
+      {
+        id: 'expenses',
+        label: pendingExpensesCount > 1 ? 'Dépenses à valider' : 'Dépense à valider',
+        count: pendingExpensesCount,
+        color: '#DC2626', bg: '#FEF2F2', border: '#FECACA',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+          </svg>
+        ),
+        onClick: () => router.push('/super-admin/expenses'),
+      },
+      {
+        id: 'projects',
+        label: pendingProjectsCount > 1 ? 'Projets à valider' : 'Projet à valider',
+        count: pendingProjectsCount,
+        color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+        ),
+        onClick: () => router.push('/super-admin/projects'),
+      },
+    ];
+  }, [data, pendingExpensesCount, pendingProjectsCount, router]);
 
   const baseStats: StatCard[] = data ? [
     {
@@ -621,10 +789,6 @@ export default function SuperAdminDashboardPage() {
     },
     {
       label: 'Taux de cotisation',
-      // 🔥 CORRIGÉ (12/08) : membres réellement à jour de paiement
-      // (membres - lateMembers.length), au lieu de "comptes non en attente
-      // d'approbation" (pendingAccounts), métrique sans rapport avec le
-      // paiement. lateMembers déjà chargé pour la carte "Retard".
       value: data.stats.members > 0
         ? `${Math.max(0, Math.round(((data.stats.members - lateMembers.length) / data.stats.members) * 100))}%`
         : '—',
@@ -722,10 +886,13 @@ export default function SuperAdminDashboardPage() {
           cursor: pointer;
         }
         .sa-item-card:hover { transform: translateX(3px); box-shadow: 0 4px 12px rgba(0,0,0,0.04); border-color: #E2E8F0; }
+        .sa-item-card.static { cursor: default; }
+        .sa-item-card.static:hover { transform: none; box-shadow: none; border-color: #F1F5F9; }
         
         .sa-avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #2563EB, #60A5FA); display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 800; color: white; flex-shrink: 0; }
         .sa-role { font-size: 0.64rem; font-weight: 800; padding: 0.14rem 0.5rem; border-radius: 6px; background: #F0F9FF; color: #0369A1; border: 1px solid #BAE6FD; }
         .sa-user-cell { display: flex; align-items: center; }
+        .sa-item-sub { font-size: 0.68rem; color: #94A3B8; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
 
         /* ── AJOUTÉ : carrousel (projets + actualités) + section Informations récentes ── */
         .sa-carousel-wrap { margin-bottom: 1.5rem; opacity: 0; animation: sain 0.5s 0.1s cubic-bezier(.22,1,.36,1) forwards; }
@@ -780,6 +947,9 @@ export default function SuperAdminDashboardPage() {
               {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
           </div>
+
+          {/* 🔥 AJOUT : bandeau "Actions requises" */}
+          <PendingActionsAlertBar items={pendingActionItems} />
 
           <p className="sa-section-label">Indicateurs généraux</p>
           <div className="sa-stats-base" style={{ marginBottom: '1.5rem' }}>
@@ -883,6 +1053,41 @@ export default function SuperAdminDashboardPage() {
             </div>
           </div>
 
+          {/* 🔥 AJOUT : "Virements récents" (visibilité seule, pas de validation) */}
+          <div className="sa-grid2">
+            <div className="sa-panel sa-panel-full" style={{ animationDelay: '0.6s' }}>
+              <div className="sa-panel-head">
+                <div className="sa-panel-title">
+                  <div className="sa-panel-ico" style={{ background: '#ECFEFF', color: '#0E7490' }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                  </div>
+                  Virements récents
+                </div>
+                {recentTransfers.length > 0 && <span className="sa-count-chip" style={{ background: '#ECFEFF', color: '#0E7490', border: '1px solid #A5F3FC' }}>{recentTransfers.length}</span>}
+              </div>
+              <div className="sa-list-items">
+                {recentTransfers.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.78rem' }}>Aucun virement récent</div>
+                ) : (
+                  recentTransfers.map(t => (
+                    <div key={t.id} className="sa-item-card static">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                        <div className="sa-avatar" style={{ background: 'linear-gradient(135deg, #0E7490, #22D3EE)' }}>
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span className="sa-item-sub">{t.senderAntenna?.name ?? '—'} → {t.receiverAntenna?.name ?? '—'}</span>
+                          <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', fontWeight: 800, color: '#0E7490' }}>{formatCurrency(t.sendAmount, t.sendCurrency)}</span>
+                        </div>
+                      </div>
+                      <StatusBadge status={t.status} />
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
           {/* ── AJOUTÉ : carrousel projets + actualités (photos) ── */}
           <div className="sa-carousel-wrap">
             <DashboardCarousel projects={projectsInProgress} news={latestContents} />
@@ -947,6 +1152,82 @@ export default function SuperAdminDashboardPage() {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 🔥 AJOUT : "Réponses aux événements" + "Communications envoyées" (visibilité seule) */}
+          <div className="sa-grid2">
+            <div className="sa-panel" style={{ animationDelay: '0.7s' }}>
+              <div className="sa-panel-head">
+                <div className="sa-panel-title">
+                  <div className="sa-panel-ico" style={{ background: '#FFFBEB', color: '#D97706' }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  </div>
+                  Réponses aux événements
+                </div>
+                {recentEventResponses.length > 0 && <span className="sa-count-chip" style={{ background: '#FFFBEB', color: '#92400E', border: '1px solid #FDE68A' }}>{recentEventResponses.length}</span>}
+              </div>
+              <div className="sa-list-items">
+                {recentEventResponses.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.78rem' }}>Aucune réponse récente</div>
+                ) : (
+                  recentEventResponses.map(r => {
+                    const meta = ATTENDANCE_LABEL[r.status] ?? { label: r.status, color: '#6B7280', bg: '#F3F4F6', border: '#E5E7EB' };
+                    return (
+                      <div key={r.id} className="sa-item-card static">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                          <div className="sa-avatar" style={{ background: 'linear-gradient(135deg, #D97706, #FBBF24)' }}>{getInitials(r.memberName)}</div>
+                          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{ fontWeight: 800, color: '#111827', fontSize: '0.82rem' }}>{r.memberName}</span>
+                            <span className="sa-item-sub">{r.eventTitle}{r.antennaName ? ` · ${r.antennaName}` : ''}</span>
+                          </div>
+                        </div>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.65rem', fontWeight: 700, color: meta.color, background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: 99, padding: '0.15rem 0.4rem', whiteSpace: 'nowrap' }}>
+                          {meta.label}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <div className="sa-panel" style={{ animationDelay: '0.75s' }}>
+              <div className="sa-panel-head">
+                <div className="sa-panel-title">
+                  <div className="sa-panel-ico" style={{ background: '#EFF6FF', color: '#1D4ED8' }}>
+                    <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  </div>
+                  Communications envoyées
+                </div>
+                {recentCommunications.length > 0 && <span className="sa-count-chip" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>{recentCommunications.length}</span>}
+              </div>
+              <div className="sa-list-items">
+                {recentCommunications.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#9CA3AF', fontSize: '0.78rem' }}>Aucune communication récente</div>
+                ) : (
+                  recentCommunications.map(c => (
+                    <div key={c.id} className="sa-item-card static">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
+                        <div className="sa-avatar" style={{ background: 'linear-gradient(135deg, #1D4ED8, #60A5FA)' }}>
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                          <span style={{ fontWeight: 800, color: '#111827', fontSize: '0.82rem' }}>{c.title ?? 'Communication'}</span>
+                          <span className="sa-item-sub">
+                            {c.audienceType ? (AUDIENCE_LABEL[c.audienceType] ?? c.audienceType) : '—'}
+                            {c.sentByName ? ` · ${c.sentByName}` : ' · Automatique'}
+                          </span>
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1D4ED8' }}>{c.successCount}/{c.recipientsCount}</div>
+                        <div style={{ fontSize: '0.65rem', color: '#9CA3AF', fontWeight: 600 }}>{timeAgo(c.triggeredAt)}</div>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

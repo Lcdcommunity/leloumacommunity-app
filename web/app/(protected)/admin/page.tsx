@@ -1,4 +1,17 @@
 // web/app/(protected)/admin/page.tsx
+// v3.5 — CHANGELOG :
+// ── AJOUTÉ : carte "Virements à valider" dans le bandeau "Actions requises"
+//    — même logique que approvals/contributions/proposals. Utilise
+//    api.getTransfersReceived({ status: 'PENDING_VALIDATION' }) (déjà
+//    existant côté api-client, scopé à l'antenne de l'admin côté backend
+//    comme le reste des routes /admin), ajouté à la même volée
+//    Promise.allSettled — aucun appel réseau séparé.
+//
+// v3.4 — AJOUTÉ : bandeau "Actions requises" (PendingActionsAlertBar, fichier
+//    isolé) juste sous la date, avant la grille de stats — regroupe
+//    adhésions à valider, cotisations à valider et propositions de projet
+//    à examiner en cartes "respirantes" cliquables.
+//
 // v3.3 — CHANGELOG :
 // ── CORRIGÉ (12/08) : "Taux de cotisation" utilisait
 //    (membres - pendingApprovals)/membres — un calcul de "comptes non en
@@ -39,6 +52,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
 import { DashboardCarousel, CarouselProject } from '../../../components/member/DashboardCarousel';
+import { PendingActionsAlertBar, PendingActionItem } from '../../../components/admin/PendingActionsAlertBar';
 import { api } from '../../../lib/api-client';
 import { formatCurrency, formatDate } from '../../../lib/format';
 import type { Project } from '../../../types/project';
@@ -50,6 +64,13 @@ interface PendingAccount {
   lastName: string;
   email: string;
   createdAt: string;
+}
+
+// ── AJOUTÉ : forme minimale utile depuis listProjectProposals pour compter
+//   les propositions encore en attente de décision (SUBMITTED/UNDER_REVIEW),
+//   même logique que admin/project-proposals/page.tsx::isPending.
+interface ProposalPendingEntry {
+  status: string;
 }
 
 // ── AJOUTÉ : forme de recentPendingContributions telle que renvoyée par
@@ -509,6 +530,12 @@ export default function AntennaAdminDashboard() {
   //   "Informations récentes" (défilement horizontal).
   const [selectedProject, setSelectedProject] = useState<ExtendedCarouselProject | null>(null);
   const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
+  // 🔥 AJOUT (v3.4) : nombre de propositions de projet encore en attente
+  // d'une décision (SUBMITTED/UNDER_REVIEW), pour le bandeau "Actions requises".
+  const [pendingProposalsCount, setPendingProposalsCount] = useState(0);
+  // 🔥 AJOUT (v3.5) : nombre de virements inter-antennes en attente de
+  // validation par cette antenne, même bandeau.
+  const [pendingTransfersCount, setPendingTransfersCount] = useState(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -523,12 +550,13 @@ export default function AntennaAdminDashboard() {
     return () => { isMounted = false; };
   }, []);
 
-  // ── AJOUTÉ : retardataires + carrousel projets/actus, en parallèle du
-  //   dashboard principal (n'affecte pas son état de chargement/erreur).
+  // ── AJOUTÉ : retardataires + carrousel projets/actus + propositions en
+  //   attente + virements en attente, en parallèle du dashboard principal
+  //   (n'affecte pas son état de chargement/erreur).
   useEffect(() => {
     let isMounted = true;
     void (async () => {
-      const [lateRes, projectsRes, contentsRes, pricingRes] = await Promise.allSettled([
+      const [lateRes, projectsRes, contentsRes, pricingRes, proposalsRes, transfersRes] = await Promise.allSettled([
         // listLateMembersOver3Months (/admin/late-members) est l'endpoint
         // dédié à l'admin d'antenne — seuil réel désormais 1 mois côté
         // backend (admin.service.ts).
@@ -536,6 +564,13 @@ export default function AntennaAdminDashboard() {
         api.listProjectsForMembers({ page: 1, pageSize: 6 }),
         api.listContentsForMembers({ page: 1, pageSize: 5 }),
         api.getAssociationPricing(),
+        // 🔥 AJOUT (v3.4) : même endpoint que admin/project-proposals/page.tsx
+        // (déjà scopé à l'antenne de l'admin), pour compter les propositions
+        // encore en attente d'une décision.
+        api.listProjectProposals({ page: 1, pageSize: 100 }),
+        // 🔥 AJOUT (v3.5) : virements reçus par l'antenne de l'admin, encore
+        // en attente de validation — même endpoint que admin/transfers/page.tsx.
+        api.getTransfersReceived({ page: 1, pageSize: 1, status: 'PENDING_VALIDATION' }),
       ]);
       if (!isMounted) return;
 
@@ -574,6 +609,16 @@ export default function AntennaAdminDashboard() {
       }
       if (pricingRes.status === 'fulfilled') {
         setPricing(pricingRes.value as PricingMap);
+      }
+      if (proposalsRes.status === 'fulfilled') {
+        const proposalItems = (proposalsRes.value.items ?? []) as unknown as ProposalPendingEntry[];
+        const count = proposalItems.filter(
+          (p) => p.status === 'SUBMITTED' || p.status === 'UNDER_REVIEW',
+        ).length;
+        setPendingProposalsCount(count);
+      }
+      if (transfersRes.status === 'fulfilled') {
+        setPendingTransfersCount(transfersRes.value.total ?? 0);
       }
     })();
     return () => { isMounted = false; };
@@ -694,6 +739,65 @@ export default function AntennaAdminDashboard() {
 
   const recentContributions = data?.recentPendingContributions ?? [];
   const defaultCurrency = data?.stats.currency || 'GNF';
+
+  // 🔥 AJOUT : items du bandeau "Actions requises" — regroupe
+  // adhésions/cotisations/propositions/virements en attente. Vide tant que
+  // `data` n'est pas chargé ; le composant lui-même n'affiche rien si tous
+  // les compteurs sont à 0.
+  const pendingActionItems: PendingActionItem[] = useMemo(() => {
+    if (!data) return [];
+    return [
+      {
+        id: 'approvals',
+        label: data.stats.pendingApprovals > 1 ? 'Adhésions à valider' : 'Adhésion à valider',
+        count: data.stats.pendingApprovals,
+        color: '#D97706', bg: '#FFFBEB', border: '#FDE68A',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+          </svg>
+        ),
+        onClick: () => router.push('/admin/approvals'),
+      },
+      {
+        id: 'contributions',
+        label: data.stats.pendingContributions > 1 ? 'Cotisations à valider' : 'Cotisation à valider',
+        count: data.stats.pendingContributions,
+        color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        onClick: () => router.push('/admin/contributions'),
+      },
+      {
+        id: 'proposals',
+        label: pendingProposalsCount > 1 ? 'Propositions de projet à examiner' : 'Proposition de projet à examiner',
+        count: pendingProposalsCount,
+        color: '#DC2626', bg: '#FEF2F2', border: '#FECACA',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 21h6M12 3a6 6 0 016 6c0 2.22-1.2 4.16-3 5.2V17a1 1 0 01-1 1H10a1 1 0 01-1-1v-2.8C7.2 13.16 6 11.22 6 9a6 6 0 016-6z" />
+          </svg>
+        ),
+        onClick: () => router.push('/admin/project-proposals'),
+      },
+      // 🔥 AJOUT (v3.5)
+      {
+        id: 'transfers',
+        label: pendingTransfersCount > 1 ? 'Virements à valider' : 'Virement à valider',
+        count: pendingTransfersCount,
+        color: '#0E7490', bg: '#ECFEFF', border: '#A5F3FC',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        ),
+        onClick: () => router.push('/admin/transfers'),
+      },
+    ];
+  }, [data, pendingProposalsCount, pendingTransfersCount, router]);
 
   return (
     <AppShell title="Tableau de bord">
@@ -883,6 +987,10 @@ export default function AntennaAdminDashboard() {
               {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
             </div>
           </div>
+
+          {/* 🔥 Bandeau "Actions requises" — emplacement exact demandé, juste
+              après la date et avant la grille de stats. */}
+          <PendingActionsAlertBar items={pendingActionItems} />
 
           {/* Toutes les statistiques regroupées dans une grille unique de 3 par ligne */}
           <div className="ad-stats-grid">
