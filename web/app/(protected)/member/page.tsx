@@ -2,11 +2,14 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/layout/AppShell';
 import { MemberStatusBanner } from '../../../components/member/MemberStatusBanner';
 import { VirtualCardWidget } from '../../../components/member/VirtualCardWidget';
 import { DashboardCarousel, CarouselProject, CarouselEvent } from '../../../components/member/DashboardCarousel';
+import { PendingActionsAlertBar, PendingActionItem } from '../../../components/admin/PendingActionsAlertBar';
 import { api } from '../../../lib/api-client';
+import type { MemberPendingActionsSummary } from '../../../lib/api-client';
 import { formatCurrency, formatDate } from '../../../lib/format';
 import type { UserSummary } from '../../../types/user';
 import type { Contribution } from '../../../types/contribution';
@@ -440,10 +443,14 @@ function ContentDetailModal({ content, onClose }: { content: ContentPost; onClos
 // ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function MemberHomePage() {
+  const router = useRouter(); // 🔥 AJOUT : pour les redirections du bandeau "Actions requises"
   const [data, setData] = useState<DashboardData | null>(null);
   const [myContributions, setMyContributions] = useState<ExtendedContribution[]>([]);
   const [balanceSummary, setBalanceSummary] = useState<BalanceSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 🔒 CONSERVÉ TEL QUEL (comportement carte de l'ancien fichier) : la carte
+  // membre reste cachée par défaut, révélée uniquement via le bouton flottant
+  // "Ma carte" ci-dessous — jamais affichée automatiquement dans la page.
   const [isCardVisible, setIsCardVisible] = useState(false);
   const [showBalanceModal, setShowBalanceModal] = useState(false);
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
@@ -451,12 +458,13 @@ export default function MemberHomePage() {
   const [selectedContent, setSelectedContent] = useState<ContentPost | null>(null);
   const [selectedContribution, setSelectedContribution] = useState<ExtendedContribution | null>(null);
   const [showWelcomePopup, setShowWelcomePopup] = useState(false);
-  const [pricing, setPricing] = useState<Record<string, { monthlyQuota: number; membershipCard: number }> | null>(null);
+  // 🔥 AJOUT : compteurs "actions requises" (bandeau respirant).
+  const [pendingActions, setPendingActions] = useState<MemberPendingActionsSummary | null>(null);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [dashRes, balanceRes, contribRes, projectsRes, contentsRes, lateRes] = await Promise.allSettled([
+        const [dashRes, balanceRes, contribRes, projectsRes, contentsRes, lateRes, pendingActionsRes] = await Promise.allSettled([
           api.dashboardMember(),
           api.getAssociationBalanceSummary(),
           // pageSize 120 pour couvrir jusqu'à une année d'avances (12 mois)
@@ -465,6 +473,8 @@ export default function MemberHomePage() {
           api.listProjectsForMembers({ page: 1, pageSize: 5 }),
           api.listContentsForMembers({ page: 1, pageSize: 5 }),
           api.listLateMembersVisible({ page: 1, pageSize: 5 }),
+          // 🔥 AJOUT : compteurs pour le bandeau "Actions requises".
+          api.getMemberPendingActions(),
         ]);
 
         if (dashRes.status === 'fulfilled') {
@@ -531,12 +541,10 @@ export default function MemberHomePage() {
         if (contribRes.status === 'fulfilled') {
           setMyContributions((contribRes.value?.items ?? []) as ExtendedContribution[]);
         }
-
-        // Pricing
-        try {
-          const pricingRes = await api.getAssociationPricing();
-          setPricing(pricingRes);
-        } catch { /* ignore */ }
+        // 🔥 AJOUT
+        if (pendingActionsRes.status === 'fulfilled') {
+          setPendingActions(pendingActionsRes.value);
+        }
 
         // ── Popup uniquement après une cotisation soumise ← CHANGÉ ──────────
         // Logique : une seule fois par contribution (clé = userId + contributionId).
@@ -576,8 +584,6 @@ export default function MemberHomePage() {
     };
     void fetchAll();
   }, []);
-
-  const me = data?.me;
 
   const recentContribs = useMemo<ExtendedContribution[]>(() => {
     return myContributions.length > 0
@@ -624,7 +630,6 @@ export default function MemberHomePage() {
   }, [recentContribs]);
 
   const popupCurrency = cur || 'EUR';
-  const popupPricing  = pricing?.[popupCurrency] ?? pricing?.['EUR'] ?? null;
   const firstName = data?.me?.firstName || data?.virtualCard?.user?.firstName || 'Membre';
 
   type StatCard = {
@@ -651,6 +656,88 @@ export default function MemberHomePage() {
     if (!data?.antennaBalances) return 0;
     return new Set(data.antennaBalances.map(a => a.id)).size;
   }, [data]);
+
+  // 🔥 AJOUT : items du bandeau "Actions requises" — visibilité seule pour
+  // la plupart (cotisation payée par un tiers, dépenses/documents/infos
+  // récents, communications), vraie file d'attente pour les événements
+  // (RSVP non encore donné).
+  const pendingActionItems: PendingActionItem[] = useMemo(() => {
+    if (!pendingActions) return [];
+    return [
+      {
+        id: 'contributions-by-other',
+        label: pendingActions.contributionsBySomeoneElse > 1 ? 'Cotisations payées pour vous' : 'Cotisation payée pour vous',
+        count: pendingActions.contributionsBySomeoneElse,
+        color: '#059669', bg: '#ECFDF5', border: '#A7F3D0',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+        onClick: () => router.push('/member/contributions/history'),
+      },
+      {
+        id: 'events-to-respond',
+        label: pendingActions.eventsToRespond > 1 ? 'Événements à confirmer' : 'Événement à confirmer',
+        count: pendingActions.eventsToRespond,
+        color: '#D97706', bg: '#FFFBEB', border: '#FDE68A',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        ),
+        onClick: () => router.push('/member/events'),
+      },
+      {
+        id: 'communications',
+        label: pendingActions.unreadCommunications > 1 ? 'Communications reçues' : 'Communication reçue',
+        count: pendingActions.unreadCommunications,
+        color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+        ),
+        onClick: () => router.push('/member/notifications'),
+      },
+      {
+        id: 'expenses',
+        label: 'Nouvelles dépenses publiées',
+        count: pendingActions.recentExpenses,
+        color: '#DC2626', bg: '#FEF2F2', border: '#FECACA',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+          </svg>
+        ),
+        onClick: () => router.push('/member/expenses'),
+      },
+      {
+        id: 'documents',
+        label: 'Nouveaux documents',
+        count: pendingActions.recentDocuments,
+        color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        ),
+        onClick: () => router.push('/member/documents'),
+      },
+      {
+        id: 'contents',
+        label: 'Nouvelles informations',
+        count: pendingActions.recentContents,
+        color: '#0891B2', bg: '#ECFEFF', border: '#A5F3FC',
+        icon: (
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+          </svg>
+        ),
+        onClick: () => router.push('/member/contents'),
+      },
+    ];
+  }, [pendingActions, router]);
 
   const stats: StatCard[] = data ? [
     // ── AJOUTÉ : Membres / Antennes / Projets en cours (visibilité déjà
@@ -968,27 +1055,29 @@ export default function MemberHomePage() {
           .hide-mobile { display: none !important; }
           .mb-stats { grid-template-columns: repeat(3, 1fr); gap: 0.4rem; }
           .mb-stat { padding: 0.6rem 0.5rem !important; border-radius: 12px !important; }
-          .mb-stat-value { font-size: 1.1rem !important; word-break: break-word; }
-          .mb-stat-label { font-size: 0.52rem !important; }
-          .mb-stat-sub   { font-size: 0.5rem !important; }
-          .mb-stat-icon  { width: 24px !important; height: 24px !important; border-radius: 6px !important; }
-          .mb-stat-icon svg { width: 12px; height: 12px; }
-          .mb-stat-top { flex-direction: column-reverse !important; gap: 0.2rem !important; margin-bottom: 0.4rem !important; }
-          .mb-panel-head { padding: 1rem; }
-          .mb-table { min-width: unset; width: 100%; }
-          .mb-table th { padding: 0.5rem 0.2rem; font-size: 0.55rem; letter-spacing: 0; text-align: center !important; }
-          .mb-table td { padding: 0.5rem 0.2rem; font-size: 0.68rem; text-align: center !important; }
-          .mb-table td.mono { font-size: 0.75rem; }
-          .mb-status-badge { font-size: 0.52rem; padding: 0.1rem 0.28rem; gap: 0.18rem; }
-          .mb-motif-badge  { font-size: 0.52rem; padding: 0.1rem 0.28rem; }
-          .truncate-cell { max-width: 90px; overflow-wrap: break-word; white-space: normal; line-height: 1.2; }
-          .mb-true-card { min-width: 200px; max-width: 220px; }
-          .mb-cards-viewport { overflow: hidden; }
-          .mb-cards-track { animation-duration: 10s; }
-          .mb-member-pill { gap: 0.4rem; }
-          .mb-late-track { max-width: 45px; }
+          .mb-stat-value  { font-size: 1.15rem !important; margin-bottom: 0.2rem !important; }
+          .mb-stat-label  { font-size: 0.5rem !important; letter-spacing: 0 !important; line-height: 1.2 !important; }
+          .mb-stat-sub    { font-size: 0.55rem !important; }
+          .mb-stat-icon   { width: 26px !important; height: 26px !important; border-radius: 7px !important; }
+          .mb-stat-icon svg { width: 13px; height: 13px; }
+          .mb-stat-top    { gap: 0.25rem !important; margin-bottom: 0.4rem !important; }
+          .mb-panel-head  { padding: 1rem; }
+          .mb-table th, .mb-table td { padding: 0.6rem 0.8rem; font-size: 0.72rem; }
+          .mb-fab span { display: none; }
+          .mb-fab { padding: 0.85rem; border-radius: 50%; }
         }
       `}</style>
+
+      {error && (
+        <div className="mb-wrap">
+          <div className="mb-error">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10" /><path strokeLinecap="round" d="M12 8v4m0 4h.01" />
+            </svg>
+            {error}
+          </div>
+        </div>
+      )}
 
       {!data && !error && (
         <div className="mb-loader">
@@ -997,242 +1086,226 @@ export default function MemberHomePage() {
         </div>
       )}
 
-      {error && (
-        <div className="mb-error">
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-            <circle cx="12" cy="12" r="10"/><path strokeLinecap="round" d="M12 8v4m0 4h.01"/>
-          </svg>
-          {error}
-        </div>
-      )}
-
       {data && (
         <div className="mb-wrap">
           <div className="mb-header">
             <div>
-              <div className="mb-eyebrow"><div className="mb-eyebrow-dot"/>Espace membre</div>
+              <div className="mb-eyebrow"><div className="mb-eyebrow-dot" />Espace membre</div>
               <h1 className="mb-title">Bonjour, <span>{firstName}</span></h1>
             </div>
             <div className="mb-greeting-chip">
-              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
           </div>
 
-          {me && <MemberStatusBanner me={me} />}
+          {/* 🔥 AJOUT : bandeau "Actions requises" côté membre — cotisation
+              payée par un tiers, événement à confirmer, communication reçue,
+              dépenses/documents/informations récents. */}
+          <PendingActionsAlertBar items={pendingActionItems} />
 
-          <div className="mb-stats" style={{ marginTop: '1.5rem' }}>
+          {/* 🔥 CORRIGÉ : MemberStatusBanner n'accepte qu'une seule prop
+              `me: UserSummary` (il dérive lui-même le reste en interne) —
+              plus de lateMonths/hasPendingContribution/hasPendingCard ici. */}
+          <MemberStatusBanner me={data.me} />
+
+          <div className="mb-stats">
             {stats.map((s, i) => (
               <div
                 key={s.label}
-                className={`mb-stat mb-span-1${s.clickable ? ' mb-stat-clickable' : ''}`}
-                style={{ animationDelay: `${0.1 + i * 0.06}s` }}
+                className={`mb-stat${s.clickable ? ' mb-stat-clickable' : ''}`}
+                style={{ animationDelay: `${0.1 + i * 0.05}s` }}
                 onClick={s.onClick}
                 role={s.clickable ? 'button' : undefined}
                 tabIndex={s.clickable ? 0 : undefined}
               >
-                <div className="mb-stat-accent" style={{ background: `linear-gradient(90deg, ${s.color}, ${s.color}55)` }} />
-                {s.urgent && (
-                  <div style={{ position: 'absolute', inset: 0, borderRadius: 18, border: `1.5px solid ${s.color}50`, pointerEvents: 'none' }}/>
-                )}
+                <div className="mb-stat-accent" style={{ background: `linear-gradient(90deg,${s.color},${s.color}55)` }} />
                 <div className="mb-stat-top">
-                  <span className="mb-stat-label">{s.label}</span>
                   <div className="mb-stat-icon" style={{ background: s.bg, color: s.color }}>{s.icon}</div>
+                  <span className="mb-stat-label">{s.label}</span>
                 </div>
-                <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{String(s.value)}</div>
+                <div className="mb-stat-value" style={{ color: s.urgent ? s.color : '#111827' }}>{s.value}</div>
                 <div className="mb-stat-sub">{s.sub}</div>
               </div>
             ))}
           </div>
 
-          <DashboardCarousel
-            projects={data.projectsInProgress}
-            news={data.latestContents}
-            events={data.upcomingEvents}
-          />
+          {/* 🔒 CONSERVÉ TEL QUEL : plus d'affichage automatique de la carte
+              ici. Elle reste accessible uniquement via le bouton flottant
+              "Ma carte" plus bas (modale), exactement comme dans l'ancien
+              fichier. */}
+          <div style={{ marginTop: '1.5rem', marginBottom: '1.5rem' }}>
+            <DashboardCarousel projects={data.projectsInProgress} news={data.latestContents} />
+          </div>
 
           <div className="mb-grid2">
-            <div className="mb-panel" style={{ animationDelay: '0.48s' }}>
+            <div className="mb-panel" style={{ animationDelay: '0.3s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
                   <div className="mb-panel-ico">
-                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 14l-4-4 4-4m6 8l4-4-4-4"/>
-                    </svg>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                   </div>
-                  Cotisations récentes
+                  Mes cotisations récentes
                 </div>
-                {recentContribs.length > 0 && (
-                  <span className="mb-count-chip">{recentContribs.length}</span>
-                )}
+                {recentContribs.length > 0 && <span className="mb-count-chip">{recentContribs.length}</span>}
               </div>
               <div className="mb-panel-body">
                 <table className="mb-table">
                   <thead>
                     <tr>
-                      <th>Montant</th>
                       <th>Motif</th>
+                      <th className="hide-mobile">Date</th>
+                      <th>Montant</th>
                       <th>Statut</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {recentContribs.length === 0 && (
-                      <EmptyRow cols={3} label="Aucune cotisation enregistrée"/>
+                    {recentContribs.length === 0 ? (
+                      <EmptyRow cols={4} label="Aucune cotisation pour le moment" />
+                    ) : (
+                      recentContribs.slice(0, 6).map((c) => {
+                        const pc = getPurposeConfig(c.purpose);
+                        return (
+                          <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)}>
+                            <td>
+                              {pc ? (
+                                <span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}>
+                                  <span className="mb-motif-icon">{pc.icon}</span>
+                                  <span className="mb-motif-text">{pc.label}</span>
+                                </span>
+                              ) : (
+                                <span className="mb-motif-badge" style={{ background: '#F3F4F6', color: '#4B5563' }}>—</span>
+                              )}
+                            </td>
+                            <td className="hide-mobile muted">{formatDate(c.depositedAt || c.createdAt)}</td>
+                            <td className="mono">{formatCurrency(c.amount, c.currency || cur)}</td>
+                            <td><StatusBadge status={c.status} /></td>
+                          </tr>
+                        );
+                      })
                     )}
-                    {recentContribs.slice(0, 10).map(c => {
-                      const pc = getPurposeConfig(c.purpose);
-                      return (
-                        <tr key={c.id} className="mb-contrib-row" onClick={() => setSelectedContribution(c)} title="Voir le détail">
-                          <td className="mono">{formatCurrency(c.amount, c.currency || cur)}</td>
-                          <td>
-                            {pc ? (
-                              <span className="mb-motif-badge" style={{ background: pc.bg, color: pc.color }}>
-                                <span className="mb-motif-icon">{pc.icon}</span>
-                                <span className="mb-motif-text">{pc.label}</span>
-                              </span>
-                            ) : (
-                              <span className="mb-motif-badge" style={{ background: '#ECFDF5', color: '#059669' }}>
-                                <span className="mb-motif-icon">📅</span>
-                                <span className="mb-motif-text">Cotisation</span>
-                              </span>
-                            )}
-                          </td>
-                          <td><StatusBadge status={c.status}/></td>
-                        </tr>
-                      );
-                    })}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <div className="mb-panel" style={{ animationDelay: '0.53s' }}>
-              <div className="mb-panel-head">
-                <div className="mb-panel-title">
-                  <div className="mb-panel-ico" style={{ background: '#F5F3FF', color: '#7C3AED' }}>
-                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2"/>
-                    </svg>
-                  </div>
-                  Projets en cours
-                </div>
-                {(data.projectsInProgress?.length ?? 0) > 0 && (
-                  <span className="mb-count-chip" style={{ background: '#F5F3FF', color: '#6D28D9', border: '1px solid #DDD6FE' }}>
-                    {data.projectsInProgress.length}
-                  </span>
-                )}
-              </div>
-              <div className="mb-cards-viewport">
-                {(data.projectsInProgress || []).length === 0 ? (
-                  <div className="mb-empty">Aucun projet actif</div>
-                ) : (
-                  <div className="mb-cards-track">
-                    {(data.projectsInProgress || []).map(p => (
-                      <div key={p.id} className="mb-true-card mb-tc-proj" onClick={() => setSelectedProject(p)}>
-                        <StatusBadge status={p.status || 'DRAFT'}/>
-                        <div className="mb-tc-title">{p.title}</div>
-                        <div className="mb-tc-meta">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          Mis à jour le {formatDate(p.updatedAt || p.createdAt || null)}
-                        </div>
-                        <div className="mb-tc-btn" style={{ color: '#2563EB' }}>Voir le projet ➔</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-grid2">
-            <div className="mb-panel" style={{ animationDelay: '0.58s' }}>
-              <div className="mb-panel-head">
-                <div className="mb-panel-title">
-                  <div className="mb-panel-ico" style={{ background: '#ECFDF5', color: '#059669' }}>
-                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/>
-                    </svg>
-                  </div>
-                  Informations récentes
-                </div>
-              </div>
-              <div className="mb-cards-viewport">
-                {(data.latestContents || []).length === 0 ? (
-                  <div className="mb-empty">Aucune actualité publiée</div>
-                ) : (
-                  <div className="mb-cards-track">
-                    {(data.latestContents || []).map(c => (
-                      <div key={c.id} className="mb-true-card mb-tc-news" onClick={() => setSelectedContent(c)}>
-                        <StatusBadge status={c.status}/>
-                        <div className="mb-tc-title">{c.title}</div>
-                        <div className="mb-tc-meta">
-                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          Publié le {formatDate(c.createdAt)}
-                        </div>
-                        <div className="mb-tc-btn" style={{ color: '#059669' }}>Lire l&apos;article ➔</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mb-panel" style={{ animationDelay: '0.63s' }}>
+            <div className="mb-panel" style={{ animationDelay: '0.35s' }}>
               <div className="mb-panel-head">
                 <div className="mb-panel-title">
                   <div className="mb-panel-ico" style={{ background: '#FEF2F2', color: '#DC2626' }}>
-                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                   </div>
-                  Retardataires · +3 mois
+                  Retardataires
                 </div>
-                {(data.lateMembersPreview?.length ?? 0) > 0 && (
-                  <span className="mb-count-chip" style={{ background: '#FEF2F2', color: '#B91C1C', border: '1px solid #FECACA' }}>
-                    {data.lateMembersPreview.length}
-                  </span>
-                )}
+                <button
+                  onClick={() => router.push('/member/late-members')}
+                  style={{ background: 'none', border: 'none', color: '#2563EB', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  Voir tout
+                  <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </button>
               </div>
               <div className="mb-panel-body">
                 <table className="mb-table">
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'left' }}>Membre</th>
+                      <th>Membre</th>
                       <th>Retard</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {(data.lateMembersPreview || []).length === 0 && <EmptyRow cols={2} label="Aucun retardataire — bravo !"/>}
-                    {(data.lateMembersPreview || []).map(m => {
-                      const months = m.lateMonths ?? 0;
-                      return (
+                    {(data.lateMembersPreview ?? []).length === 0 ? (
+                      <EmptyRow cols={2} label="Aucun retardataire 🎉" />
+                    ) : (
+                      data.lateMembersPreview.map((m) => (
                         <tr key={m.id}>
                           <td>
                             <div className="mb-member-pill">
-                              <div className="mb-avatar-sm">{(m.firstName[0] ?? '') + (m.lastName[0] ?? '')}</div>
-                              <span className="truncate-cell" style={{ fontSize: '0.82rem', fontWeight: 700, color: '#111827' }}>{m.firstName} {m.lastName}</span>
+                              <div className="mb-avatar-sm">{`${m.firstName[0] ?? ''}${m.lastName[0] ?? ''}`.toUpperCase()}</div>
+                              <span className="truncate-cell">{m.firstName} {m.lastName}</span>
                             </div>
                           </td>
                           <td>
                             <div className="mb-late-bar">
                               <div className="mb-late-track">
-                                <div className="mb-late-fill" style={{ width: `${Math.min((months / 12) * 100, 100)}%` }}/>
+                                <div className="mb-late-fill" style={{ width: `${Math.min(100, ((m.lateMonths ?? 0) / 6) * 100)}%` }} />
                               </div>
-                              <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#DC2626', whiteSpace: 'nowrap' }}>
-                                {months > 0 ? `${months} mois` : '—'}
-                              </span>
+                              <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#DC2626', whiteSpace: 'nowrap' }}>{m.lateMonths ?? 0} mois</span>
                             </div>
                           </td>
                         </tr>
-                      );
-                    })}
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
           </div>
+
+          <div className="mb-panel" style={{ animationDelay: '0.4s', marginBottom: '1.5rem' }}>
+            <div className="mb-panel-head">
+              <div className="mb-panel-title">
+                <div className="mb-panel-ico" style={{ background: '#ECFDF5', color: '#059669' }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+                </div>
+                Informations récentes
+              </div>
+            </div>
+            <div className="mb-cards-viewport">
+              {(data.latestContents ?? []).length === 0 ? (
+                <div className="mb-empty">Aucune actualité publiée</div>
+              ) : (
+                <div className="mb-cards-track">
+                  {data.latestContents.map(c => (
+                    <div key={c.id} className="mb-true-card mb-tc-news" onClick={() => setSelectedContent(c)}>
+                      <StatusBadge status={c.status} />
+                      <div className="mb-tc-title">{c.title}</div>
+                      <div className="mb-tc-meta">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        Publié le {formatDate(c.createdAt)}
+                      </div>
+                      <div className="mb-tc-btn" style={{ color: '#059669' }}>Lire l&apos;article ➔</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-panel" style={{ animationDelay: '0.45s' }}>
+            <div className="mb-panel-head">
+              <div className="mb-panel-title">
+                <div className="mb-panel-ico" style={{ background: '#EFF6FF', color: '#2563EB' }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+                Projets en cours
+              </div>
+            </div>
+            <div className="mb-cards-viewport">
+              {(data.projectsInProgress ?? []).length === 0 ? (
+                <div className="mb-empty">Aucun projet actif pour le moment</div>
+              ) : (
+                <div className="mb-cards-track">
+                  {data.projectsInProgress.map(p => (
+                    <div key={p.id} className="mb-true-card mb-tc-proj" onClick={() => setSelectedProject(p)}>
+                      <StatusBadge status={p.status || 'DRAFT'} />
+                      <div className="mb-tc-title">{p.title}</div>
+                      <div className="mb-tc-meta">
+                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Mis à jour le {formatDate(p.updatedAt || p.createdAt || null)}
+                      </div>
+                      <div className="mb-tc-btn" style={{ color: '#2563EB' }}>Voir le projet ➔</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
+      {/* 🔒 CONSERVÉ TEL QUEL : même bouton flottant, même position, même
+          comportement que l'ancien fichier — révèle la carte via une modale,
+          au lieu de rediriger vers le formulaire de cotisation. */}
       {data && (
         <button type="button" className="mb-fab" onClick={() => setIsCardVisible(true)} aria-label="Afficher ma carte virtuelle">
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
@@ -1242,6 +1315,7 @@ export default function MemberHomePage() {
         </button>
       )}
 
+      {/* 🔒 CONSERVÉ TEL QUEL : modale de la carte, identique à l'ancien fichier. */}
       {isCardVisible && (
         <div className="mb-modal-overlay" onClick={() => setIsCardVisible(false)}>
           <div className="mb-modal-inner" onClick={e => e.stopPropagation()}>
@@ -1255,21 +1329,7 @@ export default function MemberHomePage() {
         </div>
       )}
 
-      {selectedContribution && (
-        <ContributionDetailModal
-          item={selectedContribution}
-          currency={cur}
-          onClose={() => setSelectedContribution(null)}
-        />
-      )}
-
-      {showBalanceModal && (
-        <BalanceModal
-          summary={balanceSummary}
-          onClose={() => setShowBalanceModal(false)}
-        />
-      )}
-
+      {showBalanceModal && <BalanceModal summary={balanceSummary} onClose={() => setShowBalanceModal(false)} />}
       {selectedCurrency && (
         <CurrencyBalancesModal
           currency={selectedCurrency}
@@ -1277,30 +1337,17 @@ export default function MemberHomePage() {
           onClose={() => setSelectedCurrency(null)}
         />
       )}
-
-      {selectedProject && (
-        <ProjectDetailModal
-          project={selectedProject}
-          onClose={() => setSelectedProject(null)}
-        />
+      {selectedProject && <ProjectDetailModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
+      {selectedContent && <ContentDetailModal content={selectedContent} onClose={() => setSelectedContent(null)} />}
+      {selectedContribution && (
+        <ContributionDetailModal item={selectedContribution} currency={cur} onClose={() => setSelectedContribution(null)} />
       )}
-
-      {selectedContent && (
-        <ContentDetailModal
-          content={selectedContent}
-          onClose={() => setSelectedContent(null)}
-        />
-      )}
-
-      {/* ── WelcomePopup ← CHANGÉ : props simplifiées, plus de retard ── */}
-      {showWelcomePopup && data && (
+      {showWelcomePopup && (
         <WelcomePopup
           firstName={firstName}
+          currency={popupCurrency}
           hasPendingContribution={hasPendingContribution}
           hasPendingCard={hasPendingCard}
-          currency={popupCurrency}
-          regularAmount={popupPricing?.monthlyQuota ?? null}
-          cardAmount={popupPricing?.membershipCard ?? null}
           onClose={() => setShowWelcomePopup(false)}
         />
       )}
