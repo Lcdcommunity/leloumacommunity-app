@@ -1,4 +1,8 @@
 // backend/src/modules/member/member.mapper.ts
+// v1.1 - Fix: birthCountry ne lisait jamais la vraie donnée — le champ Prisma
+// s'appelle countryOfBirth (écrit par updateAntennaMember/toMeResponse), pas
+// birthCountry. La modale "Détails du compte" affichait donc "Non renseigné"
+// pour le pays de naissance juste après un enregistrement réussi.
 function toIso(value: unknown): string | null {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
@@ -94,7 +98,12 @@ export const memberMapper = {
 
       birthDate: toIso(u.birthDate),
       placeOfBirth: u.placeOfBirth ?? null,
-      birthCountry: u.birthCountry ?? null,
+      // 🔥 CORRIGÉ : le champ Prisma réel est countryOfBirth — u.birthCountry
+      // n'existe pas sur l'objet brut et valait donc toujours undefined ??
+      // null. C'est cette clé "birthCountry" que le front lit (modale
+      // détails membre, admin/members/page.tsx), d'où l'affichage
+      // systématique de "Non renseigné" malgré une sauvegarde réussie.
+      birthCountry: u.countryOfBirth ?? u.birthCountry ?? null,
       countryOfBirth: u.countryOfBirth ?? null,
       professionalStatus: u.professionalStatus ?? null,
       function: u.function ?? null,

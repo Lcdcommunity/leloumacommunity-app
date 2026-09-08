@@ -1,4 +1,9 @@
 // web/app/(protected)/member/profile/page.tsx
+// v1.1 - Fix: "Commune d'origine" passe d'une liste déroulante codée en dur
+// à un champ texte libre ("Origine ou ville d'origine") — les membres
+// saisissent eux-mêmes leur commune/secteur/district, plus de valeurs
+// figées côté front. Suppression de COMMUNES_ORIGINE et de toute la
+// logique "Autre" associée (customOriginSubPrefecture), devenue inutile.
 'use client';
 
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
@@ -35,11 +40,6 @@ export const PROFESSION_LIST = [
   'Sans emploi',
   'Retraité(e)',
   'Autre',
-];
-
-export const COMMUNES_ORIGINE = [
-  'C. Urbaine', 'Lafou', 'Manda', 'Balaya', 'Thiaguel Bori', 
-  'Parawol', 'Sagalé', 'Hérico', 'Diountou', 'Korbé', 'Linsan', 'Autre'
 ];
 
 export const COUNTRIES = [
@@ -80,7 +80,6 @@ export default function MemberProfilePage() {
   const [phone, setPhone] = useState('');
 
   const [originSubPrefecture, setOriginSubPrefecture] = useState('');
-  const [customOriginSubPrefecture, setCustomOriginSubPrefecture] = useState('');
 
   const [birthDate, setBirthDate] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
@@ -137,14 +136,7 @@ export default function MemberProfilePage() {
     setAddressLine1(user.addressLine1 || '');
     setProfession(user.professionalStatus || '');
 
-    const uOrigin = user.originSubPrefecture || '';
-    if (uOrigin && !COMMUNES_ORIGINE.includes(uOrigin)) {
-      setOriginSubPrefecture('Autre');
-      setCustomOriginSubPrefecture(uOrigin);
-    } else {
-      setOriginSubPrefecture(uOrigin);
-      setCustomOriginSubPrefecture('');
-    }
+    setOriginSubPrefecture(user.originSubPrefecture || '');
 
     const uBirthCountry = user.countryOfBirth || user.birthCountry || '';
     if (uBirthCountry && !COUNTRIES.find(c => c.name === uBirthCountry)) {
@@ -238,7 +230,6 @@ export default function MemberProfilePage() {
     setSaving(true);
     setMessage(null);
 
-    const finalOrigin = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
     const finalBirthCountry = birthCountry === 'Autre' ? customBirthCountry : birthCountry;
     const finalCountry = country === 'Autre' ? customCountry : country;
     const finalRole = associationRole === 'Autre' ? customAssociationRole : associationRole;
@@ -250,7 +241,7 @@ export default function MemberProfilePage() {
         firstName: firstName.trim() || undefined,
         lastName: lastName.trim() || undefined,
         phone: phone.trim() || undefined,
-        originSubPrefecture: finalOrigin.trim() || undefined,
+        originSubPrefecture: originSubPrefecture.trim() || undefined,
         birthDate: formattedDate,
         placeOfBirth: placeOfBirth.trim() || undefined,
         countryOfBirth: finalBirthCountry.trim() || undefined,
@@ -282,7 +273,6 @@ export default function MemberProfilePage() {
     : false;
   const currentPhoto = photoPreviewUrl || me?.avatarUrl || me?.profilePhotoUrl || '';
 
-  const currentOriginForCard = originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture;
   const currentBirthCountryForCard = birthCountry === 'Autre' ? customBirthCountry : birthCountry;
   const currentCountryForCard = country === 'Autre' ? customCountry : country;
   const currentRoleForCard = associationRole === 'Autre' ? customAssociationRole : associationRole;
@@ -299,9 +289,9 @@ export default function MemberProfilePage() {
       birthDate: convertDateToISO(birthDate) || null,
       placeOfBirth: placeOfBirth || null,
       birthCountry: currentBirthCountryForCard || null,
-      originSubPrefecture: currentOriginForCard || null,
-      originCommune: currentOriginForCard || null,
-      originVillage: currentOriginForCard || null,
+      originSubPrefecture: originSubPrefecture || null,
+      originCommune: originSubPrefecture || null,
+      originVillage: originSubPrefecture || null,
       country: currentCountryForCard || null,
       city: city || null,
       postalCode: postalCode || null,
@@ -711,20 +701,14 @@ export default function MemberProfilePage() {
             </div>
             <div className="mpr-grid-2" style={{ marginBottom: 0 }}>
               <div className="mpr-field">
-                <label className="mpr-label">Commune d&apos;origine</label>
-                {isEditing ? (
-                  <>
-                    <select className="mpr-select" value={originSubPrefecture} onChange={e => { setOriginSubPrefecture(e.target.value); if(e.target.value !== 'Autre') setCustomOriginSubPrefecture(''); }}>
-                      <option value="">Sélectionnez votre commune...</option>
-                      {COMMUNES_ORIGINE.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    {originSubPrefecture === 'Autre' && (
-                      <input className="mpr-input" style={{ marginTop: '0.4rem' }} value={customOriginSubPrefecture} onChange={e => setCustomOriginSubPrefecture(e.target.value)} placeholder="Précisez votre commune" required />
-                    )}
-                  </>
-                ) : (
-                  <input className="mpr-input" value={originSubPrefecture === 'Autre' ? customOriginSubPrefecture : originSubPrefecture} disabled />
-                )}
+                <label className="mpr-label">Origine ou ville d&apos;origine</label>
+                <input
+                  className="mpr-input"
+                  value={originSubPrefecture}
+                  onChange={e => setOriginSubPrefecture(e.target.value)}
+                  disabled={!isEditing}
+                  placeholder="Commune, secteur, district..."
+                />
               </div>
               <div className="mpr-field">
                 <label className="mpr-label">Pays de naissance</label>
