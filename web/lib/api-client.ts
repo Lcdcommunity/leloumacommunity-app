@@ -409,8 +409,21 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
       auth: false,
     }),
 
-  listPublicAntennasForSignup: () =>
-    http<Array<{ id: string; code: string; name: string; city?: string; country?: string }>>('/public/antennas', { auth: false }),
+  // 🔥 CORRECTION : accepte désormais domain/code (comme getPublicTheme et
+  // getPublicOriginLocalities) — sans ça le backend ne pouvait pas scoper
+  // et renvoyait les antennes de toutes les associations mélangées.
+  listPublicAntennasForSignup: (domain?: string, code?: string) => {
+    const params = new URLSearchParams();
+    if (domain) {
+      const cleanDomain = domain.toLowerCase().replace(/^www\./, '').trim();
+      params.append('domain', cleanDomain);
+    }
+    if (code) params.append('code', code);
+    return http<Array<{ id: string; code: string; name: string; city?: string; country?: string }>>(
+      `/public/antennas?${params.toString()}`,
+      { auth: false },
+    );
+  },
 
   verifyPublicCard: (token: string) =>
     http<VirtualCardData>(`/public/cards/${token}`, { auth: false }),

@@ -5,6 +5,7 @@ import { memoryStorage } from 'multer';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PublicService } from './public.service';
 import { MemberSignupDto } from '../auth/dto/member-signup.dto';
+import { normalizeDomain } from '../../common/utils/domain.util';
 
 interface PublicAntennaResponse {
   id: string;
@@ -12,7 +13,6 @@ interface PublicAntennaResponse {
   name: string;
   city?: string | null;
   country?: string | null;
-  associationName?: string;
 }
 
 @Controller('public')
@@ -23,23 +23,49 @@ export class PublicController {
   ) {}
 
   @Get('antennas')
-  async listAntennas(@Query('associationCode') associationCode?: string): Promise<PublicAntennaResponse[]> {
-    const items = await this.prisma.antenna.findMany({
+  async listAntennas(
+    @Query('domain') domain?: string,
+    @Query('code') code?: string,
+  ): Promise<PublicAntennaResponse[]> {
+    // 🔥 CORRECTION : cet endpoint ne filtrait jamais tant qu'aucun
+    // `associationCode` n'était fourni — et le frontend ne l'a jamais
+    // envoyé (mauvais nom de paramètre en plus, incohérent avec
+    // domain/code utilisés par public-theme et public-origin-localities).
+    // Résultat : la page publique de signup recevait TOUTES les antennes
+    // de TOUTES les associations actives, mélangées entre elles. Même
+    // résolution domain/code que les deux autres endpoints publics ;
+    // sans domaine/code résolu, on ne renvoie rien plutôt que tout.
+    const cleanDomain = normalizeDomain(domain);
+
+    if (!cleanDomain && !code) {
+      return [];
+    }
+
+    const association = await this.prisma.association.findFirst({
       where: {
         isActive: true,
-        ...(associationCode ? { association: { code: associationCode } } : {}),
+        OR: [
+          cleanDomain ? { domainName: cleanDomain } : undefined,
+          code ? { code } : undefined,
+        ].filter(Boolean) as any,
+      },
+      select: { id: true },
+    });
+
+    if (!association) {
+      return [];
+    }
+
+    return this.prisma.antenna.findMany({
+      where: {
+        isActive: true,
+        associationId: association.id,
       },
       orderBy: [{ name: 'asc' }],
       select: {
         id: true, code: true, name: true, city: true, country: true,
-        association: { select: { name: true } }
       },
     });
-
-    return items.map(item => ({
-      id: item.id, code: item.code, name: item.name, city: item.city,
-      country: item.country, associationName: item.association.name
-    }));
   }
 
   @Post('signup')
