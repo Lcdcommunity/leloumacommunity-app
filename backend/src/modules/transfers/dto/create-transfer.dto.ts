@@ -1,6 +1,10 @@
 // backend/src/modules/transfers/dto/create-transfer.dto.ts
+//
+// v1.1 — 🔥 CORRIGÉ : ajout de @Max(999999999999.99) sur les montants (colonne
+//   Decimal(14,2)) : au-delà, l'écriture échouait en erreur 500 au lieu d'un 400.
+//
 import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
+import { IsNumber, IsOptional, IsPositive, IsString, Max } from 'class-validator';
 
 export class CreateTransferDto {
   @IsString()
@@ -12,11 +16,13 @@ export class CreateTransferDto {
 
   @IsNumber()
   @IsPositive()
+  @Max(999999999999.99, { message: 'Montant trop élevé.' })
   @Type(() => Number)
   sendAmount: number;
 
   @IsNumber()
   @IsPositive()
+  @Max(999999999999.99, { message: 'Montant trop élevé.' })
   @Type(() => Number)
   receiveAmount: number;
 
@@ -34,12 +40,14 @@ export class RejectTransferDto {
 export class UpdateTransferDto {
   @IsNumber()
   @IsPositive()
+  @Max(999999999999.99, { message: 'Montant trop élevé.' })
   @Type(() => Number)
   @IsOptional()
   sendAmount?: number;
 
   @IsNumber()
   @IsPositive()
+  @Max(999999999999.99, { message: 'Montant trop élevé.' })
   @Type(() => Number)
   @IsOptional()
   receiveAmount?: number;

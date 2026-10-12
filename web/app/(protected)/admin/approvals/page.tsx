@@ -1,4 +1,11 @@
 // web/app/(protected)/admin/approvals/page.tsx
+//
+// v1.1 — 🔥 LINT (react-hooks/set-state-in-effect, React 19) : un useEffect appelait
+//   setState (directement ou via load()) de façon synchrone dans son corps, ce que
+//   la règle signale comme source de rendus en cascade. L'appel est différé via
+//   queueMicrotask (même pattern que admin/contributions/page.tsx). Aucun
+//   changement fonctionnel ni visuel.
+//
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -88,7 +95,7 @@ export default function AdminApprovalsPage() {
     }
   }
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { queueMicrotask(() => { void load(); }); }, []);
 
   /* ── Actions de la modale ── */
   const handleUpdateStatus = async (newStatus: 'ACTIVE' | 'REJECTED') => {

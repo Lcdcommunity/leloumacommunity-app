@@ -1,5 +1,12 @@
 // web/components/communications/RecipientPicker.tsx
 //
+// v1.1 — 🔥 LINT (react-hooks/set-state-in-effect, React 19) : un useEffect appelait
+//   setState (directement ou via load()) de façon synchrone dans son corps, ce que
+//   la règle signale comme source de rendus en cascade. L'appel est différé via
+//   queueMicrotask (même pattern que admin/contributions/page.tsx). Aucun
+//   changement fonctionnel ni visuel.
+//
+//
 // v1.0 — Fichier neuf, isolé. Composant de sélection de destinataires
 //   construit à neuf pour ce module (même esprit que les recherches de
 //   membres déjà présentes ailleurs dans l'app, mais sans rien importer de
@@ -88,9 +95,12 @@ export function RecipientPicker({
   // filtrable côté client — recherche nom/prénom/téléphone/email).
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    onLoadingChange?.(true);
-    setError(null);
+    queueMicrotask(() => {
+      if (!mounted) return;
+      setLoading(true);
+      onLoadingChange?.(true);
+      setError(null);
+    });
     void (async () => {
       try {
         const data =

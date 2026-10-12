@@ -1,4 +1,12 @@
 //backend/src/modules/users/users.controller.ts
+//
+// v1.1 — 🔥 CORRIGÉ (sécurité) : PATCH /users/me/password ne demandait pas
+//   l'ancien mot de passe (un access token volé suffisait à prendre le compte).
+//   Corps validé par ChangePasswordDto { currentPassword, password } ; quota de
+//   5 tentatives/minute/IP contre le brute-force de l'ancien mot de passe.
+//   ⚠️ Le front (4 pages « Paramètres ») doit envoyer `currentPassword` : à
+//   déployer avec le lot front correspondant.
+//
 import {
   BadRequestException,
   Body,
@@ -16,7 +24,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { memoryStorage } from 'multer';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdateMeDto } from './dto/update-me.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
@@ -48,15 +58,13 @@ export class UsersController {
 
   // ⚡ NOUVELLE ROUTE POUR LE MOT DE PASSE
   @UseGuards(JwtAuthGuard)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Patch('me/password')
   async updatePassword(
     @CurrentUser() user: AuthUser,
-    @Body() body: { password?: string }
+    @Body() body: ChangePasswordDto,
   ) {
-    if (!body.password || body.password.length < 8) {
-      throw new BadRequestException('Le mot de passe doit faire au moins 8 caractères.');
-    }
-    return this.usersService.updatePassword(user.id, body.password);
+    return this.usersService.updatePassword(user.id, body.currentPassword, body.password);
   }
 
   @UseGuards(JwtAuthGuard)

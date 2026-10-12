@@ -1,10 +1,24 @@
 // backend/src/modules/uploads/storage/local-storage.provider.ts
+//
+// v1.1 — 🔥 CORRIGÉ (sécurité) : path traversal. `params.folder` (saisi par le
+//   client via POST /uploads/single) était concaténé tel quel dans le chemin
+//   disque : `folder=../../src/modules` écrivait hors de ./uploads. Le dossier
+//   est désormais assaini (segments [A-Za-z0-9._-], jamais « .. »), l'extension
+//   est normalisée (liste noire html/js/php/exe…) et le chemin final est
+//   vérifié DANS le dossier d'uploads (assertInsideDirectory). Comportement
+//   inchangé pour les dossiers légitimes (« uploads », « proofs »…).
+//
 import { Injectable } from '@nestjs/common';
 import { promises as fs } from 'fs';
-import { join, extname, isAbsolute } from 'path';
+import { join, isAbsolute } from 'path';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import type { StorageProvider, StoredFileResult } from './storage.provider';
+import {
+  assertInsideDirectory,
+  sanitizeStorageExtension,
+  sanitizeStorageFolder,
+} from '../../../common/utils/safe-storage-path.util';
 
 @Injectable()
 export class LocalStorageProvider implements StorageProvider {
@@ -56,13 +70,16 @@ export class LocalStorageProvider implements StorageProvider {
     }
 
     const publicBaseUrl = this.getPublicBaseUrl();
-    const folder = params.folder?.replace(/^\/+|\/+$/g, '') || 'misc';
+    const folder = sanitizeStorageFolder(params.folder, 'misc');
     const year = String(new Date().getFullYear());
-    const ext = extname(params.fileName) || '';
+    const ext = sanitizeStorageExtension(params.fileName);
     const key = `${folder}/${year}/${randomUUID()}${ext}`;
 
     const absoluteDirectory = join(uploadDir, folder, year);
     const absoluteFilePath = join(uploadDir, key);
+
+    // Ceinture + bretelles : le fichier final doit rester dans le dossier d'uploads.
+    assertInsideDirectory(uploadDir, absoluteFilePath);
 
     await fs.mkdir(absoluteDirectory, { recursive: true });
     await fs.writeFile(absoluteFilePath, params.buffer);

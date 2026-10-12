@@ -1,4 +1,11 @@
 //web/components/projects/ProjectModal.tsx
+//
+// v1.1 — 🔥 LINT (react-hooks/set-state-in-effect, React 19) : un useEffect appelait
+//   setState (directement ou via load()) de façon synchrone dans son corps, ce que
+//   la règle signale comme source de rendus en cascade. L'appel est différé via
+//   queueMicrotask (même pattern que admin/contributions/page.tsx). Aucun
+//   changement fonctionnel ni visuel.
+//
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -197,8 +204,10 @@ export default function ProjectFormModal({
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setForm(project ? toFormData(project) : EMPTY_FORM);
-    setError(null);
+    queueMicrotask(() => {
+      setForm(project ? toFormData(project) : EMPTY_FORM);
+      setError(null);
+    });
   }, [project]);
 
   function set(key: keyof ProjectFormData) {

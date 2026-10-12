@@ -22,6 +22,8 @@
     "securityTitle": "Account Security",
     "changePasswordBtn": "Change my password",
     "passwordSecureDesc": "Your password is secure. You can change it at any time.",
+    "currentPassword": "Current Password",
+    "currentPasswordPlaceholder": "Enter your current password",
     "newPassword": "New Password",
     "newPasswordPlaceholder": "Enter your new password",
     "passwordHint": "Use at least 8 characters.",

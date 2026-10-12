@@ -1,4 +1,11 @@
 // web/app/(protected)/super-admin/communication/page.tsx
+//
+// v1.1 — 🔥 LINT (react-hooks/set-state-in-effect, React 19) : un useEffect appelait
+//   setState (directement ou via load()) de façon synchrone dans son corps, ce que
+//   la règle signale comme source de rendus en cascade. L'appel est différé via
+//   queueMicrotask (même pattern que admin/contributions/page.tsx). Aucun
+//   changement fonctionnel ni visuel.
+//
 'use client';
 
 import React, { type FormEvent, useEffect, useState } from 'react';
@@ -48,15 +55,17 @@ export default function SuperAdminCommunicationPage() {
   // Charger les membres quand le filtre d'antenne change (pour le mode MEMBER)
   useEffect(() => {
     if (targetType === 'MEMBER') {
-      setLoadingMembers(true);
-      api.listMembers({ 
-        pageSize: 500, 
-        status: 'ACTIVE',
-        ...(selectedAntennaFilter ? { antennaId: selectedAntennaFilter } : {})
-      })
-      .then(res => setMembers(res.items || []))
-      .catch(console.error)
-      .finally(() => setLoadingMembers(false));
+      queueMicrotask(() => {
+        setLoadingMembers(true);
+        api.listMembers({ 
+          pageSize: 500, 
+          status: 'ACTIVE',
+          ...(selectedAntennaFilter ? { antennaId: selectedAntennaFilter } : {})
+        })
+        .then(res => setMembers(res.items || []))
+        .catch(console.error)
+        .finally(() => setLoadingMembers(false));
+      });
     }
   }, [targetType, selectedAntennaFilter]);
 

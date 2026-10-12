@@ -36,7 +36,49 @@
 //   deleteMany s'exécute désormais dès que photoIds est fourni (tableau,
 //   même vide) ; seul le createMany reste conditionné à un tableau non vide.
 //
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+// v1.5 — 🔥 CORRIGÉ (cotisations : validate / reject / update) — intégrité du
+//   ledger.
+//   • validateContribution : aucun contrôle de statut. Une 2e validation (double
+//     clic, 2 admins) tentait de recréer une LedgerEntry avec le même
+//     contributionId (@unique) → erreur 500 en pleine transaction ; valider une
+//     cotisation CANCELLED était aussi possible. La transition est maintenant
+//     « réservée » de façon atomique (updateMany conditionné au statut) dans la
+//     même $transaction que la création du ledger. Les cotisations déjà
+//     VALIDATED ou CANCELLED renvoient un 409 clair. REJECTED reste
+//     re-validable (correction d'une erreur de l'admin). Les champs de rejet
+//     sont remis à zéro lors de la validation.
+//   • rejectContribution : écrivait validatedAt/validatedByUserId au lieu de
+//     rejectedAt/rejectedByUserId (ce que fait déjà contributions.service.ts),
+//     et rejeter une cotisation VALIDATED laissait son écriture de ledger en
+//     place (solde gonflé, cotisation REJECTED). Le rejet d'une VALIDATED
+//     supprime désormais son écriture de ledger dans la même transaction (même
+//     logique que deleteContribution). Motif obligatoire (plus de « Motif :
+//     undefined » dans la notification).
+//   • updateContribution : montant non validé (NaN, ≤ 0, chaîne…) → 500 Prisma
+//     ou montant négatif écrit dans le ledger. Contrôle strict + arrondi à 2
+//     décimales (Decimal(14,2)). Cotisation REJECTED/CANCELLED non modifiable.
+//
+// v1.6 — 🔥 CORRIGÉ (droits d'affectation) : les 4 droits d'AntennaAdminAssignment
+//   (canValidateMembers, canValidateContributions, canManageProjects,
+//   canManageContent — tous à true par défaut) n'étaient lus nulle part sauf
+//   dans contributions.service.ts : les décocher n'avait aucun effet sur les
+//   routes /admin/*, qui sont celles qu'utilise réellement le back-office.
+//   Nouveau garde assertAssignmentFlag() appliqué aux approbations de comptes,
+//   à validate/reject/update/delete des cotisations, aux propositions de
+//   projets, aux projets et aux contenus. Ne concerne que les ANTENNA_ADMIN
+//   (le SUPER_ADMIN n'a pas de filtre d'antenne) ; comme les droits valent true
+//   par défaut, aucun admin existant ne perd d'accès tant que personne ne les
+//   a explicitement retirés.
+//
+// v1.7 — 🔥 CORRIGÉ (deleteContribution) : supprimer une cotisation VALIDATED
+//   l'effaçait définitivement de la base (plus aucune trace de qui avait validé
+//   ni annulé, historique du membre faussé). Elle passe désormais en CANCELLED
+//   (cancelledAt / cancelledByUserId) et son écriture de ledger est retirée dans
+//   la même transaction ; le membre est notifié. Les cotisations jamais validées
+//   restent supprimables comme avant. Le front (DELETE /admin/contributions/:id,
+//   statut « Annulée » déjà géré) n'a pas à changer.
+//
+import { Injectable, NotFoundException, ForbiddenException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserStatus, ContributionStatus, ContributionPurpose, ProjectStatus, PostStatus, Prisma, UserRole, ProposalStatus, NotificationType, LedgerEntryType } from '@prisma/client';
 import { memberMapper } from '../member/member.mapper';
@@ -185,6 +227,35 @@ export class AdminService {
   }
 
   /**
+   * Garde de droits d'affectation (voir v1.6). `antennaIds === undefined` =
+   * SUPER_ADMIN → toujours autorisé. Sinon, l'admin doit avoir une affectation
+   * ACTIVE avec le droit demandé : sur l'antenne ciblée si elle est connue, sur
+   * au moins l'une de ses antennes sinon.
+   */
+  private async assertAssignmentFlag(
+    adminId: string,
+    antennaIds: string[] | undefined,
+    flag: 'canValidateMembers' | 'canValidateContributions' | 'canManageProjects' | 'canManageContent',
+    antennaId?: string | null,
+  ): Promise<void> {
+    if (!antennaIds) return;
+
+    const allowed = await this.prisma.antennaAdminAssignment.findFirst({
+      where: {
+        adminUserId: adminId,
+        isActive: true,
+        [flag]: true,
+        ...(antennaId ? { antennaId } : { antennaId: { in: antennaIds } }),
+      },
+      select: { id: true },
+    });
+
+    if (!allowed) {
+      throw new ForbiddenException("Vous n'avez pas le droit d'effectuer cette action pour cette antenne.");
+    }
+  }
+
+  /**
    * Vérifie s'il reste au moins une contribution MEMBERSHIP_CARD validée
    * pour ce membre. Si oui → carte déverrouillée. Sinon → reverrouillée.
    */
@@ -306,6 +377,7 @@ export class AdminService {
       } 
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canValidateMembers');
 
     const updated = await this.prisma.user.update({ 
       where: { id: userId }, 
@@ -333,6 +405,7 @@ export class AdminService {
       } 
     });
     if (!user) throw new NotFoundException("Membre introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canValidateMembers');
 
     const updated = await this.prisma.user.update({ 
       where: { id: userId }, 
@@ -765,8 +838,36 @@ export class AdminService {
     });
 
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canValidateContributions', contribution.antennaId);
+
+    if (contribution.status === ContributionStatus.VALIDATED) {
+      throw new ConflictException("Cette cotisation est déjà validée.");
+    }
+    if (contribution.status === ContributionStatus.CANCELLED) {
+      throw new ConflictException("Cette cotisation a été annulée : elle ne peut plus être validée.");
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Réservation atomique de la transition : si une autre requête a validé
+      // (ou annulé) entre-temps, count === 0 et on n'écrit RIEN dans le ledger.
+      const claimed = await tx.contribution.updateMany({
+        where: {
+          id: contributionId,
+          status: { notIn: [ContributionStatus.VALIDATED, ContributionStatus.CANCELLED] },
+        },
+        data: {
+          status: ContributionStatus.VALIDATED,
+          validatedAt: new Date(),
+          validatedByUserId: adminId,
+          rejectionReason: null,
+          rejectedAt: null,
+          rejectedByUserId: null,
+        },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictException("Cette cotisation vient d'être traitée par un autre administrateur.");
+      }
+
       const ledger = await tx.ledgerEntry.create({
         data: {
           associationId: contribution.associationId,
@@ -782,12 +883,7 @@ export class AdminService {
 
       return tx.contribution.update({
         where: { id: contributionId },
-        data: {
-          status: ContributionStatus.VALIDATED,
-          validatedAt: new Date(),
-          validatedByUserId: adminId,
-          ledgerEntryId: ledger.id,
-        },
+        data: { ledgerEntryId: ledger.id },
       });
     });
 
@@ -841,16 +937,54 @@ export class AdminService {
       } 
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canValidateContributions', contribution.antennaId);
 
-    const updated = await this.prisma.contribution.update({ 
-      where: { id: contributionId }, 
-      data: { status: ContributionStatus.REJECTED, rejectionReason: reason, validatedAt: new Date(), validatedByUserId: adminId } 
+    const cleanReason = typeof reason === 'string' ? reason.trim() : '';
+    if (!cleanReason) throw new BadRequestException("Le motif du refus est obligatoire.");
+
+    if (contribution.status === ContributionStatus.REJECTED) {
+      throw new ConflictException("Cette cotisation est déjà refusée.");
+    }
+    if (contribution.status === ContributionStatus.CANCELLED) {
+      throw new ConflictException("Cette cotisation a été annulée : elle ne peut plus être refusée.");
+    }
+
+    const wasValidated = contribution.status === ContributionStatus.VALIDATED;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.contribution.updateMany({
+        where: {
+          id: contributionId,
+          status: { notIn: [ContributionStatus.REJECTED, ContributionStatus.CANCELLED] },
+        },
+        data: {
+          status: ContributionStatus.REJECTED,
+          rejectionReason: cleanReason,
+          rejectedAt: new Date(),
+          rejectedByUserId: adminId,
+          // La cotisation n'est plus validée : on retire la trace de validation.
+          validatedAt: null,
+          validatedByUserId: null,
+        },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictException("Cette cotisation vient d'être traitée par un autre administrateur.");
+      }
+
+      // Une cotisation VALIDATED a une écriture de ledger : on l'annule dans la
+      // même transaction pour que le solde reste cohérent (cf. deleteContribution).
+      if (wasValidated) {
+        await tx.ledgerEntry.deleteMany({ where: { contributionId } });
+        await tx.contribution.update({ where: { id: contributionId }, data: { ledgerEntryId: null } });
+      }
+
+      return tx.contribution.findUniqueOrThrow({ where: { id: contributionId } });
     });
 
     await this.notifications.createForUser({
       associationId,
       userId: updated.memberUserId,
-      message: `Votre versement de ${updated.amount} ${updated.currency} a été refusé. Motif : ${reason}`,
+      message: `Votre versement de ${updated.amount} ${updated.currency} a été refusé. Motif : ${cleanReason}`,
       type: NotificationType.CONTRIBUTION_REJECTED,
     });
 
@@ -871,17 +1005,30 @@ export class AdminService {
       } 
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canValidateContributions', contribution.antennaId);
+
+    const numeric = typeof amount === 'string' ? Number(amount) : amount;
+    if (typeof numeric !== 'number' || !Number.isFinite(numeric) || numeric <= 0 || numeric >= 1e12) {
+      throw new BadRequestException("Le montant doit être un nombre strictement positif.");
+    }
+    if (
+      contribution.status === ContributionStatus.REJECTED ||
+      contribution.status === ContributionStatus.CANCELLED
+    ) {
+      throw new ConflictException("Le montant d'une cotisation refusée ou annulée ne peut pas être modifié.");
+    }
+    const newAmount = new Prisma.Decimal(numeric.toFixed(2));
 
     return this.prisma.$transaction(async (tx) => {
       if (contribution.status === ContributionStatus.VALIDATED && contribution.ledgerEntryId) {
         await tx.ledgerEntry.update({
           where: { id: contribution.ledgerEntryId },
-          data: { amount: new Prisma.Decimal(amount) },
+          data: { amount: newAmount },
         });
       }
       return tx.contribution.update({ 
         where: { id: contributionId }, 
-        data: { amount: new Prisma.Decimal(amount) } 
+        data: { amount: newAmount } 
       });
     });
   }
@@ -896,13 +1043,46 @@ export class AdminService {
       } 
     });
     if (!contribution) throw new NotFoundException("Cotisation introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canValidateContributions', contribution.antennaId);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.contribution.delete({ where: { id: contributionId } });
-      if (contribution.status === ContributionStatus.VALIDATED && contribution.ledgerEntryId) {
-        await tx.ledgerEntry.delete({ where: { id: contribution.ledgerEntryId } });
+    if (contribution.status === ContributionStatus.VALIDATED) {
+      // Cotisation VALIDATED : on ne l'efface JAMAIS (trace comptable). Elle passe
+      // en CANCELLED (qui, qui, quand) et son écriture de ledger est retirée dans
+      // la même transaction, ce qui rétablit le solde.
+      await this.prisma.$transaction(async (tx) => {
+        const claimed = await tx.contribution.updateMany({
+          where: { id: contributionId, status: ContributionStatus.VALIDATED },
+          data: {
+            status: ContributionStatus.CANCELLED,
+            cancelledAt: new Date(),
+            cancelledByUserId: adminId,
+            ledgerEntryId: null,
+          },
+        });
+        if (claimed.count === 0) {
+          throw new ConflictException("Cette cotisation vient d'être modifiée par un autre administrateur.");
+        }
+        await tx.ledgerEntry.deleteMany({ where: { contributionId } });
+      });
+
+      await this.notifications.createForUser({
+        associationId,
+        userId: contribution.memberUserId,
+        message: `Votre versement de ${contribution.amount} ${contribution.currency} a été annulé par l'administration.`,
+        type: NotificationType.SYSTEM_ALERT,
+        title: 'Versement annulé',
+      });
+
+      if (contribution.purpose === 'MEMBERSHIP_CARD') {
+        await this._syncVirtualCardLock(contribution.memberUserId, associationId);
       }
-    });
+
+      return { success: true, cancelled: true };
+    }
+
+    // Cotisation jamais validée (en attente, refusée, annulée, brouillon) : aucune
+    // écriture de ledger ; suppression conservée comme avant.
+    await this.prisma.contribution.delete({ where: { id: contributionId } });
 
     if (contribution.purpose === 'MEMBERSHIP_CARD') {
       await this._syncVirtualCardLock(contribution.memberUserId, associationId);
@@ -1106,6 +1286,7 @@ export class AdminService {
     });
 
     if (!proposal) throw new NotFoundException('Proposition introuvable.');
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageProjects', proposal.antennaId);
 
     const updated = await this.prisma.projectProposal.update({
       where: { id: proposalId },
@@ -1161,6 +1342,7 @@ export class AdminService {
     });
 
     if (!proposal) throw new NotFoundException('Proposition introuvable.');
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageProjects', proposal.antennaId);
 
     const updated = await this.prisma.projectProposal.update({
       where: { id: proposalId },
@@ -1196,6 +1378,7 @@ export class AdminService {
     if (safeStatus === 'SUSPENDED') safeStatus = ProjectStatus.ON_HOLD;
 
     const targetAntennaId = await this.resolveOptionalAntennaId(antennaIds, data.antennaId);
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageProjects', targetAntennaId);
 
     const project = await this.prisma.project.create({
       data: { 
@@ -1247,6 +1430,7 @@ export class AdminService {
       },
     });
     if (!project) throw new NotFoundException('Projet introuvable.');
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageProjects', project.antennaId);
 
     let safeStatus = data.status;
     if (safeStatus === 'DRAFT')            safeStatus = ProjectStatus.PROPOSED;
@@ -1305,6 +1489,7 @@ export class AdminService {
       } 
     });
     if (!project) throw new NotFoundException("Projet introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageProjects', project.antennaId);
     return this.prisma.project.delete({ where: { id: projectId } });
   }
 
@@ -1407,6 +1592,7 @@ export class AdminService {
     const { antennaIds, associationId } = await this.getAdminContext(adminId);
 
     const targetAntennaId = await this.resolveOptionalAntennaId(antennaIds, data.antennaId);
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageContent', targetAntennaId);
 
     const post = await this.prisma.newsPost.create({
       data: {
@@ -1442,6 +1628,7 @@ export class AdminService {
       } 
     });
     if (!post) throw new NotFoundException("Contenu introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageContent', post.antennaId);
 
     const imageId = data.coverImageFileId !== undefined ? data.coverImageFileId : data.coverFileAssetId;
 
@@ -1475,6 +1662,7 @@ export class AdminService {
       } 
     });
     if (!post) throw new NotFoundException("Contenu introuvable.");
+    await this.assertAssignmentFlag(adminId, antennaIds, 'canManageContent', post.antennaId);
     return this.prisma.newsPost.delete({ where: { id: contentId } });
   }
 

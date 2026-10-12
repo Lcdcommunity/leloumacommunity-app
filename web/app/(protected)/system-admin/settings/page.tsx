@@ -1,4 +1,10 @@
 /////// web/app/(protected)/system-admin/settings/page.tsx
+//
+// v1.1 — 🔥 SÉCURITÉ : le changement de mot de passe demande désormais le mot de
+//   passe ACTUEL (champ « Mot de passe actuel », envoyé en `currentPassword` à
+//   PATCH /users/me/password). Avant, un access token volé suffisait à prendre
+//   le compte. Lié au backend users.controller.ts v1.1.
+//
 'use client';
 
 import { type FormEvent, useState, useEffect } from 'react';
@@ -68,6 +74,7 @@ export default function SystemSettingsPage() {
   const [theme, setTheme] = useState<Theme>('system');
 
   // Mot de passe : api.updateMyPassword, le même endpoint que partout ailleurs.
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -94,7 +101,7 @@ export default function SystemSettingsPage() {
 
   const handleCancel = () => {
     setIsEditing(false);
-    setPassword('');
+    setPassword(''); setCurrentPassword('');
     setConfirmPassword('');
     setPlatformName(initialSettings.platformName);
     setContactEmail(initialSettings.contactEmail);
@@ -115,6 +122,10 @@ export default function SystemSettingsPage() {
       setMsg({ type: 'error', text: 'Les mots de passe ne correspondent pas.' });
       return;
     }
+    if (password && !currentPassword) {
+      setMsg({ type: 'error', text: 'Saisis ton mot de passe actuel pour en définir un nouveau.' });
+      return;
+    }
 
     setLoading(true);
     try {
@@ -123,7 +134,7 @@ export default function SystemSettingsPage() {
         api.updateSystemSettings({ platformName, contactEmail, maintenanceMode }),
       ];
       if (password) {
-        tasks.push(api.updateMyPassword(password));
+        tasks.push(api.updateMyPassword(currentPassword, password));
       }
 
       await Promise.all(tasks);
@@ -131,7 +142,7 @@ export default function SystemSettingsPage() {
       setInitialSettings({ platformName, contactEmail, maintenanceMode });
       setMsg({ type: 'success', text: 'Paramètres enregistrés avec succès.' });
       setIsEditing(false);
-      setPassword('');
+      setPassword(''); setCurrentPassword('');
       setConfirmPassword('');
     } catch (err: unknown) {
       setMsg({
@@ -208,6 +219,9 @@ export default function SystemSettingsPage() {
               <div className="set-card-head"><span className="set-card-title">🔒 Sécurité du compte</span></div>
               <div className="set-card-body">
                 <Field label="Nouveau mot de passe" type="password" value={password} onChange={setPassword} disabled={!isEditing} placeholder={isEditing ? "Laissez vide pour ne pas changer" : "••••••••"} />
+                {isEditing && password && (
+                  <Field label="Mot de passe actuel" type="password" value={currentPassword} onChange={setCurrentPassword} placeholder="Ton mot de passe actuel" />
+                )}
                 {isEditing && password && (
                   <Field label="Confirmer le mot de passe" type="password" value={confirmPassword} onChange={setConfirmPassword} placeholder="Répétez le mot de passe" />
                 )}

@@ -1,4 +1,6 @@
 // backend/src/modules/super-admin/super-admin.module.ts
+// v1.1 — 🔥 AJOUT : SuperAdminProjectsController (POST /super-admin/projects,
+//   route manquante — création de projet depuis le compte Super Admin).
 // 🔥 AJOUT : ProjectProposalsAdminController/Service déclarés ici (module
 // isolé, cf. project-proposals-admin.controller.ts / .service.ts) — logique
 // réservée SUPER_ADMIN/SYSTEM_ADMIN, donc rattachée à ce module plutôt qu'à
@@ -25,6 +27,9 @@ import { ProjectProposalsAdminService } from '../projects/project-proposals-admi
 import { SuperAdminLateMembersController } from './super-admin-late-members.controller';
 import { SuperAdminLateMembersService } from './super-admin-late-members.service';
 
+// 🔥 AJOUT : création de projet (Super Admin) — fichier isolé
+import { SuperAdminProjectsController } from './super-admin-projects.controller';
+
 @Module({
   imports: [NotificationsModule],
   controllers: [
@@ -32,6 +37,7 @@ import { SuperAdminLateMembersService } from './super-admin-late-members.service
     SuperAdminElectionsController, // ⚡ Ajout du contrôleur des élections
     ProjectProposalsAdminController, // 🔥 Ajout : modifier/supprimer proposition
     SuperAdminLateMembersController, // 🔥 Ajout : export retardataires
+    SuperAdminProjectsController,    // 🔥 Ajout : POST /super-admin/projects
   ],
   providers: [
     SuperAdminService,

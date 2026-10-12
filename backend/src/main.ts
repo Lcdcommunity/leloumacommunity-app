@@ -1,4 +1,26 @@
 // backend/src/main.ts
+//
+// v1.1 — 🔥 CORRIGÉ (sécurité / fiabilité) :
+//   • CORS : `hostname.endsWith('leloumacommunity.com')` acceptait aussi
+//     « evilleloumacommunity.com » (aucun point devant). Désormais le domaine
+//     exact ou un vrai sous-domaine (`.leloumacommunity.com`).
+//   • `trust proxy` était figé à 1. Il est maintenant réglable via
+//     TRUST_PROXY_HOPS (défaut 1 = comportement inchangé) : nécessaire pour que
+//     req.ip (limitation de débit, IP des sessions) soit exact selon le nombre
+//     de proxys devant l'API (ex. Cloudflare + Render = 2).
+//
+// v1.2 — 🔥 CORRIGÉ (sécurité) : Swagger (/docs) était activé par défaut, donc
+//   public en production si SWAGGER_ENABLED n'était pas explicitement défini
+//   (toute la cartographie de l'API exposée). Défaut : désactivé quand
+//   NODE_ENV=production, activé sinon. SWAGGER_ENABLED=true/false reste
+//   prioritaire dans les deux cas.
+//
+// v1.3 — 🔥 AJOUT (CORS) : l'acceptation de TOUT sous-domaine `.vercel.app`
+//   (n'importe qui peut déployer un site sur vercel.app) est désormais
+//   désactivable via CORS_ALLOW_VERCEL_APP=false, une fois les domaines clients
+//   propres en place. Défaut inchangé (true) : rien ne casse sans action de ta
+//   part. Les origines utiles restent listées dans CORS_ORIGINS / FRONTEND_URL.
+//
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -112,10 +134,10 @@ async function isAllowedOrigin(
   const hostname = parsed.hostname.toLowerCase();
 
   if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
-  if (hostname.endsWith('.vercel.app')) return true;
+  if (hostname.endsWith('.vercel.app') && process.env.CORS_ALLOW_VERCEL_APP !== 'false') return true;
 
   // 🔥 domaine prod historique
-  if (hostname.endsWith('leloumacommunity.com')) return true;
+  if (hostname === 'leloumacommunity.com' || hostname.endsWith('.leloumacommunity.com')) return true;
 
   // 🔥 CORRECTION : domaine de la console Grand Chef (system-admin) elle-même
   // — n'est rattaché à aucune Association en base (ce n'est pas un domaine
@@ -202,12 +224,14 @@ async function bootstrap() {
   const server = app.getHttpAdapter().getInstance();
 
   // Proxy (Render / Vercel / Nginx)
-  server.set('trust proxy', 1);
+  const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
+  server.set('trust proxy', Number.isInteger(trustProxyHops) && trustProxyHops >= 0 ? trustProxyHops : 1);
 
   // ─────────────────────────────────────────────────────────────
   // SWAGGER
   // ─────────────────────────────────────────────────────────────
-  const swaggerEnabled = (process.env.SWAGGER_ENABLED || 'true') === 'true';
+  const swaggerDefault = process.env.NODE_ENV === 'production' ? 'false' : 'true';
+  const swaggerEnabled = (process.env.SWAGGER_ENABLED || swaggerDefault) === 'true';
 
   if (swaggerEnabled) {
     const config = new DocumentBuilder()

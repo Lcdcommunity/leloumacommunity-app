@@ -1,4 +1,14 @@
 // web/components/layout/Sidebar.tsx
+//
+// v1.2 — 🔥 AJOUT (navigation Membre) : lien « Vue d'ensemble » vers
+//   /member/association (solde cumulé de l'association). La page et la route
+//   GET /member/association-balance existaient mais aucun menu n'y menait.
+//
+// v1.1 — 🔥 AJOUT (navigation Super Admin) : lien « Propositions membres » vers
+//   /super-admin/project-proposals. La page existait et fonctionne (mêmes routes
+//   API que /admin/project-proposals, déjà ouvertes au SUPER_ADMIN) mais n'était
+//   référencée dans aucun menu : le super admin ne pouvait pas y accéder.
+//
 'use client';
 
 import Link from 'next/link';
@@ -67,6 +77,7 @@ const superAdminItems: NavItem[] = [
   // 🔥 NOUVEAU : Vue lecture seule des virements inter-antennes (toutes antennes)
   { href: '/super-admin/transfers',       label: 'Virements',              icon: <Ico d={ICO.send} /> },
   { href: '/super-admin/projects',        label: 'Projets',                icon: <Ico d={ICO.clip} /> },
+  { href: '/super-admin/project-proposals', label: 'Propositions membres',   icon: <Ico d={ICO.lightbulb} /> },
   { href: '/super-admin/elections',       label: 'Élections',              icon: <Ico d={ICO.vote} /> },
   { href: '/super-admin/events',          label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
   { href: '/super-admin/sponsors',        label: 'Partenaires',            icon: <Ico d={ICO.star} /> },
@@ -122,7 +133,8 @@ const memberItems: NavItem[] = [
   { href: '/member',                           label: 'Dashboard',              icon: <Ico d={ICO.home} /> },
   { href: '/member/contributions/new',         label: 'Faire un dépôt',         icon: <Ico d={ICO.plus} /> },
   { href: '/member/contributions/history',     label: 'Mes cotisations',        icon: <Ico d={ICO.coin} /> },
-  { href: '/member/expenses',                  label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
+  { href: '/member/association',               label: 'Vue d\'ensemble',        icon: <Ico d={ICO.chart} /> },
+  { href: '/member/expenses',                 label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
   { href: '/member/projects',                  label: 'Projets',                icon: <Ico d={ICO.clip} /> },
   { href: '/member/projects/propose',          label: 'Proposer un projet',     icon: <Ico d={ICO.edit} /> },
   // 🔥 NOUVEAU : Simulation financière (ProjectionForm identique à l'admin)

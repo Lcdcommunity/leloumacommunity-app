@@ -1,6 +1,18 @@
 //backend/src/modules/contributions/contributions.service.ts
+//
+// v1.1 — 🔥 CORRIGÉ (validateContribution / rejectContribution) : aucun contrôle
+//   de statut. Une 2e validation recréait une LedgerEntry avec le même
+//   contributionId (@unique) → 500 ; une cotisation CANCELLED pouvait être
+//   validée/refusée ; rejeter une cotisation VALIDATED laissait son écriture de
+//   ledger (solde gonflé). Transition réservée de façon atomique (updateMany
+//   conditionné au statut) dans la même $transaction que le ledger ; 409 clair
+//   si déjà traitée. Le rejet d'une VALIDATED supprime son écriture de ledger
+//   dans la même transaction. Aligné sur admin.service.ts v1.5 (route
+//   /admin/contributions/* réellement utilisée par le back-office web).
+//
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -423,9 +435,52 @@ export class ContributionsService {
       contribution.antennaId,
     );
 
+    if (contribution.status === ContributionStatus.VALIDATED) {
+      throw new ConflictException('Cette cotisation est déjà validée');
+    }
+    if (contribution.status === ContributionStatus.CANCELLED) {
+      throw new ConflictException(
+        'Cette cotisation a été annulée : elle ne peut plus être validée',
+      );
+    }
+
     const result =
       await this.prisma.$transaction(
         async (tx) => {
+          // Réservation atomique de la transition (anti double validation).
+          const claimed =
+            await tx.contribution.updateMany({
+              where: {
+                id: contribution.id,
+                status: {
+                  notIn: [
+                    ContributionStatus.VALIDATED,
+                    ContributionStatus.CANCELLED,
+                  ],
+                },
+              },
+              data: {
+                status:
+                  ContributionStatus.VALIDATED,
+                validatedByUserId:
+                  actor.id,
+                validatedAt: new Date(),
+                adminComment:
+                  dto.adminComment?.trim(),
+                validationChannel:
+                  dto.validationChannel,
+                rejectionReason: null,
+                rejectedAt: null,
+                rejectedByUserId: null,
+              },
+            });
+
+          if (claimed.count === 0) {
+            throw new ConflictException(
+              'Cette cotisation vient d\'être traitée par un autre administrateur',
+            );
+          }
+
           const ledger =
             await tx.ledgerEntry.create({
               data: {
@@ -452,15 +507,6 @@ export class ContributionsService {
                 id: contribution.id,
               },
               data: {
-                status:
-                  ContributionStatus.VALIDATED,
-                validatedByUserId:
-                  actor.id,
-                validatedAt: new Date(),
-                adminComment:
-                  dto.adminComment?.trim(),
-                validationChannel:
-                  dto.validationChannel,
                 ledgerEntryId:
                   ledger.id,
               },
@@ -508,19 +554,67 @@ export class ContributionsService {
       contribution.antennaId,
     );
 
-    const updatedContribution = await this.prisma.contribution.update({
-      where: { id },
-      data: {
-        status:
-          ContributionStatus.REJECTED,
-        rejectedByUserId: actor.id,
-        rejectedAt: new Date(),
-        rejectionReason:
-          dto.rejectionReason.trim(),
-        adminComment:
-          dto.adminComment?.trim(),
-      },
-    });
+    if (contribution.status === ContributionStatus.REJECTED) {
+      throw new ConflictException('Cette cotisation est déjà refusée');
+    }
+    if (contribution.status === ContributionStatus.CANCELLED) {
+      throw new ConflictException(
+        'Cette cotisation a été annulée : elle ne peut plus être refusée',
+      );
+    }
+
+    const wasValidated =
+      contribution.status === ContributionStatus.VALIDATED;
+
+    const updatedContribution =
+      await this.prisma.$transaction(async (tx) => {
+        const claimed =
+          await tx.contribution.updateMany({
+            where: {
+              id,
+              status: {
+                notIn: [
+                  ContributionStatus.REJECTED,
+                  ContributionStatus.CANCELLED,
+                ],
+              },
+            },
+            data: {
+              status:
+                ContributionStatus.REJECTED,
+              rejectedByUserId: actor.id,
+              rejectedAt: new Date(),
+              rejectionReason:
+                dto.rejectionReason.trim(),
+              adminComment:
+                dto.adminComment?.trim(),
+              validatedAt: null,
+              validatedByUserId: null,
+            },
+          });
+
+        if (claimed.count === 0) {
+          throw new ConflictException(
+            'Cette cotisation vient d\'être traitée par un autre administrateur',
+          );
+        }
+
+        // Cotisation VALIDATED → on annule son écriture de ledger (même
+        // transaction) pour que le solde reste égal à la somme du ledger.
+        if (wasValidated) {
+          await tx.ledgerEntry.deleteMany({
+            where: { contributionId: id },
+          });
+          await tx.contribution.update({
+            where: { id },
+            data: { ledgerEntryId: null },
+          });
+        }
+
+        return tx.contribution.findUniqueOrThrow({
+          where: { id },
+        });
+      });
 
     await this.notifications.createForUserWithPush({
       associationId: contribution.associationId,

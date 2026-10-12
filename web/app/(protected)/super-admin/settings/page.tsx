@@ -1,5 +1,11 @@
 // web/app/(protected)/super-admin/settings/page.tsx
 //
+// v1.1 — 🔥 SÉCURITÉ : le changement de mot de passe demande désormais le mot de
+//   passe ACTUEL (champ « Mot de passe actuel », envoyé en `currentPassword` à
+//   PATCH /users/me/password). Avant, un access token volé suffisait à prendre
+//   le compte. Lié au backend users.controller.ts v1.1.
+//
+//
 // 🔥 AJOUT : coordonnées de l'association (téléphone, email, site web,
 //   adresse/siège) — absentes du formulaire jusqu'ici alors que ces champs
 //   existent déjà côté Association (utilisés entre autres par le pied de
@@ -172,6 +178,7 @@ export default function SuperAdminSettingsPage() {
 
   // Settings Security
   const [isEditingPassword, setIsEditingPassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [secLoading, setSecLoading] = useState(false);
@@ -406,9 +413,9 @@ export default function SuperAdminSettingsPage() {
     }
     setSecLoading(true);
     try {
-      await api.updateMyPassword(password);
+      await api.updateMyPassword(currentPassword, password);
       setSecMsg({ type: 'success', text: t('settings.passwordSuccess', 'Mot de passe mis à jour avec succès.') });
-      setPassword('');
+      setPassword(''); setCurrentPassword('');
       setConfirmPassword('');
       setSecFormKey(prev => prev + 1); 
 
@@ -426,7 +433,7 @@ export default function SuperAdminSettingsPage() {
 
   const handleCancelPassword = () => {
     setIsEditingPassword(false);
-    setPassword('');
+    setPassword(''); setCurrentPassword('');
     setConfirmPassword('');
     setSecMsg(null);
     setSecFormKey(prev => prev + 1);
@@ -447,7 +454,7 @@ export default function SuperAdminSettingsPage() {
       JSON.stringify(pricingMap) !== JSON.stringify(initialPricingMap)
     : false;
 
-  const isPasswordDirty = password.length > 0 || confirmPassword.length > 0;
+  const isPasswordDirty = currentPassword.length > 0 || password.length > 0 || confirmPassword.length > 0;
 
   return (
     <AppShell title={t('settings.superAdminTitle', 'Paramètres Généraux')}>
@@ -911,6 +918,16 @@ export default function SuperAdminSettingsPage() {
                 <div className="ss-panel-body">
                   {isEditingPassword ? (
                     <form key={secFormKey} onSubmit={handlePasswordSubmit} className="ss-form-stack">
+                      <Field
+                        label={t('settings.currentPassword', 'Mot de passe actuel')}
+                        type="password"
+                        value={currentPassword}
+                        onChange={setCurrentPassword}
+                        placeholder={t('settings.currentPasswordPlaceholder', 'Entrez votre mot de passe actuel')}
+                        required
+                        autoComplete="current-password"
+                        isRTL={isRTL}
+                      />
                       <Field
                         label={t('settings.newPassword', 'Nouveau mot de passe')}
                         type="password"

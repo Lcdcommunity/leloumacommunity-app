@@ -1,4 +1,18 @@
 // backend/src/modules/events/events.service.ts
+//
+// v1.1 — 🔥 CORRIGÉ (périmètre des ANTENNA_ADMIN) : l'antenne d'un admin
+//   d'antenne était déduite de son adhésion principale (Membership). Or les
+//   admins créés par le super admin n'ont QUE des affectations
+//   (AntennaAdminAssignment), pas d'adhésion : `memberships[0]` était
+//   undefined, d'où (1) un événement créé par eux sans antenne, donc visible
+//   par toute l'association ; (2) une liste « admin » non filtrée ; (3) un
+//   refus (403) systématique en modification/suppression de leurs propres
+//   événements, y compris deleteEvent. Le périmètre vient maintenant des
+//   affectations actives (getAdminAntennaIds, repli sur l'adhésion principale
+//   pour les comptes historiques). Un admin multi-antennes peut gérer les
+//   événements de toutes ses antennes ; à la création il peut cibler un
+//   sous-ensemble de ses antennes via antennaIds, sinon toutes.
+//
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEventDto, UpdateEventDto, RegisterAttendanceDto } from './dto/event.dto';
@@ -13,6 +27,24 @@ export class EventsService {
     private readonly notifications: NotificationsService,
     private readonly mailService: MailService,
   ) {}
+
+  /**
+   * Antennes gérées par un ANTENNA_ADMIN : affectations actives, sinon (comptes
+   * historiques) antenne de son adhésion principale.
+   */
+  private async getAdminAntennaIds(userId: string): Promise<string[]> {
+    const assignments = await this.prisma.antennaAdminAssignment.findMany({
+      where: { adminUserId: userId, isActive: true },
+      select: { antennaId: true },
+    });
+    if (assignments.length > 0) return assignments.map((a) => a.antennaId);
+
+    const membership = await this.prisma.membership.findFirst({
+      where: { userId, isPrimary: true },
+      select: { antennaId: true },
+    });
+    return membership ? [membership.antennaId] : [];
+  }
 
   // ==========================================
   // LECTURE DES ÉVÉNEMENTS (Admins & Membres)
@@ -56,8 +88,9 @@ export class EventsService {
         { OR: memberOrCondition }
       ];
     } else if (role === UserRole.ANTENNA_ADMIN) {
-      if (antennaId) {
-        where.antennas = { some: { id: { equals: antennaId } } }; 
+      const adminAntennaIds = await this.getAdminAntennaIds(userId);
+      if (adminAntennaIds.length > 0) {
+        where.antennas = { some: { id: { in: adminAntennaIds } } };
       }
     }
 
@@ -128,8 +161,11 @@ export class EventsService {
     let connectAntennas = [];
     if (user.role === UserRole.SUPER_ADMIN && dto.antennaIds && dto.antennaIds.length > 0) {
       connectAntennas = dto.antennaIds.map(id => ({ id }));
-    } else if (user.role === UserRole.ANTENNA_ADMIN && user.memberships[0]?.antennaId) {
-      connectAntennas = [{ id: user.memberships[0].antennaId }];
+    } else if (user.role === UserRole.ANTENNA_ADMIN) {
+      const adminAntennaIds = await this.getAdminAntennaIds(userId);
+      const requested = (dto.antennaIds || []).filter((id) => adminAntennaIds.includes(id));
+      const targetIds = requested.length > 0 ? requested : adminAntennaIds;
+      connectAntennas = targetIds.map((id) => ({ id }));
     }
 
     const inviteAll = dto.inviteAll !== false; 
@@ -187,8 +223,8 @@ export class EventsService {
     });
 
     if (user?.role === UserRole.ANTENNA_ADMIN) {
-      const adminAntennaId = user.memberships[0]?.antennaId;
-      const belongsToAdminAntenna = event.antennas.some(a => a.id === adminAntennaId);
+      const adminAntennaIds = await this.getAdminAntennaIds(userId);
+      const belongsToAdminAntenna = event.antennas.some(a => adminAntennaIds.includes(a.id));
       if (!belongsToAdminAntenna) {
         throw new ForbiddenException("Vous n'avez pas le droit de modifier cet événement");
       }
@@ -255,11 +291,8 @@ export class EventsService {
     if (!event) throw new NotFoundException('Événement introuvable');
 
     if (role === UserRole.ANTENNA_ADMIN) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
-        include: { memberships: { where: { isPrimary: true } } }
-      });
-      const belongsToAdminAntenna = event.antennas.some(a => a.id === user?.memberships[0]?.antennaId);
+      const adminAntennaIds = await this.getAdminAntennaIds(userId);
+      const belongsToAdminAntenna = event.antennas.some(a => adminAntennaIds.includes(a.id));
       if (!belongsToAdminAntenna) {
         throw new ForbiddenException("Action non autorisée sur cet événement");
       }

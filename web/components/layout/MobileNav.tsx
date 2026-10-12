@@ -1,4 +1,14 @@
 // web/components/layout/MobileNav.tsx
+//
+// v1.2 — 🔥 AJOUT (navigation Membre) : lien « Vue d'ensemble » vers
+//   /member/association (solde cumulé de l'association). La page et la route
+//   GET /member/association-balance existaient mais aucun menu n'y menait.
+//
+// v1.1 — 🔥 AJOUT (navigation Super Admin) : lien « Propositions membres » vers
+//   /super-admin/project-proposals. La page existait et fonctionne (mêmes routes
+//   API que /admin/project-proposals, déjà ouvertes au SUPER_ADMIN) mais n'était
+//   référencée dans aucun menu : le super admin ne pouvait pas y accéder.
+//
 'use client';
 
 import Link from 'next/link';
@@ -93,6 +103,7 @@ const superAdminItems: NavItem[] = [
   // 🔥 NOUVEAU : Vue lecture seule des virements inter-antennes (toutes antennes)
   { href: '/super-admin/transfers',     label: 'Virements',           ico: E.send,         section: 'Gestion'   },
   { href: '/super-admin/projects',      label: 'Projets',             ico: E.project,      section: 'Gestion'   },
+  { href: '/super-admin/project-proposals', label: 'Propositions membres', ico: E.project,   section: 'Gestion'   },
   { href: '/super-admin/elections',     label: 'Élections',           ico: E.vote,         section: 'Gestion'   },
   { href: '/super-admin/events',        label: 'Événements',          ico: E.calendar,     section: 'Gestion'   },
   { href: '/super-admin/sponsors',      label: 'Partenaires',         ico: E.star,         section: 'Gestion'   },
@@ -146,6 +157,7 @@ const memberItems: NavItem[] = [
   { href: '/member',                       label: 'Dashboard',             ico: E.home,         section: 'Principal'  },
   { href: '/member/contributions/new',     label: 'Faire un dépôt',        ico: E.contribution, section: 'Principal'  },
   { href: '/member/contributions/history', label: 'Mes cotisations',       ico: E.contribution, section: 'Principal'  },
+  { href: '/member/association',           label: 'Vue d\'ensemble',       ico: E.chart,        section: 'Principal'  },
   { href: '/member/expenses',              label: 'Dépenses',              ico: E.creditCard,   section: 'Principal'  },
   { href: '/member/projects',              label: 'Projets',               ico: E.project,      section: 'Communauté' },
   { href: '/member/projects/propose',      label: 'Proposer un projet',    ico: E.project,      section: 'Communauté' },

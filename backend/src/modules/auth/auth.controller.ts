@@ -1,5 +1,15 @@
 // backend/src/modules/auth/auth.controller.ts
+//
+// v1.1 — 🔥 CORRIGÉ (sécurité) : (1) getClientIp() se fiait au premier élément
+//   de X-Forwarded-For (falsifiable par le client) : l'IP enregistrée avec les
+//   sessions pouvait être inventée ; on utilise req.ip (trust proxy, cf.
+//   main.ts). (2) Aucune limitation spécifique sur les routes sensibles : seul le
+//   quota global (120 req/min/IP) s'appliquait, soit des milliers d'essais de
+//   mot de passe par heure. Ajout de @Throttle par route : login 15/min,
+//   forgot-password 5/min, reset-password 10/min, refresh 60/min (par IP).
+//
 import { Body, Controller, Post, Get, Req, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -15,14 +25,10 @@ import { Request } from 'express';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  // Même logique que ThrottlerBehindProxyGuard.getTracker() : derrière un
-  // proxy (Vercel/Railway), req.ip renvoie souvent l'IP du proxy, pas celle
-  // du visiteur.
+  // Même logique que ThrottlerBehindProxyGuard.getTracker() : req.ip, calculé
+  // par Express d'après `trust proxy` (TRUST_PROXY_HOPS dans main.ts). On ne lit
+  // plus X-Forwarded-For à la main : cet en-tête est fourni par le client.
   private getClientIp(req: Request): string {
-    const xff = req.headers['x-forwarded-for'];
-    if (typeof xff === 'string' && xff.length > 0) {
-      return xff.split(',')[0].trim();
-    }
     return req.ip ?? req.socket?.remoteAddress ?? 'unknown';
   }
 
@@ -49,6 +55,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ default: { limit: 15, ttl: 60_000 } })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
     return this.authService.login(dto, {
       userAgent: req.headers['user-agent'],
@@ -58,6 +65,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
     return this.authService.refresh(dto, {
       userAgent: req.headers['user-agent'],
@@ -72,11 +80,13 @@ export class AuthController {
   }
 
   @Post('forgot-password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
 
   @Post('reset-password')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }

@@ -6,6 +6,10 @@
 //   N'importe rien de l'existant à part `communicationsApi` (fichier neuf
 //   lui aussi) — reste hors des fichiers déjà en place, comme demandé.
 //
+// v1.1 — 🔥 LINT : apostrophes de deux libellés (« l'en-tête de l'email »,
+//   « Objet de l'email ») échappées (&apos;) — règle react/no-unescaped-entities.
+//   Aucun changement visuel.
+//
 'use client';
 
 import { useMemo, useState } from 'react';
@@ -246,12 +250,12 @@ export function CommunicationsConsole({ scope }: { scope: 'admin' | 'super-admin
             onChange={(e) => setTitle(e.target.value)}
             maxLength={120}
           />
-          <div className="cc-hint">Affiché en en-tête de l'email et conservé dans l'historique des envois.</div>
+          <div className="cc-hint">Affiché en en-tête de l&apos;email et conservé dans l&apos;historique des envois.</div>
         </div>
 
         {channels.email && (
           <div className="cc-field">
-            <label className="cc-label" htmlFor="cc-subject">Objet de l'email</label>
+            <label className="cc-label" htmlFor="cc-subject">Objet de l&apos;email</label>
             <input
               id="cc-subject"
               className="cc-input"

@@ -1,4 +1,11 @@
 // web/app/(protected)/admin/audit/page.tsx
+//
+// v1.1 — 🔥 LINT (react-hooks/set-state-in-effect, React 19) : un useEffect appelait
+//   setState (directement ou via load()) de façon synchrone dans son corps, ce que
+//   la règle signale comme source de rendus en cascade. L'appel est différé via
+//   queueMicrotask (même pattern que admin/contributions/page.tsx). Aucun
+//   changement fonctionnel ni visuel.
+//
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
@@ -197,7 +204,7 @@ export default function AdminAuditPage() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
 
   function handleFilter() {
     void load(actionFilter.trim() || undefined);

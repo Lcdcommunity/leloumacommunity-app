@@ -22,6 +22,8 @@
     "securityTitle": "Sécurité du compte",
     "changePasswordBtn": "Modifier mon mot de passe",
     "passwordSecureDesc": "Votre mot de passe est sécurisé. Vous pouvez le changer à tout moment.",
+    "currentPassword": "Mot de passe actuel",
+    "currentPasswordPlaceholder": "Entrez votre mot de passe actuel",
     "newPassword": "Nouveau mot de passe",
     "newPasswordPlaceholder": "Entrez votre nouveau mot de passe",
     "passwordHint": "Utilisez au moins 8 caractères.",
@@ -47,6 +49,19 @@
     "forgotPassword": "Mot de passe oublié ?",
     "submitBtn": "Accéder à mon espace",
     "notMember": "Pas encore membre ?",
-    "joinCommunity": "Rejoindre la communauté"
+    "joinCommunity": "Rejoindre la communauté",
+    "error": "Identifiants incorrects."
+  },
+  "signup": {
+    "newMember": "Nouveau membre",
+    "join": "Rejoindre",
+    "successTitle": "Inscription enregistrée !",
+    "successText1": "Vérifiez votre email pour activer votre compte,",
+    "successText2": "puis attendez la validation par l'administrateur",
+    "successText3": "de votre antenne.",
+    "login": "Se connecter",
+    "loading": "Chargement...",
+    "selectAntenna": "Sélectionnez une antenne",
+    "createAccount": "Créer mon compte"
   }
 }

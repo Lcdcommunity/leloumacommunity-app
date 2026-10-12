@@ -1,4 +1,8 @@
 // web/lib/api-client.ts
+//
+// v1.1 — 🔥 SÉCURITÉ : updateMyPassword(currentPassword, password) envoie
+//   désormais le mot de passe actuel (exigé par PATCH /users/me/password).
+//
 import type { MemberDashboardStats } from '../types/member';
 import type { ProjectProposal } from '../types/project-proposal';
 import type { ContentPost } from '../types/content';
@@ -450,8 +454,11 @@ getPublicOriginLocalities: (domain?: string, code?: string) => {
   updateMemberProfile: (body: Partial<UserSummary>) =>
     http<UserSummary, Partial<UserSummary>>('/member/profile', { method: 'PATCH', body }),
 
-  updateMyPassword: (password: string) =>
-    http<{ message: string }, { password: string }>('/users/me/password', { method: 'PATCH', body: { password } }),
+  updateMyPassword: (currentPassword: string, password: string) =>
+    http<{ message: string }, { currentPassword: string; password: string }>('/users/me/password', {
+      method: 'PATCH',
+      body: { currentPassword, password },
+    }),
 
   uploadAvatar: async (formData: FormData): Promise<{
     message: string;

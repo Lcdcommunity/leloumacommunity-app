@@ -22,6 +22,8 @@
     "securityTitle": "Segurança da Conta",
     "changePasswordBtn": "Mudar minha senha",
     "passwordSecureDesc": "A sua senha está segura. Pode alterá-la a qualquer momento.",
+    "currentPassword": "Senha atual",
+    "currentPasswordPlaceholder": "Digite a sua senha atual",
     "newPassword": "Nova Senha",
     "newPasswordPlaceholder": "Digite a sua nova senha",
     "passwordHint": "Use pelo menos 8 caracteres.",

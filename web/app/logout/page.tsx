@@ -1,4 +1,10 @@
 // web/app/logout/page.tsx
+//
+// v1.1 — 🔥 CORRIGÉ (style) : le texte d'accessibilité « Déconnexion en cours… »
+//   utilisait la classe Tailwind `sr-only` (Tailwind n'est pas installé dans ce
+//   projet) : il s'affichait donc en clair derrière le rideau. Remplacé par un
+//   masquage visuel inline (lisible par les lecteurs d'écran uniquement).
+//
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -280,7 +286,21 @@ export default function LogoutPage() {
         ))}
       </div>
       
-      <p className="sr-only">Déconnexion en cours…</p>
+      <p
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          margin: -1,
+          padding: 0,
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
+        Déconnexion en cours…
+      </p>
     </main>
   );
 }

@@ -1,4 +1,11 @@
 // backend/src/modules/users/users.service.ts
+//
+// v1.1 — 🔥 CORRIGÉ (sécurité) : updatePassword() change le mot de passe sans
+//   vérifier l'ancien. Il est maintenant comparé (bcrypt) au hash en base avant
+//   toute modification ; un mauvais mot de passe actuel renvoie une 400 (jamais
+//   une 401, que le front interprète comme « session expirée » et déconnecte).
+//   Le nouveau mot de passe doit aussi différer de l'ancien.
+//
 import {
   BadRequestException,
   Injectable,
@@ -111,7 +118,7 @@ export class UsersService {
   }
 
   // ⚡ MÉTHODE POUR CHANGER LE MOT DE PASSE
-  async updatePassword(userId: string, newPasswordRaw: string) {
+  async updatePassword(userId: string, currentPasswordRaw: string, newPasswordRaw: string) {
     // 1. Récupérer l'utilisateur pour avoir son associationId (requis pour la notification)
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -119,6 +126,16 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException('Utilisateur introuvable');
+    }
+
+    const currentOk = user.passwordHash
+      ? await bcrypt.compare(currentPasswordRaw, user.passwordHash)
+      : false;
+    if (!currentOk) {
+      throw new BadRequestException('Le mot de passe actuel est incorrect.');
+    }
+    if (currentPasswordRaw === newPasswordRaw) {
+      throw new BadRequestException('Le nouveau mot de passe doit être différent de l\'ancien.');
     }
 
     const saltRounds = 10;

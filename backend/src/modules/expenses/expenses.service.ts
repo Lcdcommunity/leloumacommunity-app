@@ -1,4 +1,18 @@
 // backend/src/modules/expenses/expenses.service.ts
+//
+// v1.1 — 🔥 CORRIGÉ (createAntennaExpense) : la dépense (statut VALIDATED, sous
+//   le seuil) était créée, PUIS son écriture de ledger dans un 2e appel Prisma
+//   séparé. Si le 2e échouait (coupure réseau, contrainte), la dépense restait
+//   « validée » sans jamais être déduite du solde de l'antenne. Les deux
+//   écritures sont maintenant dans la même $transaction (règle du projet pour
+//   toute dépense/cotisation validée). La notification aux super admins (cas
+//   PENDING_VALIDATION) reste hors transaction, comme avant.
+//
+// v1.2 — 🔥 CORRIGÉ (updateSuperAdminExpense) : le montant modifié n'était pas
+//   validé (NaN, négatif, 0, chaîne…) et, pour une dépense VALIDATED, était
+//   recopié tel quel dans le ledger. Contrôle strict (fini, > 0, < 1e12) et
+//   arrondi à 2 décimales avant toute écriture.
+//
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ExpenseStatus, LedgerEntryType, ExpenseCategory, CurrencyCode, PaymentMethod, Prisma, NotificationType } from '@prisma/client';
@@ -53,40 +67,46 @@ export class ExpensesService {
     const isAboveThreshold = threshold !== null && Number(dto.amount) >= threshold;
     const initialStatus = isAboveThreshold ? ExpenseStatus.PENDING_VALIDATION : ExpenseStatus.VALIDATED;
 
-    const expense = await this.prisma.expense.create({
-      data: {
-        associationId: association.id,
-        antennaId: antenna.id,
-        engagedByUserId: adminUserId,
-        amount: dto.amount,
-        currency: currencyToUse,
-        category: dto.category as ExpenseCategory,
-        title: dto.title,
-        description: dto.description,
-        expenseDate: new Date(dto.expenseDate),
-        paymentMethod: dto.paymentMethod || 'OTHER',
-        proofFileId: dto.proofFileId,
-        status: initialStatus,
-        validatedAt: initialStatus === ExpenseStatus.VALIDATED ? new Date() : null,
-      }
-    });
-
-    // Si la dépense est validée (sous le seuil), on l'impute au solde immédiatement
-    if (initialStatus === ExpenseStatus.VALIDATED) {
-      await this.prisma.ledgerEntry.create({
+    const expense = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.expense.create({
         data: {
           associationId: association.id,
           antennaId: antenna.id,
-          type: LedgerEntryType.ANTENNA_EXPENSE_OUT,
+          engagedByUserId: adminUserId,
           amount: dto.amount,
-          currency: expense.currency,
-          title: `Dépense: ${expense.title}`,
-          effectiveDate: expense.expenseDate,
-          expenseId: expense.id,
-          createdByUserId: adminUserId,
+          currency: currencyToUse,
+          category: dto.category as ExpenseCategory,
+          title: dto.title,
+          description: dto.description,
+          expenseDate: new Date(dto.expenseDate),
+          paymentMethod: dto.paymentMethod || 'OTHER',
+          proofFileId: dto.proofFileId,
+          status: initialStatus,
+          validatedAt: initialStatus === ExpenseStatus.VALIDATED ? new Date() : null,
         }
       });
-    } else {
+
+      // Si la dépense est validée (sous le seuil), on l'impute au solde immédiatement
+      if (initialStatus === ExpenseStatus.VALIDATED) {
+        await tx.ledgerEntry.create({
+          data: {
+            associationId: association.id,
+            antennaId: antenna.id,
+            type: LedgerEntryType.ANTENNA_EXPENSE_OUT,
+            amount: dto.amount,
+            currency: created.currency,
+            title: `Dépense: ${created.title}`,
+            effectiveDate: created.expenseDate,
+            expenseId: created.id,
+            createdByUserId: adminUserId,
+          }
+        });
+      }
+
+      return created;
+    });
+
+    if (initialStatus !== ExpenseStatus.VALIDATED) {
       await this.notifications.notifySuperAdminsWithPush(
         association.id,
         `Une dépense de ${expense.amount} ${expense.currency} pour l'antenne "${antenna.name}" nécessite votre validation.`,
@@ -287,7 +307,14 @@ export class ExpensesService {
     const expense = await this.prisma.expense.findFirst({ where: { id: expenseId, associationId } });
     if (!expense) throw new NotFoundException("Dépense introuvable.");
 
-    const newAmount = dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : expense.amount;
+    let newAmount = expense.amount;
+    if (dto.amount !== undefined) {
+      const n = typeof dto.amount === 'string' ? Number(dto.amount) : dto.amount;
+      if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0 || n >= 1e12) {
+        throw new BadRequestException('Le montant doit être un nombre strictement positif.');
+      }
+      newAmount = new Prisma.Decimal(n.toFixed(2));
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.expense.update({

@@ -1,3 +1,11 @@
+// app/forgot-password/page.tsx
+//
+// v1.1 — 🔥 LINT (react-hooks/set-state-in-effect, React 19) : un useEffect appelait
+//   setState (directement ou via load()) de façon synchrone dans son corps, ce que
+//   la règle signale comme source de rendus en cascade. L'appel est différé via
+//   queueMicrotask (même pattern que admin/contributions/page.tsx). Aucun
+//   changement fonctionnel ni visuel.
+//
 'use client';
 
 import { FormEvent, useState, useEffect } from 'react';
@@ -12,7 +20,7 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
 
   // Pour éviter les erreurs d'hydratation avec les animations
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { queueMicrotask(() => setMounted(true)); }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();

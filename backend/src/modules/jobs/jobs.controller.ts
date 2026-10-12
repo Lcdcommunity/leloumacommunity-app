@@ -1,4 +1,14 @@
 //////// backend/src/modules/jobs/jobs.controller.ts
+//
+// v1.1 — 🔥 CORRIGÉ (sécurité) : GET /jobs/run-scheduled comparait
+//   `auth !== `Bearer ${process.env.JOBS_SECRET}``. Si JOBS_SECRET n'était pas
+//   défini sur le serveur, la valeur attendue devenait « Bearer undefined » et
+//   n'importe qui pouvait déclencher les 3 jobs sur TOUTES les associations
+//   (notifications de retard à tous les membres…). Vérification désormais via
+//   isValidBearerSecret() : secret absent ⇒ route fermée, comparaison en temps
+//   constant. Le secret est contrôlé AVANT le coupe-circuit JOBS_ENABLED (un
+//   anonyme n'apprend plus l'état de la configuration).
+//
 import { Controller, Post, Get, Headers, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -6,6 +16,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
 import { JobsService } from './jobs.service';
 import { CurrentUser, AuthUser } from '../../common/decorators/current-user.decorator';
+import { isValidBearerSecret } from '../../common/utils/bearer-secret.util';
 
 // 🔥 CORRECTION : @UseGuards retiré du niveau controller (comme pour
 // DomainProvisioningController) et redescendu sur chacune des 3 routes
@@ -68,11 +79,11 @@ export class JobsController {
    */
   @Get('run-scheduled')
   async runScheduled(@Headers('authorization') auth: string) {
+    if (!isValidBearerSecret(auth, process.env.JOBS_SECRET)) {
+      throw new UnauthorizedException();
+    }
     if (process.env.JOBS_ENABLED !== 'true') {
       return { skipped: true, reason: 'JOBS_ENABLED désactivé' };
-    }
-    if (auth !== `Bearer ${process.env.JOBS_SECRET}`) {
-      throw new UnauthorizedException();
     }
 
     const [purged, snapshots, lateMembers] = await Promise.all([

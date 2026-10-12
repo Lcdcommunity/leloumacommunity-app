@@ -1,4 +1,8 @@
 // web/app/(protected)/member/documents/page.tsx
+//
+// v1.1 — 🔥 LINT : apostrophe du message « Il n'y a pas de document… » échappée
+//   (&apos;) — règle react/no-unescaped-entities. Aucun changement visuel.
+//
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -15,7 +19,7 @@ function fixEncoding(str?: string | null): string {
       return decodeURIComponent(escape(str));
     }
     return str;
-  } catch (e) {
+  } catch {
     return str.replace(/RÃ©union/g, 'Réunion')
               .replace(/NÂ°/g, 'N°')
               .replace(/Ã©/g, 'é')
@@ -203,7 +207,7 @@ export default function MemberDocumentsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
             </svg>
             <div className="md-empty-title">Aucun document trouv&eacute;</div>
-            <div className="md-empty-sub">Il n'y a pas de document disponible pour le moment.</div>
+            <div className="md-empty-sub">Il n&apos;y a pas de document disponible pour le moment.</div>
           </div>
         ) : !error ? (
           <div className="md-cards-grid">

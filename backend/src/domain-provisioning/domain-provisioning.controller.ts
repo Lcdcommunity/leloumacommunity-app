@@ -1,5 +1,11 @@
 // backend/src/domain-provisioning/domain-provisioning.controller.ts
 // v2.1
+//
+// v2.2 — 🔥 CORRIGÉ (sécurité) : GET /domain-provisioning/check comparait
+//   `auth !== `Bearer ${process.env.CRON_SECRET}``. CRON_SECRET non défini ⇒
+//   « Bearer undefined » acceptable par n'importe qui. Désormais
+//   isValidBearerSecret() : secret absent ⇒ refusé, comparaison en temps constant.
+//
 import {
   Controller,
   Post,
@@ -14,6 +20,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '@prisma/client';
+import { isValidBearerSecret } from '../common/utils/bearer-secret.util';
 
 @Controller('domain-provisioning')
 export class DomainProvisioningController {
@@ -28,7 +35,7 @@ export class DomainProvisioningController {
 
   @Get('check')
   check(@Headers('authorization') auth: string) {
-    if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    if (!isValidBearerSecret(auth, process.env.CRON_SECRET)) {
       throw new UnauthorizedException();
     }
     return this.service.checkPendingDomains();

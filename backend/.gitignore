@@ -22,7 +22,10 @@ pnpm-debug.log*
 Thumbs.db
 
 # Uploads (user generated content — never commit)
-uploads/
+# ⚠️ Ancré à la racine du backend : l'ancien motif `uploads/` ignorait AUSSI
+# n'importe quel dossier nommé « uploads » (ex. src/modules/uploads/), si bien
+# qu'un nouveau fichier créé dans ce module n'apparaissait jamais dans `git status`.
+/uploads/
 
 # Prisma local dev db
 *.db

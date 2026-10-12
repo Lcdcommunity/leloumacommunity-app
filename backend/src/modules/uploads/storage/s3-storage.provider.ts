@@ -1,10 +1,16 @@
 // backend/src/modules/uploads/storage/s3-storage.provider.ts
+//
+// v1.1 — 🔥 CORRIGÉ (sécurité) : même assainissement du dossier et de
+//   l'extension que local-storage.provider.ts (safe-storage-path.util.ts) —
+//   `folder` venait tel quel du client et permettait de viser une clé arbitraire
+//   du bucket (« ../ », segments vides…).
+//
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
-import { extname } from 'path';
 import type { StorageProvider, StoredFileResult } from './storage.provider';
+import { sanitizeStorageExtension, sanitizeStorageFolder } from '../../../common/utils/safe-storage-path.util';
 
 @Injectable()
 export class S3StorageProvider implements StorageProvider {
@@ -37,8 +43,8 @@ export class S3StorageProvider implements StorageProvider {
       throw new Error('S3 bucket non configuré');
     }
 
-    const folder = params.folder?.replace(/^\/+|\/+$/g, '') || 'misc';
-    const ext = extname(params.fileName) || '';
+    const folder = sanitizeStorageFolder(params.folder, 'misc');
+    const ext = sanitizeStorageExtension(params.fileName);
     const key = `${folder}/${new Date().getFullYear()}/${randomUUID()}${ext}`;
 
     await this.client.send(
