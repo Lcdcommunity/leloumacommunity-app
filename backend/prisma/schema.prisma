@@ -341,6 +341,11 @@ enum AuditAction {
   CREATE_ADMIN_ACCOUNT
   ASSIGN_ADMIN_TO_ANTENNA
   REMOVE_ADMIN_FROM_ANTENNA
+  CREATE_PLATFORM_TRANSFER
+  VALIDATE_PLATFORM_TRANSFER
+  REJECT_PLATFORM_TRANSFER
+  CANCEL_PLATFORM_TRANSFER
+  PLATFORM_WALLET_MOVEMENT
 }
 
 enum TokenType {
@@ -999,6 +1004,7 @@ model LedgerEntry {
   project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
   document        Document?       @relation(fields: [documentId], references: [id], onDelete: SetNull)
   senderTransferFor   AntennaTransfer? @relation("TransferSenderLedger")
+  platformTransferFor PlatformTransfer? @relation("PlatformTransferLedger")
   receiverTransferFor AntennaTransfer? @relation("TransferReceiverLedger")
 
   @@index([associationId, effectiveDate])
@@ -1944,7 +1950,86 @@ model PlatformSetting {
   platformName    String   @default("LCD Platform")
   contactEmail    String?
   maintenanceMode Boolean  @default(false)
+  platformWalletCurrencies CurrencyCode[] @default([EUR, USD, GNF, XOF])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 //npx prisma generate
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Wallet de la plateforme (Grand Chef) — commissions payées par virement.
+// Un virement part d'une antenne (ledger TRANSFER_OUT au moment de la validation)
+// et arrive dans le wallet de la plateforme (PlatformWalletEntry), séparé de
+// toute association. Statuts réutilisés : TransferStatus.
+// ─────────────────────────────────────────────────────────────────────────────
+enum PlatformWalletEntryType {
+  COMMISSION_IN
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  WITHDRAWAL_OUT
+}
+
+model PlatformTransfer {
+  id                 String         @id @default(cuid())
+  reference          String         @unique
+  // Pas de clé étrangère vers Association / Antenne / User : l'historique des commissions
+  // doit survivre à la suppression d'une association ; les noms sont donc figés ici.
+  associationId      String
+  associationName    String
+  senderAntennaId    String
+  senderAntennaName  String
+  initiatedByUserId  String
+  initiatedByName    String
+
+  amount             Decimal        @db.Decimal(14, 2)
+  currency           CurrencyCode
+  purpose            String         @default("COMMISSION")
+  periodLabel        String?
+  notes              String?
+
+  status             TransferStatus @default(PENDING_VALIDATION)
+  decidedByUserId    String?
+  validatedAt        DateTime?
+  rejectedAt         DateTime?
+  cancelledAt        DateTime?
+  rejectionReason    String?
+
+  senderLedgerEntryId String?       @unique
+  walletEntryId       String?       @unique
+
+  idempotencyKey     String?
+
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  senderLedgerEntry  LedgerEntry?   @relation("PlatformTransferLedger", fields: [senderLedgerEntryId], references: [id], onDelete: SetNull)
+  walletEntry        PlatformWalletEntry? @relation("PlatformTransferWalletEntry", fields: [walletEntryId], references: [id], onDelete: SetNull)
+
+  @@unique([initiatedByUserId, idempotencyKey])
+  @@index([associationId, status, createdAt])
+  @@index([senderAntennaId, status, currency])
+  @@index([status, createdAt])
+  @@map("platform_transfers")
+}
+
+model PlatformWalletEntry {
+  id              String                  @id @default(cuid())
+  type            PlatformWalletEntryType
+  currency        CurrencyCode
+  amount          Decimal                 @db.Decimal(14, 2)
+  title           String
+  description     String?
+  referenceCode   String?
+  associationId   String?
+  createdByUserId String?
+  idempotencyKey  String?                 @unique
+  effectiveDate   DateTime                @default(now())
+  createdAt       DateTime                @default(now())
+
+  transfer        PlatformTransfer?       @relation("PlatformTransferWalletEntry")
+
+  @@index([currency, effectiveDate])
+  @@index([type, effectiveDate])
+  @@index([associationId, effectiveDate])
+  @@map("platform_wallet_entries")
+}

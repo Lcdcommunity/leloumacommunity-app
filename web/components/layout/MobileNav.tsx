@@ -1,5 +1,11 @@
 // web/components/layout/MobileNav.tsx
 //
+// v1.4 — 🆕 AJOUT (console unique) : lien « Changer d'univers » (SYSTEM_ADMIN) vers /system-admin/hub.
+//
+// v1.3 — 🆕 AJOUT (wallet plateforme) : « Wallet Grand Chef » (SYSTEM_ADMIN, /system-admin/wallet),
+//   « Commissions » (ANTENNA_ADMIN : envoi, /admin/commissions ; SUPER_ADMIN : lecture seule,
+//   /super-admin/commissions). Pages et routes API neuves, rien d'existant modifié.
+//
 // v1.2 — 🔥 AJOUT (navigation Membre) : lien « Vue d'ensemble » vers
 //   /member/association (solde cumulé de l'association). La page et la route
 //   GET /member/association-balance existaient mais aucun menu n'y menait.
@@ -85,8 +91,10 @@ const E = {
 type NavItem = { href: string; label: string; ico: string | string[]; section?: string };
 
 const systemAdminItems: NavItem[] = [
+  { href: '/system-admin/hub',              label: 'Changer d\'univers', ico: '🔀',            section: 'Plateforme' },
   { href: '/system-admin',                  label: 'Dashboard SaaS',    ico: E.home,         section: 'Plateforme' },
   { href: '/system-admin/associations/new', label: 'Nouvelle Instance', ico: E.plus,         section: 'Plateforme' },
+  { href: '/system-admin/wallet',           label: 'Wallet Grand Chef', ico: E.contribution, section: 'Plateforme' },
   { href: '/system-admin/audit',            label: 'Logs Système',      ico: E.audit,        section: 'Sécurité'   },
   { href: '/system-admin/profile',          label: 'Mon profil',        ico: E.profile,      section: 'Compte'     },
   { href: '/system-admin/settings',         label: 'Paramètres SaaS',   ico: E.settings,     section: 'Compte'     },
@@ -102,6 +110,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/expenses',      label: 'Dépenses',            ico: E.creditCard,   section: 'Gestion'   },
   // 🔥 NOUVEAU : Vue lecture seule des virements inter-antennes (toutes antennes)
   { href: '/super-admin/transfers',     label: 'Virements',           ico: E.send,         section: 'Gestion'   },
+  { href: '/super-admin/commissions',   label: 'Commissions plateforme', ico: E.contribution, section: 'Gestion' },
   { href: '/super-admin/projects',      label: 'Projets',             ico: E.project,      section: 'Gestion'   },
   { href: '/super-admin/project-proposals', label: 'Propositions membres', ico: E.project,   section: 'Gestion'   },
   { href: '/super-admin/elections',     label: 'Élections',           ico: E.vote,         section: 'Gestion'   },
@@ -134,6 +143,7 @@ const adminItems: NavItem[] = [
   { href: '/admin/expenses',              label: 'Dépenses',               ico: E.creditCard,   section: 'Finances'  },
   { href: '/admin/projections',           label: 'Projections',            ico: E.chart,        section: 'Finances'  },
   { href: '/admin/transfers',             label: 'Virements',              ico: E.send,         section: 'Finances'  },
+  { href: '/admin/commissions',           label: 'Commissions plateforme', ico: E.contribution, section: 'Finances'  },
   { href: '/admin/projects',              label: 'Projets',                ico: E.project,      section: 'Contenu'   },
   { href: '/admin/project-proposals',     label: 'Propositions membres',   ico: E.project,      section: 'Contenu'   },
   { href: '/admin/elections',             label: 'Élections',              ico: E.vote,         section: 'Contenu'   },

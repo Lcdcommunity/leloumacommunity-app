@@ -1,4 +1,8 @@
 /////// web/middleware.ts
+//
+// v1.1 — 🔥 CORRIGÉ (console unique) : le Grand Chef (SYSTEM_ADMIN) déjà connecté arrive sur le hub
+//   /system-admin/hub (choix « associations » / « sociétés de transfert ») au lieu du tableau de bord.
+//
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
@@ -33,7 +37,7 @@ export function middleware(request: NextRequest) {
       const payload = JSON.parse(atob(payloadBase64));
       const userRole = payload.role;
 
-      if (userRole === 'SYSTEM_ADMIN') return NextResponse.redirect(new URL('/system-admin', request.url));
+      if (userRole === 'SYSTEM_ADMIN') return NextResponse.redirect(new URL('/system-admin/hub', request.url));
       if (userRole === 'SUPER_ADMIN') return NextResponse.redirect(new URL('/super-admin', request.url));
       if (userRole === 'ANTENNA_ADMIN') return NextResponse.redirect(new URL('/admin', request.url));
       if (userRole === 'MEMBER') return NextResponse.redirect(new URL('/member', request.url));

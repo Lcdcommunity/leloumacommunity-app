@@ -1,4 +1,8 @@
 // web/app/login/page.tsx
+//
+// v1.1 — 🔥 CORRIGÉ (console unique) : après connexion, le SYSTEM_ADMIN est envoyé sur le hub
+//   /system-admin/hub (choix associations / sociétés de transfert).
+//
 'use client';
 
 import { FormEvent, useState, useEffect, useCallback, useRef } from 'react';
@@ -152,7 +156,7 @@ export default function LoginPage() {
       setShowCurtain(true);
       setCurtainOpen(false);
       let target = '/dashboard';
-      if      (role === 'SYSTEM_ADMIN')  target = '/system-admin';
+      if      (role === 'SYSTEM_ADMIN')  target = '/system-admin/hub';
       else if (role === 'SUPER_ADMIN')   target = '/super-admin';
       else if (role === 'ANTENNA_ADMIN') target = '/admin';
       else if (role === 'MEMBER')        target = '/member';

@@ -1,5 +1,12 @@
 // web/components/layout/Sidebar.tsx
 //
+// v1.4 — 🆕 AJOUT (console unique) : lien « Changer d'univers » (SYSTEM_ADMIN) vers le hub
+//   /system-admin/hub, d'où le Grand Chef bascule vers les sociétés de transfert.
+//
+// v1.3 — 🆕 AJOUT (wallet plateforme) : « Wallet Grand Chef » (SYSTEM_ADMIN, /system-admin/wallet),
+//   « Commissions » (ANTENNA_ADMIN : envoi, /admin/commissions ; SUPER_ADMIN : lecture seule,
+//   /super-admin/commissions). Pages et routes API neuves, rien d'existant modifié.
+//
 // v1.2 — 🔥 AJOUT (navigation Membre) : lien « Vue d'ensemble » vers
 //   /member/association (solde cumulé de l'association). La page et la route
 //   GET /member/association-balance existaient mais aucun menu n'y menait.
@@ -59,8 +66,10 @@ const ICO = {
 };
 
 const systemAdminItems: NavItem[] = [
+  { href: '/system-admin/hub',              label: 'Changer d\'univers',     icon: <Ico d={ICO.send} /> },
   { href: '/system-admin',                  label: 'Tableau de Bord',        icon: <Ico d={ICO.home} /> },
   { href: '/system-admin/associations/new', label: 'Nouvelle Instance',      icon: <Ico d={ICO.plus} /> },
+  { href: '/system-admin/wallet',           label: 'Wallet Grand Chef',      icon: <Ico d={ICO.coin} /> },
   { href: '/system-admin/audit',            label: 'Logs Système',           icon: <Ico d={ICO.audit} /> },
   { href: '/system-admin/profile',          label: 'Mon profil',             icon: <Ico d={ICO.user} /> },
   { href: '/system-admin/settings',         label: 'Paramètres Plateforme',  icon: <Ico d={ICO.gear} /> },
@@ -76,6 +85,7 @@ const superAdminItems: NavItem[] = [
   { href: '/super-admin/expenses',        label: 'Dépenses',               icon: <Ico d={ICO.creditCard} /> },
   // 🔥 NOUVEAU : Vue lecture seule des virements inter-antennes (toutes antennes)
   { href: '/super-admin/transfers',       label: 'Virements',              icon: <Ico d={ICO.send} /> },
+  { href: '/super-admin/commissions',     label: 'Commissions plateforme', icon: <Ico d={ICO.coin} /> },
   { href: '/super-admin/projects',        label: 'Projets',                icon: <Ico d={ICO.clip} /> },
   { href: '/super-admin/project-proposals', label: 'Propositions membres',   icon: <Ico d={ICO.lightbulb} /> },
   { href: '/super-admin/elections',       label: 'Élections',              icon: <Ico d={ICO.vote} /> },
@@ -111,6 +121,7 @@ const adminItems: NavItem[] = [
   // 🔥 NOUVEAU : Propositions de projets reçues des membres
   { href: '/admin/project-proposals',         label: 'Propositions membres',   icon: <Ico d={ICO.lightbulb} /> },
   { href: '/admin/transfers',                 label: 'Virements',              icon: <Ico d={ICO.send} /> },
+  { href: '/admin/commissions',               label: 'Commissions plateforme', icon: <Ico d={ICO.coin} /> },
   { href: '/admin/elections',                 label: 'Élections',              icon: <Ico d={ICO.vote} /> },
   { href: '/admin/events',                    label: 'Événements',             icon: <Ico d={ICO.calendar} /> },
   { href: '/admin/documents',                 label: 'Documents & photos',     icon: <Ico d={ICO.doc} /> },

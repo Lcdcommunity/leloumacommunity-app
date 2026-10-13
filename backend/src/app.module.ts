@@ -1,4 +1,8 @@
 // backend/src/app.module.ts
+//
+// Wallet plateforme — 🆕 AJOUT : PlatformWalletModule (wallet du Grand Chef + virements de commission des
+//   antennes) et ConsoleSsoModule (connexion unique vers Direct Transf'air). Modules isolés, aucun autre module modifié.
+//
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -38,6 +42,8 @@ import { TransfersModule } from './modules/transfers/transfers.module';
 // 🔥 NOUVEAU : vue lecture seule des virements pour SUPER_ADMIN (toutes antennes)
 import { SuperAdminTransfersModule } from './modules/transfers/super-admin-transfers.module';
 import { SystemAdminModule } from './modules/system-admin/system-admin.module';
+import { PlatformWalletModule } from './modules/platform-wallet/platform-wallet.module';
+import { ConsoleSsoModule } from './modules/console-sso/console-sso.module';
 import { PublicModule } from './modules/public/public.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { MemberModule } from './modules/member/member.module';
@@ -109,6 +115,8 @@ import { MemberActivityModule } from './modules/member-activity/member-activity.
     TransfersModule,
     SuperAdminTransfersModule, // 🔥 NOUVEAU
     SystemAdminModule,
+    PlatformWalletModule, // 🆕 wallet du Grand Chef + virements de commission
+    ConsoleSsoModule, // 🆕 connexion unique vers Direct Transf'air
     PublicModule,
     DashboardModule,
     MemberModule,
